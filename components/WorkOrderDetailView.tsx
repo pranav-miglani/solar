@@ -156,20 +156,20 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
     .reverse()[0] || null
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <Link href="/workorders">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-            <ClipboardList className="h-8 w-8 text-primary" />
-            {workOrder.title}
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2 md:gap-3 flex-wrap">
+            <ClipboardList className="h-6 w-6 md:h-8 md:w-8 text-primary flex-shrink-0" />
+            <span className="break-words">{workOrder.title}</span>
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-sm md:text-base text-muted-foreground mt-2">
             Created {new Date(workOrder.created_at).toLocaleDateString()}
           </p>
         </div>
@@ -255,16 +255,17 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
         </Card>
       )}
 
-      {/* Plants Table */}
+      {/* Plants Table - Desktop */}
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="text-2xl">Plants & Stations</CardTitle>
+          <CardTitle className="text-xl md:text-2xl">Plants & Stations</CardTitle>
           <p className="text-sm text-muted-foreground">
             {activePlants.length} {activePlants.length === 1 ? "plant" : "plants"} in this work order
           </p>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          {/* Desktop Table View */}
+          <div className="hidden lg:block rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
@@ -339,6 +340,67 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                 )}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="lg:hidden space-y-3">
+            {activePlants.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No plants assigned to this work order
+              </div>
+            ) : (
+              activePlants.map((plant) => (
+                <Card key={plant.id} className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-semibold text-base flex-1">{plant.name}</h3>
+                      <Badge variant="outline">{plant.vendors.name}</Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Capacity</p>
+                        <p className="font-medium">{plant.capacity_kw.toFixed(2)} kW</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Current Power</p>
+                        <p className="font-medium">
+                          {plant.current_power_kw !== null ? (
+                            <span className="text-green-600 dark:text-green-400">
+                              {plant.current_power_kw.toFixed(2)} kW
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">N/A</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    {plant.location?.address && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        <span className="text-muted-foreground break-words">{plant.location.address}</span>
+                      </div>
+                    )}
+                    <div className="space-y-1 text-xs border-t pt-3">
+                      {plant.daily_energy_mwh !== null && (
+                        <div>Daily: {plant.daily_energy_mwh.toFixed(2)} MWh</div>
+                      )}
+                      {plant.monthly_energy_mwh !== null && (
+                        <div>Monthly: {plant.monthly_energy_mwh.toFixed(2)} MWh</div>
+                      )}
+                      {plant.performance_ratio !== null && (
+                        <div>PR: {(plant.performance_ratio * 100).toFixed(2)}%</div>
+                      )}
+                    </div>
+                    <Link href={`/plants/${plant.id}`}>
+                      <Button variant="ghost" size="sm" className="w-full">
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        View Plant
+                      </Button>
+                    </Link>
+                  </div>
+                </Card>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

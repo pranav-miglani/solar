@@ -127,25 +127,25 @@ export function OrganizationPlantsView({ orgId }: { orgId: string }) {
   const { organization, plants, totalPlants } = data
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="md:ml-64 container mx-auto p-4 md:p-6 space-y-4 md:space-y-6 pt-16 md:pt-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-            <Building2 className="h-8 w-8 text-primary" />
-            {organization.name}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2 md:gap-3 flex-wrap">
+            <Building2 className="h-6 w-6 md:h-8 md:w-8 text-primary flex-shrink-0" />
+            <span className="break-words">{organization.name}</span>
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-sm md:text-base text-muted-foreground mt-2">
             {totalPlants} {totalPlants === 1 ? "Plant" : "Plants"} Total
           </p>
         </div>
         <Link href="/dashboard">
-          <Button variant="outline">Back to Dashboard</Button>
+          <Button variant="outline" className="w-full sm:w-auto">Back to Dashboard</Button>
         </Link>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -217,10 +217,11 @@ export function OrganizationPlantsView({ orgId }: { orgId: string }) {
       {/* Plants Table */}
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="text-2xl">Plants & Work Orders</CardTitle>
+          <CardTitle className="text-xl md:text-2xl">Plants & Work Orders</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          {/* Desktop Table View */}
+          <div className="hidden lg:block rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
@@ -312,6 +313,79 @@ export function OrganizationPlantsView({ orgId }: { orgId: string }) {
                 )}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="lg:hidden space-y-3">
+            {plants.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No plants found for this organization
+              </div>
+            ) : (
+              plants.map((plant) => (
+                <Card key={plant.id} className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-semibold text-base flex-1">{plant.name}</h3>
+                      <Badge variant="outline">{plant.vendors.name}</Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Capacity</p>
+                        <p className="font-medium">{plant.capacity_kw.toFixed(2)} kW</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Current Power</p>
+                        <p className="font-medium">
+                          {plant.current_power_kw !== null ? (
+                            <span className="text-green-600 dark:text-green-400">
+                              {plant.current_power_kw.toFixed(2)} kW
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">N/A</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    {plant.location?.address && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        <span className="text-muted-foreground break-words">{plant.location.address}</span>
+                      </div>
+                    )}
+                    {plant.activeWorkOrders.length > 0 && (
+                      <div className="space-y-2 border-t pt-3">
+                        <p className="text-xs font-medium text-muted-foreground">Work Orders</p>
+                        <div className="flex flex-wrap gap-2">
+                          {plant.activeWorkOrders.map((wo) => (
+                            <Link key={wo.id} href={`/workorders/${wo.id}`}>
+                              <Badge
+                                variant={
+                                  wo.priority === "HIGH"
+                                    ? "destructive"
+                                    : wo.priority === "MEDIUM"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                                className="cursor-pointer hover:opacity-80"
+                              >
+                                {wo.title}
+                              </Badge>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <Link href={`/workorders?plantId=${plant.id}`}>
+                      <Button variant="ghost" size="sm" className="w-full">
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        View Details
+                      </Button>
+                    </Link>
+                  </div>
+                </Card>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

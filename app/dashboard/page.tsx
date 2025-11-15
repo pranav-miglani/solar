@@ -125,12 +125,12 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <DashboardSidebar accountType={accountType} />
 
-      <div className="ml-64 p-8">
+      <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         {/* Top Bar */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-6 md:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
               Welcome back, {role === "SUPERADMIN" ? "Super Admin" : role === "GOVT" ? "Government Agency" : "Organization"}
             </p>
           </div>

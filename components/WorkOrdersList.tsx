@@ -74,22 +74,24 @@ export function WorkOrdersList() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border">
         <div className="flex flex-wrap gap-3">
           {/* Filters removed - priority and created_by no longer displayed */}
         </div>
         <Button 
           onClick={handleCreate}
-          className="transition-all duration-200 hover:scale-105 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl"
+          className="w-full sm:w-auto transition-all duration-200 hover:scale-105 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl"
         >
           <Plus className="h-4 w-4 mr-2" />
           Create Work Order
         </Button>
       </div>
 
-      <div className="border rounded-lg overflow-hidden shadow-sm">
-        <Table>
+      {/* Desktop Table View */}
+      <div className="hidden md:block border rounded-lg overflow-hidden shadow-sm bg-card">
+        <div className="overflow-x-auto">
+          <Table>
           <TableHeader className="bg-muted/50">
             <TableRow className="hover:bg-muted/50">
               <TableHead className="font-semibold">Title</TableHead>
@@ -151,6 +153,56 @@ export function WorkOrdersList() {
             )}
           </TableBody>
         </Table>
+        </div>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3">
+        {workOrders.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground border rounded-lg">
+            No work orders found
+          </div>
+        ) : (
+          workOrders.map((wo, index) => (
+            <div
+              key={wo.id}
+              className="border rounded-lg p-4 bg-card hover:bg-primary/5 cursor-pointer transition-all duration-200 animate-in shadow-sm"
+              style={{
+                animationDelay: `${index * 50}ms`
+              }}
+              onClick={() => handleEdit(wo.id)}
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <h3 className="font-semibold text-base flex-1">{wo.title}</h3>
+                <div 
+                  className="flex gap-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEdit(wo.id)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Link href={`/workorders/${wo.id}`}>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Created {new Date(wo.created_at).toLocaleDateString()}
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       <WorkOrderModal
