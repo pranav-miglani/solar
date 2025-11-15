@@ -104,26 +104,37 @@ ALTER TABLE accounts ADD CONSTRAINT accounts_org_id_fkey
   FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE;
 
 -- Vendors table
+-- Vendors are mapped to organizations (one org can have multiple vendors)
 CREATE TABLE vendors (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   vendor_type vendor_type NOT NULL,
   api_base_url TEXT NOT NULL,
   credentials JSONB NOT NULL,
+  org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Plants table
+-- Includes production metrics from Production Overview dashboard
 CREATE TABLE plants (
   id SERIAL PRIMARY KEY,
   org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   vendor_id INTEGER NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   vendor_plant_id TEXT NOT NULL,
   name TEXT NOT NULL,
-  capacity_kw NUMERIC(10, 2) NOT NULL,
+  capacity_kw NUMERIC(10, 2) NOT NULL, -- Installed Capacity (shown in Production Overview)
   location JSONB DEFAULT '{}',
+  -- Production metrics (from Production Overview dashboard)
+  current_power_kw NUMERIC(10, 3), -- Current Power in kW
+  daily_energy_mwh NUMERIC(10, 3), -- Daily Energy in MWh
+  monthly_energy_mwh NUMERIC(10, 3), -- Monthly Energy in MWh
+  yearly_energy_mwh NUMERIC(10, 3), -- Yearly Energy in MWh
+  total_energy_mwh NUMERIC(10, 3), -- Total Energy in MWh
+  performance_ratio NUMERIC(5, 4), -- PR (0-1 range, displayed as percentage in circular indicator)
+  last_update_time TIMESTAMPTZ, -- Last time production data was updated (shown as "Updated" timestamp)
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(vendor_id, vendor_plant_id)
@@ -187,8 +198,11 @@ CREATE TABLE work_order_plant_eff (
 CREATE INDEX idx_accounts_email ON accounts(email);
 CREATE INDEX idx_accounts_org_id ON accounts(org_id);
 CREATE INDEX idx_accounts_account_type ON accounts(account_type);
+CREATE INDEX idx_vendors_org_id ON vendors(org_id);
 CREATE INDEX idx_plants_org_id ON plants(org_id);
 CREATE INDEX idx_plants_vendor_id ON plants(vendor_id);
+CREATE INDEX idx_plants_vendor_id_org_id ON plants(vendor_id, org_id);
+CREATE INDEX idx_plants_last_update_time ON plants(last_update_time);
 CREATE INDEX idx_work_orders_created_by ON work_orders(created_by);
 CREATE INDEX idx_work_order_plants_work_order_id ON work_order_plants(work_order_id);
 CREATE INDEX idx_work_order_plants_plant_id ON work_order_plants(plant_id);
@@ -247,4 +261,22 @@ BEGIN
   END IF;
   
   RAISE NOTICE '✅ All 8 tables created successfully';
+  
+  -- Verify production metrics columns exist in plants table
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'plants' AND column_name = 'current_power_kw'
+  ) THEN
+    RAISE EXCEPTION 'Production metrics columns not found in plants table';
+  END IF;
+  
+  -- Verify org_id exists in vendors table
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'vendors' AND column_name = 'org_id'
+  ) THEN
+    RAISE EXCEPTION 'org_id column not found in vendors table';
+  END IF;
+  
+  RAISE NOTICE '✅ Schema verification complete - all required columns present';
 END $$;

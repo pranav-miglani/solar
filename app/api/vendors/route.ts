@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     const { data: vendors, error } = await supabase
       .from("vendors")
-      .select("*")
+      .select("*, organizations(id, name)")
       .order("name")
 
     if (error) {
@@ -79,11 +79,18 @@ export async function POST(request: NextRequest) {
     requirePermission(accountType as any, "vendors", "create")
 
     const body = await request.json()
-    const { name, vendor_type, api_base_url, credentials, is_active } = body
+    const { name, vendor_type, api_base_url, credentials, is_active, org_id } = body
 
     if (!name || !vendor_type || !api_base_url || !credentials) {
       return NextResponse.json(
         { error: "Name, vendor_type, api_base_url, and credentials are required" },
+        { status: 400 }
+      )
+    }
+
+    if (!org_id) {
+      return NextResponse.json(
+        { error: "org_id is required" },
         { status: 400 }
       )
     }
@@ -99,6 +106,7 @@ export async function POST(request: NextRequest) {
         api_base_url,
         credentials,
         is_active: is_active ?? true,
+        org_id,
       })
       .select()
       .single()

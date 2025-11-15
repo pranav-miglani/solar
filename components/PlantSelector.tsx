@@ -11,6 +11,12 @@ interface Plant {
   name: string
   capacity_kw: number
   vendor_plant_id: string
+  vendor_id?: number
+  vendors?: {
+    id: number
+    name: string
+    vendor_type: string
+  }
   isActive?: boolean
 }
 
@@ -39,10 +45,10 @@ export function PlantSelector({
 
       const supabase = createClient()
 
-      // Fetch plants for selected orgs
+      // Fetch plants for selected orgs with vendor information
       const { data: plantsData, error: plantsError } = await supabase
         .from("plants")
-        .select("*")
+        .select("*, vendors(id, name, vendor_type)")
         .in("org_id", orgIds)
 
       if (plantsError) {
@@ -121,7 +127,8 @@ export function PlantSelector({
                 <div className="font-medium">{plant.name}</div>
                 <div className="text-sm text-muted-foreground">
                   {plant.capacity_kw} kW
-                  {isActive && " (Active in another work order)"}
+                  {plant.vendors && ` • ${plant.vendors.name} (${plant.vendors.vendor_type})`}
+                  {isActive && " • Active in another work order"}
                 </div>
               </Label>
             </div>

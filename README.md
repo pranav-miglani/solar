@@ -58,6 +58,9 @@ WOMS is a comprehensive platform that enables:
 
 #### 2. Multi-Vendor Integration
 - **Pluggable Architecture**: Add new vendors by implementing adapter interface
+- **Vendor-Organization Mapping**: Multiple vendors per organization (same or different types)
+- **Plant Synchronization**: One-click sync to fetch all plants from vendor APIs
+- **Progress Tracking**: Real-time progress indicators during plant sync operations
 - **Token Caching**: Automatic token management and refresh
 - **Data Normalization**: Vendor-specific data converted to standard format
 - **Error Handling**: Robust error handling and retry logic
@@ -80,12 +83,22 @@ WOMS is a comprehensive platform that enables:
 - **Status Tracking**: ACTIVE, RESOLVED, ACKNOWLEDGED
 - **Role-Scoped Views**: Alerts filtered by user role
 
-#### 6. Modern UI/UX
-- **Glassmorphism Design**: Modern glass-effect styling with backdrop blur
+#### 6. Production Metrics & Overview
+- **Production Dashboard**: Comprehensive production overview with key metrics
+- **Real-Time Metrics**: Current power, installed capacity, energy generation (daily/monthly/yearly/total)
+- **Performance Ratio (PR)**: Visual circular indicator showing plant efficiency
+- **Multi-Level Aggregation**: Metrics aggregated at plant, vendor, and work order levels
+- **Automatic Sync**: Production metrics updated during plant synchronization
+- **Last Update Tracking**: Timestamp showing when data was last synced from vendor
+
+#### 7. Modern UI/UX
+- **Modern Design System**: shadcn/ui components (Radix UI primitives) with TailwindCSS
+- **Material-Like Design**: Clean, modern interface with Material Design principles
+- **Glassmorphism Effects**: Modern glass-effect styling with backdrop blur
 - **Dark/Light Mode**: System-aware theme switching with next-themes
 - **Responsive Layout**: Mobile-first responsive design
 - **Smooth Animations**: Framer Motion animations for enhanced UX
-- **Accessible Components**: shadcn/ui components with accessibility built-in
+- **Accessible Components**: WCAG-compliant components with full keyboard navigation
 
 ## Architecture
 
@@ -169,11 +182,12 @@ Redirect to /dashboard
 - **Next.js 14**: App Router for server-side rendering and API routes
 - **TypeScript**: Type-safe development
 - **TailwindCSS**: Utility-first CSS framework
-- **shadcn/ui**: Accessible component library
+- **shadcn/ui**: Modern component library (Radix UI primitives) with Material-like design
 - **Recharts**: Chart library for data visualization
 - **Framer Motion**: Animation library
 - **next-themes**: Theme management (dark/light mode)
 - **react-hook-form + zod**: Form validation
+- **Lucide React**: Modern icon library
 
 ### Backend
 - **Supabase**: PostgreSQL database with Row-Level Security
@@ -200,10 +214,19 @@ woms/
 │   │   │   ├── workorder/[id]/   # Work order telemetry
 │   │   │   ├── org/[id]/         # Organization telemetry
 │   │   │   └── global/           # Global telemetry (Govt)
+│   │   ├── vendors/              # Vendor management
+│   │   │   ├── [id]/
+│   │   │   │   ├── sync-plants/  # Plant synchronization
+│   │   │   │   └── production/   # Vendor production metrics
+│   │   │   └── route.ts
+│   │   ├── plants/
+│   │   │   └── [id]/
+│   │   │       └── production/   # Plant production metrics
 │   │   ├── alerts/               # Alerts endpoint
 │   │   ├── workorders/           # Work order CRUD
+│   │   │   └── [id]/
+│   │   │       └── production/   # Work order production metrics
 │   │   ├── orgs/                 # Organization management
-│   │   └── vendors/              # Vendor management
 │   ├── auth/
 │   │   └── login/                # Login page
 │   ├── dashboard/                 # Unified dashboard
@@ -214,15 +237,19 @@ woms/
 │   └── globals.css                # Global styles
 │
 ├── components/                    # React components
-│   ├── ui/                        # shadcn/ui components
+│   ├── ui/                        # shadcn/ui components (Radix UI)
 │   │   ├── button.tsx
 │   │   ├── card.tsx
 │   │   ├── input.tsx
+│   │   ├── progress.tsx
 │   │   └── ...
 │   ├── DashboardSidebar.tsx      # Navigation sidebar
 │   ├── DashboardMetrics.tsx      # Metrics cards
 │   ├── TelemetryChart.tsx        # Telemetry visualization
 │   ├── AlertsFeed.tsx            # Alerts display
+│   ├── ProductionOverview.tsx    # Production metrics dashboard
+│   ├── VendorsTable.tsx          # Vendor management with sync
+│   ├── PlantSelector.tsx         # Plant selection component
 │   ├── ThemeToggle.tsx            # Dark/light mode toggle
 │   └── ...
 │
@@ -245,9 +272,12 @@ woms/
 │   │   ├── sync-alerts/          # Alert synchronization
 │   │   └── compute-efficiency/   # Efficiency calculation
 │   └── migrations/               # Database migrations
-│       ├── 001_initial_schema.sql
+│       ├── 001_initial_schema.sql  # Complete schema (includes org_id in vendors, production metrics)
 │       ├── 002_rls_policies.sql
-│       └── 003_telemetry_db_schema.sql
+│       ├── 003_telemetry_db_schema.sql
+│       ├── 004_manual_user_setup.sql
+│       ├── 006_add_org_id_to_vendors.sql  # Obsolete (merged into 001)
+│       └── 007_add_plant_production_metrics.sql  # Obsolete (merged into 001)
 │
 ├── scripts/
 │   └── seed.ts                    # Database seeding script (⚠️ Not recommended for user creation - use Supabase console instead)
@@ -294,7 +324,7 @@ Organizations that own solar plants.
 | `updated_at` | TIMESTAMPTZ | Last update timestamp |
 
 #### `vendors`
-Vendor configurations for API integrations.
+Vendor configurations for API integrations. Vendors are mapped to organizations (one org can have multiple vendors).
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -303,12 +333,13 @@ Vendor configurations for API integrations.
 | `vendor_type` | ENUM | SOLARMAN, SUNGROW, OTHER |
 | `api_base_url` | TEXT | Vendor API base URL |
 | `credentials` | JSONB | Encrypted API credentials |
+| `org_id` | INTEGER | Foreign key to organizations (nullable, for vendor-org mapping) |
 | `is_active` | BOOLEAN | Active status |
 | `created_at` | TIMESTAMPTZ | Creation timestamp |
 | `updated_at` | TIMESTAMPTZ | Last update timestamp |
 
 #### `plants`
-Solar power plants.
+Solar power plants with production metrics from vendor APIs.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -317,13 +348,25 @@ Solar power plants.
 | `vendor_id` | INTEGER | Foreign key to vendors |
 | `vendor_plant_id` | TEXT | Vendor-specific plant identifier |
 | `name` | TEXT | Plant name |
-| `capacity_kw` | NUMERIC(10,2) | Plant capacity in kilowatts |
+| `capacity_kw` | NUMERIC(10,2) | Installed capacity in kilowatts (kWp) |
 | `location` | JSONB | Location data (lat, lng, address) |
+| `current_power_kw` | NUMERIC(10,3) | Current generation power (kW) |
+| `daily_energy_mwh` | NUMERIC(10,3) | Daily energy generation (MWh) |
+| `monthly_energy_mwh` | NUMERIC(10,3) | Monthly energy generation (MWh) |
+| `yearly_energy_mwh` | NUMERIC(10,3) | Yearly energy generation (MWh) |
+| `total_energy_mwh` | NUMERIC(10,3) | Total cumulative energy (MWh) |
+| `performance_ratio` | NUMERIC(5,4) | Performance Ratio (PR) - 0-1 range |
+| `last_update_time` | TIMESTAMPTZ | Last time production data was synced |
 | `created_at` | TIMESTAMPTZ | Creation timestamp |
 | `updated_at` | TIMESTAMPTZ | Last update timestamp |
 
 **Constraints**:
 - Unique constraint on `(vendor_id, vendor_plant_id)`
+
+**Production Metrics**:
+- Metrics are fetched from vendor APIs during plant sync
+- Displayed in Production Overview dashboard at plant, vendor, and work order levels
+- Aggregated (sum/average) for vendor and work order views
 
 #### `work_orders`
 Work orders (static, no status).
@@ -971,25 +1014,128 @@ Create organization (Super Admin only).
 
 #### GET /api/vendors
 
-List vendors (role-scoped).
+List vendors (role-scoped). Returns vendors with organization information.
+
+**Response** (200 OK):
+```json
+{
+  "vendors": [
+    {
+      "id": 1,
+      "name": "Solarman",
+      "vendor_type": "SOLARMAN",
+      "api_base_url": "https://globalpro.solarmanpv.com",
+      "org_id": 1,
+      "organizations": {
+        "id": 1,
+        "name": "Solar Energy Corp"
+      },
+      "is_active": true
+    }
+  ]
+}
+```
 
 #### POST /api/vendors
 
-Create vendor (Super Admin only).
+Create vendor (Super Admin only). Requires `org_id` for vendor-organization mapping.
 
 **Request Body**:
 ```json
 {
   "name": "Solarman",
   "vendor_type": "SOLARMAN",
-  "api_base_url": "https://api.solarmanpv.com",
+  "api_base_url": "https://globalpro.solarmanpv.com",
+  "org_id": 1,
   "credentials": {
     "appId": "your_app_id",
     "appSecret": "your_app_secret",
     "username": "your_username",
-    "passwordSha256": "hashed_password"
+    "password": "your_password",
+    "solarmanOrgId": 12345
   },
   "is_active": true
+}
+```
+
+#### POST /api/vendors/:id/sync-plants
+
+Synchronize plants from vendor API (Super Admin only). Fetches all plants from the vendor and updates/creates them in the database with production metrics.
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "Plants synced successfully",
+  "synced": 25,
+  "created": 5,
+  "updated": 20,
+  "total": 25
+}
+```
+
+#### GET /api/vendors/:id/production
+
+Get aggregated production metrics for all plants in a vendor.
+
+**Response** (200 OK):
+```json
+{
+  "totalPlants": 25,
+  "aggregated": {
+    "installedCapacityKw": 5000.0,
+    "currentPowerKw": 150.5,
+    "dailyEnergyMwh": 120.5,
+    "monthlyEnergyMwh": 3500.0,
+    "yearlyEnergyMwh": 45000.0,
+    "totalEnergyMwh": 50000.0,
+    "averagePerformanceRatio": 0.85
+  },
+  "plants": [...]
+}
+```
+
+#### GET /api/plants/:id/production
+
+Get production metrics for a specific plant.
+
+**Response** (200 OK):
+```json
+{
+  "plant": {
+    "id": 1,
+    "name": "Solar Farm Alpha",
+    "capacityKw": 1000.0,
+    "currentPowerKw": 50.5,
+    "dailyEnergyMwh": 25.5,
+    "monthlyEnergyMwh": 750.0,
+    "yearlyEnergyMwh": 9000.0,
+    "totalEnergyMwh": 10000.0,
+    "performanceRatio": 0.85,
+    "prPercentage": "85.000",
+    "lastUpdateTime": "2024-01-15T10:00:00Z"
+  }
+}
+```
+
+#### GET /api/workorders/:id/production
+
+Get aggregated production metrics for all plants in a work order (Government admin view).
+
+**Response** (200 OK):
+```json
+{
+  "totalPlants": 10,
+  "aggregated": {
+    "installedCapacityKw": 2000.0,
+    "currentPowerKw": 100.5,
+    "dailyEnergyMwh": 50.5,
+    "monthlyEnergyMwh": 1500.0,
+    "yearlyEnergyMwh": 18000.0,
+    "totalEnergyMwh": 20000.0,
+    "averagePerformanceRatio": 0.82
+  },
+  "plants": [...]
 }
 ```
 
@@ -1178,9 +1324,13 @@ Calculate efficiency metrics for work orders.
 
 4. **Run database migrations**
    
-   **Main Database**:
-   - Apply `supabase/migrations/001_initial_schema.sql`
+   **Main Database** (Fresh Install):
+   - Apply `supabase/migrations/001_initial_schema.sql` (complete schema with all features)
    - Apply `supabase/migrations/002_rls_policies.sql`
+   
+   **Main Database** (Upgrade from existing):
+   - If upgrading, you can use `006_add_org_id_to_vendors.sql` and `007_add_plant_production_metrics.sql`
+   - However, it's recommended to use the consolidated `001_initial_schema.sql` for fresh installs
    
    **Telemetry Database** (separate instance):
    - Apply `supabase/migrations/003_telemetry_db_schema.sql`

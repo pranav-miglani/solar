@@ -145,6 +145,36 @@ export async function POST(request: NextRequest) {
     // Use service role client to bypass RLS for insert
     const supabase = createServiceClient()
 
+    // Validate that all plants belong to the same organization
+    const { data: plants, error: plantsError } = await supabase
+      .from("plants")
+      .select("id, org_id")
+      .in("id", plantIds)
+
+    if (plantsError) {
+      console.error("Plants validation error:", plantsError)
+      return NextResponse.json(
+        { error: "Failed to validate plants" },
+        { status: 500 }
+      )
+    }
+
+    if (!plants || plants.length !== plantIds.length) {
+      return NextResponse.json(
+        { error: "One or more plants not found" },
+        { status: 400 }
+      )
+    }
+
+    // Check that all plants belong to the same org
+    const orgIds = [...new Set(plants.map((p) => p.org_id))]
+    if (orgIds.length > 1) {
+      return NextResponse.json(
+        { error: "All plants must belong to the same organization" },
+        { status: 400 }
+      )
+    }
+
     // Create work order (static, no status)
     const { data: workOrder, error: woError } = await supabase
       .from("work_orders")

@@ -41,7 +41,7 @@ export async function GET(
 
     const { data: vendor, error } = await supabase
       .from("vendors")
-      .select("*")
+      .select("*, organizations(id, name)")
       .eq("id", params.id)
       .single()
 
@@ -78,19 +78,25 @@ export async function PUT(
     requirePermission(accountType as any, "vendors", "update")
 
     const body = await request.json()
-    const { name, api_base_url, credentials, is_active } = body
+    const { name, api_base_url, credentials, is_active, org_id } = body
 
     // Use service role client to bypass RLS
     const supabase = createServiceClient()
 
+    const updateData: any = {
+      name,
+      api_base_url,
+      credentials,
+      is_active,
+    }
+
+    if (org_id !== undefined) {
+      updateData.org_id = org_id
+    }
+
     const { data: vendor, error } = await supabase
       .from("vendors")
-      .update({
-        name,
-        api_base_url,
-        credentials,
-        is_active,
-      })
+      .update(updateData)
       .eq("id", params.id)
       .select()
       .single()

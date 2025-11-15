@@ -53,6 +53,82 @@ export async function POST(
     // Use service role client to bypass RLS
     const supabase = createServiceClient()
 
+    // Get the existing work order's plants to check their org
+    const { data: existingWorkOrderPlants, error: woError } = await supabase
+      .from("work_order_plants")
+      .select(`
+        plant_id,
+        plants!inner(org_id)
+      `)
+      .eq("work_order_id", parseInt(params.id))
+      .eq("is_active", true)
+
+    if (woError) {
+      console.error("Work order plants fetch error:", woError)
+      return NextResponse.json(
+        { error: "Failed to fetch work order plants" },
+        { status: 500 }
+      )
+    }
+
+    // Validate that all new plants belong to the same organization
+    const { data: newPlants, error: plantsError } = await supabase
+      .from("plants")
+      .select("id, org_id")
+      .in("id", plantIds)
+
+    if (plantsError) {
+      console.error("Plants validation error:", plantsError)
+      return NextResponse.json(
+        { error: "Failed to validate plants" },
+        { status: 500 }
+      )
+    }
+
+    if (!newPlants || newPlants.length !== plantIds.length) {
+      return NextResponse.json(
+        { error: "One or more plants not found" },
+        { status: 400 }
+      )
+    }
+
+    // If work order already has plants, ensure new plants belong to the same org
+    if (existingWorkOrderPlants && existingWorkOrderPlants.length > 0) {
+      const existingOrgIds = [
+        ...new Set(
+          existingWorkOrderPlants.map(
+            (wop: any) => wop.plants.org_id
+          )
+        ),
+      ]
+      const newOrgIds = [...new Set(newPlants.map((p) => p.org_id))]
+
+      // All existing plants should be from the same org (should be enforced, but check anyway)
+      if (existingOrgIds.length > 1) {
+        return NextResponse.json(
+          { error: "Work order has plants from multiple organizations" },
+          { status: 400 }
+        )
+      }
+
+      // New plants must belong to the same org as existing plants
+      if (newOrgIds.length > 1 || (existingOrgIds.length > 0 && newOrgIds[0] !== existingOrgIds[0])) {
+        return NextResponse.json(
+          { error: "All plants must belong to the same organization as existing plants in this work order" },
+          { status: 400 }
+        )
+      }
+    } else {
+      // If work order has no plants yet, ensure all new plants belong to the same org
+      const newOrgIds = [...new Set(newPlants.map((p) => p.org_id))]
+      if (newOrgIds.length > 1) {
+        return NextResponse.json(
+          { error: "All plants must belong to the same organization" },
+          { status: 400 }
+        )
+      }
+    }
+
     // First, deactivate existing active plants for these plant IDs
     await supabase
       .from("work_order_plants")

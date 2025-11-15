@@ -23,7 +23,7 @@ interface Org {
 export function CreateWorkOrderForm() {
   const router = useRouter()
   const [orgs, setOrgs] = useState<Org[]>([])
-  const [selectedOrgIds, setSelectedOrgIds] = useState<number[]>([])
+  const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null)
   const [selectedPlantIds, setSelectedPlantIds] = useState<number[]>([])
   const [formData, setFormData] = useState({
     title: "",
@@ -51,6 +51,18 @@ export function CreateWorkOrderForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
+
+    if (!selectedOrgId) {
+      alert("Please select an organization")
+      setLoading(false)
+      return
+    }
+
+    if (selectedPlantIds.length === 0) {
+      alert("Please select at least one plant")
+      setLoading(false)
+      return
+    }
 
     try {
       const response = await fetch("/api/workorders", {
@@ -124,35 +136,33 @@ export function CreateWorkOrderForm() {
       </div>
 
       <div>
-        <Label>Organizations *</Label>
-        <div className="space-y-2 mt-2">
-          {orgs.map((org) => (
-            <div key={org.id} className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id={`org-${org.id}`}
-                checked={selectedOrgIds.includes(org.id)}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedOrgIds([...selectedOrgIds, org.id])
-                  } else {
-                    setSelectedOrgIds(
-                      selectedOrgIds.filter((id) => id !== org.id)
-                    )
-                  }
-                }}
-              />
-              <Label htmlFor={`org-${org.id}`} className="cursor-pointer">
+        <Label htmlFor="organization">Organization *</Label>
+        <Select
+          value={selectedOrgId?.toString() || ""}
+          onValueChange={(value) => {
+            setSelectedOrgId(parseInt(value))
+            setSelectedPlantIds([]) // Reset plant selection when org changes
+          }}
+        >
+          <SelectTrigger id="organization">
+            <SelectValue placeholder="Select an organization" />
+          </SelectTrigger>
+          <SelectContent>
+            {orgs.map((org) => (
+              <SelectItem key={org.id} value={org.id.toString()}>
                 {org.name}
-              </Label>
-            </div>
-          ))}
-        </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-muted-foreground mt-1">
+          Work orders can only contain plants from a single organization
+        </p>
       </div>
 
-      {selectedOrgIds.length > 0 && (
+      {selectedOrgId && (
         <PlantSelector
-          orgIds={selectedOrgIds}
+          orgIds={[selectedOrgId]}
           selectedPlantIds={selectedPlantIds}
           onSelectionChange={setSelectedPlantIds}
         />

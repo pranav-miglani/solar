@@ -1,0 +1,39 @@
+You are continuing development on WOMS (Work Order Management System) - a unified solar monitoring platform built with Next.js 14, TypeScript, TailwindCSS, and Supabase.
+
+KEY CONTEXT:
+- Custom authentication using `accounts` table (NOT Supabase Auth)
+- Session: HTTP-only cookie with base64 JSON `{ accountId, accountType, orgId }`
+- Passwords: bcrypt hashed before storage (users input plain text)
+- All API routes use `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS (RLS policies require auth.uid() which doesn't exist)
+- One account per organization (enforced)
+- Work orders are static (no status/lifecycle)
+- Unified dashboard at `/dashboard` adapts to role (SUPERADMIN, GOVT, ORG)
+- Super Admin controls all write operations
+- Default users: admin@woms.com/admin123 (SUPERADMIN), govt@woms.com/govt123 (GOVT), org1@woms.com/org1123 (ORG)
+
+AUTHENTICATION FLOW:
+1. Login: `/api/login` uses service role key to query accounts table
+2. Password: Plain text input → bcrypt hash → stored
+3. Session: Created as cookie, decoded in middleware and API routes
+4. All routes: Check session, decode, use service role key for DB ops
+
+DATABASE:
+- Main DB: accounts, organizations, vendors, plants, work_orders, alerts, etc.
+- Telemetry DB: Separate instance, 24h retention
+- No `users` or `user_orgs` tables (removed/deprecated)
+
+ORGANIZATION MANAGEMENT:
+- Super Admin can create orgs and accounts
+- Each org has exactly one account (type: ORG)
+- UI shows account per org, allows creating account if missing
+- Removed "Assign Users" feature (not applicable)
+
+API ROUTES PATTERN:
+- Check session cookie → decode → requirePermission() → createServiceClient() → DB operation
+
+CURRENT STATE:
+✅ Authentication, org management, dashboard, CRUD operations working
+⚠️ Some telemetry/vendor-specific routes may still need updates
+
+See CONTEXT_PROMPT.md for full details.
+
