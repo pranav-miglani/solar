@@ -149,7 +149,7 @@ POST /api/login
 Query accounts table (custom, not Supabase Auth)
     │
     ▼
-Verify credentials (plain text password comparison)
+Verify credentials (bcrypt hash comparison)
     │
     ▼
 Create session token (JWT-like)
@@ -178,7 +178,7 @@ Redirect to /dashboard
 ### Backend
 - **Supabase**: PostgreSQL database with Row-Level Security
 - **Deno**: Runtime for Edge Functions
-- **Password Storage**: Plain text (for simplicity - implement hashing for production)
+- **Password Storage**: Bcrypt hashed (passwords are hashed before storage, users input plain text)
 - **Custom JWT**: Session management
 
 ### Development Tools
@@ -273,7 +273,7 @@ User accounts with role-based access.
 | `id` | UUID | Primary key |
 | `account_type` | ENUM | SUPERADMIN, ORG, or GOVT |
 | `email` | TEXT | Unique email address |
-| `password_hash` | TEXT | Password (plain text - implement hashing for production) |
+| `password_hash` | TEXT | Password (bcrypt hash - passwords are hashed before storage) |
 | `org_id` | INTEGER | Foreign key to organizations (NULL for SUPERADMIN/GOVT) |
 | `created_at` | TIMESTAMPTZ | Account creation timestamp |
 | `updated_at` | TIMESTAMPTZ | Last update timestamp |
@@ -1201,7 +1201,7 @@ Calculate efficiency metrics for work orders.
    - See [SETUP_GUIDE.md](./SETUP_GUIDE.md) for detailed step-by-step instructions
    - Use this method if you need to create custom accounts or troubleshoot issues
    
-   **Note**: This application uses a custom `accounts` table for authentication (not Supabase Auth). Passwords are stored in plain text for simplicity. Implement proper password hashing (bcrypt, argon2, etc.) for production.
+   **Note**: This application uses a custom `accounts` table for authentication (not Supabase Auth). Passwords are hashed using bcrypt before storage. Users input plain text passwords, which are hashed and compared with stored hashes during login.
 
 6. **Start development server**
    ```bash
@@ -1379,7 +1379,7 @@ npm start
 ### Authentication
 
 - **Custom Authentication**: Uses custom `accounts` table (not Supabase Auth)
-- **Password Storage**: Plain text (implement hashing for production)
+- **Password Storage**: Bcrypt hashed (passwords are hashed before storage)
 - **Session Management**: HTTP-only cookies prevent XSS
 - **Token Expiry**: 7-day session expiry
 - **Secure Cookies**: `secure` flag in production

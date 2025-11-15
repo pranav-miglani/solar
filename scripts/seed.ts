@@ -8,8 +8,9 @@
 import { config } from "dotenv"
 import { resolve } from "path"
 import { createClient } from "@supabase/supabase-js"
-// Note: Using plain text passwords for simplicity
-// For production, implement proper password hashing (bcrypt, argon2, etc.)
+import bcrypt from "bcryptjs"
+
+// Password hashing: User inputs plain text, we hash before storing in database
 
 // Load environment variables from .env.local
 const envPath = resolve(process.cwd(), ".env.local")
@@ -103,15 +104,20 @@ async function seed() {
     console.log("✓ Created organization: Green Power Solutions")
   }
 
-  // Create accounts with plain text passwords
-  console.log("👤 Creating accounts...")
+  // Create accounts with hashed passwords
+  console.log("👤 Creating accounts with hashed passwords...")
+  
+  // Hash passwords before storing
+  const adminPasswordHash = await bcrypt.hash("admin123", 10)
+  const govtPasswordHash = await bcrypt.hash("govt123", 10)
+  const org1PasswordHash = await bcrypt.hash("org1123", 10)
   
   const { data: superAdmin, error: superAdminError } = await supabase
     .from("accounts")
     .insert({
       account_type: "SUPERADMIN",
       email: "admin@woms.com",
-      password_hash: "admin123",  // Plain text password
+      password_hash: adminPasswordHash,  // Hashed password
       org_id: null,
     })
     .select()
@@ -120,7 +126,7 @@ async function seed() {
   if (superAdminError) {
     console.error("❌ Error creating superadmin:", superAdminError.message)
   } else {
-    console.log("✓ Created superadmin: admin@woms.com (password: admin123)")
+    console.log("✓ Created superadmin: admin@woms.com (password: admin123 - stored as hash)")
   }
 
   const { data: govt, error: govtError } = await supabase
@@ -128,7 +134,7 @@ async function seed() {
     .insert({
       account_type: "GOVT",
       email: "govt@woms.com",
-      password_hash: "govt123",  // Plain text password
+      password_hash: govtPasswordHash,  // Hashed password
       org_id: null,
     })
     .select()
@@ -137,7 +143,7 @@ async function seed() {
   if (govtError) {
     console.error("❌ Error creating govt:", govtError.message)
   } else {
-    console.log("✓ Created govt account: govt@woms.com (password: govt123)")
+    console.log("✓ Created govt account: govt@woms.com (password: govt123 - stored as hash)")
   }
 
   if (org1) {
@@ -146,7 +152,7 @@ async function seed() {
       .insert({
         account_type: "ORG",
         email: "org1@woms.com",
-        password_hash: "org1123",  // Plain text password
+        password_hash: org1PasswordHash,  // Hashed password
         org_id: org1.id,
       })
       .select()
@@ -155,7 +161,7 @@ async function seed() {
     if (org1AccountError) {
       console.error("❌ Error creating org1 account:", org1AccountError.message)
     } else {
-      console.log("✓ Created org1 account: org1@woms.com (password: org1123)")
+      console.log("✓ Created org1 account: org1@woms.com (password: org1123 - stored as hash)")
     }
   }
 

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import bcrypt from "bcryptjs"
 
-// Password comparison: Plain text for simplicity
-// Note: For production, implement proper password hashing (bcrypt, argon2, etc.)
+// Password hashing: User inputs plain text, we hash and compare with stored hash
 
 // For login, we need to bypass RLS to query accounts table
 // We use service role key since user is not authenticated yet
@@ -151,15 +151,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify password (plain text comparison)
-    console.log("🔐 [LOGIN] Comparing passwords (plain text)")
-    const isValid = password === account.password_hash
+    // Verify password (hash comparison)
+    // User provides plain text password, we compare with stored bcrypt hash
+    console.log("🔐 [LOGIN] Comparing password hash")
     
-    console.log("🔐 [LOGIN] Password comparison:", {
-      providedPassword: password,
-      storedPassword: account.password_hash,
-      match: isValid,
-    })
+    // Check if stored password is a bcrypt hash (starts with $2a$, $2b$, or $2y$)
+    const isBcryptHash = account.password_hash?.match(/^\$2[ayb]\$.{56}$/)
+    
+    let isValid = false
+    if (isBcryptHash) {
+      // Compare with bcrypt hash
+      isValid = await bcrypt.compare(password, account.password_hash)
+      console.log("🔐 [LOGIN] Password comparison (bcrypt):", {
+        providedPasswordLength: password.length,
+        storedHashLength: account.password_hash.length,
+        isBcryptHash: true,
+        match: isValid,
+      })
+    } else {
+      // Fallback: plain text comparison (for backward compatibility during migration)
+      isValid = password === account.password_hash
+      console.log("🔐 [LOGIN] Password comparison (plain text fallback):", {
+        providedPassword: password,
+        storedPassword: account.password_hash,
+        match: isValid,
+        warning: "Password stored in plain text - should be migrated to hash",
+      })
+    }
 
     if (!isValid) {
       console.log("❌ [LOGIN] Password mismatch for email:", email)

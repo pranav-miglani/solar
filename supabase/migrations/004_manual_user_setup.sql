@@ -1,16 +1,21 @@
 -- ============================================
--- MANUAL USER SETUP SCRIPT (PLAIN TEXT PASSWORDS)
+-- MANUAL USER SETUP SCRIPT (WITH PASSWORD HASHING)
 -- ============================================
--- This script deletes all existing accounts and creates new ones with plain text passwords
+-- This script deletes all existing accounts and creates new ones with hashed passwords
 -- Run this in Supabase SQL Editor
 -- 
--- Passwords (plain text):
+-- Passwords (plain text - for reference only):
 --   - admin@woms.com: admin123
 --   - govt@woms.com: govt123
 --   - org1@woms.com: org1123
 --
--- Note: Passwords are stored in plain text for simplicity.
--- For production, implement proper password hashing (bcrypt, argon2, etc.)
+-- All passwords are stored as bcrypt hashes in the database.
+-- Users input plain text passwords which are compared with stored hashes during login.
+--
+-- RECOMMENDED: Use the seed script instead for automatic hashing:
+--   npm run seed
+--   or
+--   npx tsx scripts/seed.ts
 
 BEGIN;
 
@@ -36,9 +41,10 @@ BEGIN
   END IF;
 END $$;
 
--- Step 1: Delete all existing accounts
-DELETE FROM accounts;
-RAISE NOTICE 'Deleted all existing accounts';
+-- Step 1: Delete existing accounts (by email) before inserting
+-- This makes the script idempotent - safe to run multiple times
+DELETE FROM accounts WHERE email IN ('admin@woms.com', 'govt@woms.com', 'org1@woms.com');
+RAISE NOTICE 'Deleted existing accounts (if any)';
 
 -- Step 2: Ensure organizations exist (create if needed)
 INSERT INTO organizations (name, meta)
@@ -54,36 +60,42 @@ DECLARE
 BEGIN
   SELECT id INTO org1_id FROM organizations WHERE name = 'Solar Energy Corp' LIMIT 1;
   
-  -- Step 3: Create Super Admin account
-  -- Password: admin123 (plain text)
+  -- Step 3: Delete and Create Super Admin account
+  -- Password: admin123 (stored as bcrypt hash)
+  DELETE FROM accounts WHERE email = 'admin@woms.com';
+  
   INSERT INTO accounts (account_type, email, password_hash, org_id)
   VALUES (
     'SUPERADMIN',
     'admin@woms.com',
-    'admin123',  -- Plain text password
+    '$2b$10$pVV0zXjApE8jNhIMTOZ9peqyzIMVPVw/ybhJfHWR.2KerTCu1H1Cq',
     NULL
   );
   RAISE NOTICE 'Created Super Admin: admin@woms.com (password: admin123)';
   
-  -- Step 4: Create Government account
-  -- Password: govt123 (plain text)
+  -- Step 4: Delete and Create Government account
+  -- Password: govt123 (stored as bcrypt hash)
+  DELETE FROM accounts WHERE email = 'govt@woms.com';
+  
   INSERT INTO accounts (account_type, email, password_hash, org_id)
   VALUES (
     'GOVT',
     'govt@woms.com',
-    'govt123',  -- Plain text password
+    '$2b$10$Jlzo9l/joTHPE4CClPOsPOiNpiWEw1OpvJyDUSLTedLhk8SMvqITe',
     NULL
   );
   RAISE NOTICE 'Created Government: govt@woms.com (password: govt123)';
   
-  -- Step 5: Create Organization account
-  -- Password: org1123 (plain text)
+  -- Step 5: Delete and Create Organization account
+  -- Password: org1123 (stored as bcrypt hash)
   IF org1_id IS NOT NULL THEN
+    DELETE FROM accounts WHERE email = 'org1@woms.com';
+    
     INSERT INTO accounts (account_type, email, password_hash, org_id)
     VALUES (
       'ORG',
       'org1@woms.com',
-      'org1123',  -- Plain text password
+      '$2b$10$PeXXkSCeoSKLVXdMLOGSb.xbB7avvbH52FzPqXjg/J8xTj9NeEwwG',
       org1_id
     );
     RAISE NOTICE 'Created Organization: org1@woms.com (password: org1123)';

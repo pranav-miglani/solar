@@ -91,7 +91,7 @@ This creates:
 1. Open Supabase SQL Editor
 2. Copy and paste the contents of `supabase/migrations/004_manual_user_setup.sql`
 3. Run the script
-4. This creates 3 accounts with plain text passwords:
+4. This creates 3 accounts with hashed passwords:
    - `admin@woms.com` / `admin123` (Super Admin)
    - `govt@woms.com` / `govt123` (Government)
    - `org1@woms.com` / `org1123` (Organization)
@@ -101,7 +101,7 @@ This creates:
    SELECT email, account_type, org_id FROM accounts ORDER BY email;
    ```
 
-**Note**: This system uses a **custom `accounts` table** for authentication (NOT Supabase Auth). Passwords are stored in plain text for simplicity. Implement proper password hashing for production.
+**Note**: This system uses a **custom `accounts` table** for authentication (NOT Supabase Auth). Passwords are hashed using bcrypt before storage. Users input plain text passwords, which are automatically hashed and compared with stored hashes during login.
 
 ## Step 5: Deploy Edge Functions (Cloud Supabase)
 
@@ -241,7 +241,7 @@ When testing login, watch your terminal where `npm run dev` is running. You shou
 🔐 [LOGIN] Supabase config check: { hasUrl: true, hasKey: true, ... }
 ✅ [LOGIN] Database connection successful
 ✅ [LOGIN] Account found: { id: '...', email: 'admin@woms.com', ... }
-🔐 [LOGIN] Comparing passwords (plain text)
+🔐 [LOGIN] Comparing password hash
 ✅ [LOGIN] Password verified successfully
 ✅ [LOGIN] Login successful, session cookie set
 ```
@@ -273,7 +273,7 @@ If login fails, check the password format in the database:
 SELECT email, password_hash FROM accounts WHERE email = 'admin@woms.com';
 ```
 
-The password should be stored as plain text: `admin123` (not hashed).
+The password should be stored as a bcrypt hash (starts with `$2a$`, `$2b$`, or `$2y$`). If it's still plain text, run the seed script to update it: `npm run seed`
 
 ## Troubleshooting
 
@@ -291,7 +291,9 @@ The password should be stored as plain text: `admin123` (not hashed).
 1. **"Invalid credentials" error:**
    - Check server logs for detailed error messages
    - Verify user exists: `SELECT * FROM accounts WHERE email = 'admin@woms.com';`
-   - Ensure password_hash is exactly the password (e.g., 'admin123' for plain text)
+   - Ensure password_hash is a bcrypt hash (starts with `$2a$`, `$2b$`, or `$2y$`)
+   - Generate hashes using: `npx tsx scripts/generate-password-hash.ts <password>`
+   - If password is still plain text, run the seed script: `npm run seed`
 
 2. **"Account not found":**
    - Run the user setup script: `supabase/migrations/004_manual_user_setup.sql`
