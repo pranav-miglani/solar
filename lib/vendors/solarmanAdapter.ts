@@ -304,69 +304,91 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     const urlObj = new URL(baseUrl)
     const apiBaseUrl = `${urlObj.protocol}//${urlObj.host}`
     
-    // Use /station/v1.0/list endpoint with POST body
-    const requestBody = {
-      page: 1,
-      size: 100,
-    }
-    
     const url = `${apiBaseUrl}/station/v1.0/list`
-    
-    console.log('📊 [Solarman] Fetching plants from:', url)
-    console.log('📊 [Solarman] Request body:', requestBody)
-    
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    })
+    const pageSize = 100 // Maximum page size
+    let allStations: any[] = []
+    let currentPage = 1
+    let total = 0
+    let hasMore = true
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('❌ [Solarman] Failed to fetch stations:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText,
+    console.log('📊 [Solarman] Starting paginated fetch from:', url)
+
+    // Fetch all pages
+    while (hasMore) {
+      const requestBody = {
+        page: currentPage,
+        size: pageSize,
+      }
+      
+      console.log(`📊 [Solarman] Fetching page ${currentPage} with size ${pageSize}`)
+      
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
       })
-      throw new Error(`Failed to fetch stations: ${response.statusText} - ${errorText}`)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`❌ [Solarman] Failed to fetch page ${currentPage}:`, {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+        })
+        throw new Error(`Failed to fetch stations: ${response.statusText} - ${errorText}`)
+      }
+
+      const data = await response.json()
+      
+      // Handle different response formats
+      if (data.success === false) {
+        throw new Error(`Failed to fetch stations from Solarman: ${data.msg || data.message || 'Unknown error'}`)
+      }
+
+      // Check if stationList exists and is an array
+      if (!data.stationList || !Array.isArray(data.stationList)) {
+        console.error('❌ [Solarman] Invalid response format:', data)
+        throw new Error("Invalid response format from Solarman API - expected stationList array")
+      }
+
+      // Get total from first page
+      if (currentPage === 1) {
+        total = data.total || 0
+        console.log(`📊 [Solarman] Total stations available: ${total}`)
+      }
+
+      // Add stations from this page
+      allStations = allStations.concat(data.stationList)
+      console.log(`📊 [Solarman] Page ${currentPage}: Fetched ${data.stationList.length} stations (Total so far: ${allStations.length}/${total})`)
+
+      // Check if we need to fetch more pages
+      // If we got fewer stations than requested, or we've fetched all stations, we're done
+      if (data.stationList.length < pageSize || allStations.length >= total) {
+        hasMore = false
+      } else {
+        currentPage++
+        // Add a small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
     }
 
-    const data = await response.json()
-    console.log('📊 [Solarman] Response received:', {
-      success: data.success,
-      dataLength: data.data?.length || 0,
-    })
-
-    // Handle different response formats
-    if (data.success === false) {
-      throw new Error(`Failed to fetch stations from Solarman: ${data.message || 'Unknown error'}`)
-    }
-
-    // Check if data exists and is an array
-    if (!data.data || !Array.isArray(data.data)) {
-      console.error('❌ [Solarman] Invalid response format:', data)
-      throw new Error("Invalid response format from Solarman API - expected data array")
-    }
+    console.log(`✅ [Solarman] Completed fetching all stations: ${allStations.length} total`)
 
     // Map stations to Plant format
-    return data.data.map((station: any) => {
-      // Handle different field names (stationId vs id, stationName vs name, etc.)
-      const stationId = station.stationId || station.id
-      const stationName = station.stationName || station.name
-      const capacity = station.capacity || station.installedCapacity || 0
+    return allStations.map((station: any) => {
+      // Extract station ID and name
+      const stationId = station.id
+      const stationName = station.name || `Station ${stationId}`
       
-      // Handle location - could be object or separate fields
+      // Capacity is already in kW (installedCapacity field)
+      const capacityKw = station.installedCapacity || 0
+      
+      // Handle location - fields are separate (locationLat, locationLng, locationAddress)
       let location: any = undefined
-      if (station.location) {
-        location = {
-          lat: station.location.latitude || station.location.lat,
-          lng: station.location.longitude || station.location.lng,
-          address: station.location.address,
-        }
-      } else if (station.locationAddress || station.locationLat || station.locationLng) {
+      if (station.locationLat || station.locationLng || station.locationAddress) {
         location = {
           lat: station.locationLat,
           lng: station.locationLng,
@@ -374,14 +396,35 @@ export class SolarmanAdapter extends BaseVendorAdapter {
         }
       }
 
+      // Extract production metrics from response
+      // generationPower is in W, convert to kW
+      const currentPowerKw = station.generationPower ? station.generationPower / 1000 : null
+      
+      // lastUpdateTime is Unix timestamp (seconds), convert to ISO string
+      const lastUpdateTime = station.lastUpdateTime 
+        ? new Date(station.lastUpdateTime * 1000).toISOString() 
+        : null
+
       return {
         id: stationId.toString(),
         name: stationName,
-        capacityKw: typeof capacity === 'number' ? capacity / 1000 : 0, // Convert W to kW if needed
+        capacityKw: capacityKw,
         location: location,
         metadata: {
           stationId: stationId,
-          // Include any additional fields from the response
+          // Production metrics (only those shown in Production Overview dashboard)
+          currentPowerKw: currentPowerKw, // Converted from W to kW
+          // Note: Daily/Monthly/Yearly/Total energy and PR not available in /station/v1.0/list
+          // These would need to be fetched from other endpoints if needed
+          lastUpdateTime: lastUpdateTime,
+          // Additional station metadata
+          networkStatus: station.networkStatus,
+          type: station.type,
+          contactPhone: station.contactPhone,
+          gridInterconnectionType: station.gridInterconnectionType,
+          regionTimezone: station.regionTimezone,
+          startOperatingTime: station.startOperatingTime,
+          // Include all other fields for reference
           ...station,
         },
       }

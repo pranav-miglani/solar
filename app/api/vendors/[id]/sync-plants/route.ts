@@ -100,70 +100,127 @@ export async function POST(
       })
     }
 
-    // Sync plants to database
+    console.log(`🔄 [Sync] Starting batch sync for ${vendorPlants.length} plants`)
+
+    // Prepare all plant data
+    const plantDataArray = vendorPlants.map((plant) => {
+      const metadata = plant.metadata || {}
+      const lastUpdateTime = metadata.lastUpdateTime 
+        ? new Date(metadata.lastUpdateTime).toISOString()
+        : null
+
+      return {
+        org_id: vendor.org_id,
+        vendor_id: vendor.id,
+        vendor_plant_id: plant.id.toString(),
+        name: plant.name || `Plant ${plant.id}`,
+        capacity_kw: plant.capacityKw || 0,
+        location: plant.location || {},
+        current_power_kw: metadata.currentPowerKw || null,
+        daily_energy_mwh: metadata.dailyEnergyMwh || null,
+        monthly_energy_mwh: metadata.monthlyEnergyMwh || null,
+        yearly_energy_mwh: metadata.yearlyEnergyMwh || null,
+        total_energy_mwh: metadata.totalEnergyMwh || null,
+        performance_ratio: metadata.performanceRatio || null,
+        last_update_time: lastUpdateTime,
+      }
+    })
+
+    // Batch size for database operations
+    const BATCH_SIZE = 100
     let synced = 0
-    let updated = 0
     let created = 0
+    let updated = 0
+    const errors: string[] = []
 
-    for (const plant of vendorPlants) {
+    // Get existing plant IDs for counting (to distinguish created vs updated)
+    const vendorPlantIds = plantDataArray.map((p) => p.vendor_plant_id)
+    const { data: existingPlants } = await supabase
+      .from("plants")
+      .select("vendor_plant_id")
+      .eq("vendor_id", vendor.id)
+      .in("vendor_plant_id", vendorPlantIds)
+
+    const existingIds = new Set(
+      (existingPlants || []).map((p) => p.vendor_plant_id)
+    )
+
+    // Process in batches using upsert (inserts new, updates existing)
+    for (let i = 0; i < plantDataArray.length; i += BATCH_SIZE) {
+      const batch = plantDataArray.slice(i, i + BATCH_SIZE)
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1
+      const totalBatches = Math.ceil(plantDataArray.length / BATCH_SIZE)
+      
+      console.log(`📦 [Sync] Processing batch ${batchNumber}/${totalBatches} (${batch.length} plants)`)
+
       try {
-        // Check if plant already exists (by vendor_plant_id)
-        const { data: existingPlant } = await supabase
+        // Use upsert to handle both inserts and updates in one operation
+        // The unique constraint on (vendor_id, vendor_plant_id) will be used for conflict resolution
+        const { data, error } = await supabase
           .from("plants")
-          .select("id")
-          .eq("vendor_id", vendor.id)
-          .eq("vendor_plant_id", plant.id)
-          .single()
+          .upsert(batch, {
+            onConflict: "vendor_id,vendor_plant_id",
+          })
+          .select()
 
-        // Extract production metrics from metadata (only fields shown in Production Overview)
-        const metadata = plant.metadata || {}
-        const lastUpdateTime = metadata.lastUpdateTime 
-          ? new Date(metadata.lastUpdateTime).toISOString()
-          : null
+        if (error) {
+          console.error(`❌ [Sync] Batch ${batchNumber} upsert error:`, error)
+          errors.push(`Batch ${batchNumber}: ${error.message}`)
+          
+          // Fallback: try individual upserts
+          console.log(`🔄 [Sync] Falling back to individual operations for batch ${batchNumber}`)
+          for (const plantData of batch) {
+            try {
+              const { error: individualError } = await supabase
+                .from("plants")
+                .upsert(plantData, {
+                  onConflict: "vendor_id,vendor_plant_id",
+                })
 
-        const plantData: any = {
-          org_id: vendor.org_id,
-          vendor_id: vendor.id,
-          vendor_plant_id: plant.id,
-          name: plant.name || `Plant ${plant.id}`,
-          capacity_kw: plant.capacityKw || 0, // Installed Capacity (shown in Production Overview)
-          location: plant.location || {},
-          // Production metrics (only those displayed in Production Overview dashboard)
-          current_power_kw: metadata.currentPowerKw || null,
-          daily_energy_mwh: metadata.dailyEnergyMwh || null,
-          monthly_energy_mwh: metadata.monthlyEnergyMwh || null,
-          yearly_energy_mwh: metadata.yearlyEnergyMwh || null,
-          total_energy_mwh: metadata.totalEnergyMwh || null,
-          performance_ratio: metadata.performanceRatio || null, // PR (shown as percentage in circular indicator)
-          last_update_time: lastUpdateTime, // Shown as "Updated" timestamp
-        }
-
-        if (existingPlant) {
-          // Update existing plant
-          await supabase
-            .from("plants")
-            .update(plantData)
-            .eq("id", existingPlant.id)
-          updated++
+              if (individualError) {
+                console.error(`❌ [Sync] Error upserting plant ${plantData.vendor_plant_id}:`, individualError)
+                errors.push(`Plant ${plantData.vendor_plant_id}: ${individualError.message}`)
+              } else {
+                // Count as created or updated
+                if (existingIds.has(plantData.vendor_plant_id)) {
+                  updated++
+                } else {
+                  created++
+                }
+                synced++
+              }
+            } catch (individualException: any) {
+              console.error(`❌ [Sync] Exception upserting plant ${plantData.vendor_plant_id}:`, individualException)
+              errors.push(`Plant ${plantData.vendor_plant_id}: ${individualException.message}`)
+            }
+          }
         } else {
-          // Create new plant
-          await supabase.from("plants").insert(plantData)
-          created++
+          // Count created vs updated based on whether they existed before
+          const batchCreated = batch.filter((p) => !existingIds.has(p.vendor_plant_id)).length
+          const batchUpdated = batch.length - batchCreated
+          
+          created += batchCreated
+          updated += batchUpdated
+          synced += batch.length
+          
+          console.log(`✅ [Sync] Batch ${batchNumber} completed: ${batch.length} plants (${batchCreated} created, ${batchUpdated} updated)`)
         }
-        synced++
-      } catch (error: any) {
-        console.error(`Error syncing plant ${plant.id}:`, error)
-        // Continue with next plant
+      } catch (batchError: any) {
+        console.error(`❌ [Sync] Batch ${batchNumber} exception:`, batchError)
+        errors.push(`Batch ${batchNumber}: ${batchError.message}`)
       }
     }
 
+    console.log(`✅ [Sync] Completed: ${synced}/${vendorPlants.length} plants synced (${created} created, ${updated} updated)`)
+
     return NextResponse.json({
       success: true,
-      message: `Successfully synced ${synced} plants`,
+      message: `Successfully synced ${synced} plants in batches`,
       synced,
       total: vendorPlants.length,
       created,
       updated,
+      errors: errors.length > 0 ? errors.slice(0, 10) : undefined, // Return first 10 errors if any
     })
   } catch (error: any) {
     console.error("Sync plants error:", error)

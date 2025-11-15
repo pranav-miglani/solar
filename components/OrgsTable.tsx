@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import Link from "next/link"
+import { ExternalLink } from "lucide-react"
 
 interface Org {
   id: number
@@ -185,17 +187,25 @@ export function OrgsTable() {
                   )}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedOrg(org)
-                      setAccountFormData({ email: "", password: "" })
-                      setAccountDialogOpen(true)
-                    }}
-                  >
-                    {orgAccount ? "View Account" : "Create Account"}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Link href={`/orgs/${org.id}/plants`}>
+                      <Button variant="default" size="sm">
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        View Plants
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedOrg(org)
+                        setAccountFormData({ email: "", password: "" })
+                        setAccountDialogOpen(true)
+                      }}
+                    >
+                      {orgAccount ? "View Account" : "Create Account"}
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             )

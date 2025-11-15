@@ -1,13 +1,12 @@
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
-import { WorkOrderDetailView } from "@/components/WorkOrderDetailView"
+import { OrganizationPlantsView } from "@/components/OrganizationPlantsView"
 
-export default async function WorkOrderDetailPage({
+export default async function OrganizationPlantsPage({
   params,
 }: {
   params: { id: string }
 }) {
-  // Check custom session authentication
   const cookieStore = await cookies()
   const session = cookieStore.get("session")?.value
 
@@ -15,13 +14,12 @@ export default async function WorkOrderDetailPage({
     redirect("/auth/login")
   }
 
-  // Decode session (middleware already validates, but we decode for component)
   try {
     JSON.parse(Buffer.from(session, "base64").toString())
   } catch {
     redirect("/auth/login")
   }
 
-  return <WorkOrderDetailView workOrderId={params.id} />
+  return <OrganizationPlantsView orgId={params.id} />
 }
 

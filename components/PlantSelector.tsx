@@ -33,7 +33,6 @@ export function PlantSelector({
 }: PlantSelectorProps) {
   const [plants, setPlants] = useState<Plant[]>([])
   const [loading, setLoading] = useState(true)
-  const [activePlantIds, setActivePlantIds] = useState<number[]>([])
 
   useEffect(() => {
     async function fetchPlants() {
@@ -43,44 +42,31 @@ export function PlantSelector({
         return
       }
 
-      const supabase = createClient()
+      setLoading(true)
 
-      // Fetch plants for selected orgs with vendor information
-      const { data: plantsData, error: plantsError } = await supabase
-        .from("plants")
-        .select("*, vendors(id, name, vendor_type)")
-        .in("org_id", orgIds)
+      try {
+        // Fetch only unassigned plants (not in any active work order)
+        const orgIdsParam = orgIds.join(",")
+        const response = await fetch(`/api/plants/unassigned?orgIds=${orgIdsParam}`)
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch unassigned plants")
+        }
 
-      if (plantsError) {
-        console.error("Error fetching plants:", plantsError)
+        const data = await response.json()
+        setPlants(data.plants || [])
+      } catch (error) {
+        console.error("Error fetching unassigned plants:", error)
+        setPlants([])
+      } finally {
         setLoading(false)
-        return
       }
-
-      // Fetch active work order plants to disable them
-      const { data: activeWOP, error: activeError } = await supabase
-        .from("work_order_plants")
-        .select("plant_id")
-        .eq("is_active", true)
-
-      if (activeError) {
-        console.error("Error fetching active work orders:", activeError)
-      } else {
-        setActivePlantIds(activeWOP?.map((p) => p.plant_id) || [])
-      }
-
-      setPlants(plantsData || [])
-      setLoading(false)
     }
 
     fetchPlants()
   }, [orgIds])
 
   const handleToggle = (plantId: number) => {
-    if (activePlantIds.includes(plantId)) {
-      return // Don't allow selection of active plants
-    }
-
     const newSelection = selectedPlantIds.includes(plantId)
       ? selectedPlantIds.filter((id) => id !== plantId)
       : [...selectedPlantIds, plantId]
@@ -103,21 +89,17 @@ export function PlantSelector({
       </CardHeader>
       <CardContent className="space-y-2 max-h-96 overflow-y-auto">
         {plants.map((plant) => {
-          const isActive = activePlantIds.includes(plant.id)
           const isSelected = selectedPlantIds.includes(plant.id)
 
           return (
             <div
               key={plant.id}
-              className={`flex items-center space-x-2 p-2 rounded border ${
-                isActive ? "opacity-50 cursor-not-allowed bg-muted" : "cursor-pointer hover:bg-muted"
-              }`}
-              onClick={() => !isActive && handleToggle(plant.id)}
+              className="flex items-center space-x-2 p-2 rounded border cursor-pointer hover:bg-muted"
+              onClick={() => handleToggle(plant.id)}
             >
               <Checkbox
                 id={`plant-${plant.id}`}
                 checked={isSelected}
-                disabled={isActive}
                 onCheckedChange={() => handleToggle(plant.id)}
               />
               <Label
@@ -128,7 +110,6 @@ export function PlantSelector({
                 <div className="text-sm text-muted-foreground">
                   {plant.capacity_kw} kW
                   {plant.vendors && ` • ${plant.vendors.name} (${plant.vendors.vendor_type})`}
-                  {isActive && " • Active in another work order"}
                 </div>
               </Label>
             </div>

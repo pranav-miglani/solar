@@ -28,7 +28,6 @@ export function CreateWorkOrderForm() {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    priority: "MEDIUM" as "LOW" | "MEDIUM" | "HIGH",
   })
   const [loading, setLoading] = useState(false)
 
@@ -71,7 +70,6 @@ export function CreateWorkOrderForm() {
         body: JSON.stringify({
           title: formData.title,
           description: formData.description,
-          priority: formData.priority,
           plantIds: selectedPlantIds,
         }),
       })
@@ -114,25 +112,6 @@ export function CreateWorkOrderForm() {
           }
           rows={4}
         />
-      </div>
-
-      <div>
-        <Label htmlFor="priority">Priority</Label>
-        <Select
-          value={formData.priority}
-          onValueChange={(value: "LOW" | "MEDIUM" | "HIGH") =>
-            setFormData({ ...formData, priority: value })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="LOW">Low</SelectItem>
-            <SelectItem value="MEDIUM">Medium</SelectItem>
-            <SelectItem value="HIGH">High</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       <div>

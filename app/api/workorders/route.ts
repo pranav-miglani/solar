@@ -49,7 +49,8 @@ export async function GET(request: NextRequest) {
             id,
             name,
             org_id,
-            capacity_kw
+            capacity_kw,
+            organizations(id, name)
           )
         )
       `)
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest) {
     requirePermission(accountType as any, "work_orders", "create")
 
     const body = await request.json()
-    const { title, description, priority, plantIds } = body
+    const { title, description, location, plantIds } = body
 
     if (!title || !plantIds || plantIds.length === 0) {
       return NextResponse.json(
@@ -181,7 +182,8 @@ export async function POST(request: NextRequest) {
       .insert({
         title,
         description,
-        priority: priority || "MEDIUM",
+        location,
+        priority: "MEDIUM", // Default value for existing schema, but not used in UI
         created_by: sessionData.accountId,
       })
       .select()
