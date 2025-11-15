@@ -165,6 +165,7 @@ export async function PUT(
       )
     }
 
+<<<<<<< HEAD
     // Get all existing work_order_plants for this work order (both active and inactive)
     const { data: existingWorkOrderPlants, error: existingError } = await supabase
       .from("work_order_plants")
