@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { OrgsTable } from "@/components/OrgsTable"
+import { DashboardSidebar } from "@/components/DashboardSidebar"
 
 export default async function OrgsPage() {
   // Check custom session authentication
@@ -27,11 +28,19 @@ export default async function OrgsPage() {
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Organizations</h1>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <DashboardSidebar accountType={accountType} />
+      <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/60 bg-clip-text text-transparent">
+            Organizations
+          </h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            Manage all organizations and their accounts
+          </p>
+        </div>
+        <OrgsTable />
       </div>
-      <OrgsTable />
     </div>
   )
 }

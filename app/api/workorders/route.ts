@@ -173,6 +173,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const orgId = orgIds[0] // All plants belong to the same org
+
     // Create work order (static, no status)
     const { data: workOrder, error: woError } = await supabase
       .from("work_orders")
@@ -180,6 +182,7 @@ export async function POST(request: NextRequest) {
         title,
         description,
         location,
+        org_id: orgId, // Set the organization ID for cascade delete
         priority: "MEDIUM", // Default value for existing schema, but not used in UI
         created_by: sessionData.accountId,
       })

@@ -1,0 +1,76 @@
+import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
+import { requirePermission } from "@/lib/rbac"
+
+// For orgs API, we need to bypass RLS for write operations
+// We use service role key since RLS policies require auth.uid() which we don't have
+function createServiceClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase service role key")
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey)
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = request.cookies.get("session")?.value
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    let sessionData
+    try {
+      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+    } catch {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+    }
+
+    const accountType = sessionData.accountType as string
+
+    // Only SUPERADMIN can delete organizations
+    requirePermission(accountType as any, "organizations", "delete")
+
+    const supabase = createServiceClient()
+
+    // Delete the organization
+    // Cascade deletes will automatically handle:
+    // - accounts (with org_id)
+    // - vendors (with org_id)
+    // - plants (with org_id)
+    // - work_orders (with org_id)
+    // - work_order_plants (through plants)
+    // - alerts (through plants)
+    const { error } = await supabase
+      .from("organizations")
+      .delete()
+      .eq("id", params.id)
+
+    if (error) {
+      console.error("Delete organization error:", error)
+      return NextResponse.json(
+        { error: "Failed to delete organization" },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Organization deleted successfully",
+    })
+  } catch (error: any) {
+    console.error("Delete organization error:", error)
+    return NextResponse.json(
+      { error: error.message || "Internal server error" },
+      { status: error.message?.includes("permission") ? 403 : 500 }
+    )
+  }
+}
+

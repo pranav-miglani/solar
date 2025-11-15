@@ -154,13 +154,24 @@ CREATE TABLE plants (
   UNIQUE(vendor_id, vendor_plant_id)
 );
 
+-- Add comments for plant production metrics
+COMMENT ON COLUMN plants.current_power_kw IS 'Current generation power in kW (shown in Production Overview)';
+COMMENT ON COLUMN plants.daily_energy_mwh IS 'Daily energy generation in MWh (shown in Production Overview)';
+COMMENT ON COLUMN plants.monthly_energy_mwh IS 'Monthly energy generation in MWh (shown in Production Overview)';
+COMMENT ON COLUMN plants.yearly_energy_mwh IS 'Yearly energy generation in MWh (shown in Production Overview)';
+COMMENT ON COLUMN plants.total_energy_mwh IS 'Total cumulative energy generation in MWh (shown in Production Overview)';
+COMMENT ON COLUMN plants.performance_ratio IS 'Performance Ratio (PR) 0-1 range, displayed as percentage in circular indicator';
+COMMENT ON COLUMN plants.last_update_time IS 'Last time production data was updated from vendor (shown as "Updated" timestamp)';
+
 -- Work Orders table (static, no status)
 -- Note: priority and created_by are nullable/deprecated but kept for backward compatibility
+-- org_id is required for cascade delete: when an organization is deleted, all its work orders are automatically deleted
 CREATE TABLE work_orders (
   id SERIAL PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT,
   location TEXT, -- Physical location of the work order
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, -- Organization this work order belongs to (required for cascade delete)
   priority work_order_priority DEFAULT 'MEDIUM', -- DEPRECATED: No longer used in UI, kept for backward compatibility
   created_by UUID REFERENCES accounts(id) ON DELETE CASCADE, -- DEPRECATED: No longer used in UI, kept for backward compatibility
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -220,6 +231,7 @@ CREATE INDEX idx_plants_org_id ON plants(org_id);
 CREATE INDEX idx_plants_vendor_id ON plants(vendor_id);
 CREATE INDEX idx_plants_vendor_id_org_id ON plants(vendor_id, org_id);
 CREATE INDEX idx_plants_last_update_time ON plants(last_update_time);
+CREATE INDEX idx_work_orders_org_id ON work_orders(org_id);
 CREATE INDEX idx_work_orders_location ON work_orders(location) WHERE location IS NOT NULL;
 CREATE INDEX idx_work_orders_created_by ON work_orders(created_by) WHERE created_by IS NOT NULL;
 CREATE INDEX idx_work_order_plants_work_order_id ON work_order_plants(work_order_id);
@@ -312,7 +324,16 @@ BEGIN
     RAISE EXCEPTION 'location column not found in work_orders table';
   END IF;
   
+  -- Verify org_id column exists in work_orders table
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'work_orders' AND column_name = 'org_id'
+  ) THEN
+    RAISE EXCEPTION 'org_id column not found in work_orders table';
+  END IF;
+  
   RAISE NOTICE '✅ Schema verification complete - all required columns present';
   RAISE NOTICE '✅ Token storage fields verified in vendors table';
+  RAISE NOTICE '✅ org_id column verified in work_orders table for cascade delete';
   RAISE NOTICE '✅ Work orders location field verified';
 END $$;

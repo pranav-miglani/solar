@@ -20,9 +20,22 @@ import {
   ArrowLeft,
   ExternalLink,
   AlertCircle,
+  Trash2,
 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { ProductionOverview } from "@/components/ProductionOverview"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface Plant {
   id: number
@@ -65,10 +78,13 @@ interface WorkOrder {
 }
 
 export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
+  const router = useRouter()
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [productionData, setProductionData] = useState<any>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     fetchWorkOrder()
@@ -102,6 +118,31 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
       }
     } catch (err) {
       console.error("Failed to fetch production data:", err)
+    }
+  }
+
+  async function handleDelete() {
+    if (!workOrder) return
+
+    setDeleting(true)
+    try {
+      const response = await fetch(`/api/workorders/${workOrderId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        alert(error.error || "Failed to delete work order")
+        setDeleting(false)
+        return
+      }
+
+      // Redirect to work orders list after successful deletion
+      router.push("/workorders")
+    } catch (error) {
+      console.error("Error deleting work order:", error)
+      alert("Failed to delete work order")
+      setDeleting(false)
     }
   }
 
@@ -173,6 +214,43 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
             Created {new Date(workOrder.created_at).toLocaleDateString()}
           </p>
         </div>
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Work Order
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete "{workOrder.title}"? This action cannot be undone and will remove all associated plant mappings.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting ? (
+                  <span className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Deleting...
+                  </span>
+                ) : (
+                  "Delete"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Organization & Summary Cards */}

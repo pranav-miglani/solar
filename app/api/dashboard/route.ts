@@ -18,6 +18,8 @@ interface DashboardData {
   role: AccountType
   metrics: {
     totalPlants?: number
+    unmappedPlants?: number
+    mappedPlants?: number
     totalAlerts?: number
     activeAlerts?: number
     totalWorkOrders?: number
@@ -80,8 +82,22 @@ export async function GET(request: NextRequest) {
         .select("id", { count: "exact", head: true })
         .eq("status", "ACTIVE")
 
+      // Get mapped plants (plants in active work orders)
+      const { data: mappedPlantsData } = await supabase
+        .from("work_order_plants")
+        .select("plant_id")
+        .eq("is_active", true)
+
+      const mappedPlants = mappedPlantsData
+        ? new Set(mappedPlantsData.map((wop) => wop.plant_id)).size
+        : 0
+      const totalPlants = plantsResult.count || 0
+      const unmappedPlants = totalPlants - mappedPlants
+
       dashboardData.metrics = {
-        totalPlants: plantsResult.count || 0,
+        totalPlants,
+        unmappedPlants,
+        mappedPlants,
         totalAlerts: alertsResult.count || 0,
         activeAlerts: activeAlertsResult.count || 0,
         totalWorkOrders: workOrdersResult.count || 0,
@@ -106,8 +122,22 @@ export async function GET(request: NextRequest) {
           .select("id", { count: "exact", head: true }),
       ])
 
+      // Get mapped plants (plants in active work orders)
+      const { data: mappedPlantsData } = await supabase
+        .from("work_order_plants")
+        .select("plant_id")
+        .eq("is_active", true)
+
+      const mappedPlants = mappedPlantsData
+        ? new Set(mappedPlantsData.map((wop) => wop.plant_id)).size
+        : 0
+      const totalPlants = plantsResult.count || 0
+      const unmappedPlants = totalPlants - mappedPlants
+
       dashboardData.metrics = {
-        totalPlants: plantsResult.count || 0,
+        totalPlants,
+        unmappedPlants,
+        mappedPlants,
         totalAlerts: alertsResult.count || 0,
         totalWorkOrders: workOrdersResult.count || 0,
       }
@@ -134,6 +164,19 @@ export async function GET(request: NextRequest) {
 
       const plantIds = orgPlants?.map((p) => p.id) || []
 
+      // Get mapped plants (plants in active work orders for this org)
+      const { data: mappedPlantsData } = await supabase
+        .from("work_order_plants")
+        .select("plant_id")
+        .eq("is_active", true)
+        .in("plant_id", plantIds.length > 0 ? plantIds : [-1])
+
+      const mappedPlants = mappedPlantsData
+        ? new Set(mappedPlantsData.map((wop) => wop.plant_id)).size
+        : 0
+      const totalPlants = plantsResult.count || 0
+      const unmappedPlants = totalPlants - mappedPlants
+
       // Get alerts for org plants
       const alertsResult = await supabase
         .from("alerts")
@@ -156,7 +199,9 @@ export async function GET(request: NextRequest) {
         .in("id", workOrderIds.length > 0 ? workOrderIds : [-1]) // Use -1 to return empty if no work orders
 
       dashboardData.metrics = {
-        totalPlants: plantsResult.count || 0,
+        totalPlants,
+        unmappedPlants,
+        mappedPlants,
         totalAlerts: alertsResult.count || 0,
         totalWorkOrders: workOrdersResult.count || 0,
       }

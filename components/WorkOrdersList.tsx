@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { motion } from "framer-motion"
 import Link from "next/link"
 import {
   Table,
@@ -11,8 +12,19 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { ExternalLink, Plus, Pencil } from "lucide-react"
+import { ExternalLink, Plus, Pencil, Trash2 } from "lucide-react"
 import { WorkOrderModal } from "@/components/WorkOrderModal"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface WorkOrder {
   id: number
@@ -31,6 +43,7 @@ export function WorkOrdersList() {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingWorkOrderId, setEditingWorkOrderId] = useState<number | undefined>()
+  const [deletingWorkOrderId, setDeletingWorkOrderId] = useState<number | null>(null)
 
   useEffect(() => {
     fetchWorkOrders()
@@ -59,6 +72,27 @@ export function WorkOrdersList() {
     fetchWorkOrders() // Refresh list after modal closes
   }
 
+  async function handleDelete(workOrderId: number) {
+    try {
+      const response = await fetch(`/api/workorders/${workOrderId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        alert(error.error || "Failed to delete work order")
+        return
+      }
+
+      // Refresh the list
+      fetchWorkOrders()
+      setDeletingWorkOrderId(null)
+    } catch (error) {
+      console.error("Error deleting work order:", error)
+      alert("Failed to delete work order")
+    }
+  }
+
   const editingWorkOrder = workOrders.find((wo) => wo.id === editingWorkOrderId)
   const organizationName = editingWorkOrder?.work_order_plants?.[0]?.plants?.organizations?.name
 
@@ -75,17 +109,21 @@ export function WorkOrdersList() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border">
-        <div className="flex flex-wrap gap-3">
-          {/* Filters removed - priority and created_by no longer displayed */}
-        </div>
-        <Button 
-          onClick={handleCreate}
-          className="w-full sm:w-auto transition-all duration-200 hover:scale-105 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl"
+      <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-4 p-4 md:p-6 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border shadow-sm">
+        <motion.div 
+          whileHover={{ scale: 1.05 }} 
+          whileTap={{ scale: 0.95 }}
+          className="w-full sm:w-auto"
         >
-          <Plus className="h-4 w-4 mr-2" />
-          Create Work Order
-        </Button>
+          <Button 
+            onClick={handleCreate}
+            size="lg"
+            className="w-full sm:w-auto transition-all duration-200 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white shadow-lg hover:shadow-xl font-semibold text-base"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Create Work Order
+          </Button>
+        </motion.div>
       </div>
 
       {/* Desktop Table View */}
@@ -146,6 +184,36 @@ export function WorkOrdersList() {
                           View
                         </Button>
                       </Link>
+                      <AlertDialog open={deletingWorkOrderId === wo.id} onOpenChange={(open: boolean) => !open && setDeletingWorkOrderId(null)}>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeletingWorkOrderId(wo.id)}
+                            className="transition-all duration-200 hover:scale-110 hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete "{wo.title}"? This action cannot be undone and will remove all associated plant mappings.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(wo.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -195,6 +263,35 @@ export function WorkOrdersList() {
                       <ExternalLink className="h-4 w-4" />
                     </Button>
                   </Link>
+                  <AlertDialog open={deletingWorkOrderId === wo.id} onOpenChange={(open: boolean) => !open && setDeletingWorkOrderId(null)}>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeletingWorkOrderId(wo.id)}
+                        className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete "{wo.title}"? This action cannot be undone and will remove all associated plant mappings.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDelete(wo.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
               <div className="text-sm text-muted-foreground">

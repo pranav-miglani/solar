@@ -142,6 +142,8 @@ export async function PUT(
       )
     }
 
+    const orgId = orgIds[0] // All plants belong to the same org
+
     // Update work order
     const { data: workOrder, error: woError } = await supabase
       .from("work_orders")
@@ -149,6 +151,7 @@ export async function PUT(
         title,
         description,
         location,
+        org_id: orgId, // Update the organization ID for cascade delete
       })
       .eq("id", params.id)
       .select()
@@ -268,6 +271,58 @@ export async function PUT(
     return NextResponse.json(
       { error: error.message || "Internal server error" },
       { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = request.cookies.get("session")?.value
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    let sessionData
+    try {
+      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+    } catch {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+    }
+
+    const accountType = sessionData.accountType as string
+
+    // Only SUPERADMIN can delete work orders
+    requirePermission(accountType as any, "work_orders", "delete")
+
+    const supabase = createServiceClient()
+
+    // Delete the work order (cascade will handle work_order_plants)
+    const { error: deleteError } = await supabase
+      .from("work_orders")
+      .delete()
+      .eq("id", params.id)
+
+    if (deleteError) {
+      console.error("Delete work order error:", deleteError)
+      return NextResponse.json(
+        { error: "Failed to delete work order" },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Work order deleted successfully",
+    })
+  } catch (error: any) {
+    console.error("Delete work order error:", error)
+    return NextResponse.json(
+      { error: error.message || "Internal server error" },
+      { status: error.message?.includes("permission") ? 403 : 500 }
     )
   }
 }

@@ -168,7 +168,7 @@ export function WorkOrderModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-4xl max-h-[95vh] md:max-h-[90vh] overflow-hidden flex flex-col p-0 mx-4">
-        <DialogHeader className="border-b pb-4 px-4 md:px-6 pt-4 md:pt-6">
+        <DialogHeader className="border-b pb-4 px-4 md:px-6 pt-4 md:pt-6 pr-12 md:pr-16">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
             <DialogTitle className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent flex-1 min-w-0">
               <span className="block sm:inline">
@@ -177,27 +177,39 @@ export function WorkOrderModal({
                   : "Create Workorder"}
               </span>
             </DialogTitle>
-            {isEditMode && (
+            <div className="flex items-center gap-4 sm:mr-8">
               <Button 
                 type="submit"
                 form="workorder-form"
                 disabled={loading || selectedPlantIds.length === 0}
-                className="w-full sm:w-auto transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl sm:mr-8 text-sm sm:text-base"
+                className="w-full sm:w-auto transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl text-sm sm:text-base"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span className="hidden sm:inline">Updating...</span>
-                    <span className="sm:hidden">Updating</span>
+                    {isEditMode ? (
+                      <>
+                        <span className="hidden sm:inline">Updating...</span>
+                        <span className="sm:hidden">Updating</span>
+                      </>
+                    ) : (
+                      "Creating..."
+                    )}
                   </span>
                 ) : (
                   <>
-                    <span className="hidden sm:inline">Update Workorder</span>
-                    <span className="sm:hidden">Update</span>
+                    {isEditMode ? (
+                      <>
+                        <span className="hidden sm:inline">Update Workorder</span>
+                        <span className="sm:hidden">Update</span>
+                      </>
+                    ) : (
+                      "Create Workorder"
+                    )}
                   </>
                 )}
               </Button>
-            )}
+            </div>
           </div>
         </DialogHeader>
 
@@ -289,22 +301,6 @@ export function WorkOrderModal({
             >
               Cancel
             </Button>
-            {!isEditMode && (
-              <Button 
-                type="submit" 
-                disabled={loading || selectedPlantIds.length === 0}
-                className="w-full sm:w-auto transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl"
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2 justify-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Creating...
-                  </span>
-                ) : (
-                  "Create Workorder"
-                )}
-              </Button>
-            )}
           </div>
         </form>
       </DialogContent>
