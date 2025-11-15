@@ -298,6 +298,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     // /station/v1.0/list endpoint is always on globalapi, not globalpro
     if (baseUrl.includes('globalpro')) {
       baseUrl = baseUrl.replace('globalpro', 'globalapi')
+<<<<<<< HEAD
     }
     
     // Extract just the domain (remove any paths)
