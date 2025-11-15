@@ -316,6 +316,7 @@ BEGIN
     RAISE EXCEPTION 'Token storage columns not found in vendors table';
   END IF;
   
+<<<<<<< HEAD
   -- Verify location column exists in work_orders table
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns 
