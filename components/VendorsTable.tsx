@@ -196,7 +196,7 @@ export function VendorsTable() {
     if (!confirm("This will fetch all plants from the vendor and sync them to the database. Continue?")) {
       return
     }
-
+    console.log("Syncing plants for vendor:", vendorId);
     setSyncingVendorId(vendorId)
     setSyncProgress({ current: 0, total: 0 })
 

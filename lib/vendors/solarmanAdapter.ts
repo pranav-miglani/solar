@@ -225,7 +225,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       username: credentials.username,
       password: credentials.password || credentials.passwordSha256,
     }
-
+    console.log("[SOLARMAN] Request body:", requestBody);
     if (!requestBody.password) {
       throw new Error('Solarman authentication failed: Password or passwordSha256 is required')
     }
@@ -292,111 +292,100 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   async listPlants(): Promise<Plant[]> {
     const token = await this.authenticate()
     
-    // Use the new v2 search endpoint that returns detailed production metrics
-    // Try the new endpoint first, fallback to old endpoint if needed
-    const baseUrl = this.getApiBaseUrl()
+    // Get base URL and ensure we use globalapi for /station/v1.0/list endpoint
+    let baseUrl = this.getApiBaseUrl()
     
-    // Check if baseUrl contains 'globalpro' (new API) or 'globalapi' (old API)
-    // Also check for 'globalpro' in any form
-    const isNewApi = baseUrl.includes('globalpro') || baseUrl.includes('globalpro.solarmanpv.com')
-    
-    if (isNewApi) {
-      // Use new v2 search endpoint
-      const response = await fetch(
-        `${baseUrl}/maintain-s/operating/station/v2/search?page=1&size=50&order.direction=ASC&order.property=name`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-            "accept": "application/json, text/plain, */*",
-          },
-          body: JSON.stringify({
-            station: {
-              powerTypeList: ["PV"]
-            }
-          }),
-        }
-      )
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Failed to fetch stations: ${response.statusText} - ${errorText}`)
-      }
-
-      const data = await response.json()
-
-      if (!data.data || !Array.isArray(data.data)) {
-        throw new Error("Invalid response format from Solarman API")
-      }
-
-      return data.data.map((item: any) => {
-        const station = item.station
-        return {
-          id: station.id.toString(),
-          name: station.name,
-          capacityKw: station.installedCapacity || 0,
-          location: station.locationAddress
-            ? {
-                address: station.locationAddress,
-                lat: station.locationLat || undefined,
-                lng: station.locationLng || undefined,
-              }
-            : undefined,
-          metadata: {
-            stationId: station.id,
-            // Production metrics (only those shown in Production Overview dashboard)
-            currentPowerKw: station.generationPower ? station.generationPower / 1000 : null, // Convert W to kW
-            dailyEnergyMwh: station.generationValue ? station.generationValue / 1000 : null, // Convert kWh to MWh
-            monthlyEnergyMwh: station.generationMonth ? station.generationMonth / 1000 : null,
-            yearlyEnergyMwh: station.generationYear ? station.generationYear / 1000 : null,
-            totalEnergyMwh: station.generationTotal ? station.generationTotal / 1000 : null,
-            performanceRatio: station.generationCapacity || null, // PR as decimal (0-1 range)
-            lastUpdateTime: station.lastUpdateTime ? new Date(station.lastUpdateTime * 1000).toISOString() : null,
-          },
-        }
-      })
-    } else {
-      // Fallback to old v1.0/list endpoint
-      const response = await fetch(
-        `${baseUrl}/station/v1.0/list`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({}),
-        }
-      )
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Failed to fetch stations: ${response.statusText} - ${errorText}`)
-      }
-
-      const data: SolarmanStationListResponse = await response.json()
-
-      if (!data.success) {
-        throw new Error("Failed to fetch stations from Solarman")
-      }
-
-      return data.data.map((station) => ({
-        id: station.stationId.toString(),
-        name: station.stationName,
-        capacityKw: station.capacity,
-        location: station.location
-          ? {
-              lat: station.location.latitude,
-              lng: station.location.longitude,
-              address: station.location.address,
-            }
-          : undefined,
-        metadata: {
-          stationId: station.stationId,
-        },
-      }))
+    // /station/v1.0/list endpoint is always on globalapi, not globalpro
+    if (baseUrl.includes('globalpro')) {
+      baseUrl = baseUrl.replace('globalpro', 'globalapi')
     }
+    
+    // Extract just the domain (remove any paths)
+    const urlObj = new URL(baseUrl)
+    const apiBaseUrl = `${urlObj.protocol}//${urlObj.host}`
+    
+    // Use /station/v1.0/list endpoint with POST body
+    const requestBody = {
+      page: 1,
+      size: 100,
+    }
+    
+    const url = `${apiBaseUrl}/station/v1.0/list`
+    
+    console.log('📊 [Solarman] Fetching plants from:', url)
+    console.log('📊 [Solarman] Request body:', requestBody)
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ [Solarman] Failed to fetch stations:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      })
+      throw new Error(`Failed to fetch stations: ${response.statusText} - ${errorText}`)
+    }
+
+    const data = await response.json()
+    console.log('📊 [Solarman] Response received:', {
+      success: data.success,
+      dataLength: data.data?.length || 0,
+    })
+
+    // Handle different response formats
+    if (data.success === false) {
+      throw new Error(`Failed to fetch stations from Solarman: ${data.message || 'Unknown error'}`)
+    }
+
+    // Check if data exists and is an array
+    if (!data.data || !Array.isArray(data.data)) {
+      console.error('❌ [Solarman] Invalid response format:', data)
+      throw new Error("Invalid response format from Solarman API - expected data array")
+    }
+
+    // Map stations to Plant format
+    return data.data.map((station: any) => {
+      // Handle different field names (stationId vs id, stationName vs name, etc.)
+      const stationId = station.stationId || station.id
+      const stationName = station.stationName || station.name
+      const capacity = station.capacity || station.installedCapacity || 0
+      
+      // Handle location - could be object or separate fields
+      let location: any = undefined
+      if (station.location) {
+        location = {
+          lat: station.location.latitude || station.location.lat,
+          lng: station.location.longitude || station.location.lng,
+          address: station.location.address,
+        }
+      } else if (station.locationAddress || station.locationLat || station.locationLng) {
+        location = {
+          lat: station.locationLat,
+          lng: station.locationLng,
+          address: station.locationAddress,
+        }
+      }
+
+      return {
+        id: stationId.toString(),
+        name: stationName,
+        capacityKw: typeof capacity === 'number' ? capacity / 1000 : 0, // Convert W to kW if needed
+        location: location,
+        metadata: {
+          stationId: stationId,
+          // Include any additional fields from the response
+          ...station,
+        },
+      }
+    })
   }
 
   async getTelemetry(

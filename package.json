@@ -4,13 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:debug": "NODE_OPTIONS='--inspect' next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
     "test:login": "bash scripts/test-login.sh",
-    "verify:setup": "bash scripts/verify-setup.sh"
+    "verify:setup": "bash scripts/verify-setup.sh",
+    "debug": "NODE_OPTIONS='--inspect-brk' next dev"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
