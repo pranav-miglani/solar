@@ -155,12 +155,14 @@ CREATE TABLE plants (
 );
 
 -- Work Orders table (static, no status)
+-- Note: priority and created_by are nullable/deprecated but kept for backward compatibility
 CREATE TABLE work_orders (
   id SERIAL PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT,
-  priority work_order_priority NOT NULL DEFAULT 'MEDIUM',
-  created_by UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  location TEXT, -- Physical location of the work order
+  priority work_order_priority DEFAULT 'MEDIUM', -- DEPRECATED: No longer used in UI, kept for backward compatibility
+  created_by UUID REFERENCES accounts(id) ON DELETE CASCADE, -- DEPRECATED: No longer used in UI, kept for backward compatibility
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -218,7 +220,8 @@ CREATE INDEX idx_plants_org_id ON plants(org_id);
 CREATE INDEX idx_plants_vendor_id ON plants(vendor_id);
 CREATE INDEX idx_plants_vendor_id_org_id ON plants(vendor_id, org_id);
 CREATE INDEX idx_plants_last_update_time ON plants(last_update_time);
-CREATE INDEX idx_work_orders_created_by ON work_orders(created_by);
+CREATE INDEX idx_work_orders_location ON work_orders(location) WHERE location IS NOT NULL;
+CREATE INDEX idx_work_orders_created_by ON work_orders(created_by) WHERE created_by IS NOT NULL;
 CREATE INDEX idx_work_order_plants_work_order_id ON work_order_plants(work_order_id);
 CREATE INDEX idx_work_order_plants_plant_id ON work_order_plants(plant_id);
 CREATE INDEX idx_alerts_plant_id ON alerts(plant_id);
@@ -301,6 +304,15 @@ BEGIN
     RAISE EXCEPTION 'Token storage columns not found in vendors table';
   END IF;
   
+  -- Verify location column exists in work_orders table
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'work_orders' AND column_name = 'location'
+  ) THEN
+    RAISE EXCEPTION 'location column not found in work_orders table';
+  END IF;
+  
   RAISE NOTICE '✅ Schema verification complete - all required columns present';
   RAISE NOTICE '✅ Token storage fields verified in vendors table';
+  RAISE NOTICE '✅ Work orders location field verified';
 END $$;

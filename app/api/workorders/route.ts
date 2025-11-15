@@ -35,14 +35,15 @@ export async function GET(request: NextRequest) {
     // Use service role client to bypass RLS
     const supabase = createServiceClient()
 
-    const { searchParams } = new URL(request.url)
-    const priority = searchParams.get("priority")
-
     let query = supabase
       .from("work_orders")
       .select(`
-        *,
-        created_by_account:accounts!work_orders_created_by_fkey(id, email),
+        id,
+        title,
+        description,
+        location,
+        created_at,
+        updated_at,
         work_order_plants(
           *,
           plants:plant_id (
@@ -55,10 +56,6 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order("created_at", { ascending: false })
-
-    if (priority) {
-      query = query.eq("priority", priority)
-    }
 
     // Filter based on role
     if (accountType === "ORG" && orgId) {

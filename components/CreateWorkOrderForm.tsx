@@ -140,11 +140,13 @@ export function CreateWorkOrderForm() {
       </div>
 
       {selectedOrgId && (
-        <PlantSelector
-          orgIds={[selectedOrgId]}
-          selectedPlantIds={selectedPlantIds}
-          onSelectionChange={setSelectedPlantIds}
-        />
+        <div className="space-y-2">
+          <PlantSelector
+            orgIds={[selectedOrgId]}
+            selectedPlantIds={selectedPlantIds}
+            onSelectionChange={setSelectedPlantIds}
+          />
+        </div>
       )}
 
       <div className="flex space-x-4">

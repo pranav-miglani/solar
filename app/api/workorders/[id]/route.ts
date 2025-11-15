@@ -37,8 +37,12 @@ export async function GET(
     const { data: workOrder, error } = await supabase
       .from("work_orders")
       .select(`
-        *,
-        created_by_account:accounts!work_orders_created_by_fkey(id, email),
+        id,
+        title,
+        description,
+        location,
+        created_at,
+        updated_at,
         work_order_plants(
           *,
           plants(

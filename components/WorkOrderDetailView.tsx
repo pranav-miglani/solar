@@ -17,8 +17,6 @@ import {
   Building2,
   Zap,
   MapPin,
-  Calendar,
-  User,
   ArrowLeft,
   ExternalLink,
   AlertCircle,
@@ -57,12 +55,7 @@ interface WorkOrder {
   id: number
   title: string
   description: string | null
-  priority: string
   created_at: string
-  created_by_account: {
-    id: string
-    email: string
-  }
   work_order_plants: Array<{
     id: number
     is_active: boolean
@@ -165,39 +158,25 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/workorders">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
-              <ClipboardList className="h-8 w-8 text-primary" />
-              {workOrder.title}
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Created {new Date(workOrder.created_at).toLocaleDateString()}
-            </p>
-          </div>
+      <div className="flex items-center gap-4">
+        <Link href="/workorders">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+            <ClipboardList className="h-8 w-8 text-primary" />
+            {workOrder.title}
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Created {new Date(workOrder.created_at).toLocaleDateString()}
+          </p>
         </div>
-        <Badge
-          variant={
-            workOrder.priority === "HIGH"
-              ? "destructive"
-              : workOrder.priority === "MEDIUM"
-              ? "default"
-              : "secondary"
-          }
-          className="text-lg px-4 py-2"
-        >
-          {workOrder.priority}
-        </Badge>
       </div>
 
       {/* Organization & Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -250,22 +229,6 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                 </p>
               </div>
               <Zap className="h-8 w-8 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border-orange-200 dark:border-orange-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                  Created By
-                </p>
-                <p className="text-sm font-bold text-orange-900 dark:text-orange-100 truncate">
-                  {workOrder.created_by_account?.email || "N/A"}
-                </p>
-              </div>
-              <User className="h-8 w-8 text-orange-500" />
             </div>
           </CardContent>
         </Card>
