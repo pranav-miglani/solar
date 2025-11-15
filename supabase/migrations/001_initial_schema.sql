@@ -105,6 +105,8 @@ ALTER TABLE accounts ADD CONSTRAINT accounts_org_id_fkey
 
 -- Vendors table
 -- Vendors are mapped to organizations (one org can have multiple vendors)
+-- Includes token storage for vendor API authentication (e.g., Solarman)
+-- Tokens are cached in DB to avoid repeated API calls - checked before authentication
 CREATE TABLE vendors (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -112,10 +114,22 @@ CREATE TABLE vendors (
   api_base_url TEXT NOT NULL,
   credentials JSONB NOT NULL,
   org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+  -- Token storage for vendor API authentication (Solarman, etc.)
+  access_token TEXT, -- Cached access token from vendor API (stored after first auth)
+  refresh_token TEXT, -- Refresh token for token renewal (if supported by vendor)
+  token_expires_at TIMESTAMPTZ, -- Token expiration timestamp (checked before reuse)
+  token_metadata JSONB DEFAULT '{}', -- Additional token metadata (token_type, scope, expires_in, etc.)
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Add comments for token fields
+COMMENT ON COLUMN vendors.access_token IS 'Cached access token from vendor API (e.g., Solarman). Stored after authentication to avoid repeated API calls.';
+COMMENT ON COLUMN vendors.refresh_token IS 'Refresh token for token renewal (if supported by vendor)';
+COMMENT ON COLUMN vendors.token_expires_at IS 'Token expiration timestamp - token is valid until this time. Checked before reuse to avoid expired tokens.';
+COMMENT ON COLUMN vendors.token_metadata IS 'Additional token metadata (token_type, scope, expires_in, stored_at, etc.)';
+COMMENT ON COLUMN vendors.org_id IS 'Organization this vendor belongs to. NULL means vendor is global/shared.';
 
 -- Plants table
 -- Includes production metrics from Production Overview dashboard
@@ -199,6 +213,7 @@ CREATE INDEX idx_accounts_email ON accounts(email);
 CREATE INDEX idx_accounts_org_id ON accounts(org_id);
 CREATE INDEX idx_accounts_account_type ON accounts(account_type);
 CREATE INDEX idx_vendors_org_id ON vendors(org_id);
+CREATE INDEX idx_vendors_token_expires_at ON vendors(token_expires_at) WHERE token_expires_at IS NOT NULL;
 CREATE INDEX idx_plants_org_id ON plants(org_id);
 CREATE INDEX idx_plants_vendor_id ON plants(vendor_id);
 CREATE INDEX idx_plants_vendor_id_org_id ON plants(vendor_id, org_id);
@@ -278,5 +293,14 @@ BEGIN
     RAISE EXCEPTION 'org_id column not found in vendors table';
   END IF;
   
+  -- Verify token storage columns exist in vendors table
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'vendors' AND column_name = 'access_token'
+  ) THEN
+    RAISE EXCEPTION 'Token storage columns not found in vendors table';
+  END IF;
+  
   RAISE NOTICE '✅ Schema verification complete - all required columns present';
+  RAISE NOTICE '✅ Token storage fields verified in vendors table';
 END $$;

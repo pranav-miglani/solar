@@ -74,6 +74,11 @@ export async function POST(
 
     const adapter = VendorManager.getAdapter(vendorConfig)
 
+    // Set token storage for Solarman adapter (if it supports it)
+    if (adapter && typeof (adapter as any).setTokenStorage === 'function') {
+      (adapter as any).setTokenStorage(vendor.id, supabase)
+    }
+
     // Fetch plants from vendor
     let vendorPlants
     try {

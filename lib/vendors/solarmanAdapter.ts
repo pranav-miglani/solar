@@ -76,34 +76,185 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     expiresAt: number
   } | null = null
 
+  private vendorId?: number
+  private supabaseClient?: any // Supabase client for token storage
+
+  /**
+   * Set vendor ID and Supabase client for token storage
+   */
+  setTokenStorage(vendorId: number, supabaseClient: any) {
+    this.vendorId = vendorId
+    this.supabaseClient = supabaseClient
+  }
+
+  /**
+   * Decode JWT token to check expiry (if token is JWT format)
+   * Returns expiry timestamp in milliseconds, or null if not a JWT
+   */
+  private decodeJWTExpiry(token: string): number | null {
+    try {
+      const parts = token.split('.')
+      if (parts.length !== 3) {
+        // Not a JWT, return null
+        return null
+      }
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+      if (payload.exp) {
+        // JWT expiry is in seconds, convert to milliseconds
+        return payload.exp * 1000
+      }
+      return null
+    } catch {
+      // Not a valid JWT or can't decode
+      return null
+    }
+  }
+
+  /**
+   * Check if token from DB is still valid
+   */
+  private async getTokenFromDB(): Promise<string | null> {
+    if (!this.vendorId || !this.supabaseClient) {
+      return null
+    }
+
+    try {
+      const { data: vendor, error } = await this.supabaseClient
+        .from('vendors')
+        .select('access_token, token_expires_at')
+        .eq('id', this.vendorId)
+        .single()
+
+      if (error || !vendor || !vendor.access_token) {
+        return null
+      }
+
+      // Check if token is expired
+      if (vendor.token_expires_at) {
+        const expiresAt = new Date(vendor.token_expires_at).getTime()
+        // Add 5 minute buffer for safety
+        if (expiresAt > Date.now() + 5 * 60 * 1000) {
+          return vendor.access_token
+        }
+      } else {
+        // If no expiry stored, try to decode JWT
+        const jwtExpiry = this.decodeJWTExpiry(vendor.access_token)
+        if (jwtExpiry && jwtExpiry > Date.now() + 5 * 60 * 1000) {
+          return vendor.access_token
+        }
+      }
+
+      return null
+    } catch (error) {
+      console.error('Error fetching token from DB:', error)
+      return null
+    }
+  }
+
+  /**
+   * Store token in database
+   */
+  private async storeTokenInDB(token: string, expiresIn: number, refreshToken?: string): Promise<void> {
+    if (!this.vendorId || !this.supabaseClient) {
+      return
+    }
+
+    try {
+      // Calculate expiry timestamp (expiresIn is in seconds)
+      const expiresAt = new Date(Date.now() + expiresIn * 1000)
+      
+      // Also try to decode JWT expiry if it's a JWT
+      const jwtExpiry = this.decodeJWTExpiry(token)
+      const finalExpiresAt = jwtExpiry ? new Date(jwtExpiry) : expiresAt
+
+      const updateData: any = {
+        access_token: token,
+        token_expires_at: finalExpiresAt.toISOString(),
+        token_metadata: {
+          expires_in: expiresIn,
+          stored_at: new Date().toISOString(),
+        },
+      }
+
+      if (refreshToken) {
+        updateData.refresh_token = refreshToken
+      }
+
+      await this.supabaseClient
+        .from('vendors')
+        .update(updateData)
+        .eq('id', this.vendorId)
+    } catch (error) {
+      console.error('Error storing token in DB:', error)
+      // Don't throw - token caching is optional
+    }
+  }
+
   async authenticate(): Promise<string> {
-    // Check cache
+    // Check in-memory cache first
     if (this.tokenCache && this.tokenCache.expiresAt > Date.now()) {
       return this.tokenCache.token
     }
 
+    // Check database for stored token
+    const dbToken = await this.getTokenFromDB()
+    if (dbToken) {
+      // Cache in memory for this session
+      const jwtExpiry = this.decodeJWTExpiry(dbToken)
+      this.tokenCache = {
+        token: dbToken,
+        expiresAt: jwtExpiry || Date.now() + 3600 * 1000, // Default 1 hour if can't decode
+      }
+      return dbToken
+    }
+
+    // Need to authenticate
     const credentials = this.getCredentials() as {
       appId: string
       appSecret: string
       username: string
-      passwordSha256: string
-      orgId?: number // Optional Solarman orgId (not our organization ID)
+      password?: string
+      passwordSha256?: string
+      solarmanOrgId?: number // Optional Solarman orgId (not our organization ID)
+      orgId?: number // Alternative name
     }
 
     // Build request body according to SOLARMAN_DOC.md
     const requestBody: any = {
       appSecret: credentials.appSecret,
       username: credentials.username,
-      password: credentials.passwordSha256,
+      password: credentials.password || credentials.passwordSha256,
+    }
+
+    if (!requestBody.password) {
+      throw new Error('Solarman authentication failed: Password or passwordSha256 is required')
     }
 
     // Add orgId if provided (for org-scoped login)
-    if (credentials.orgId) {
-      requestBody.orgId = credentials.orgId
+    // Check both solarmanOrgId and orgId for compatibility
+    const orgId = credentials.solarmanOrgId || credentials.orgId
+    if (orgId) {
+      requestBody.orgId = orgId
     }
 
+    // Ensure we use the correct base URL (globalapi, not globalpro for auth)
+    // Authentication endpoint is always on globalapi.solarmanpv.com
+    let authBaseUrl = this.getApiBaseUrl()
+    
+    // Replace globalpro with globalapi for authentication
+    if (authBaseUrl.includes('globalpro')) {
+      authBaseUrl = authBaseUrl.replace('globalpro', 'globalapi')
+    }
+    
+    // Extract just the domain (remove any paths)
+    const urlObj = new URL(authBaseUrl)
+    const baseDomain = `${urlObj.protocol}//${urlObj.host}`
+    
     // appId goes in query parameter, not body
-    const url = `${this.getApiBaseUrl()}/account/v1.0/token?appId=${credentials.appId}`
+    const url = `${baseDomain}/account/v1.0/token?appId=${credentials.appId}`
+
+    console.log('🔐 [Solarman] Authenticating with URL:', url)
+    console.log('🔐 [Solarman] Request body (without password):', { ...requestBody, password: '***' })
 
     const response = await fetch(url, {
       method: "POST",
@@ -115,15 +266,24 @@ export class SolarmanAdapter extends BaseVendorAdapter {
 
     if (!response.ok) {
       const errorText = await response.text()
+      console.error('❌ [Solarman] Auth failed:', response.status, errorText)
       throw new Error(`Solarman authentication failed: ${response.statusText} - ${errorText}`)
     }
 
     const data: SolarmanAuthResponse = await response.json()
 
-    // Cache token (expires 1 hour before actual expiry for safety)
+    if (!data.access_token) {
+      throw new Error('Solarman authentication failed: No access token in response')
+    }
+
+    // Store token in database
+    await this.storeTokenInDB(data.access_token, data.expires_in || 3600)
+
+    // Cache token in memory (expires 5 minutes before actual expiry for safety)
+    const expiresIn = data.expires_in || 3600
     this.tokenCache = {
       token: data.access_token,
-      expiresAt: Date.now() + (data.expires_in - 3600) * 1000,
+      expiresAt: Date.now() + (expiresIn - 300) * 1000,
     }
 
     return data.access_token
