@@ -44,7 +44,7 @@ END $$;
 -- Step 1: Delete existing accounts (by email) before inserting
 -- This makes the script idempotent - safe to run multiple times
 DELETE FROM accounts WHERE email IN ('admin@woms.com', 'govt@woms.com', 'org1@woms.com');
-RAISE NOTICE 'Deleted existing accounts (if any)';
+-- RAISE NOTICE 'Deleted existing accounts (if any)';
 
 -- Step 2: Ensure organizations exist (create if needed)
 INSERT INTO organizations (name, meta)
