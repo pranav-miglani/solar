@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 import { requirePermission } from "@/lib/rbac"
+
+// For orgs API, we need to bypass RLS for write operations
+// We use service role key since RLS policies require auth.uid() which we don't have
+function createServiceClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase service role key")
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey)
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const session = request.cookies.get("session")?.value
 
     if (!session) {
@@ -21,6 +33,9 @@ export async function GET(request: NextRequest) {
     const accountType = sessionData.accountType as string
 
     requirePermission(accountType as any, "organizations", "read")
+
+    // Use service role client to bypass RLS
+    const supabase = createServiceClient()
 
     const { data: orgs, error } = await supabase
       .from("organizations")
@@ -47,7 +62,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const session = request.cookies.get("session")?.value
 
     if (!session) {
@@ -63,6 +77,7 @@ export async function POST(request: NextRequest) {
 
     const accountType = sessionData.accountType as string
 
+    // Only SUPERADMIN can create organizations
     requirePermission(accountType as any, "organizations", "create")
 
     const body = await request.json()
@@ -75,6 +90,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Use service role client to bypass RLS for insert
+    const supabase = createServiceClient()
+
     const { data: org, error } = await supabase
       .from("organizations")
       .insert({ name, meta: meta || {} })
@@ -83,8 +101,14 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Org creation error:", error)
+      console.error("Error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      })
       return NextResponse.json(
-        { error: "Failed to create organization" },
+        { error: "Failed to create organization", details: error.message },
         { status: 500 }
       )
     }
@@ -94,7 +118,7 @@ export async function POST(request: NextRequest) {
     console.error("Org creation error:", error)
     return NextResponse.json(
       { error: error.message || "Internal server error" },
-      { status: 403 }
+      { status: error.message?.includes("permission") ? 403 : 500 }
     )
   }
 }
