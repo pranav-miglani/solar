@@ -14,40 +14,31 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { PlantSelector } from "@/components/PlantSelector"
-import { createClient } from "@/lib/supabase/client"
 
 interface Org {
   id: number
   name: string
 }
 
-interface User {
-  id: string
-  email: string
-}
-
 export function CreateWorkOrderForm() {
   const router = useRouter()
   const [orgs, setOrgs] = useState<Org[]>([])
-  const [engineers, setEngineers] = useState<User[]>([])
   const [selectedOrgIds, setSelectedOrgIds] = useState<number[]>([])
   const [selectedPlantIds, setSelectedPlantIds] = useState<number[]>([])
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     priority: "MEDIUM" as "LOW" | "MEDIUM" | "HIGH",
-    assignedEngineer: "",
   })
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     fetchOrgs()
-    fetchEngineers()
   }, [])
 
   async function fetchOrgs() {
     try {
-      const response = await fetch("/api/user-orgs/my-orgs")
+      const response = await fetch("/api/orgs")
       const data = await response.json()
       if (data.orgs) {
         setOrgs(data.orgs)
@@ -55,15 +46,6 @@ export function CreateWorkOrderForm() {
     } catch (error) {
       console.error("Error fetching orgs:", error)
     }
-  }
-
-  async function fetchEngineers() {
-    const response = await fetch("/api/users")
-    const data = await response.json()
-    const engineers = data.users?.filter(
-      (u: any) => u.role === "ENGINEER"
-    ) || []
-    setEngineers(engineers)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -75,10 +57,10 @@ export function CreateWorkOrderForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...formData,
-          orgIds: selectedOrgIds,
+          title: formData.title,
+          description: formData.description,
+          priority: formData.priority,
           plantIds: selectedPlantIds,
-          assignedEngineer: formData.assignedEngineer || null,
         }),
       })
 
@@ -173,32 +155,7 @@ export function CreateWorkOrderForm() {
           orgIds={selectedOrgIds}
           selectedPlantIds={selectedPlantIds}
           onSelectionChange={setSelectedPlantIds}
-          assignedEngineer={formData.assignedEngineer}
         />
-      )}
-
-      {selectedPlantIds.length > 0 && (
-        <div>
-          <Label htmlFor="assignedEngineer">Assign Engineer</Label>
-          <Select
-            value={formData.assignedEngineer}
-            onValueChange={(value) =>
-              setFormData({ ...formData, assignedEngineer: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select engineer (optional)" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">None</SelectItem>
-              {engineers.map((engineer) => (
-                <SelectItem key={engineer.id} value={engineer.id}>
-                  {engineer.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
       )}
 
       <div className="flex space-x-4">

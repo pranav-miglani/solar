@@ -1,25 +1,29 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { cookies } from "next/headers"
 import { VendorsTable } from "@/components/VendorsTable"
 
 export default async function VendorsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Check custom session authentication
+  const cookieStore = await cookies()
+  const session = cookieStore.get("session")?.value
 
-  if (!user) {
+  if (!session) {
     redirect("/auth/login")
   }
 
-  const { data: userData } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single()
+  // Decode session to get account type
+  let sessionData
+  try {
+    sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+  } catch {
+    redirect("/auth/login")
+  }
 
-  if (userData?.role !== "SUPERADMIN") {
-    redirect("/")
+  const accountType = sessionData.accountType
+
+  // Only SUPERADMIN can access this page
+  if (accountType !== "SUPERADMIN") {
+    redirect("/dashboard")
   }
 
   return (

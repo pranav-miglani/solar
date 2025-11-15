@@ -1,32 +1,43 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 import { requirePermission } from "@/lib/rbac"
+
+// For vendors API, we need to bypass RLS
+function createServiceClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase service role key")
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey)
+}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const session = request.cookies.get("session")?.value
 
-    if (!user) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: userData } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single()
-
-    if (!userData) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    let sessionData
+    try {
+      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+    } catch {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    requirePermission(userData.role as any, "vendors", "read")
+    const accountType = sessionData.accountType as string
+
+    requirePermission(accountType as any, "vendors", "read")
+
+    // Use service role client to bypass RLS
+    const supabase = createServiceClient()
 
     const { data: vendor, error } = await supabase
       .from("vendors")
@@ -49,29 +60,28 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const session = request.cookies.get("session")?.value
 
-    if (!user) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: userData } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single()
-
-    if (!userData) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    let sessionData
+    try {
+      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+    } catch {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    requirePermission(userData.role as any, "vendors", "update")
+    const accountType = sessionData.accountType as string
+
+    requirePermission(accountType as any, "vendors", "update")
 
     const body = await request.json()
     const { name, api_base_url, credentials, is_active } = body
+
+    // Use service role client to bypass RLS
+    const supabase = createServiceClient()
 
     const { data: vendor, error } = await supabase
       .from("vendors")
@@ -100,26 +110,25 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const session = request.cookies.get("session")?.value
 
-    if (!user) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: userData } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single()
-
-    if (!userData) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    let sessionData
+    try {
+      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+    } catch {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    requirePermission(userData.role as any, "vendors", "delete")
+    const accountType = sessionData.accountType as string
+
+    requirePermission(accountType as any, "vendors", "delete")
+
+    // Use service role client to bypass RLS
+    const supabase = createServiceClient()
 
     const { error } = await supabase
       .from("vendors")

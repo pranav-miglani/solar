@@ -18,14 +18,12 @@ interface PlantSelectorProps {
   orgIds: number[]
   selectedPlantIds: number[]
   onSelectionChange: (plantIds: number[]) => void
-  assignedEngineer?: string
 }
 
 export function PlantSelector({
   orgIds,
   selectedPlantIds,
   onSelectionChange,
-  assignedEngineer,
 }: PlantSelectorProps) {
   const [plants, setPlants] = useState<Plant[]>([])
   const [loading, setLoading] = useState(true)

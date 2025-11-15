@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { createClient } from "@/lib/supabase/client"
 
 interface Org {
   id: number
@@ -27,24 +26,29 @@ interface Org {
   meta: Record<string, any>
 }
 
-interface User {
+interface Account {
   id: string
   email: string
-  role: string
+  account_type: string
+  org_id: number | null
 }
 
 export function OrgsTable() {
   const [orgs, setOrgs] = useState<Org[]>([])
-  const [users, setUsers] = useState<User[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
+  const [accountDialogOpen, setAccountDialogOpen] = useState(false)
   const [selectedOrg, setSelectedOrg] = useState<Org | null>(null)
   const [formData, setFormData] = useState({ name: "" })
+  const [accountFormData, setAccountFormData] = useState({ 
+    email: "", 
+    password: "" 
+  })
 
   useEffect(() => {
     fetchOrgs()
-    fetchUsers()
+    fetchAccounts()
   }, [])
 
   async function fetchOrgs() {
@@ -54,10 +58,12 @@ export function OrgsTable() {
     setLoading(false)
   }
 
-  async function fetchUsers() {
-    const response = await fetch("/api/users")
-    const data = await response.json()
-    setUsers(data.users || [])
+  async function fetchAccounts() {
+    const response = await fetch("/api/accounts")
+    if (response.ok) {
+      const data = await response.json()
+      setAccounts(data.accounts || [])
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -79,19 +85,30 @@ export function OrgsTable() {
     }
   }
 
-  async function handleAssignUser(userId: string, orgId: number) {
-    const response = await fetch("/api/user-orgs", {
+  async function handleCreateAccount(e: React.FormEvent) {
+    e.preventDefault()
+    
+    if (!selectedOrg) return
+
+    const response = await fetch("/api/accounts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: userId, org_id: orgId }),
+      body: JSON.stringify({
+        email: accountFormData.email,
+        password: accountFormData.password,
+        account_type: "ORG",
+        org_id: selectedOrg.id,
+      }),
     })
 
     if (response.ok) {
-      setAssignDialogOpen(false)
+      setAccountDialogOpen(false)
+      setAccountFormData({ email: "", password: "" })
+      fetchAccounts()
       fetchOrgs()
     } else {
       const error = await response.json()
-      alert(error.error || "Failed to assign user")
+      alert(error.error || "Failed to create account")
     }
   }
 
@@ -142,61 +159,122 @@ export function OrgsTable() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
+            <TableHead>Organization Name</TableHead>
+            <TableHead>Account</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {orgs.map((org) => (
-            <TableRow key={org.id}>
-              <TableCell>{org.name}</TableCell>
-              <TableCell>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedOrg(org)
-                    setAssignDialogOpen(true)
-                  }}
-                >
-                  Assign Users
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
+          {orgs.map((org) => {
+            const orgAccount = accounts.find((acc) => acc.org_id === org.id)
+            return (
+              <TableRow key={org.id}>
+                <TableCell className="font-medium">{org.name}</TableCell>
+                <TableCell>
+                  {orgAccount ? (
+                    <div>
+                      <div className="font-medium">{orgAccount.email}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {orgAccount.account_type}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">
+                      No account
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedOrg(org)
+                      setAccountFormData({ email: "", password: "" })
+                      setAccountDialogOpen(true)
+                    }}
+                  >
+                    {orgAccount ? "View Account" : "Create Account"}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            )
+          })}
         </TableBody>
       </Table>
 
-      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+      <Dialog open={accountDialogOpen} onOpenChange={setAccountDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Assign Users to {selectedOrg?.name}
+              {accounts.find((acc) => acc.org_id === selectedOrg?.id)
+                ? "Organization Account"
+                : `Create Account for ${selectedOrg?.name}`}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {users.map((user) => (
-              <div
-                key={user.id}
-                className="flex items-center justify-between p-2 border rounded"
-              >
-                <div>
-                  <div className="font-medium">{user.email}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {user.role}
-                  </div>
+          {accounts.find((acc) => acc.org_id === selectedOrg?.id) ? (
+            <div className="space-y-2">
+              <div>
+                <Label>Email</Label>
+                <div className="text-sm font-medium">
+                  {accounts.find((acc) => acc.org_id === selectedOrg?.id)?.email}
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    selectedOrg && handleAssignUser(user.id, selectedOrg.id)
-                  }
-                >
-                  Assign
-                </Button>
               </div>
-            ))}
-          </div>
+              <div>
+                <Label>Account Type</Label>
+                <div className="text-sm font-medium">ORG</div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Each organization has one account. To change the account, delete
+                the existing one and create a new one.
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleCreateAccount} className="space-y-4">
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={accountFormData.email}
+                  onChange={(e) =>
+                    setAccountFormData({
+                      ...accountFormData,
+                      email: e.target.value,
+                    })
+                  }
+                  required
+                  placeholder="org@example.com"
+                />
+              </div>
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={accountFormData.password}
+                  onChange={(e) =>
+                    setAccountFormData({
+                      ...accountFormData,
+                      password: e.target.value,
+                    })
+                  }
+                  required
+                  placeholder="Enter password"
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setAccountDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">Create Account</Button>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>

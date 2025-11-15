@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 import type { AccountType } from "@/lib/rbac"
+
+// For dashboard API, we need to bypass RLS for queries
+function createServiceClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase service role key")
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey)
+}
 
 interface DashboardData {
   role: AccountType
@@ -27,7 +39,6 @@ interface DashboardData {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const session = request.cookies.get("session")?.value
 
     if (!session) {
@@ -44,6 +55,9 @@ export async function GET(request: NextRequest) {
 
     const accountType = sessionData.accountType as AccountType
     const orgId = sessionData.orgId
+
+    // Use service role client to bypass RLS
+    const supabase = createServiceClient()
 
     const dashboardData: DashboardData = {
       role: accountType,

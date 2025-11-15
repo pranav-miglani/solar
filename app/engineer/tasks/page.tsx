@@ -1,32 +1,18 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { EngineerTasksList } from "@/components/EngineerTasksList"
+import { cookies } from "next/headers"
 
+// Note: ENGINEER role doesn't exist in the current system (only SUPERADMIN, ORG, GOVT)
+// This page is redirected to dashboard
 export default async function EngineerTasksPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Check custom session authentication
+  const cookieStore = await cookies()
+  const session = cookieStore.get("session")?.value
 
-  if (!user) {
+  if (!session) {
     redirect("/auth/login")
   }
 
-  const { data: userData } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single()
-
-  if (userData?.role !== "ENGINEER") {
-    redirect("/")
-  }
-
-  return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">My Tasks</h1>
-      <EngineerTasksList />
-    </div>
-  )
+  // Redirect to dashboard (engineer role not supported in current system)
+  redirect("/dashboard")
 }
 

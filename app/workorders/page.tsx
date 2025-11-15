@@ -1,26 +1,37 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { cookies } from "next/headers"
 import { WorkOrdersList } from "@/components/WorkOrdersList"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 export default async function WorkOrdersPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Check custom session authentication
+  const cookieStore = await cookies()
+  const session = cookieStore.get("session")?.value
 
-  if (!user) {
+  if (!session) {
     redirect("/auth/login")
   }
+
+  // Decode session to get account type
+  let sessionData
+  try {
+    sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+  } catch {
+    redirect("/auth/login")
+  }
+
+  const accountType = sessionData.accountType
 
   return (
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Work Orders</h1>
-        <a href="/workorders/create">
-          <button className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
-            Create Work Order
-          </button>
-        </a>
+        {accountType === "SUPERADMIN" && (
+          <Link href="/workorders/create">
+            <Button>Create Work Order</Button>
+          </Link>
+        )}
       </div>
       <WorkOrdersList />
     </div>

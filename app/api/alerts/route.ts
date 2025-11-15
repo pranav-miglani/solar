@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
+
+// For alerts API, we need to bypass RLS
+function createServiceClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase service role key")
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey)
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const session = request.cookies.get("session")?.value
 
     if (!session) {
@@ -19,6 +30,9 @@ export async function GET(request: NextRequest) {
 
     const accountType = sessionData.accountType
     const orgId = sessionData.orgId
+
+    // Use service role client to bypass RLS
+    const supabase = createServiceClient()
 
     let query = supabase.from("alerts").select(`
       *,

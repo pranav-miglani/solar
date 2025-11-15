@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 import { requirePermission } from "@/lib/rbac"
+
+// For workorders API, we need to bypass RLS for write operations
+function createServiceClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase service role key")
+  }
+
+  return createClient(supabaseUrl, supabaseServiceKey)
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const session = request.cookies.get("session")?.value
 
     if (!session) {
@@ -20,6 +31,9 @@ export async function GET(request: NextRequest) {
 
     const accountType = sessionData.accountType
     const orgId = sessionData.orgId
+
+    // Use service role client to bypass RLS
+    const supabase = createServiceClient()
 
     const { searchParams } = new URL(request.url)
     const priority = searchParams.get("priority")
@@ -100,7 +114,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const session = request.cookies.get("session")?.value
 
     if (!session) {
@@ -128,6 +141,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Use service role client to bypass RLS for insert
+    const supabase = createServiceClient()
 
     // Create work order (static, no status)
     const { data: workOrder, error: woError } = await supabase
