@@ -78,7 +78,8 @@ export async function GET(request: NextRequest) {
         logger.info(`🕐 Plant sync cron triggered at ${istHour}:${istMin.toString().padStart(2, "0")} IST`)
 
         // Execute sync (context automatically propagated)
-        const summary = await syncAllPlants()
+        // forceSync=false for cron - respects interval boundaries and restricted window
+        const summary = await syncAllPlants(false)
 
         return NextResponse.json({
           success: true,
@@ -141,7 +142,8 @@ export async function POST(request: NextRequest) {
         logger.info("🔄 Manual plant sync triggered")
 
         // Execute sync (context automatically propagated)
-        const summary = await syncAllPlants()
+        // forceSync=true for manual sync - bypasses interval boundaries and restricted window
+        const summary = await syncAllPlants(true)
 
         return NextResponse.json({
           success: true,
