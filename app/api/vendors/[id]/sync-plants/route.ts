@@ -184,7 +184,8 @@ export async function POST(
         yearly_energy_mwh: metadata.yearlyEnergyMwh || null,
         total_energy_mwh: metadata.totalEnergyMwh || null,
         performance_ratio: metadata.performanceRatio || null,
-        last_update_time: lastUpdateTime, // lastUpdateTime from vendor
+        last_update_time: lastUpdateTime, // lastUpdateTime from vendor (Solarman's last update)
+        last_refreshed_at: new Date().toISOString(), // Always set to current time when syncing
         // Additional metadata fields (refreshed on every sync)
         contact_phone: metadata.contactPhone || null,
         // Normalize network_status by trimming whitespace (handle ' ALL_OFFLINE' with leading space)
