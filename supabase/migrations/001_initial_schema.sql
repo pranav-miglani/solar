@@ -149,6 +149,11 @@ CREATE TABLE plants (
   total_energy_mwh NUMERIC(10, 3), -- Total Energy in MWh
   performance_ratio NUMERIC(5, 4), -- PR (0-1 range, displayed as percentage in circular indicator)
   last_update_time TIMESTAMPTZ, -- Last time production data was updated (shown as "Updated" timestamp)
+  -- Additional metadata fields (refreshed on every sync)
+  contact_phone TEXT, -- Contact phone number from vendor
+  network_status TEXT, -- Network status from vendor (e.g., NORMAL, ALL_OFFLINE, PARTIAL_OFFLINE). May include leading/trailing whitespace which is normalized during sync.
+  vendor_created_date TIMESTAMPTZ, -- Original creation date from vendor (Unix timestamp converted to TIMESTAMPTZ)
+  start_operating_time TIMESTAMPTZ, -- When plant started operating (Unix timestamp converted to TIMESTAMPTZ)
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(vendor_id, vendor_plant_id)
@@ -162,6 +167,10 @@ COMMENT ON COLUMN plants.yearly_energy_mwh IS 'Yearly energy generation in MWh (
 COMMENT ON COLUMN plants.total_energy_mwh IS 'Total cumulative energy generation in MWh (shown in Production Overview)';
 COMMENT ON COLUMN plants.performance_ratio IS 'Performance Ratio (PR) 0-1 range, displayed as percentage in circular indicator';
 COMMENT ON COLUMN plants.last_update_time IS 'Last time production data was updated from vendor (shown as "Updated" timestamp)';
+COMMENT ON COLUMN plants.contact_phone IS 'Contact phone number from vendor (refreshed on sync)';
+COMMENT ON COLUMN plants.network_status IS 'Network status from vendor. Valid values: NORMAL, ALL_OFFLINE, PARTIAL_OFFLINE. May include leading/trailing whitespace which is normalized during sync. Unknown values are displayed as N/A in UI.';
+COMMENT ON COLUMN plants.vendor_created_date IS 'Original creation date from vendor (Unix timestamp converted to TIMESTAMPTZ) - refreshed on sync';
+COMMENT ON COLUMN plants.start_operating_time IS 'When plant started operating (Unix timestamp converted to TIMESTAMPTZ) - refreshed on sync';
 
 -- Work Orders table (static, no status)
 -- Note: priority and created_by are nullable/deprecated but kept for backward compatibility
@@ -231,6 +240,7 @@ CREATE INDEX idx_plants_org_id ON plants(org_id);
 CREATE INDEX idx_plants_vendor_id ON plants(vendor_id);
 CREATE INDEX idx_plants_vendor_id_org_id ON plants(vendor_id, org_id);
 CREATE INDEX idx_plants_last_update_time ON plants(last_update_time);
+CREATE INDEX idx_plants_network_status ON plants(network_status);
 CREATE INDEX idx_work_orders_org_id ON work_orders(org_id);
 CREATE INDEX idx_work_orders_location ON work_orders(location) WHERE location IS NOT NULL;
 CREATE INDEX idx_work_orders_created_by ON work_orders(created_by) WHERE created_by IS NOT NULL;

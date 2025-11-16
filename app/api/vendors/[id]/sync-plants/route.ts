@@ -3,6 +3,9 @@ import { createClient } from "@supabase/supabase-js"
 import { requirePermission } from "@/lib/rbac"
 import { VendorManager } from "@/lib/vendors/vendorManager"
 import type { VendorConfig } from "@/lib/vendors/types"
+import MDC from "@/lib/context/mdc"
+import { logger } from "@/lib/context/logger"
+import { randomUUID } from "crypto"
 
 // For vendors API, we need to bypass RLS
 function createServiceClient() {
@@ -20,26 +23,45 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  try {
-    const session = request.cookies.get("session")?.value
+  const requestId = randomUUID()
+  
+  return MDC.runAsync(
+    {
+      source: "user",
+      requestId,
+      operation: "sync-vendor-plants",
+      vendorId: parseInt(params.id),
+    },
+    async () => {
+      try {
+        const session = request.cookies.get("session")?.value
 
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+        if (!session) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
 
-    let sessionData
-    try {
-      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
-    } catch {
-      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
-    }
+        let sessionData
+        try {
+          sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+        } catch {
+          return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+        }
 
-    const accountType = sessionData.accountType as string
+        const accountType = sessionData.accountType as string
 
-    // Only SUPERADMIN can sync plants
-    requirePermission(accountType as any, "vendors", "update")
+        // Only SUPERADMIN can sync plants
+        requirePermission(accountType as any, "vendors", "update")
 
-    const supabase = createServiceClient()
+        // Update MDC context with user info (context automatically propagated)
+        MDC.withContext({
+          userId: sessionData.accountId,
+          accountType: sessionData.accountType,
+          orgId: sessionData.orgId,
+        }, () => {
+          logger.info(`Syncing plants for vendor ${params.id}`)
+        })
+
+        const supabase = createServiceClient()
 
     // Get vendor details
     const { data: vendor, error: vendorError } = await supabase
@@ -100,29 +122,75 @@ export async function POST(
       })
     }
 
-    console.log(`🔄 [Sync] Starting batch sync for ${vendorPlants.length} plants`)
+        logger.info(`Starting batch sync for ${vendorPlants.length} plants`)
 
     // Prepare all plant data
+    // All these fields are refreshed on every sync to keep data up-to-date
     const plantDataArray = vendorPlants.map((plant) => {
       const metadata = plant.metadata || {}
-      const lastUpdateTime = metadata.lastUpdateTime 
-        ? new Date(metadata.lastUpdateTime).toISOString()
-        : null
+      
+      // Handle timestamps - they should already be ISO strings from adapter
+      // But handle both cases: ISO string or Unix timestamp (seconds)
+      let lastUpdateTime: string | null = null
+      if (metadata.lastUpdateTime) {
+        if (typeof metadata.lastUpdateTime === 'string') {
+          // Already ISO string
+          lastUpdateTime = metadata.lastUpdateTime
+        } else if (typeof metadata.lastUpdateTime === 'number') {
+          // Unix timestamp in seconds - convert to ISO
+          lastUpdateTime = new Date(metadata.lastUpdateTime * 1000).toISOString()
+        }
+      }
+      
+      let createdDate: string | null = null
+      if (metadata.createdDate) {
+        if (typeof metadata.createdDate === 'string') {
+          // Already ISO string
+          createdDate = metadata.createdDate
+        } else if (typeof metadata.createdDate === 'number') {
+          // Unix timestamp in seconds - convert to ISO
+          createdDate = new Date(metadata.createdDate * 1000).toISOString()
+        }
+      }
+      
+      let startOperatingTime: string | null = null
+      if (metadata.startOperatingTime) {
+        if (typeof metadata.startOperatingTime === 'string') {
+          // Already ISO string
+          startOperatingTime = metadata.startOperatingTime
+        } else if (typeof metadata.startOperatingTime === 'number') {
+          // Unix timestamp in seconds - convert to ISO
+          startOperatingTime = new Date(metadata.startOperatingTime * 1000).toISOString()
+        }
+      }
+
+      // Ensure location.address is included
+      const location = plant.location || {}
+      if (metadata.locationAddress && !location.address) {
+        location.address = metadata.locationAddress
+      }
 
       return {
         org_id: vendor.org_id,
         vendor_id: vendor.id,
-        vendor_plant_id: plant.id.toString(),
+        vendor_plant_id: plant.id.toString(), // Vendor's plant ID (unique per vendor)
         name: plant.name || `Plant ${plant.id}`,
-        capacity_kw: plant.capacityKw || 0,
-        location: plant.location || {},
-        current_power_kw: metadata.currentPowerKw || null,
+        capacity_kw: plant.capacityKw || 0, // installedCapacity from vendor
+        location: location, // Includes address, lat, lng
+        // Production metrics
+        current_power_kw: metadata.currentPowerKw || null, // generationPower from vendor (converted to kW)
         daily_energy_mwh: metadata.dailyEnergyMwh || null,
         monthly_energy_mwh: metadata.monthlyEnergyMwh || null,
         yearly_energy_mwh: metadata.yearlyEnergyMwh || null,
         total_energy_mwh: metadata.totalEnergyMwh || null,
         performance_ratio: metadata.performanceRatio || null,
-        last_update_time: lastUpdateTime,
+        last_update_time: lastUpdateTime, // lastUpdateTime from vendor
+        // Additional metadata fields (refreshed on every sync)
+        contact_phone: metadata.contactPhone || null,
+        // Normalize network_status by trimming whitespace (handle ' ALL_OFFLINE' with leading space)
+        network_status: metadata.networkStatus ? String(metadata.networkStatus).trim() : null,
+        vendor_created_date: createdDate || null,
+        start_operating_time: startOperatingTime || null,
       }
     })
 
@@ -151,7 +219,7 @@ export async function POST(
       const batchNumber = Math.floor(i / BATCH_SIZE) + 1
       const totalBatches = Math.ceil(plantDataArray.length / BATCH_SIZE)
       
-      console.log(`📦 [Sync] Processing batch ${batchNumber}/${totalBatches} (${batch.length} plants)`)
+          logger.info(`Processing batch ${batchNumber}/${totalBatches} (${batch.length} plants)`)
 
       try {
         // Use upsert to handle both inserts and updates in one operation
@@ -164,11 +232,11 @@ export async function POST(
           .select()
 
         if (error) {
-          console.error(`❌ [Sync] Batch ${batchNumber} upsert error:`, error)
+          logger.error(`Batch ${batchNumber} upsert error`, error)
           errors.push(`Batch ${batchNumber}: ${error.message}`)
-          
+
           // Fallback: try individual upserts
-          console.log(`🔄 [Sync] Falling back to individual operations for batch ${batchNumber}`)
+          logger.info(`Falling back to individual operations for batch ${batchNumber}`)
           for (const plantData of batch) {
             try {
               const { error: individualError } = await supabase
@@ -178,7 +246,7 @@ export async function POST(
                 })
 
               if (individualError) {
-                console.error(`❌ [Sync] Error upserting plant ${plantData.vendor_plant_id}:`, individualError)
+                logger.error(`Error upserting plant ${plantData.vendor_plant_id}`, individualError)
                 errors.push(`Plant ${plantData.vendor_plant_id}: ${individualError.message}`)
               } else {
                 // Count as created or updated
@@ -190,7 +258,7 @@ export async function POST(
                 synced++
               }
             } catch (individualException: any) {
-              console.error(`❌ [Sync] Exception upserting plant ${plantData.vendor_plant_id}:`, individualException)
+              logger.error(`Exception upserting plant ${plantData.vendor_plant_id}`, individualException)
               errors.push(`Plant ${plantData.vendor_plant_id}: ${individualException.message}`)
             }
           }
@@ -203,31 +271,33 @@ export async function POST(
           updated += batchUpdated
           synced += batch.length
           
-          console.log(`✅ [Sync] Batch ${batchNumber} completed: ${batch.length} plants (${batchCreated} created, ${batchUpdated} updated)`)
+              logger.info(`Batch ${batchNumber} completed: ${batch.length} plants (${batchCreated} created, ${batchUpdated} updated)`)
+            }
+          } catch (batchError: any) {
+            logger.error(`Batch ${batchNumber} exception`, batchError)
+            errors.push(`Batch ${batchNumber}: ${batchError.message}`)
+          }
         }
-      } catch (batchError: any) {
-        console.error(`❌ [Sync] Batch ${batchNumber} exception:`, batchError)
-        errors.push(`Batch ${batchNumber}: ${batchError.message}`)
+
+        logger.info(`Completed: ${synced}/${vendorPlants.length} plants synced (${created} created, ${updated} updated)`)
+
+        return NextResponse.json({
+          success: true,
+          message: `Successfully synced ${synced} plants in batches`,
+          synced,
+          total: vendorPlants.length,
+          created,
+          updated,
+          errors: errors.length > 0 ? errors.slice(0, 10) : undefined, // Return first 10 errors if any
+        })
+      } catch (error: any) {
+        logger.error("Sync plants error", error)
+        return NextResponse.json(
+          { error: error.message || "Internal server error" },
+          { status: 500 }
+        )
       }
     }
-
-    console.log(`✅ [Sync] Completed: ${synced}/${vendorPlants.length} plants synced (${created} created, ${updated} updated)`)
-
-    return NextResponse.json({
-      success: true,
-      message: `Successfully synced ${synced} plants in batches`,
-      synced,
-      total: vendorPlants.length,
-      created,
-      updated,
-      errors: errors.length > 0 ? errors.slice(0, 10) : undefined, // Return first 10 errors if any
-    })
-  } catch (error: any) {
-    console.error("Sync plants error:", error)
-    return NextResponse.json(
-      { error: error.message || "Internal server error" },
-      { status: 500 }
-    )
-  }
+  )
 }
 

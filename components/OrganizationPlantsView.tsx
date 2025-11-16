@@ -20,6 +20,10 @@ import {
   ExternalLink,
   AlertCircle,
   CheckCircle2,
+  Wifi,
+  WifiOff,
+  Activity,
+  HelpCircle,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -34,6 +38,10 @@ interface Plant {
   total_energy_mwh: number | null
   performance_ratio: number | null
   last_update_time: string | null
+  contact_phone: string | null
+  network_status: string | null
+  vendor_created_date: string | null
+  start_operating_time: string | null
   location: {
     lat?: number
     lng?: number
@@ -126,8 +134,49 @@ export function OrganizationPlantsView({ orgId }: { orgId: string }) {
 
   const { organization, plants, totalPlants } = data
 
+  const getNetworkStatusBadge = (status: string | null) => {
+    if (!status) {
+      return (
+        <Badge variant="outline" className="flex items-center gap-1 w-fit text-muted-foreground">
+          <HelpCircle className="h-3 w-3" />
+          N/A
+        </Badge>
+      )
+    }
+    
+    // Normalize status by trimming whitespace (handle ' ALL_OFFLINE' with leading space)
+    const normalizedStatus = status.trim().toUpperCase()
+    
+    const statusMap: Record<string, { variant: "default" | "destructive" | "secondary", label: string, icon: any }> = {
+      NORMAL: { variant: "default", label: "Online", icon: Wifi },
+      ALL_OFFLINE: { variant: "destructive", label: "Offline", icon: WifiOff },
+      PARTIAL_OFFLINE: { variant: "secondary", label: "Partial", icon: Activity },
+    }
+
+    const statusInfo = statusMap[normalizedStatus]
+    
+    if (!statusInfo) {
+      // Unknown status - show as N/A with help icon
+      return (
+        <Badge variant="outline" className="flex items-center gap-1 w-fit text-muted-foreground">
+          <HelpCircle className="h-3 w-3" />
+          N/A
+        </Badge>
+      )
+    }
+    
+    const Icon = statusInfo.icon
+
+    return (
+      <Badge variant={statusInfo.variant} className="flex items-center gap-1 w-fit">
+        <Icon className="h-3 w-3" />
+        {statusInfo.label}
+      </Badge>
+    )
+  }
+
   return (
-    <div className="md:ml-64 container mx-auto p-4 md:p-6 space-y-4 md:space-y-6 pt-16 md:pt-6">
+    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -229,6 +278,7 @@ export function OrganizationPlantsView({ orgId }: { orgId: string }) {
                   <TableHead>Vendor</TableHead>
                   <TableHead>Capacity</TableHead>
                   <TableHead>Current Power</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Work Orders</TableHead>
                   <TableHead>Actions</TableHead>
@@ -237,7 +287,7 @@ export function OrganizationPlantsView({ orgId }: { orgId: string }) {
               <TableBody>
                 {plants.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No plants found for this organization
                     </TableCell>
                   </TableRow>
@@ -256,6 +306,11 @@ export function OrganizationPlantsView({ orgId }: { orgId: string }) {
                           </span>
                         ) : (
                           <span className="text-muted-foreground">N/A</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {getNetworkStatusBadge(plant.network_status) || (
+                          <span className="text-muted-foreground text-sm">N/A</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -301,7 +356,7 @@ export function OrganizationPlantsView({ orgId }: { orgId: string }) {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Link href={`/workorders?plantId=${plant.id}`}>
+                        <Link href={`/plants/${plant.id}`}>
                           <Button variant="ghost" size="sm">
                             <ExternalLink className="h-4 w-4 mr-1" />
                             View
@@ -347,6 +402,12 @@ export function OrganizationPlantsView({ orgId }: { orgId: string }) {
                         </p>
                       </div>
                     </div>
+                    {plant.network_status && (
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-muted-foreground">Status:</p>
+                        {getNetworkStatusBadge(plant.network_status)}
+                      </div>
+                    )}
                     {plant.location?.address && (
                       <div className="flex items-start gap-2 text-sm">
                         <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
@@ -376,7 +437,7 @@ export function OrganizationPlantsView({ orgId }: { orgId: string }) {
                         </div>
                       </div>
                     )}
-                    <Link href={`/workorders?plantId=${plant.id}`}>
+                    <Link href={`/plants/${plant.id}`}>
                       <Button variant="ghost" size="sm" className="w-full">
                         <ExternalLink className="h-4 w-4 mr-1" />
                         View Details

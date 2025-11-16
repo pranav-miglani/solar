@@ -1320,6 +1320,10 @@ Calculate efficiency metrics for work orders.
    
    # Node Environment
    NODE_ENV=development
+   
+   # Plant Sync Cron (optional)
+   ENABLE_PLANT_SYNC_CRON=true
+   CRON_SECRET=your-secret-token-here
    ```
 
 4. **Run database migrations**
@@ -1375,6 +1379,8 @@ Calculate efficiency metrics for work orders.
 | `TELEMETRY_SUPABASE_ANON_KEY` | Telemetry DB anon key | Yes |
 | `TELEMETRY_SUPABASE_SERVICE_ROLE_KEY` | Telemetry DB service role key | Yes |
 | `NODE_ENV` | Environment (development/production) | Yes |
+| `ENABLE_PLANT_SYNC_CRON` | Enable plant sync cron job (default: true) | No |
+| `CRON_SECRET` | Secret token for securing cron endpoint | No (recommended) |
 
 ### Database Configuration
 
@@ -1395,6 +1401,21 @@ Configure scheduled execution in Supabase:
 1. **sync-telemetry**: Every 15 minutes
 2. **sync-alerts**: Every 30 minutes
 3. **compute-efficiency**: On-demand (via API)
+
+### Plant Sync Cron Job
+
+The plant sync cron job automatically synchronizes plant data from all active vendors. See [CRON_SYNC.md](./docs/CRON_SYNC.md) for detailed documentation.
+
+**Configuration:**
+- **Vercel**: Automatically configured via `vercel.json` (runs every 15 minutes)
+- **External Cron**: Use any HTTP cron service to call `/api/cron/sync-plants`
+- **Manual Trigger**: POST to `/api/cron/sync-plants` (SUPERADMIN only)
+
+**Features:**
+- Generic vendor support (works with any vendor adapter)
+- Automatic token validation and refresh
+- Parallel processing of organizations
+- Batch database operations for efficiency
 
 ## Development Guide
 

@@ -405,6 +405,16 @@ export class SolarmanAdapter extends BaseVendorAdapter {
         ? new Date(station.lastUpdateTime * 1000).toISOString() 
         : null
 
+      // createdDate is Unix timestamp (seconds), convert to ISO string
+      const createdDate = station.createdDate
+        ? new Date(station.createdDate * 1000).toISOString()
+        : null
+
+      // startOperatingTime is Unix timestamp (seconds), convert to ISO string
+      const startOperatingTime = station.startOperatingTime
+        ? new Date(station.startOperatingTime * 1000).toISOString()
+        : null
+
       return {
         id: stationId.toString(),
         name: stationName,
@@ -417,15 +427,25 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           // Note: Daily/Monthly/Yearly/Total energy and PR not available in /station/v1.0/list
           // These would need to be fetched from other endpoints if needed
           lastUpdateTime: lastUpdateTime,
-          // Additional station metadata
-          networkStatus: station.networkStatus,
+          // Additional station metadata - these are refreshed on every sync
+          // Normalize networkStatus by trimming whitespace (Solarman may return ' ALL_OFFLINE' with leading space)
+          networkStatus: station.networkStatus ? String(station.networkStatus).trim() : null,
           type: station.type,
-          contactPhone: station.contactPhone,
+          contactPhone: station.contactPhone || null,
           gridInterconnectionType: station.gridInterconnectionType,
           regionTimezone: station.regionTimezone,
-          startOperatingTime: station.startOperatingTime,
-          // Include all other fields for reference
-          ...station,
+          startOperatingTime: startOperatingTime, // Already converted to ISO string
+          createdDate: createdDate, // Already converted to ISO string
+          // Include other fields but exclude raw timestamps to avoid confusion
+          regionLevel1: station.regionLevel1,
+          regionLevel2: station.regionLevel2,
+          regionLevel3: station.regionLevel3,
+          regionLevel4: station.regionLevel4,
+          regionLevel5: station.regionLevel5,
+          regionNationId: station.regionNationId,
+          batterySoc: station.batterySoc,
+          ownerName: station.ownerName,
+          stationImage: station.stationImage,
         },
       }
     })
