@@ -95,6 +95,9 @@ CREATE TABLE organizations (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   meta JSONB DEFAULT '{}',
+  -- Auto-sync settings (enabled by default, 15 minutes interval)
+  auto_sync_enabled BOOLEAN NOT NULL DEFAULT true,
+  sync_interval_minutes INTEGER NOT NULL DEFAULT 15 CHECK (sync_interval_minutes > 0 AND sync_interval_minutes <= 1440), -- 1 minute to 24 hours
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -120,6 +123,7 @@ CREATE TABLE vendors (
   token_expires_at TIMESTAMPTZ, -- Token expiration timestamp (checked before reuse)
   token_metadata JSONB DEFAULT '{}', -- Additional token metadata (token_type, scope, expires_in, etc.)
   is_active BOOLEAN NOT NULL DEFAULT true,
+  last_synced_at TIMESTAMPTZ, -- Last time plants were synced from this vendor
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -130,6 +134,7 @@ COMMENT ON COLUMN vendors.refresh_token IS 'Refresh token for token renewal (if 
 COMMENT ON COLUMN vendors.token_expires_at IS 'Token expiration timestamp - token is valid until this time. Checked before reuse to avoid expired tokens.';
 COMMENT ON COLUMN vendors.token_metadata IS 'Additional token metadata (token_type, scope, expires_in, stored_at, etc.)';
 COMMENT ON COLUMN vendors.org_id IS 'Organization this vendor belongs to. NULL means vendor is global/shared.';
+COMMENT ON COLUMN vendors.last_synced_at IS 'Last time plants were synced from this vendor (updated after successful sync)';
 
 -- Plants table
 -- Includes production metrics from Production Overview dashboard
@@ -267,6 +272,10 @@ CREATE TRIGGER update_accounts_updated_at BEFORE UPDATE ON accounts
 
 CREATE TRIGGER update_organizations_updated_at BEFORE UPDATE ON organizations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Add comments for organization sync settings
+COMMENT ON COLUMN organizations.auto_sync_enabled IS 'Whether automatic plant sync is enabled for this organization (default: true)';
+COMMENT ON COLUMN organizations.sync_interval_minutes IS 'Sync interval in minutes (default: 15). Must be between 1 and 1440 (24 hours). Sync runs at fixed clock times based on this interval.';
 
 CREATE TRIGGER update_vendors_updated_at BEFORE UPDATE ON vendors
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

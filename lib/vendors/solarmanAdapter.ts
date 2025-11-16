@@ -71,16 +71,12 @@ interface SolarmanTelemetryResponse {
 }
 
 export class SolarmanAdapter extends BaseVendorAdapter {
-  private tokenCache: {
-    token: string
-    expiresAt: number
-  } | null = null
-
   private vendorId?: number
   private supabaseClient?: any // Supabase client for token storage
 
   /**
    * Set vendor ID and Supabase client for token storage
+   * Note: Tokens are stored in DB only, not cached in memory
    */
   setTokenStorage(vendorId: number, supabaseClient: any) {
     this.vendorId = vendorId
@@ -191,21 +187,15 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   }
 
   async authenticate(): Promise<string> {
-    // Check in-memory cache first
-    if (this.tokenCache && this.tokenCache.expiresAt > Date.now()) {
-      return this.tokenCache.token
-    }
-
-    // Check database for stored token
+    // Check database for stored token (no in-memory cache - always fetch from DB)
     const dbToken = await this.getTokenFromDB()
     if (dbToken) {
-      // Cache in memory for this session
+      // Verify token is still valid by checking expiry
       const jwtExpiry = this.decodeJWTExpiry(dbToken)
-      this.tokenCache = {
-        token: dbToken,
-        expiresAt: jwtExpiry || Date.now() + 3600 * 1000, // Default 1 hour if can't decode
+      if (jwtExpiry && jwtExpiry > Date.now()) {
+        return dbToken
       }
-      return dbToken
+      // Token expired, will need to re-authenticate
     }
 
     // Need to authenticate
@@ -276,15 +266,8 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       throw new Error('Solarman authentication failed: No access token in response')
     }
 
-    // Store token in database
+    // Store token in database only (no in-memory cache)
     await this.storeTokenInDB(data.access_token, data.expires_in || 3600)
-
-    // Cache token in memory (expires 5 minutes before actual expiry for safety)
-    const expiresIn = data.expires_in || 3600
-    this.tokenCache = {
-      token: data.access_token,
-      expiresAt: Date.now() + (expiresIn - 300) * 1000,
-    }
 
     return data.access_token
   }

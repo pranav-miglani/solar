@@ -292,6 +292,14 @@ async function syncVendorPlants(
       `✅ Vendor ${vendor.name}: ${result.synced}/${result.total} plants synced (${created} created, ${updated} updated) in ${duration}ms`
     )
 
+    // Update last_synced_at timestamp if sync was successful
+    if (result.success && result.synced > 0) {
+      await supabase
+        .from("vendors")
+        .update({ last_synced_at: new Date().toISOString() })
+        .eq("id", vendor.id)
+    }
+
     return result
   } catch (error: any) {
     logger.error(`❌ Error syncing vendor ${vendor.name}`, error)
@@ -301,8 +309,43 @@ async function syncVendorPlants(
 }
 
 /**
+ * Check if an organization should be synced based on clock time and interval
+ * Sync runs at fixed clock times: if interval is 15, syncs at :00, :15, :30, :45
+ * Uses Asia/Kolkata timezone to match the cron schedule
+ */
+function shouldSyncOrg(org: any): boolean {
+  if (!org.auto_sync_enabled) {
+    return false
+  }
+
+  const intervalMinutes = org.sync_interval_minutes || 15
+  
+  // Get current time in Asia/Kolkata timezone (matching cron schedule)
+  const now = new Date()
+  const kolkataTime = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(now)
+  
+  const currentMinute = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
+  
+  // Calculate which intervals have passed in this hour
+  // For 15-minute interval: sync at 0, 15, 30, 45
+  // For 30-minute interval: sync at 0, 30
+  // For 60-minute interval: sync at 0
+  const currentInterval = Math.floor(currentMinute / intervalMinutes)
+  
+  // Check if current minute matches an interval boundary
+  const expectedMinute = currentInterval * intervalMinutes
+  return currentMinute === expectedMinute
+}
+
+/**
  * Sync plants for all active vendors across all organizations
- * Processes organizations in parallel for better performance
+ * Only syncs organizations that have auto_sync_enabled = true
+ * and whose sync interval matches the current clock time
  */
 export async function syncAllPlants(): Promise<SyncSummary> {
   const startTime = Date.now()
@@ -312,10 +355,18 @@ export async function syncAllPlants(): Promise<SyncSummary> {
   const source = MDC.getSource() || "system"
   logger.info(`🚀 Starting plant sync for all organizations (source: ${source})...`)
 
-  // Fetch all active vendors with organization assignments
+  // Fetch all active vendors with their organization sync settings
   const { data: vendors, error: vendorsError } = await supabase
     .from("vendors")
-    .select("*")
+    .select(`
+      *,
+      organizations (
+        id,
+        name,
+        auto_sync_enabled,
+        sync_interval_minutes
+      )
+    `)
     .eq("is_active", true)
     .not("org_id", "is", null)
 
@@ -337,11 +388,68 @@ export async function syncAllPlants(): Promise<SyncSummary> {
     }
   }
 
-  logger.info(`Found ${vendors.length} active vendor(s) to sync`)
+  logger.info(`Found ${vendors.length} active vendor(s)`)
+
+  // Filter vendors by organization sync settings
+  const vendorsToSync: any[] = []
+  const skippedOrgs = new Set<number>()
+
+  for (const vendor of vendors) {
+    const org = vendor.organizations
+    if (!org) {
+      logger.warn(`⚠️ Organization not found for vendor ${vendor.id}, skipping`)
+      continue
+    }
+
+    // Check if this org should be synced
+    const shouldSync = shouldSyncOrg(org)
+    if (!shouldSync) {
+      if (!skippedOrgs.has(org.id)) {
+        // Get current IST time for logging
+        const now = new Date()
+        const kolkataTime = new Intl.DateTimeFormat("en-US", {
+          timeZone: "Asia/Kolkata",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).formatToParts(now)
+        const currentHour = parseInt(kolkataTime.find((part) => part.type === "hour")?.value || "0")
+        const currentMinute = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
+        
+        logger.info(
+          `⏭️ Skipping org ${org.id} (${org.name}): ` +
+          `auto_sync_enabled=${org.auto_sync_enabled}, ` +
+          `interval=${org.sync_interval_minutes}min, ` +
+          `current IST time=${currentHour}:${currentMinute.toString().padStart(2, "0")}, ` +
+          `doesn't match interval boundary`
+        )
+        skippedOrgs.add(org.id)
+      }
+      continue
+    }
+
+    vendorsToSync.push(vendor)
+  }
+
+  if (vendorsToSync.length === 0) {
+    logger.info("No organizations to sync at this time")
+    return {
+      totalVendors: vendors.length,
+      successful: 0,
+      failed: 0,
+      totalPlantsSynced: 0,
+      totalPlantsCreated: 0,
+      totalPlantsUpdated: 0,
+      results: [],
+      duration: Date.now() - startTime,
+    }
+  }
+
+  logger.info(`Processing ${vendorsToSync.length} vendor(s) from organizations with auto-sync enabled and matching interval`)
 
   // Group vendors by organization for parallel processing
   const vendorsByOrg = new Map<number, any[]>()
-  vendors.forEach((vendor) => {
+  vendorsToSync.forEach((vendor) => {
     if (vendor.org_id) {
       if (!vendorsByOrg.has(vendor.org_id)) {
         vendorsByOrg.set(vendor.org_id, [])
@@ -352,29 +460,22 @@ export async function syncAllPlants(): Promise<SyncSummary> {
 
   logger.info(`Processing ${vendorsByOrg.size} organization(s) in parallel`)
 
-  // Process all vendors in parallel (with concurrency limit)
+  // Process all vendors in parallel (no concurrency limit - all vendors processed simultaneously)
   // Context automatically propagated to each vendor sync
-  const CONCURRENCY_LIMIT = 5 // Process 5 vendors at a time to avoid overwhelming the system
-  const results: SyncResult[] = []
-  
-  for (let i = 0; i < vendors.length; i += CONCURRENCY_LIMIT) {
-    const batch = vendors.slice(i, i + CONCURRENCY_LIMIT)
-    const batchResults = await Promise.all(
-      batch.map((vendor) => 
-        // Create child context for each vendor (context still propagated)
-        MDC.withContextAsync(
-          {
-            vendorId: vendor.id,
-            vendorName: vendor.name,
-            orgId: vendor.org_id,
-            operation: `sync-vendor-${vendor.id}`,
-          },
-          () => syncVendorPlants(vendor, supabase)
-        )
+  const results = await Promise.all(
+    vendorsToSync.map((vendor) => 
+      // Create child context for each vendor (context still propagated)
+      MDC.withContextAsync(
+        {
+          vendorId: vendor.id,
+          vendorName: vendor.name,
+          orgId: vendor.org_id,
+          operation: `sync-vendor-${vendor.id}`,
+        },
+        () => syncVendorPlants(vendor, supabase)
       )
     )
-    results.push(...batchResults)
-  }
+  )
 
   // Calculate summary
   const successful = results.filter((r) => r.success).length
@@ -384,7 +485,7 @@ export async function syncAllPlants(): Promise<SyncSummary> {
   const totalPlantsUpdated = results.reduce((sum, r) => sum + r.updated, 0)
 
   const summary: SyncSummary = {
-    totalVendors: vendors.length,
+    totalVendors: vendorsToSync.length,
     successful,
     failed,
     totalPlantsSynced,
@@ -395,7 +496,7 @@ export async function syncAllPlants(): Promise<SyncSummary> {
   }
 
   logger.info(
-    `✅ Sync complete: ${successful}/${vendors.length} vendors successful, ` +
+    `✅ Sync complete: ${successful}/${vendorsToSync.length} vendors successful, ` +
     `${totalPlantsSynced} plants synced (${totalPlantsCreated} created, ${totalPlantsUpdated} updated) ` +
     `in ${summary.duration}ms`
   )

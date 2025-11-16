@@ -31,26 +31,18 @@ CRON_SECRET=your-secret-token-here
 PLANT_SYNC_CRON_SCHEDULE="*/15 * * * *"
 ```
 
-### Vercel Cron Jobs
+### Server-Side Cron (Default)
 
-If deploying on Vercel, the cron job is automatically configured via `vercel.json`:
+The cron job runs automatically on the Node.js server when it starts. It's initialized in `instrumentation.ts` and uses `node-cron` to schedule syncs every 15 minutes.
 
-```json
-{
-  "crons": [
-    {
-      "path": "/api/cron/sync-plants",
-      "schedule": "*/15 * * * *"
-    }
-  ]
-}
-```
+**How it works:**
+1. When the Next.js server starts, `instrumentation.ts` runs
+2. A cron job is scheduled to run every 15 minutes (`*/15 * * * *`)
+3. Each time it runs, it checks the current IST time
+4. Organizations with `auto_sync_enabled=true` are synced if their `sync_interval_minutes` matches the current clock time (e.g., :00, :15, :30, :45 for 15-minute intervals)
+5. Sync is automatically skipped during the restricted time window (default: 7 PM - 6 AM IST)
 
-The schedule uses cron syntax:
-- `*/15 * * * *` = Every 15 minutes
-- `0 * * * *` = Every hour
-- `0 */6 * * *` = Every 6 hours
-- `0 0 * * *` = Daily at midnight
+**No additional configuration needed** - just start your server with `npm run dev` or `npm start` and the cron will run automatically.
 
 ## API Endpoints
 
@@ -203,18 +195,19 @@ Check your deployment logs to monitor cron execution.
 
 ### Cron Not Running
 
-1. **Check Environment Variables**:
-   - `ENABLE_PLANT_SYNC_CRON` should be `true` (or not set)
-   - `CRON_SECRET` should match if using external cron
+1. **Check Server Logs**:
+   - Look for "✅ Plant sync cron job initialized" message when server starts
+   - Check for "🕐 Plant sync cron triggered" messages every 15 minutes
+   - Verify server is running (not just in build mode)
 
-2. **Check Vercel Cron** (if using Vercel):
-   - Go to Vercel Dashboard → Project → Settings → Cron Jobs
-   - Verify cron job is enabled and scheduled correctly
+2. **Check Environment Variables**:
+   - Ensure all required Supabase environment variables are set
+   - `SYNC_WINDOW_START` and `SYNC_WINDOW_END` are optional (defaults: 19:00 and 06:00 IST)
 
-3. **Check External Cron Service**:
-   - Verify cron job is active
-   - Check execution logs
-   - Verify URL and headers are correct
+3. **Verify Server is Running**:
+   - The cron only runs when the Node.js server is active
+   - Make sure you're running `npm run dev` or `npm start`, not just building
+   - Check that `instrumentation.ts` is being loaded (should see initialization log)
 
 ### Token Validation Failures
 

@@ -41,7 +41,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
-import { Loader2, Factory, Plus, Pencil, Trash2, RefreshCw, Globe, Building2, CheckCircle2, XCircle } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Loader2, Factory, Plus, Pencil, Trash2, RefreshCw, Globe, Building2, CheckCircle2, XCircle, Settings, Clock } from "lucide-react"
 
 interface Organization {
   id: number
@@ -59,6 +60,8 @@ interface Vendor {
   organizations?: {
     id: number
     name: string
+    auto_sync_enabled?: boolean
+    sync_interval_minutes?: number
   }
 }
 
@@ -74,6 +77,9 @@ export function VendorsTable() {
     current: number
     total: number
   } | null>(null)
+  const [syncSettingsDialogOpen, setSyncSettingsDialogOpen] = useState(false)
+  const [selectedOrgForSync, setSelectedOrgForSync] = useState<{ id: number, name: string } | null>(null)
+  const [syncSettings, setSyncSettings] = useState<{ enabled: boolean, interval: number }>({ enabled: true, interval: 15 })
   const [formData, setFormData] = useState({
     name: "",
     vendor_type: "SOLARMAN",
@@ -107,6 +113,48 @@ export function VendorsTable() {
     const data = await response.json()
     setVendors(data.vendors || [])
     setLoading(false)
+  }
+  
+  function openSyncSettingsDialog(orgId: number, orgName: string) {
+    // Find the org's current sync settings from vendors
+    const vendor = vendors.find((v) => v.organizations?.id === orgId)
+    if (vendor?.organizations) {
+      setSyncSettings({
+        enabled: vendor.organizations.auto_sync_enabled ?? true,
+        interval: vendor.organizations.sync_interval_minutes ?? 15,
+      })
+    } else {
+      setSyncSettings({ enabled: true, interval: 15 })
+    }
+    setSelectedOrgForSync({ id: orgId, name: orgName })
+    setSyncSettingsDialogOpen(true)
+  }
+  
+  async function saveSyncSettings() {
+    if (!selectedOrgForSync) return
+    
+    try {
+      const response = await fetch(`/api/orgs/${selectedOrgForSync.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          auto_sync_enabled: syncSettings.enabled,
+          sync_interval_minutes: syncSettings.interval,
+        }),
+      })
+
+      if (response.ok) {
+        setSyncSettingsDialogOpen(false)
+        setSelectedOrgForSync(null)
+        // Refresh vendors to get updated org data
+        fetchVendors()
+      } else {
+        const error = await response.json()
+        alert(error.error || "Failed to update sync settings")
+      }
+    } catch (error: any) {
+      alert(`Error updating sync settings: ${error.message}`)
+    }
   }
 
   function openDialog(vendor?: Vendor) {
@@ -533,6 +581,19 @@ export function VendorsTable() {
                             Edit
                           </Button>
                         </motion.div>
+                        {vendor.organizations && (
+                          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openSyncSettingsDialog(vendor.organizations!.id, vendor.organizations!.name)}
+                              className="transition-all duration-200 hover:scale-110 hover:bg-primary/10"
+                              title="Sync Settings"
+                            >
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                          </motion.div>
+                        )}
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                           <Button
                             variant="default"
@@ -549,7 +610,7 @@ export function VendorsTable() {
                             ) : (
                               <>
                                 <RefreshCw className="h-4 w-4 mr-1" />
-                                Sync Plants
+                                Plants
                               </>
                             )}
                           </Button>
@@ -683,10 +744,22 @@ export function VendorsTable() {
                       ) : (
                         <>
                           <RefreshCw className="h-4 w-4 mr-2" />
-                          Sync Plants
+                          Plants
                         </>
                       )}
                     </Button>
+                    {vendor.organizations && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openSyncSettingsDialog(vendor.organizations!.id, vendor.organizations!.name)}
+                        className="w-full"
+                        title="Sync Settings"
+                      >
+                        <Settings className="h-4 w-4 mr-2" />
+                        Sync Settings
+                      </Button>
+                    )}
                     <AlertDialog open={deletingVendorId === vendor.id} onOpenChange={(open: boolean) => !open && setDeletingVendorId(null)}>
                       <AlertDialogTrigger asChild>
                         <Button
@@ -751,6 +824,79 @@ export function VendorsTable() {
           )}
         </Card>
       )}
+
+      {/* Sync Settings Dialog */}
+      <Dialog open={syncSettingsDialogOpen} onOpenChange={setSyncSettingsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">
+              Auto-Sync Settings
+            </DialogTitle>
+          </DialogHeader>
+          {selectedOrgForSync && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Building2 className="h-5 w-5 text-primary" />
+                <span className="font-semibold">{selectedOrgForSync.name}</span>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="sync-enabled" className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Enable Auto-Sync
+                  </Label>
+                  <Switch
+                    id="sync-enabled"
+                    checked={syncSettings.enabled}
+                    onCheckedChange={(checked) => {
+                      setSyncSettings((prev) => ({ ...prev, enabled: checked }))
+                    }}
+                  />
+                </div>
+                {syncSettings.enabled && (
+                  <div className="space-y-2">
+                    <Label htmlFor="sync-interval">Sync Interval (minutes)</Label>
+                    <Input
+                      id="sync-interval"
+                      type="number"
+                      min="1"
+                      max="1440"
+                      value={syncSettings.interval}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 15
+                        setSyncSettings((prev) => ({
+                          ...prev,
+                          interval: Math.max(1, Math.min(1440, value)),
+                        }))
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Sync runs at fixed clock times. For 15 min: :00, :15, :30, :45
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSyncSettingsDialogOpen(false)
+                    setSelectedOrgForSync(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={saveSyncSettings}
+                  className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                >
+                  Save
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -281,6 +281,14 @@ export async function POST(
 
         logger.info(`Completed: ${synced}/${vendorPlants.length} plants synced (${created} created, ${updated} updated)`)
 
+        // Update last_synced_at timestamp if sync was successful
+        if (synced > 0) {
+          await supabase
+            .from("vendors")
+            .update({ last_synced_at: new Date().toISOString() })
+            .eq("id", vendorId)
+        }
+
         return NextResponse.json({
           success: true,
           message: `Successfully synced ${synced} plants in batches`,

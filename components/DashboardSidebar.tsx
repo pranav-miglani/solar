@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   X,
+  RefreshCw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -47,6 +48,12 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
       title: "Vendors",
       href: "/superadmin/vendors",
       icon: Factory,
+      roles: ["SUPERADMIN"],
+    },
+    {
+      title: "Vendor Sync",
+      href: "/superadmin/vendor-sync",
+      icon: RefreshCw,
       roles: ["SUPERADMIN"],
     },
     {

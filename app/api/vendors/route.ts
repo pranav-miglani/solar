@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     const { data: vendors, error } = await supabase
       .from("vendors")
-      .select("*, organizations(id, name)")
+      .select("*, organizations(id, name, auto_sync_enabled, sync_interval_minutes)")
       .order("name")
 
     if (error) {

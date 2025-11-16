@@ -38,16 +38,53 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Check if cron is enabled
-        const cronEnabled = process.env.ENABLE_PLANT_SYNC_CRON !== "false"
-        if (!cronEnabled) {
+        // Check if we're in the restricted time window (7 PM IST to 6 AM IST)
+        const syncWindowStart = process.env.SYNC_WINDOW_START || "19:00" // 7 PM IST default
+        const syncWindowEnd = process.env.SYNC_WINDOW_END || "06:00" // 6 AM IST default
+        
+        // Get current time in Asia/Kolkata timezone using Intl API
+        const now = new Date()
+        const kolkataTime = new Intl.DateTimeFormat("en-US", {
+          timeZone: "Asia/Kolkata",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).formatToParts(now)
+        
+        const currentHour = parseInt(kolkataTime.find((part) => part.type === "hour")?.value || "0")
+        const currentMinute = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
+        const currentTimeMinutes = currentHour * 60 + currentMinute
+        
+        // Parse window times
+        const [startHour, startMin] = syncWindowStart.split(":").map(Number)
+        const [endHour, endMin] = syncWindowEnd.split(":").map(Number)
+        const startTimeMinutes = startHour * 60 + startMin
+        const endTimeMinutes = endHour * 60 + endMin
+        
+        // Check if current time is in the restricted window
+        // Handle case where window spans midnight (e.g., 19:00 to 06:00)
+        let inRestrictedWindow = false
+        if (startTimeMinutes > endTimeMinutes) {
+          // Window spans midnight
+          inRestrictedWindow = currentTimeMinutes >= startTimeMinutes || currentTimeMinutes < endTimeMinutes
+        } else {
+          // Normal window
+          inRestrictedWindow = currentTimeMinutes >= startTimeMinutes && currentTimeMinutes < endTimeMinutes
+        }
+        
+        if (inRestrictedWindow) {
+          logger.info(`⏸️ Plant sync skipped - in restricted time window (${syncWindowStart} - ${syncWindowEnd} IST)`)
           return NextResponse.json({
             success: false,
-            message: "Plant sync cron is disabled",
+            message: `Sync skipped - in restricted time window (${syncWindowStart} - ${syncWindowEnd} IST)`,
+            skipped: true,
           })
         }
 
-        logger.info("🕐 Plant sync cron triggered")
+        // Log current IST time for debugging
+        const istHour = parseInt(kolkataTime.find((part) => part.type === "hour")?.value || "0")
+        const istMin = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
+        logger.info(`🕐 Plant sync cron triggered at ${istHour}:${istMin.toString().padStart(2, "0")} IST`)
 
         // Execute sync (context automatically propagated)
         const summary = await syncAllPlants()

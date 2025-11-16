@@ -1,9 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/sync-plants",
-      "schedule": "*/15 * * * *"
-    }
-  ]
+  "crons": []
 }
 

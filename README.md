@@ -1379,8 +1379,9 @@ Calculate efficiency metrics for work orders.
 | `TELEMETRY_SUPABASE_ANON_KEY` | Telemetry DB anon key | Yes |
 | `TELEMETRY_SUPABASE_SERVICE_ROLE_KEY` | Telemetry DB service role key | Yes |
 | `NODE_ENV` | Environment (development/production) | Yes |
-| `ENABLE_PLANT_SYNC_CRON` | Enable plant sync cron job (default: true) | No |
 | `CRON_SECRET` | Secret token for securing cron endpoint | No (recommended) |
+| `SYNC_WINDOW_START` | Start time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "19:00") | No |
+| `SYNC_WINDOW_END` | End time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "06:00") | No |
 
 ### Database Configuration
 
@@ -1393,6 +1394,23 @@ Calculate efficiency metrics for work orders.
 - Set up automatic cleanup (24h retention)
 - Configure indexes for time-series queries
 - Consider partitioning for large datasets
+
+### Auto-Sync Configuration
+
+Plant synchronization is automatically enabled for all organizations by default with a 15-minute interval. Super admins can configure sync settings per organization from the Vendors management page:
+
+- **Enable/Disable Auto-Sync**: Toggle automatic synchronization for each organization
+- **Sync Interval**: Set the interval in minutes (1-1440 minutes, default: 15)
+- **Clock-Based Scheduling**: Sync runs at fixed clock times based on the interval (e.g., 15 min = :00, :15, :30, :45)
+- **Time Window Restriction**: Sync is automatically skipped during the configured time window (default: 7 PM to 6 AM Asia/Kolkata timezone)
+
+**Environment Variables for Sync Window**:
+- `SYNC_WINDOW_START`: Start time in HH:MM format (Asia/Kolkata timezone, default: "19:00")
+- `SYNC_WINDOW_END`: End time in HH:MM format (Asia/Kolkata timezone, default: "06:00")
+
+**Note**: Time calculations use the `Asia/Kolkata` timezone (IST) via JavaScript's Intl API for accurate timezone handling.
+
+**Note**: All vendors are processed in parallel during sync operations. Tokens are stored in the database only (no in-memory caching) to ensure each vendor uses its own token.
 
 ### Edge Function Scheduling
 
@@ -1407,15 +1425,19 @@ Configure scheduled execution in Supabase:
 The plant sync cron job automatically synchronizes plant data from all active vendors. See [CRON_SYNC.md](./docs/CRON_SYNC.md) for detailed documentation.
 
 **Configuration:**
-- **Vercel**: Automatically configured via `vercel.json` (runs every 15 minutes)
-- **External Cron**: Use any HTTP cron service to call `/api/cron/sync-plants`
-- **Manual Trigger**: POST to `/api/cron/sync-plants` (SUPERADMIN only)
+- **Server-Side Cron**: Automatically initialized when the Node.js server starts via `instrumentation.ts` (runs every 15 minutes)
+- **Manual Trigger**: POST to `/api/cron/sync-plants` (SUPERADMIN only) or use the "Trigger Sync Now" button in the Vendor Sync Dashboard
 
 **Features:**
-- Generic vendor support (works with any vendor adapter)
-- Automatic token validation and refresh
-- Parallel processing of organizations
-- Batch database operations for efficiency
+- **Auto-Implemented**: No configuration needed - sync is automatically enabled for all organizations
+- **Per-Organization Settings**: Super admins configure sync intervals from the Vendors page
+- **Clock-Based Scheduling**: Sync runs at fixed clock times (e.g., 15 min = :00, :15, :30, :45)
+- **Time Window Restriction**: Automatically skips sync during configured hours (default: 7 PM - 6 AM Asia/Kolkata timezone)
+- **Parallel Processing**: All vendors are processed simultaneously (no concurrency limit)
+- **Database Token Storage**: Tokens stored in DB only (no in-memory cache) - each vendor uses its own token
+- **Generic Vendor Support**: Works with any vendor adapter
+- **Automatic Token Validation**: Tokens are validated and refreshed automatically
+- **Batch Database Operations**: Efficient batch upserts for plant data
 
 ## Development Guide
 
