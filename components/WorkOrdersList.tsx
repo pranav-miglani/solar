@@ -109,7 +109,7 @@ export function WorkOrdersList() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-4 p-4 md:p-6 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-4 p-4 md:p-6 bg-card/80 dark:bg-card/40 rounded-lg border border-border shadow-sm backdrop-blur-sm">
         <motion.div 
           whileHover={{ scale: 1.05 }} 
           whileTap={{ scale: 0.95 }}
@@ -118,7 +118,7 @@ export function WorkOrdersList() {
           <Button 
             onClick={handleCreate}
             size="lg"
-            className="w-full sm:w-auto transition-all duration-200 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white shadow-lg hover:shadow-xl font-semibold text-base"
+            className="w-full sm:w-auto transition-all duration-200 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-semibold text-base shadow-lg hover:shadow-xl border-0 ring-2 ring-blue-500/20 dark:ring-blue-400/30"
           >
             <Plus className="h-5 w-5 mr-2" />
             Create Work Order

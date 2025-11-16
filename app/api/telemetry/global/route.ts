@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getTelemetryClient } from "@/lib/supabase/telemetryClient"
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const hours = parseInt(searchParams.get("hours") || "24")
 
-    const supabase = await createClient()
+    const supabase = getTelemetryClient()
 
     const startTime = new Date()
     startTime.setHours(startTime.getHours() - hours)

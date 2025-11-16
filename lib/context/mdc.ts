@@ -11,6 +11,7 @@ interface MDCContext {
   source: "user" | "cron" | "system" | "api"
   requestId?: string
   userId?: string
+  userEmail?: string  // User email for tracking all logs by email ID
   accountType?: string
   orgId?: number
   
@@ -107,6 +108,11 @@ class MDC {
 
     const parts: string[] = []
     parts.push(`[${context.source.toUpperCase()}]`)
+    
+    // Always include user email if available for tracking
+    if (context.userEmail) {
+      parts.push(`[Email:${context.userEmail}]`)
+    }
     
     if (context.operation) {
       parts.push(`[${context.operation}]`)

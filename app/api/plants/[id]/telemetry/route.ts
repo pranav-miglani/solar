@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getTelemetryClient } from "@/lib/supabase/telemetryClient"
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const session = request.cookies.get("session")?.value
 
-    if (!user) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -21,8 +18,9 @@ export async function GET(
     const startTime = new Date()
     startTime.setHours(startTime.getHours() - hours)
 
+    const supabase = getTelemetryClient()
     const { data: telemetry, error } = await supabase
-      .from("telemetry")
+      .from("telemetry_readings")
       .select("*")
       .eq("plant_id", params.id)
       .gte("ts", startTime.toISOString())

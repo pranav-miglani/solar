@@ -1,19 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { getServiceClient } from "@/lib/supabase/serviceClient"
 import { requirePermission } from "@/lib/rbac"
 import bcrypt from "bcryptjs"
 
-// For accounts API, we need to bypass RLS for write operations
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +25,7 @@ export async function GET(request: NextRequest) {
     requirePermission(accountType as any, "accounts", "read")
 
     // Use service role client to bypass RLS
-    const supabase = createServiceClient()
+    const supabase = getServiceClient()
 
     const { data: accounts, error } = await supabase
       .from("accounts")
@@ -124,7 +113,7 @@ export async function POST(request: NextRequest) {
     const passwordHash = await bcrypt.hash(password, 10)
 
     // Use service role client to bypass RLS
-    const supabase = createServiceClient()
+    const supabase = getServiceClient()
 
     // Check if account already exists
     const { data: existingAccount } = await supabase

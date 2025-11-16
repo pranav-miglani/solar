@@ -6,6 +6,7 @@ import type {
   RealtimeData,
   VendorConfig,
 } from "./types"
+import { pooledFetch } from "../http/pooledClient"
 
 interface SolarmanAuthResponse {
   access_token: string
@@ -246,7 +247,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     console.log('🔐 [Solarman] Authenticating with URL:', url)
     console.log('🔐 [Solarman] Request body (without password):', { ...requestBody, password: '***' })
 
-    const response = await fetch(url, {
+    const response = await pooledFetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -305,7 +306,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       
       console.log(`📊 [Solarman] Fetching page ${currentPage} with size ${pageSize}`)
       
-      const response = await fetch(url, {
+      const response = await pooledFetch(url, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -466,7 +467,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     const startDate = startTime.toISOString().split('T')[0]
     const endDate = endTime.toISOString().split('T')[0]
 
-    const response = await fetch(
+    const response = await pooledFetch(
       `${this.getApiBaseUrl()}/device/v1.0/historical`,
       {
         method: "POST",
@@ -561,7 +562,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       requestBody.deviceSn = deviceId
     }
 
-    const response = await fetch(
+    const response = await pooledFetch(
       `${this.getApiBaseUrl()}/device/v1.0/currentData`,
       {
         method: "POST",
@@ -634,7 +635,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       requestBody.endTimestamp = endTimestamp
     }
 
-    const response = await fetch(
+    const response = await pooledFetch(
       `${this.getApiBaseUrl()}/device/v1.0/alertList`,
       {
         method: "POST",
@@ -710,7 +711,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   async getPlantBaseInfo(stationId: number): Promise<Plant> {
     const token = await this.authenticate()
     
-    const response = await fetch(
+    const response = await pooledFetch(
       `${this.getApiBaseUrl()}/station/v1.0/base?language=en`,
       {
         method: "POST",
@@ -754,7 +755,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   async getPlantDevices(stationId: number): Promise<any[]> {
     const token = await this.authenticate()
     
-    const response = await fetch(
+    const response = await pooledFetch(
       `${this.getApiBaseUrl()}/station/v1.0/device`,
       {
         method: "POST",

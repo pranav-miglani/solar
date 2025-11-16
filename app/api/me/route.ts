@@ -1,18 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-// For /api/me, we need to bypass RLS to verify the account exists
-// We use service role key since RLS policies require auth.uid() which we don't have
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
+import { getServiceClient } from "@/lib/supabase/serviceClient"
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +23,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Use service role client to bypass RLS and verify account exists
-    const supabase = createServiceClient()
+    const supabase = getServiceClient()
     
     // Get account to verify it still exists
     const { data: account, error } = await supabase

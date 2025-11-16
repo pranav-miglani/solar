@@ -10,7 +10,17 @@ class ContextLogger {
   private formatMessage(level: LogLevel, message: string, ...args: any[]): string {
     const prefix = MDC.getLogPrefix()
     const timestamp = new Date().toISOString()
-    return `[${timestamp}] ${prefix} [${level.toUpperCase()}] ${message}`
+    const context = MDC.getContext()
+    
+    // Include user email prominently in logs for tracking
+    let logMessage = `[${timestamp}] ${prefix} [${level.toUpperCase()}] ${message}`
+    
+    // Add user email to log output if available
+    if (context?.userEmail) {
+      logMessage = `[${timestamp}] ${prefix} [${level.toUpperCase()}] [User:${context.userEmail}] ${message}`
+    }
+    
+    return logMessage
   }
 
   debug(message: string, ...args: any[]): void {
