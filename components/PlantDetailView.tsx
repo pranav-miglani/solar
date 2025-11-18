@@ -35,6 +35,7 @@ interface Plant {
   total_energy_mwh: number | null
   performance_ratio: number | null
   last_update_time: string | null
+  last_refreshed_at: string | null
   contact_phone: string | null
   network_status: string | null
   vendor_created_date: string | null
@@ -388,6 +389,18 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                   <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
                   <p className="text-base">
                     {format(new Date(plant.last_update_time), "PPp")}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {plant.last_refreshed_at && (
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Last Refresh</p>
+                  <p className="text-base">
+                    {format(new Date(plant.last_refreshed_at), "PPp")}
                   </p>
                 </div>
               </div>

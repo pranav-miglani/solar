@@ -69,6 +69,9 @@ export async function GET(
       )
     }
 
+    // Log to verify last_refreshed_at is included
+    console.log(`[Plant API] Plant ${params.id} - last_refreshed_at:`, plant.last_refreshed_at)
+    
     return NextResponse.json(plant)
   } catch (error: any) {
     console.error("Get plant error:", error)

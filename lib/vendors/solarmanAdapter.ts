@@ -84,29 +84,171 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   }
 
   /**
+   * Logged fetch adapter - logs all requests and responses to Solarman API
+   * This wraps the native fetch to provide comprehensive logging
+   */
+  private async loggedFetch(
+    url: string,
+    options: RequestInit = {},
+    context?: { operation?: string; description?: string }
+  ): Promise<Response> {
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const operation = context?.operation || 'API_CALL'
+    const description = context?.description || 'Solarman API request'
+
+    // Log request details
+    const requestLog: any = {
+      requestId,
+      operation,
+      description,
+      method: options.method || 'GET',
+      url,
+      timestamp: new Date().toISOString(),
+    }
+
+    // Log headers (sanitize sensitive data)
+    const headers: Record<string, string> = {}
+    if (options.headers) {
+      const headerEntries = options.headers instanceof Headers
+        ? Array.from(options.headers.entries())
+        : Object.entries(options.headers as Record<string, string>)
+      
+      headerEntries.forEach(([key, value]) => {
+        // Sanitize authorization header
+        if (key.toLowerCase() === 'authorization') {
+          headers[key] = value ? `${value.substring(0, 20)}...` : 'N/A'
+        } else {
+          headers[key] = value
+        }
+      })
+    }
+    requestLog.headers = headers
+
+    // Log request body (if present)
+    if (options.body) {
+      try {
+        if (typeof options.body === 'string') {
+          requestLog.body = JSON.parse(options.body)
+        } else {
+          requestLog.body = options.body
+        }
+      } catch {
+        requestLog.body = '[Unable to parse body]'
+      }
+    }
+
+    console.log(`📤 [Solarman API Request] ${requestId}`, JSON.stringify(requestLog, null, 2))
+
+    const startTime = Date.now()
+
+    try {
+      // Make the actual fetch call
+      const response = await fetch(url, options)
+      const duration = Date.now() - startTime
+
+      // Clone response to read body without consuming it
+      const responseClone = response.clone()
+      let responseBody: any = null
+      let responseBodyText: string | null = null
+
+      try {
+        responseBodyText = await responseClone.text()
+        if (responseBodyText) {
+          try {
+            responseBody = JSON.parse(responseBodyText)
+          } catch {
+            responseBody = responseBodyText
+          }
+        }
+      } catch (error) {
+        responseBody = '[Unable to read response body]'
+      }
+
+      // Log response details
+      const responseLog: any = {
+        requestId,
+        operation,
+        description,
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString(),
+      }
+
+      // Log response headers
+      const responseHeaders: Record<string, string> = {}
+      response.headers.forEach((value, key) => {
+        responseHeaders[key] = value
+      })
+      responseLog.headers = responseHeaders
+
+      // Log response body (truncate if too large)
+      if (responseBody) {
+        const bodyStr = typeof responseBody === 'string' 
+          ? responseBody 
+          : JSON.stringify(responseBody, null, 2)
+        
+        if (bodyStr.length > 10000) {
+          responseLog.body = bodyStr.substring(0, 10000) + '...[truncated]'
+          responseLog.bodySize = bodyStr.length
+        } else {
+          responseLog.body = responseBody
+        }
+      }
+
+      if (response.ok) {
+        console.log(`✅ [Solarman API Response] ${requestId}`, JSON.stringify(responseLog, null, 2))
+      } else {
+        console.error(`❌ [Solarman API Error Response] ${requestId}`, JSON.stringify(responseLog, null, 2))
+      }
+
+      return response
+    } catch (error: any) {
+      const duration = Date.now() - startTime
+      const errorLog = {
+        requestId,
+        operation,
+        description,
+        error: error.message || String(error),
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString(),
+      }
+      console.error(`💥 [Solarman API Exception] ${requestId}`, JSON.stringify(errorLog, null, 2))
+      throw error
+    }
+  }
+
+  /**
    * Get PRO API base URL from environment variables
    * Uses SOLARMAN_PRO_API_BASE_URL if set, otherwise converts SOLARMAN_API_BASE_URL to PRO URL
+   * Returns the URL and a flag indicating if it was explicitly set or auto-converted
    */
-  private getProApiBaseUrl(): string {
+  private getProApiBaseUrl(): { url: string; isExplicit: boolean } {
     // First try PRO API base URL
     const proApiUrl = process.env.SOLARMAN_PRO_API_BASE_URL
     if (proApiUrl) {
-      return proApiUrl
+      console.log('🔵 [Solarman] Using PRO API base URL from SOLARMAN_PRO_API_BASE_URL:', proApiUrl)
+      return { url: proApiUrl, isExplicit: true }
     }
     
     // If not set, convert regular API base URL to PRO URL
     const regularApiUrl = this.getApiBaseUrl()
     if (regularApiUrl.includes('globalapi')) {
-      return regularApiUrl.replace('globalapi', 'globalpro')
+      const convertedUrl = regularApiUrl.replace('globalapi', 'globalpro')
+      console.log('🟡 [Solarman] PRO API base URL not set, auto-converting from regular API:', regularApiUrl, '→', convertedUrl)
+      return { url: convertedUrl, isExplicit: false }
     }
     
     // If already globalpro, return as is
     if (regularApiUrl.includes('globalpro')) {
-      return regularApiUrl
+      console.log('🟡 [Solarman] Using regular API URL (already globalpro):', regularApiUrl)
+      return { url: regularApiUrl, isExplicit: false }
     }
     
     // Default fallback
-    return 'https://globalpro.solarmanpv.com'
+    console.log('🟠 [Solarman] Using default PRO API base URL:', 'https://globalpro.solarmanpv.com')
+    return { url: 'https://globalpro.solarmanpv.com', isExplicit: false }
   }
 
   /**
@@ -272,12 +414,15 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     console.log('🔐 [Solarman] Authenticating with URL:', url)
     console.log('🔐 [Solarman] Request body (without password):', { ...requestBody, password: '***' })
 
-    const response = await fetch(url, {
+    const response = await this.loggedFetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(requestBody),
+    }, {
+      operation: 'AUTHENTICATE',
+      description: 'Solarman authentication request',
     })
 
     if (!response.ok) {
@@ -302,7 +447,14 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     const token = await this.authenticate()
     
     // Always use PRO API (converts regular API URL to PRO if needed)
-    const proApiUrl = this.getProApiBaseUrl()
+    const { url: proApiUrl, isExplicit } = this.getProApiBaseUrl()
+    
+    if (isExplicit) {
+      console.log('✅ [Solarman] PRO API explicitly configured - using PRO API endpoint')
+    } else {
+      console.log('⚠️ [Solarman] PRO API not explicitly configured - auto-converted to PRO API endpoint')
+    }
+    
     console.log('📊 [Solarman] Fetching plants from PRO API:', proApiUrl)
     return await this.listPlantsFromProApi(token, proApiUrl)
   }
@@ -321,23 +473,28 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       }
     }
 
-    console.log('📊 [Solarman PRO] Fetching from:', url)
+    console.log('🚀 [Solarman PRO API] Triggered - Endpoint:', url)
+    console.log('🚀 [Solarman PRO API] Request body:', JSON.stringify(requestBody, null, 2))
 
-    const response = await fetch(url, {
+    const response = await this.loggedFetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(requestBody),
+    }, {
+      operation: 'LIST_PLANTS_PRO_API',
+      description: 'Fetch plants from Solarman PRO API',
     })
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error(`❌ [Solarman PRO] Failed to fetch:`, {
+      console.error(`❌ [Solarman PRO API] Request failed:`, {
         status: response.status,
         statusText: response.statusText,
         error: errorText,
+        url: url,
       })
       throw new Error(`Failed to fetch stations from PRO API: ${response.statusText} - ${errorText}`)
     }
@@ -346,16 +503,16 @@ export class SolarmanAdapter extends BaseVendorAdapter {
 
     // PRO API response format: { total: number, data: Array<{ station: {...}, tags: [], ... }> }
     if (!data.data || !Array.isArray(data.data)) {
-      console.error('❌ [Solarman PRO] Invalid response format:', data)
+      console.error('❌ [Solarman PRO API] Invalid response format:', JSON.stringify(data, null, 2))
       throw new Error("Invalid response format from Solarman PRO API - expected data array")
     }
 
     const total = data.total || 0
-    console.log(`📊 [Solarman PRO] Total stations available: ${total}`)
+    console.log(`✅ [Solarman PRO API] Successfully fetched data - Total stations: ${total}`)
 
     // Extract stations from nested structure
     const allStations = data.data.map((item: any) => item.station).filter((s: any) => s !== undefined)
-    console.log(`✅ [Solarman PRO] Fetched ${allStations.length} stations`)
+    console.log(`✅ [Solarman PRO API] Processed ${allStations.length} stations from response`)
 
     // Map stations to Plant format
     return allStations.map((station: any) => {
@@ -507,13 +664,16 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       
       console.log(`📊 [Solarman] Fetching page ${currentPage} with size ${pageSize}`)
       
-      const response = await fetch(url, {
+      const response = await this.loggedFetch(url, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(requestBody),
+      }, {
+        operation: 'LIST_PLANTS_REGULAR_API',
+        description: `Fetch plants from Solarman regular API (page ${currentPage})`,
       })
 
       if (!response.ok) {
@@ -668,7 +828,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     const startDate = startTime.toISOString().split('T')[0]
     const endDate = endTime.toISOString().split('T')[0]
 
-    const response = await fetch(
+    const response = await this.loggedFetch(
       `${this.getApiBaseUrl()}/device/v1.0/historical`,
       {
         method: "POST",
@@ -682,6 +842,10 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           endTime: endDate,
           timeType,
         }),
+      },
+      {
+        operation: 'GET_TELEMETRY',
+        description: `Get historical telemetry for device ${deviceId}`,
       }
     )
 
@@ -763,7 +927,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       requestBody.deviceSn = deviceId
     }
 
-    const response = await fetch(
+    const response = await this.loggedFetch(
       `${this.getApiBaseUrl()}/device/v1.0/currentData`,
       {
         method: "POST",
@@ -772,6 +936,10 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(requestBody),
+      },
+      {
+        operation: 'GET_REALTIME',
+        description: `Get realtime data for device ${deviceId}`,
       }
     )
 
@@ -836,7 +1004,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       requestBody.endTimestamp = endTimestamp
     }
 
-    const response = await fetch(
+    const response = await this.loggedFetch(
       `${this.getApiBaseUrl()}/device/v1.0/alertList`,
       {
         method: "POST",
@@ -845,6 +1013,10 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(requestBody),
+      },
+      {
+        operation: 'GET_ALERTS',
+        description: `Get alerts for device ${deviceId}`,
       }
     )
 
@@ -912,7 +1084,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   async getPlantBaseInfo(stationId: number): Promise<Plant> {
     const token = await this.authenticate()
     
-    const response = await fetch(
+    const response = await this.loggedFetch(
       `${this.getApiBaseUrl()}/station/v1.0/base?language=en`,
       {
         method: "POST",
@@ -921,6 +1093,10 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ stationId }),
+      },
+      {
+        operation: 'GET_PLANT_BASE_INFO',
+        description: `Get base info for station ${stationId}`,
       }
     )
 
@@ -956,7 +1132,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   async getPlantDevices(stationId: number): Promise<any[]> {
     const token = await this.authenticate()
     
-    const response = await fetch(
+    const response = await this.loggedFetch(
       `${this.getApiBaseUrl()}/station/v1.0/device`,
       {
         method: "POST",
@@ -965,6 +1141,10 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ stationId }),
+      },
+      {
+        operation: 'GET_PLANT_DEVICES',
+        description: `Get devices for station ${stationId}`,
       }
     )
 

@@ -186,6 +186,7 @@ export async function POST(
         total_energy_mwh: metadata.totalEnergyMwh || null,
         performance_ratio: metadata.performanceRatio || null,
         last_update_time: lastUpdateTime, // lastUpdateTime from vendor
+        last_refreshed_at: new Date().toISOString(), // Always set to current time when syncing
         // Additional metadata fields (refreshed on every sync)
         contact_phone: metadata.contactPhone || null,
         // Normalize network_status by trimming whitespace (handle ' ALL_OFFLINE' with leading space)
@@ -225,9 +226,24 @@ export async function POST(
       try {
         // Use upsert to handle both inserts and updates in one operation
         // The unique constraint on (vendor_id, vendor_plant_id) will be used for conflict resolution
+        // Log first plant in batch to verify last_refreshed_at is included
+        if (batch.length > 0) {
+          logger.info(`Batch ${batchNumber} first plant sample:`, {
+            vendor_plant_id: batch[0].vendor_plant_id,
+            name: batch[0].name,
+            last_refreshed_at: batch[0].last_refreshed_at,
+          })
+        }
+        
+        // Ensure last_refreshed_at is set for all plants in batch
+        const batchWithRefreshTime = batch.map((plant) => ({
+          ...plant,
+          last_refreshed_at: new Date().toISOString(), // Ensure it's always set to current time
+        }))
+        
         const { data, error } = await supabase
           .from("plants")
-          .upsert(batch, {
+          .upsert(batchWithRefreshTime, {
             onConflict: "vendor_id,vendor_plant_id",
           })
           .select()
@@ -240,9 +256,15 @@ export async function POST(
           logger.info(`Falling back to individual operations for batch ${batchNumber}`)
           for (const plantData of batch) {
             try {
+              // Ensure last_refreshed_at is set
+              const plantDataWithRefresh = {
+                ...plantData,
+                last_refreshed_at: new Date().toISOString(),
+              }
+              
               const { error: individualError } = await supabase
                 .from("plants")
-                .upsert(plantData, {
+                .upsert(plantDataWithRefresh, {
                   onConflict: "vendor_id,vendor_plant_id",
                 })
 
