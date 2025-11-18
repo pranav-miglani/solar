@@ -61,7 +61,23 @@ export abstract class BaseVendorAdapter {
   protected abstract normalizeAlert(rawData: any): Alert
 
   protected getApiBaseUrl(): string {
-    return this.config.apiBaseUrl
+    // For backward compatibility, check config first, then fall back to vendor-specific env vars
+    if (this.config.apiBaseUrl) {
+      return this.config.apiBaseUrl
+    }
+    
+    // Get vendor-specific base URL from environment variables
+    const vendorType = this.config.vendorType.toUpperCase()
+    const envVarName = `${vendorType}_API_BASE_URL`
+    const baseUrl = process.env[envVarName]
+    
+    if (!baseUrl) {
+      throw new Error(
+        `API base URL not configured. Please set ${envVarName} environment variable or provide apiBaseUrl in config.`
+      )
+    }
+    
+    return baseUrl
   }
 
   protected getCredentials(): Record<string, any> {

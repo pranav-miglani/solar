@@ -79,11 +79,11 @@ export async function POST(request: NextRequest) {
     requirePermission(accountType as any, "vendors", "create")
 
     const body = await request.json()
-    const { name, vendor_type, api_base_url, credentials, is_active, org_id } = body
+    const { name, vendor_type, credentials, is_active, org_id } = body
 
-    if (!name || !vendor_type || !api_base_url || !credentials) {
+    if (!name || !vendor_type || !credentials) {
       return NextResponse.json(
-        { error: "Name, vendor_type, api_base_url, and credentials are required" },
+        { error: "Name, vendor_type, and credentials are required" },
         { status: 400 }
       )
     }
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
       .insert({
         name,
         vendor_type,
-        api_base_url,
+        // api_base_url removed - now stored in environment variables
         credentials,
         is_active: is_active ?? true,
         org_id,

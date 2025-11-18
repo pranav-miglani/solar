@@ -331,8 +331,8 @@ Vendor configurations for API integrations. Vendors are mapped to organizations 
 | `id` | SERIAL | Primary key |
 | `name` | TEXT | Vendor name |
 | `vendor_type` | ENUM | SOLARMAN, SUNGROW, OTHER |
-| `api_base_url` | TEXT | Vendor API base URL |
 | `credentials` | JSONB | Encrypted API credentials |
+| | | **Note:** `api_base_url` removed - now stored in environment variables (e.g., `SOLARMAN_API_BASE_URL`) |
 | `org_id` | INTEGER | Foreign key to organizations (nullable, for vendor-org mapping) |
 | `is_active` | BOOLEAN | Active status |
 | `created_at` | TIMESTAMPTZ | Creation timestamp |
@@ -1321,6 +1321,13 @@ Calculate efficiency metrics for work orders.
    # Node Environment
    NODE_ENV=development
    
+   # Vendor API Base URLs (vendor-specific, constant per vendor type)
+   SOLARMAN_API_BASE_URL=https://globalapi.solarmanpv.com
+   # Optional: Solarman PRO API for richer data (power users)
+   # SOLARMAN_PRO_API_BASE_URL=https://globalpro.solarmanpv.com
+   # SUNGROW_API_BASE_URL=https://api.sungrow.com (if using Sungrow)
+   # OTHER_API_BASE_URL=https://api.example.com (if using OTHER vendor type)
+   
    # Plant Sync Cron (optional)
    ENABLE_PLANT_SYNC_CRON=true
    CRON_SECRET=your-secret-token-here
@@ -1379,6 +1386,10 @@ Calculate efficiency metrics for work orders.
 | `TELEMETRY_SUPABASE_ANON_KEY` | Telemetry DB anon key | Yes |
 | `TELEMETRY_SUPABASE_SERVICE_ROLE_KEY` | Telemetry DB service role key | Yes |
 | `NODE_ENV` | Environment (development/production) | Yes |
+| `SOLARMAN_API_BASE_URL` | Solarman API base URL (e.g., `https://globalapi.solarmanpv.com`) | Yes (if using Solarman) |
+| `SOLARMAN_PRO_API_BASE_URL` | Solarman PRO API base URL (e.g., `https://globalpro.solarmanpv.com`) - Optional, provides richer data | No (optional, for power users) |
+| `SUNGROW_API_BASE_URL` | Sungrow API base URL | Yes (if using Sungrow) |
+| `OTHER_API_BASE_URL` | Other vendor API base URL | Yes (if using OTHER vendor type) |
 | `CRON_SECRET` | Secret token for securing cron endpoint | No (recommended) |
 | `SYNC_WINDOW_START` | Start time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "19:00") | No |
 | `SYNC_WINDOW_END` | End time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "06:00") | No |

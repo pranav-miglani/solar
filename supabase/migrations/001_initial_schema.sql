@@ -1,4 +1,18 @@
 -- ============================================
+-- FRESH INSTALL SCHEMA
+-- ============================================
+-- This file contains the complete database schema for a fresh installation.
+-- All migrations have been consolidated into this single file.
+-- 
+-- Key features:
+-- - No api_base_url in vendors table (stored in environment variables)
+-- - Complete production metrics in plants table
+-- - Auto-sync settings in organizations table
+-- - Token storage in vendors table
+-- - last_refreshed_at tracking in plants table
+--
+-- Run this file for a fresh database installation.
+-- ============================================
 -- DROP EXISTING SCHEMA (CLEAN SLATE)
 -- ============================================
 -- Drop in reverse dependency order to avoid constraint errors
@@ -114,7 +128,7 @@ CREATE TABLE vendors (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   vendor_type vendor_type NOT NULL,
-  api_base_url TEXT NOT NULL,
+  -- Note: api_base_url removed - now stored in environment variables (e.g., SOLARMAN_API_BASE_URL)
   credentials JSONB NOT NULL,
   org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
   -- Token storage for vendor API authentication (Solarman, etc.)
@@ -153,7 +167,8 @@ CREATE TABLE plants (
   yearly_energy_mwh NUMERIC(10, 3), -- Yearly Energy in MWh
   total_energy_mwh NUMERIC(10, 3), -- Total Energy in MWh
   performance_ratio NUMERIC(5, 4), -- PR (0-1 range, displayed as percentage in circular indicator)
-  last_update_time TIMESTAMPTZ, -- Last time production data was updated (shown as "Updated" timestamp)
+  last_update_time TIMESTAMPTZ, -- Last time production data was updated from vendor (shown as "Last Updated" timestamp)
+  last_refreshed_at TIMESTAMPTZ, -- Last time this plant data was refreshed/synced in our database (shown as "Last Refresh" timestamp)
   -- Additional metadata fields (refreshed on every sync)
   contact_phone TEXT, -- Contact phone number from vendor
   network_status TEXT, -- Network status from vendor (e.g., NORMAL, ALL_OFFLINE, PARTIAL_OFFLINE). May include leading/trailing whitespace which is normalized during sync.
@@ -171,7 +186,8 @@ COMMENT ON COLUMN plants.monthly_energy_mwh IS 'Monthly energy generation in MWh
 COMMENT ON COLUMN plants.yearly_energy_mwh IS 'Yearly energy generation in MWh (shown in Production Overview)';
 COMMENT ON COLUMN plants.total_energy_mwh IS 'Total cumulative energy generation in MWh (shown in Production Overview)';
 COMMENT ON COLUMN plants.performance_ratio IS 'Performance Ratio (PR) 0-1 range, displayed as percentage in circular indicator';
-COMMENT ON COLUMN plants.last_update_time IS 'Last time production data was updated from vendor (shown as "Updated" timestamp)';
+COMMENT ON COLUMN plants.last_update_time IS 'Last time production data was updated from vendor (shown as "Last Updated" timestamp)';
+COMMENT ON COLUMN plants.last_refreshed_at IS 'Last time this plant data was refreshed/synced in our database (shown as "Last Refresh" timestamp) - set to NOW() on every sync';
 COMMENT ON COLUMN plants.contact_phone IS 'Contact phone number from vendor (refreshed on sync)';
 COMMENT ON COLUMN plants.network_status IS 'Network status from vendor. Valid values: NORMAL, ALL_OFFLINE, PARTIAL_OFFLINE. May include leading/trailing whitespace which is normalized during sync. Unknown values are displayed as N/A in UI.';
 COMMENT ON COLUMN plants.vendor_created_date IS 'Original creation date from vendor (Unix timestamp converted to TIMESTAMPTZ) - refreshed on sync';
@@ -351,8 +367,26 @@ BEGIN
     RAISE EXCEPTION 'org_id column not found in work_orders table';
   END IF;
   
+  -- Verify last_refreshed_at column exists in plants table
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'plants' AND column_name = 'last_refreshed_at'
+  ) THEN
+    RAISE EXCEPTION 'last_refreshed_at column not found in plants table';
+  END IF;
+  
+  -- Verify api_base_url does NOT exist in vendors table (should be in env vars)
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'vendors' AND column_name = 'api_base_url'
+  ) THEN
+    RAISE EXCEPTION 'api_base_url column should not exist in vendors table - it should be in environment variables';
+  END IF;
+  
   RAISE NOTICE '✅ Schema verification complete - all required columns present';
   RAISE NOTICE '✅ Token storage fields verified in vendors table';
   RAISE NOTICE '✅ org_id column verified in work_orders table for cascade delete';
   RAISE NOTICE '✅ Work orders location field verified';
+  RAISE NOTICE '✅ last_refreshed_at column verified in plants table';
+  RAISE NOTICE '✅ api_base_url correctly removed from vendors table (using env vars)';
 END $$;

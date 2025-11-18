@@ -42,7 +42,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Switch } from "@/components/ui/switch"
-import { Loader2, Factory, Plus, Pencil, Trash2, RefreshCw, Globe, Building2, CheckCircle2, XCircle, Settings, Clock } from "lucide-react"
+import { Loader2, Factory, Plus, Pencil, Trash2, RefreshCw, Building2, CheckCircle2, XCircle, Settings, Clock } from "lucide-react"
 
 interface Organization {
   id: number
@@ -53,7 +53,7 @@ interface Vendor {
   id: number
   name: string
   vendor_type: string
-  api_base_url: string
+  // api_base_url removed - now stored in environment variables
   credentials: Record<string, any>
   is_active: boolean
   org_id?: number
@@ -83,7 +83,7 @@ export function VendorsTable() {
   const [formData, setFormData] = useState({
     name: "",
     vendor_type: "SOLARMAN",
-    api_base_url: "",
+    // api_base_url removed - now stored in environment variables
     org_id: "",
     appId: "",
     appSecret: "",
@@ -163,7 +163,7 @@ export function VendorsTable() {
       setFormData({
         name: vendor.name,
         vendor_type: vendor.vendor_type || "SOLARMAN",
-        api_base_url: vendor.api_base_url,
+        // api_base_url removed - now stored in environment variables
         org_id: vendor.org_id?.toString() || "",
         appId: vendor.credentials.appId || "",
         appSecret: vendor.credentials.appSecret || "",
@@ -177,7 +177,7 @@ export function VendorsTable() {
       setFormData({
         name: "",
         vendor_type: "SOLARMAN",
-        api_base_url: "",
+        // api_base_url removed - now stored in environment variables
         org_id: "",
         appId: "",
         appSecret: "",
@@ -220,14 +220,14 @@ export function VendorsTable() {
     const response = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: formData.name,
-        vendor_type: formData.vendor_type,
-        api_base_url: formData.api_base_url,
-        org_id: parseInt(formData.org_id),
-        credentials,
-        is_active: formData.is_active,
-      }),
+        body: JSON.stringify({
+          name: formData.name,
+          vendor_type: formData.vendor_type,
+          // api_base_url removed - now stored in environment variables
+          org_id: parseInt(formData.org_id),
+          credentials,
+          is_active: formData.is_active,
+        }),
     })
 
     if (response.ok) {
@@ -372,18 +372,7 @@ export function VendorsTable() {
                   </Select>
                 )}
               </div>
-              <div>
-                <Label htmlFor="api_base_url">API Base URL *</Label>
-                <Input
-                  id="api_base_url"
-                  value={formData.api_base_url}
-                  onChange={(e) =>
-                    setFormData({ ...formData, api_base_url: e.target.value })
-                  }
-                  required
-                  className="mt-1"
-                />
-              </div>
+              {/* API Base URL removed from UI - configured via environment variables */}
               <div>
                 <Label htmlFor="appId">App ID *</Label>
                 <Input
@@ -501,7 +490,6 @@ export function VendorsTable() {
                 <TableHead className="font-bold text-base">Name</TableHead>
                 <TableHead className="font-bold text-base">Type</TableHead>
                 <TableHead className="font-bold text-base">Organization</TableHead>
-                <TableHead className="font-bold text-base">API URL</TableHead>
                 <TableHead className="font-bold text-base">Status</TableHead>
                 <TableHead className="font-bold text-base text-right">Actions</TableHead>
               </TableRow>
@@ -549,12 +537,7 @@ export function VendorsTable() {
                         <span>{vendor.organizations?.name || "N/A"}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="py-4">
-                      <div className="flex items-center gap-2 font-mono text-sm">
-                        <Globe className="h-4 w-4 text-muted-foreground" />
-                        <span className="truncate max-w-[200px]">{vendor.api_base_url}</span>
-                      </div>
-                    </TableCell>
+                    {/* API Base URL column removed - configured via environment variables */}
                     <TableCell className="py-4">
                       {vendor.is_active ? (
                         <Badge className="bg-green-500 hover:bg-green-600 text-white">
@@ -711,13 +694,7 @@ export function VendorsTable() {
                       <span className="text-muted-foreground">Organization:</span>
                       <span className="font-medium">{vendor.organizations?.name || "N/A"}</span>
                     </div>
-                    <div className="flex items-start gap-2">
-                      <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-muted-foreground">API URL: </span>
-                        <span className="font-mono text-xs break-all">{vendor.api_base_url}</span>
-                      </div>
-                    </div>
+                    {/* API Base URL removed from mobile view - configured via environment variables */}
                   </div>
                   <div className="flex flex-col gap-2 pt-2 border-t">
                     <Button

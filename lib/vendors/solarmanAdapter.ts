@@ -84,6 +84,18 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   }
 
   /**
+   * Get PRO API base URL from environment variables
+   * Falls back to regular API base URL if PRO API is not configured
+   */
+  private getProApiBaseUrl(): string | null {
+    const proApiUrl = process.env.SOLARMAN_PRO_API_BASE_URL
+    if (proApiUrl) {
+      return proApiUrl
+    }
+    return null
+  }
+
+  /**
    * Decode JWT token to check expiry (if token is JWT format)
    * Returns expiry timestamp in milliseconds, or null if not a JWT
    */
@@ -275,6 +287,181 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   async listPlants(): Promise<Plant[]> {
     const token = await this.authenticate()
     
+    // Try PRO API first if configured, fall back to regular API
+    const proApiUrl = this.getProApiBaseUrl()
+    if (proApiUrl) {
+      try {
+        console.log('📊 [Solarman] Attempting to fetch from PRO API:', proApiUrl)
+        return await this.listPlantsFromProApi(token, proApiUrl)
+      } catch (error: any) {
+        console.warn('⚠️ [Solarman] PRO API failed, falling back to regular API:', error.message)
+        // Fall through to regular API
+      }
+    }
+    
+    // Fall back to regular API
+    console.log('📊 [Solarman] Using regular API')
+    return await this.listPlantsFromRegularApi(token)
+  }
+
+  /**
+   * Fetch plants from Solarman PRO API (v2/search endpoint)
+   * Returns richer data including generationValue, generationTotal, etc.
+   */
+  private async listPlantsFromProApi(token: string, proApiBaseUrl: string): Promise<Plant[]> {
+    const url = `${proApiBaseUrl}/maintain-s/operating/station/v2/search`
+    
+    // PRO API request body
+    const requestBody = {
+      station: {
+        powerTypeList: ["PV"] // Filter for PV (solar) stations
+      }
+    }
+
+    console.log('📊 [Solarman PRO] Fetching from:', url)
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`❌ [Solarman PRO] Failed to fetch:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      })
+      throw new Error(`Failed to fetch stations from PRO API: ${response.statusText} - ${errorText}`)
+    }
+
+    const data = await response.json()
+
+    // PRO API response format: { total: number, data: Array<{ station: {...}, tags: [], ... }> }
+    if (!data.data || !Array.isArray(data.data)) {
+      console.error('❌ [Solarman PRO] Invalid response format:', data)
+      throw new Error("Invalid response format from Solarman PRO API - expected data array")
+    }
+
+    const total = data.total || 0
+    console.log(`📊 [Solarman PRO] Total stations available: ${total}`)
+
+    // Extract stations from nested structure
+    const allStations = data.data.map((item: any) => item.station).filter((s: any) => s !== undefined)
+    console.log(`✅ [Solarman PRO] Fetched ${allStations.length} stations`)
+
+    // Map stations to Plant format
+    return allStations.map((station: any) => {
+      // Extract station ID and name
+      const stationId = station.id
+      const stationName = station.name || `Station ${stationId}`
+      
+      // Capacity is already in kW (installedCapacity field)
+      const capacityKw = station.installedCapacity || 0
+      
+      // Handle location - fields are separate (locationLat, locationLng, locationAddress)
+      let location: any = undefined
+      if (station.locationLat || station.locationLng || station.locationAddress) {
+        location = {
+          lat: station.locationLat,
+          lng: station.locationLng,
+          address: station.locationAddress,
+        }
+      }
+
+      // Extract production metrics from PRO API response
+      // generationPower is in W, convert to kW
+      const currentPowerKw = station.generationPower ? station.generationPower / 1000 : null
+      
+      // PRO API provides richer energy data
+      // generationValue: daily energy (kWh), convert to MWh
+      const dailyEnergyMwh = station.generationValue ? station.generationValue / 1000 : null
+      
+      // generationMonth: monthly energy (kWh), convert to MWh
+      const monthlyEnergyMwh = station.generationMonth ? station.generationMonth / 1000 : null
+      
+      // generationYear: yearly energy (kWh), convert to MWh
+      const yearlyEnergyMwh = station.generationYear ? station.generationYear / 1000 : null
+      
+      // generationTotal: total energy (kWh), convert to MWh
+      const totalEnergyMwh = station.generationTotal ? station.generationTotal / 1000 : null
+      
+      // lastUpdateTime is Unix timestamp (seconds), convert to ISO string
+      // PRO API returns as float (e.g., 1763468017.000000000)
+      const lastUpdateTime = station.lastUpdateTime 
+        ? new Date(Math.floor(station.lastUpdateTime) * 1000).toISOString() 
+        : null
+
+      // createdDate is Unix timestamp (seconds), convert to ISO string
+      // PRO API returns as float
+      const createdDate = station.createdDate
+        ? new Date(Math.floor(station.createdDate) * 1000).toISOString()
+        : null
+
+      // startOperatingTime is Unix timestamp (seconds), convert to ISO string
+      // PRO API returns as float
+      const startOperatingTime = station.startOperatingTime
+        ? new Date(Math.floor(station.startOperatingTime) * 1000).toISOString()
+        : null
+
+      return {
+        id: stationId.toString(),
+        name: stationName,
+        capacityKw: capacityKw,
+        location: location,
+        metadata: {
+          stationId: stationId,
+          // Production metrics from PRO API (richer data)
+          currentPowerKw: currentPowerKw, // Converted from W to kW
+          dailyEnergyMwh: dailyEnergyMwh, // From generationValue (kWh -> MWh)
+          monthlyEnergyMwh: monthlyEnergyMwh, // From generationMonth (kWh -> MWh)
+          yearlyEnergyMwh: yearlyEnergyMwh, // From generationYear (kWh -> MWh)
+          totalEnergyMwh: totalEnergyMwh, // From generationTotal (kWh -> MWh)
+          // Additional PRO API fields
+          fullPowerHoursDay: station.fullPowerHoursDay || null,
+          generationCapacity: station.generationCapacity || null,
+          usePower: station.usePower || null,
+          useMonth: station.useMonth || null,
+          useYear: station.useYear || null,
+          useTotal: station.useTotal || null,
+          powerType: station.powerType || null,
+          system: station.system || null,
+          lastUpdateTime: lastUpdateTime,
+          // Additional station metadata - these are refreshed on every sync
+          // Normalize networkStatus by trimming whitespace (Solarman may return ' ALL_OFFLINE' with leading space)
+          networkStatus: station.networkStatus ? String(station.networkStatus).trim() : null,
+          type: station.type,
+          contactPhone: station.contactPhone || null,
+          gridInterconnectionType: station.gridInterconnectionType,
+          regionTimezone: station.regionTimezone,
+          startOperatingTime: startOperatingTime, // Already converted to ISO string
+          createdDate: createdDate, // Already converted to ISO string
+          // Include other fields but exclude raw timestamps to avoid confusion
+          regionLevel1: station.regionLevel1,
+          regionLevel2: station.regionLevel2,
+          regionLevel3: station.regionLevel3,
+          regionLevel4: station.regionLevel4,
+          regionLevel5: station.regionLevel5,
+          regionNationId: station.regionNationId,
+          installationAzimuthAngle: station.installationAzimuthAngle,
+          installationTiltAngle: station.installationTiltAngle,
+          businessWarningStatus: station.businessWarningStatus,
+          consumerWarningStatus: station.consumerWarningStatus,
+          operating: station.operating,
+        },
+      }
+    })
+  }
+
+  /**
+   * Fetch plants from Solarman regular API (v1.0/list endpoint)
+   * Fallback when PRO API is not available
+   */
+  private async listPlantsFromRegularApi(token: string): Promise<Plant[]> {
     // Get base URL and ensure we use globalapi for /station/v1.0/list endpoint
     let baseUrl = this.getApiBaseUrl()
     

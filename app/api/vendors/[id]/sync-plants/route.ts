@@ -84,15 +84,16 @@ export async function POST(
       )
     }
 
-    // Create vendor adapter
-    const vendorConfig: VendorConfig = {
-      id: vendor.id,
-      name: vendor.name,
-      vendorType: vendor.vendor_type as "SOLARMAN" | "SUNGROW" | "OTHER",
-      apiBaseUrl: vendor.api_base_url,
-      credentials: vendor.credentials as Record<string, any>,
-      isActive: vendor.is_active,
-    }
+                    // Create vendor adapter
+                    // Note: apiBaseUrl is now optional - will be read from environment variables if not provided
+                    const vendorConfig: VendorConfig = {
+                      id: vendor.id,
+                      name: vendor.name,
+                      vendorType: vendor.vendor_type as "SOLARMAN" | "SUNGROW" | "OTHER",
+                      // apiBaseUrl removed - now read from environment variables (e.g., SOLARMAN_API_BASE_URL)
+                      credentials: vendor.credentials as Record<string, any>,
+                      isActive: vendor.is_active,
+                    }
 
     const adapter = VendorManager.getAdapter(vendorConfig)
 
@@ -286,7 +287,7 @@ export async function POST(
           await supabase
             .from("vendors")
             .update({ last_synced_at: new Date().toISOString() })
-            .eq("id", vendorId)
+            .eq("id", vendor.id)
         }
 
         return NextResponse.json({

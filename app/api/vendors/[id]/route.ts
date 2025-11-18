@@ -78,14 +78,14 @@ export async function PUT(
     requirePermission(accountType as any, "vendors", "update")
 
     const body = await request.json()
-    const { name, api_base_url, credentials, is_active, org_id } = body
+    const { name, credentials, is_active, org_id } = body
 
     // Use service role client to bypass RLS
     const supabase = createServiceClient()
 
     const updateData: any = {
       name,
-      api_base_url,
+      // api_base_url removed - now stored in environment variables
       credentials,
       is_active,
     }

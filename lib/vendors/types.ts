@@ -6,7 +6,7 @@ export interface VendorConfig {
   id: number
   name: string
   vendorType: 'SOLARMAN' | 'SUNGROW' | 'OTHER'
-  apiBaseUrl: string
+  apiBaseUrl?: string // Optional - can be read from environment variables instead
   credentials: VendorCredentials
   isActive: boolean
 }
