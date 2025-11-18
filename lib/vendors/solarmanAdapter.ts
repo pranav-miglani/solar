@@ -85,14 +85,28 @@ export class SolarmanAdapter extends BaseVendorAdapter {
 
   /**
    * Get PRO API base URL from environment variables
-   * Falls back to regular API base URL if PRO API is not configured
+   * Uses SOLARMAN_PRO_API_BASE_URL if set, otherwise converts SOLARMAN_API_BASE_URL to PRO URL
    */
-  private getProApiBaseUrl(): string | null {
+  private getProApiBaseUrl(): string {
+    // First try PRO API base URL
     const proApiUrl = process.env.SOLARMAN_PRO_API_BASE_URL
     if (proApiUrl) {
       return proApiUrl
     }
-    return null
+    
+    // If not set, convert regular API base URL to PRO URL
+    const regularApiUrl = this.getApiBaseUrl()
+    if (regularApiUrl.includes('globalapi')) {
+      return regularApiUrl.replace('globalapi', 'globalpro')
+    }
+    
+    // If already globalpro, return as is
+    if (regularApiUrl.includes('globalpro')) {
+      return regularApiUrl
+    }
+    
+    // Default fallback
+    return 'https://globalpro.solarmanpv.com'
   }
 
   /**
@@ -287,21 +301,10 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   async listPlants(): Promise<Plant[]> {
     const token = await this.authenticate()
     
-    // Try PRO API first if configured, fall back to regular API
+    // Always use PRO API (converts regular API URL to PRO if needed)
     const proApiUrl = this.getProApiBaseUrl()
-    if (proApiUrl) {
-      try {
-        console.log('📊 [Solarman] Attempting to fetch from PRO API:', proApiUrl)
-        return await this.listPlantsFromProApi(token, proApiUrl)
-      } catch (error: any) {
-        console.warn('⚠️ [Solarman] PRO API failed, falling back to regular API:', error.message)
-        // Fall through to regular API
-      }
-    }
-    
-    // Fall back to regular API
-    console.log('📊 [Solarman] Using regular API')
-    return await this.listPlantsFromRegularApi(token)
+    console.log('📊 [Solarman] Fetching plants from PRO API:', proApiUrl)
+    return await this.listPlantsFromProApi(token, proApiUrl)
   }
 
   /**
@@ -365,11 +368,12 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       
       // Handle location - fields are separate (locationLat, locationLng, locationAddress)
       let location: any = undefined
-      if (station.locationLat || station.locationLng || station.locationAddress) {
+      const locationAddress = station.locationAddress || null
+      if (station.locationLat || station.locationLng || locationAddress) {
         location = {
           lat: station.locationLat,
           lng: station.locationLng,
-          address: station.locationAddress,
+          address: locationAddress,
         }
       }
 
@@ -389,6 +393,15 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       
       // generationTotal: total energy (kWh), convert to MWh
       const totalEnergyMwh = station.generationTotal ? station.generationTotal / 1000 : null
+      
+      // Performance Ratio: PRO API may have prYesterday, or we can calculate from generationCapacity
+      // PR = (Actual Generation / Expected Generation) where Expected = Capacity * Hours * Efficiency
+      // For now, use prYesterday if available, otherwise null (will be calculated elsewhere if needed)
+      const performanceRatio = station.prYesterday !== null && station.prYesterday !== undefined 
+        ? station.prYesterday 
+        : (station.generationCapacity !== null && station.generationCapacity !== undefined && station.installedCapacity > 0
+          ? station.generationCapacity / station.installedCapacity
+          : null)
       
       // lastUpdateTime is Unix timestamp (seconds), convert to ISO string
       // PRO API returns as float (e.g., 1763468017.000000000)
@@ -421,6 +434,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           monthlyEnergyMwh: monthlyEnergyMwh, // From generationMonth (kWh -> MWh)
           yearlyEnergyMwh: yearlyEnergyMwh, // From generationYear (kWh -> MWh)
           totalEnergyMwh: totalEnergyMwh, // From generationTotal (kWh -> MWh)
+          performanceRatio: performanceRatio, // From prYesterday or calculated from generationCapacity
           // Additional PRO API fields
           fullPowerHoursDay: station.fullPowerHoursDay || null,
           generationCapacity: station.generationCapacity || null,
@@ -436,6 +450,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           networkStatus: station.networkStatus ? String(station.networkStatus).trim() : null,
           type: station.type,
           contactPhone: station.contactPhone || null,
+          locationAddress: locationAddress, // For sync route compatibility (must always be refreshed)
           gridInterconnectionType: station.gridInterconnectionType,
           regionTimezone: station.regionTimezone,
           startOperatingTime: startOperatingTime, // Already converted to ISO string
