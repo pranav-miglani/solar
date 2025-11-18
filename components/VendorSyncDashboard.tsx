@@ -21,9 +21,6 @@ import {
   Building2,
   Activity,
   Play,
-  AlertTriangle,
-  PauseCircle,
-  Power,
 } from "lucide-react"
 import { format, formatDistanceToNow } from "date-fns"
 import { Button } from "@/components/ui/button"
@@ -48,33 +45,15 @@ export function VendorSyncDashboard() {
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [syncing, setSyncing] = useState(false)
-  const [cronStatus, setCronStatus] = useState<{
-    inRestrictedWindow: boolean
-    currentTimeIST: string
-    nextSyncTime: string
-    restrictedWindowStart: string
-    restrictedWindowEnd: string
-  } | null>(null)
 
   useEffect(() => {
     fetchVendorSyncStatus()
-    calculateCronStatus()
-    
     // Auto-refresh every 30 seconds
     const interval = setInterval(() => {
       fetchVendorSyncStatus()
-      calculateCronStatus()
     }, 30000)
-    
-    // Update cron status every minute to show current time
-    const timeInterval = setInterval(() => {
-      calculateCronStatus()
-    }, 60000)
 
-    return () => {
-      clearInterval(interval)
-      clearInterval(timeInterval)
-    }
+    return () => clearInterval(interval)
   }, [])
 
   async function fetchVendorSyncStatus() {
@@ -84,124 +63,12 @@ export function VendorSyncDashboard() {
         const data = await response.json()
         setVendors(data.vendors || [])
         setLastRefresh(new Date())
-        
-        // Calculate cron status
-        calculateCronStatus()
       }
     } catch (error) {
       console.error("Error fetching vendor sync status:", error)
     } finally {
       setLoading(false)
     }
-  }
-
-  function calculateCronStatus() {
-    const now = new Date()
-    const kolkataTime24 = new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Kolkata",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).formatToParts(now)
-    
-    const kolkataTime12 = new Intl.DateTimeFormat("en-US", {
-      timeZone: "Asia/Kolkata",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).formatToParts(now)
-    
-    const currentHour = parseInt(kolkataTime24.find((p) => p.type === "hour")?.value || "0")
-    const currentMinute = parseInt(kolkataTime24.find((p) => p.type === "minute")?.value || "0")
-    const currentTimeMinutes = currentHour * 60 + currentMinute
-    
-    // Format in 12-hour format
-    const hour12 = kolkataTime12.find((p) => p.type === "hour")?.value || "12"
-    const minute12 = kolkataTime12.find((p) => p.type === "minute")?.value || "00"
-    const dayPeriod = kolkataTime12.find((p) => p.type === "dayPeriod")?.value || "AM"
-    const currentTimeIST = `${hour12}:${minute12} ${dayPeriod}`
-    
-    // Restricted window: 7 PM (19:00) to 6 AM (06:00) IST
-    // Keep internal calculation in 24-hour format
-    const syncWindowStart24 = "19:00"
-    const syncWindowEnd24 = "06:00"
-    const [startHour, startMin] = syncWindowStart24.split(":").map(Number)
-    const [endHour, endMin] = syncWindowEnd24.split(":").map(Number)
-    const startTimeMinutes = startHour * 60 + startMin
-    const endTimeMinutes = endHour * 60 + endMin
-    
-    // Display format in 12-hour format
-    const syncWindowStart = "7:00 PM"
-    const syncWindowEnd = "6:00 AM"
-    
-    // Check if in restricted window
-    let inRestrictedWindow = false
-    if (startTimeMinutes > endTimeMinutes) {
-      // Window spans midnight
-      inRestrictedWindow = currentTimeMinutes >= startTimeMinutes || currentTimeMinutes < endTimeMinutes
-    } else {
-      // Normal window
-      inRestrictedWindow = currentTimeMinutes >= startTimeMinutes && currentTimeMinutes < endTimeMinutes
-    }
-    
-    // Calculate next sync time in 12-hour format
-    let nextSyncTime = ""
-    if (inRestrictedWindow) {
-      // If we're in restricted window, next sync is at 6 AM (06:00) IST
-      if (currentTimeMinutes >= startTimeMinutes) {
-        // We're after 7 PM, next sync is tomorrow at 6 AM
-        const tomorrow = new Date(now)
-        tomorrow.setDate(tomorrow.getDate() + 1)
-        tomorrow.setHours(6, 0, 0, 0)
-        const nextKolkataTime = new Intl.DateTimeFormat("en-US", {
-          timeZone: "Asia/Kolkata",
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        }).formatToParts(tomorrow)
-        const nextHour12 = nextKolkataTime.find((p) => p.type === "hour")?.value || "6"
-        const nextMin12 = nextKolkataTime.find((p) => p.type === "minute")?.value || "00"
-        const nextDayPeriod = nextKolkataTime.find((p) => p.type === "dayPeriod")?.value || "AM"
-        nextSyncTime = `${nextHour12}:${nextMin12} ${nextDayPeriod} IST (tomorrow)`
-      } else {
-        // We're before 6 AM, next sync is today at 6 AM
-        nextSyncTime = "6:00 AM IST (today)"
-      }
-    } else {
-      // Not in restricted window, next sync is at next 15-minute interval
-      const nextInterval = Math.ceil(currentMinute / 15) * 15
-      let nextHour = currentHour
-      if (nextInterval >= 60) {
-        nextHour = (currentHour + 1) % 24
-      }
-      
-      // Convert to 12-hour format
-      const nextTime = new Date(now)
-      if (nextInterval >= 60) {
-        nextTime.setHours(nextHour, 0, 0, 0)
-      } else {
-        nextTime.setHours(currentHour, nextInterval, 0, 0)
-      }
-      
-      const nextKolkataTime = new Intl.DateTimeFormat("en-US", {
-        timeZone: "Asia/Kolkata",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      }).formatToParts(nextTime)
-      const nextHour12 = nextKolkataTime.find((p) => p.type === "hour")?.value || "12"
-      const nextMin12 = nextKolkataTime.find((p) => p.type === "minute")?.value || "00"
-      const nextDayPeriod = nextKolkataTime.find((p) => p.type === "dayPeriod")?.value || "AM"
-      nextSyncTime = `${nextHour12}:${nextMin12} ${nextDayPeriod} IST`
-    }
-    
-    setCronStatus({
-      inRestrictedWindow,
-      currentTimeIST,
-      nextSyncTime,
-      restrictedWindowStart: syncWindowStart,
-      restrictedWindowEnd: syncWindowEnd,
-    })
   }
 
   async function triggerManualSync() {
@@ -377,68 +244,6 @@ export function VendorSyncDashboard() {
         </Card>
       </div>
 
-      {/* Cron Status Alert */}
-      {cronStatus && (
-        <Card className={`shadow-lg border-l-4 ${
-          cronStatus.inRestrictedWindow 
-            ? "bg-amber-50/50 dark:bg-amber-950/20 border-l-amber-500 dark:border-l-amber-400" 
-            : "bg-green-50/50 dark:bg-green-950/20 border-l-green-500 dark:border-l-green-400"
-        }`}>
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              {cronStatus.inRestrictedWindow ? (
-                <PauseCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-              ) : (
-                <Power className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-              )}
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className={`font-semibold ${
-                    cronStatus.inRestrictedWindow 
-                      ? "text-amber-900 dark:text-amber-100" 
-                      : "text-green-900 dark:text-green-100"
-                  }`}>
-                    Auto-Sync Status
-                  </h3>
-                  <Badge 
-                    variant="outline" 
-                    className={
-                      cronStatus.inRestrictedWindow
-                        ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700"
-                        : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-300 dark:border-green-700"
-                    }
-                  >
-                    {cronStatus.inRestrictedWindow ? "Paused" : "Active"}
-                  </Badge>
-                </div>
-                {cronStatus.inRestrictedWindow ? (
-                  <div className="space-y-1 text-sm text-amber-800 dark:text-amber-200">
-                    <p>
-                      Auto-sync is <strong>paused</strong> during restricted hours ({cronStatus.restrictedWindowStart} - {cronStatus.restrictedWindowEnd} IST).
-                    </p>
-                    <p>
-                      Current time: <strong>{cronStatus.currentTimeIST} IST</strong> | Next auto-sync: <strong>{cronStatus.nextSyncTime}</strong>
-                    </p>
-                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
-                      💡 You can still trigger manual sync using the "Trigger Sync Now" button below.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-1 text-sm text-green-800 dark:text-green-200">
-                    <p>
-                      Auto-sync is <strong>active</strong> and running every 15 minutes.
-                    </p>
-                    <p>
-                      Current time: <strong>{cronStatus.currentTimeIST} IST</strong> | Next sync: <strong>{cronStatus.nextSyncTime}</strong>
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Vendor Sync Table */}
       <Card className="shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between">
@@ -496,18 +301,10 @@ export function VendorSyncDashboard() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  vendors.map((vendor, index) => {
-                    // Check if vendor requires manual sync (auto-sync disabled)
-                    const requiresManualSync = !vendor.organizations?.auto_sync_enabled
-                    
-                    return (
+                  vendors.map((vendor, index) => (
                     <TableRow
                       key={vendor.id}
-                      className={`hover:bg-muted/50 ${
-                        requiresManualSync 
-                          ? "bg-amber-50/50 dark:bg-amber-950/20 border-l-4 border-l-amber-500 dark:border-l-amber-400" 
-                          : ""
-                      }`}
+                      className="hover:bg-muted/50"
                       style={{
                         animationDelay: `${index * 50}ms`,
                       }}
@@ -517,15 +314,7 @@ export function VendorSyncDashboard() {
                           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 p-2">
                             <Factory className="h-full w-full text-white" />
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span>{vendor.name}</span>
-                            {requiresManualSync && (
-                              <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 flex items-center gap-1 text-xs">
-                                <AlertTriangle className="h-3 w-3" />
-                                Manual Only
-                              </Badge>
-                            )}
-                          </div>
+                          {vendor.name}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -549,7 +338,7 @@ export function VendorSyncDashboard() {
                               Enabled ({vendor.organizations.sync_interval_minutes || 15}m)
                             </Badge>
                           ) : (
-                            <Badge variant="secondary" className="flex items-center gap-1 w-fit bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+                            <Badge variant="secondary" className="flex items-center gap-1 w-fit">
                               <XCircle className="h-3 w-3" />
                               Disabled
                             </Badge>
@@ -574,8 +363,7 @@ export function VendorSyncDashboard() {
                         )}
                       </TableCell>
                     </TableRow>
-                    )
-                  })
+                  ))
                 )}
               </TableBody>
             </Table>
@@ -588,19 +376,8 @@ export function VendorSyncDashboard() {
                 No vendors found
               </div>
             ) : (
-              vendors.map((vendor) => {
-                // Check if vendor requires manual sync (auto-sync disabled)
-                const requiresManualSync = !vendor.organizations?.auto_sync_enabled
-                
-                return (
-                <Card 
-                  key={vendor.id} 
-                  className={`p-4 ${
-                    requiresManualSync 
-                      ? "bg-amber-50/50 dark:bg-amber-950/20 border-l-4 border-l-amber-500 dark:border-l-amber-400" 
-                      : ""
-                  }`}
-                >
+              vendors.map((vendor) => (
+                <Card key={vendor.id} className="p-4">
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 flex-1">
@@ -608,15 +385,7 @@ export function VendorSyncDashboard() {
                           <Factory className="h-full w-full text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold text-base">{vendor.name}</h3>
-                            {requiresManualSync && (
-                              <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 flex items-center gap-1 text-xs">
-                                <AlertTriangle className="h-3 w-3" />
-                                Manual Only
-                              </Badge>
-                            )}
-                          </div>
+                          <h3 className="font-semibold text-base">{vendor.name}</h3>
                           <Badge variant="outline" className="text-xs mt-1">
                             {vendor.vendor_type}
                           </Badge>
@@ -640,7 +409,7 @@ export function VendorSyncDashboard() {
                               Enabled ({vendor.organizations.sync_interval_minutes || 15}m)
                             </Badge>
                           ) : (
-                            <Badge variant="secondary" className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+                            <Badge variant="secondary" className="text-xs">
                               Disabled
                             </Badge>
                           )
@@ -666,8 +435,7 @@ export function VendorSyncDashboard() {
                     </div>
                   </div>
                 </Card>
-                )
-              })
+              ))
             )}
           </div>
         </CardContent>

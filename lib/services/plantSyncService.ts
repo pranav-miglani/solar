@@ -334,21 +334,16 @@ function shouldSyncOrg(org: any): boolean {
 
 /**
  * Sync plants for all active vendors across all organizations
- * 
- * @param forceSync - If true, bypasses interval boundary check and restricted window (for manual syncs)
- *                    If false, only syncs organizations that match interval boundaries (for cron syncs)
+ * Only syncs organizations that have auto_sync_enabled = true
+ * and whose sync interval matches the current clock time
  */
-export async function syncAllPlants(forceSync: boolean = false): Promise<SyncSummary> {
+export async function syncAllPlants(): Promise<SyncSummary> {
   const startTime = Date.now()
-  const supabase = getServiceClient()
+    const supabase = getServiceClient()
 
   // Context is automatically propagated from caller (cron or user)
   const source = MDC.getSource() || "system"
-  if (forceSync) {
-    logger.info(`🚀 Starting FORCED manual plant sync for all organizations (source: ${source})...`)
-  } else {
-    logger.info(`🚀 Starting plant sync for all organizations (source: ${source})...`)
-  }
+  logger.info(`🚀 Starting plant sync for all organizations (source: ${source})...`)
 
   // Fetch all active vendors with their organization sync settings
   const { data: vendors, error: vendorsError } = await supabase
@@ -397,64 +392,29 @@ export async function syncAllPlants(forceSync: boolean = false): Promise<SyncSum
     }
 
     // Check if this org should be synced
-    // For manual syncs (forceSync=true), bypass interval check and sync all enabled orgs
-    // For cron syncs (forceSync=false), only sync if interval matches
-    let shouldSync = false
-    if (forceSync) {
-      // Manual sync: sync all orgs with auto_sync_enabled (ignore interval boundary)
-      shouldSync = org.auto_sync_enabled === true
-      if (shouldSync) {
-        logger.info(
-          `✅ [FORCED] Org ${org.id} (${org.name}) will be synced: ` +
-          `auto_sync_enabled=${org.auto_sync_enabled} (manual sync bypasses interval check)`
-        )
-      }
-    } else {
-      // Cron sync: check interval boundary
-      shouldSync = shouldSyncOrg(org)
-      
-      // Get current IST time for logging
-      const now = new Date()
-      const kolkataTime = new Intl.DateTimeFormat("en-US", {
-        timeZone: "Asia/Kolkata",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).formatToParts(now)
-      const currentHour = parseInt(kolkataTime.find((part) => part.type === "hour")?.value || "0")
-      const currentMinute = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
-      const currentTimeStr = `${currentHour}:${currentMinute.toString().padStart(2, "0")}`
-      
-      if (!shouldSync) {
-        if (!skippedOrgs.has(org.id)) {
-          // Calculate expected minute for debugging
-          const intervalMinutes = org.sync_interval_minutes || 15
-          const currentInterval = Math.floor(currentMinute / intervalMinutes)
-          const expectedMinute = currentInterval * intervalMinutes
-          
-          logger.info(
-            `⏭️ Skipping org ${org.id} (${org.name}): ` +
-            `auto_sync_enabled=${org.auto_sync_enabled}, ` +
-            `interval=${org.sync_interval_minutes}min, ` +
-            `current IST time=${currentTimeStr}, ` +
-            `current minute=${currentMinute}, expected minute=${expectedMinute}, ` +
-            `doesn't match interval boundary`
-          )
-          skippedOrgs.add(org.id)
-        }
-        continue
-      }
-      
-      logger.info(
-        `✅ Org ${org.id} (${org.name}) should sync: ` +
-        `auto_sync_enabled=${org.auto_sync_enabled}, ` +
-        `interval=${org.sync_interval_minutes}min, ` +
-        `current IST time=${currentTimeStr}, ` +
-        `matches interval boundary`
-      )
-    }
-    
+    const shouldSync = shouldSyncOrg(org)
     if (!shouldSync) {
+      if (!skippedOrgs.has(org.id)) {
+        // Get current IST time for logging
+        const now = new Date()
+        const kolkataTime = new Intl.DateTimeFormat("en-US", {
+          timeZone: "Asia/Kolkata",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).formatToParts(now)
+        const currentHour = parseInt(kolkataTime.find((part) => part.type === "hour")?.value || "0")
+        const currentMinute = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
+        
+        logger.info(
+          `⏭️ Skipping org ${org.id} (${org.name}): ` +
+          `auto_sync_enabled=${org.auto_sync_enabled}, ` +
+          `interval=${org.sync_interval_minutes}min, ` +
+          `current IST time=${currentHour}:${currentMinute.toString().padStart(2, "0")}, ` +
+          `doesn't match interval boundary`
+        )
+        skippedOrgs.add(org.id)
+      }
       continue
     }
 
