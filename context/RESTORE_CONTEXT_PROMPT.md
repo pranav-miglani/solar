@@ -40,7 +40,7 @@ You are an expert full-stack engineer continuing development on **WOMS (Work Ord
 
 **Main Supabase Database:**
 - `accounts` - Authentication table (id UUID, account_type ENUM, email, password_hash TEXT, org_id INTEGER nullable)
-- `organizations` - Organizations (id SERIAL, name, meta JSONB)
+- `organizations` - Organizations (id SERIAL, name, auto_sync_enabled BOOLEAN, sync_interval_minutes INTEGER)
 - `vendors` - Vendor integrations (vendor_type: SOLARMAN, SUNGROW, OTHER)
 - `plants` - Solar plants (linked to org_id and vendor_id)
 - `work_orders` - Static work orders (NO status field - per requirements)

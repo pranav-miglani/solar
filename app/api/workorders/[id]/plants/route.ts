@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { getMainClient } from "@/lib/supabase/pooled"
 
 // For workorders plants API, we need to bypass RLS
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
 
 export async function POST(
   request: NextRequest,
@@ -51,7 +41,7 @@ export async function POST(
     }
 
     // Use service role client to bypass RLS
-    const supabase = createServiceClient()
+    const supabase = getMainClient()
 
     // Get the existing work order's plants to check their org
     const { data: existingWorkOrderPlants, error: woError } = await supabase

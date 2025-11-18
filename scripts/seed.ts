@@ -74,7 +74,6 @@ async function seed() {
     .from("organizations")
     .insert({
       name: "Solar Energy Corp",
-      meta: { region: "North", established: "2020" },
     })
     .select()
     .single()
@@ -93,7 +92,6 @@ async function seed() {
     .from("organizations")
     .insert({
       name: "Green Power Solutions",
-      meta: { region: "South", established: "2019" },
     })
     .select()
     .single()

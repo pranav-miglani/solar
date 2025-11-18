@@ -47,9 +47,9 @@ DELETE FROM accounts WHERE email IN ('admin@woms.com', 'govt@woms.com', 'org1@wo
 -- RAISE NOTICE 'Deleted existing accounts (if any)';
 
 -- Step 2: Ensure organizations exist (create if needed)
-INSERT INTO organizations (name, meta)
+INSERT INTO organizations (name)
 VALUES 
-  ('Solar Energy Corp', '{"region": "North", "established": "2020"}')
+  ('Solar Energy Corp')
 ON CONFLICT DO NOTHING;
 
 -- Get organization ID for ORG account

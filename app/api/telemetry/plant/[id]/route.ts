@@ -1,16 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
+import { getTelemetryClient } from "@/lib/supabase/pooled"
 
 export async function GET(
   request: NextRequest,
@@ -38,10 +27,10 @@ export async function GET(
       return NextResponse.json({ error: "Invalid plant ID" }, { status: 400 })
     }
 
-    const supabase = createServiceClient()
+    // Use TELEMETRY client - telemetry_readings table is in telemetry database
+    const supabase = getTelemetryClient()
 
-    // Query telemetry from main DB (telemetry_readings table)
-    // In production, you might use a separate telemetry DB
+    // Query telemetry from TELEMETRY DB (separate Supabase instance)
     const startTime = new Date()
     startTime.setHours(startTime.getHours() - hours)
 

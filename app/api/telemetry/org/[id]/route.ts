@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getMainClient, getTelemetryClient } from "@/lib/supabase/pooled"
 
 export async function GET(
   request: NextRequest,
@@ -14,10 +14,12 @@ export async function GET(
       return NextResponse.json({ error: "Invalid org ID" }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    // Use MAIN client for plants (main database), TELEMETRY client for telemetry (telemetry database)
+    const mainSupabase = getMainClient() // Main DB - for reading plants
+    const telemetrySupabase = getTelemetryClient() // Telemetry DB - for reading telemetry
 
-    // Get all plants for this org
-    const { data: plants, error: plantsError } = await supabase
+    // Read plants from MAIN DB
+    const { data: plants, error: plantsError } = await mainSupabase
       .from("plants")
       .select("id")
       .eq("org_id", orgId)
@@ -43,8 +45,8 @@ export async function GET(
     const startTime = new Date()
     startTime.setHours(startTime.getHours() - hours)
 
-    // Query telemetry for all org plants
-    const { data: telemetry, error } = await supabase
+    // Query telemetry from TELEMETRY DB (separate Supabase instance)
+    const { data: telemetry, error } = await telemetrySupabase
       .from("telemetry_readings")
       .select("*")
       .in("plant_id", plantIds)

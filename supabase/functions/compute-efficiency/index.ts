@@ -26,10 +26,10 @@ serve(async (req) => {
       throw new Error("Missing Supabase environment variables. Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.")
     }
 
-    // Main DB - use service role key to bypass RLS
+    // MAIN DB - Read work orders and plants from main database (separate Supabase instance)
     const mainSupabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Telemetry DB (separate instance) - use service role for read operations
+    // TELEMETRY DB - Read telemetry from telemetry database (separate Supabase instance)
     const telemetrySupabaseUrl = Deno.env.get("TELEMETRY_SUPABASE_URL") ?? ""
     const telemetrySupabaseServiceKey = Deno.env.get("TELEMETRY_SUPABASE_SERVICE_ROLE_KEY") ?? ""
 

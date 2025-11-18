@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
 import type { AccountType } from "@/lib/rbac"
-
-// For dashboard API, we need to bypass RLS for queries
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
+import { getMainClient } from "@/lib/supabase/pooled"
+import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
 
 interface DashboardData {
   role: AccountType
@@ -40,26 +29,33 @@ interface DashboardData {
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    const session = request.cookies.get("session")?.value
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Decode session
-    let sessionData
+  const startTime = Date.now()
+  
+  return withMDCContext(request, async () => {
+    logApiRequest(request)
+    
     try {
-      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
-    } catch {
-      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
-    }
+      const session = request.cookies.get("session")?.value
 
-    const accountType = sessionData.accountType as AccountType
-    const orgId = sessionData.orgId
+      if (!session) {
+        logApiResponse(request, 401, Date.now() - startTime)
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+
+      // Decode session
+      let sessionData
+      try {
+        sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+      } catch {
+        logApiResponse(request, 401, Date.now() - startTime)
+        return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+      }
+
+      const accountType = sessionData.accountType as AccountType
+      const orgId = sessionData.orgId
 
     // Use service role client to bypass RLS
-    const supabase = createServiceClient()
+    const supabase = getMainClient()
 
     const dashboardData: DashboardData = {
       role: accountType,
@@ -214,13 +210,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    logApiResponse(request, 200, Date.now() - startTime)
     return NextResponse.json(dashboardData)
   } catch (error) {
     console.error("Dashboard error:", error)
+    logApiResponse(request, 500, Date.now() - startTime, error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
     )
   }
+  })
 }
 

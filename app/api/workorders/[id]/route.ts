@@ -1,17 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
 import { requirePermission } from "@/lib/rbac"
-
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
+import { getMainClient } from "@/lib/supabase/pooled"
 
 export async function GET(
   request: NextRequest,
@@ -32,7 +21,7 @@ export async function GET(
     }
 
     // Use service role client to bypass RLS
-    const supabase = createServiceClient()
+    const supabase = getMainClient()
 
     const { data: workOrder, error } = await supabase
       .from("work_orders")
@@ -110,7 +99,7 @@ export async function PUT(
       )
     }
 
-    const supabase = createServiceClient()
+    const supabase = getMainClient()
 
     // Validate that all plants belong to the same organization
     const { data: plants, error: plantsError } = await supabase
@@ -298,7 +287,7 @@ export async function DELETE(
     // Only SUPERADMIN can delete work orders
     requirePermission(accountType as any, "work_orders", "delete")
 
-    const supabase = createServiceClient()
+    const supabase = getMainClient()
 
     // Delete the work order (cascade will handle work_order_plants)
     const { error: deleteError } = await supabase

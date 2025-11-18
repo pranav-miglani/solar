@@ -1,17 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
 import { requirePermission } from "@/lib/rbac"
-
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
+import { getMainClient } from "@/lib/supabase/pooled"
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,7 +29,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = createServiceClient()
+    const supabase = getMainClient()
 
     // Fetch all vendors with their organization and sync status
     const { data: vendors, error } = await supabase

@@ -1,23 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
 import bcrypt from "bcryptjs"
+import { getMainClient } from "@/lib/supabase/pooled"
+import { logApiRequest, logApiResponse } from "@/lib/api-logger"
 
 // Password hashing: User inputs plain text, we hash and compare with stored hash
 
 // For login, we need to bypass RLS to query accounts table
 // We use service role key since user is not authenticated yet
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key for authentication")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now()
+  // Log login attempt (no user session yet)
+  logApiRequest(request, { action: "Login attempt" })
+  
   try {
     const url = request.url
     const method = request.method
@@ -37,6 +32,7 @@ export async function POST(request: NextRequest) {
 
     if (!email || !password) {
       console.log("❌ [LOGIN] Missing email or password")
+      logApiResponse(request, 400, Date.now() - startTime)
       return NextResponse.json(
         { error: "Email and password are required" },
         { status: 400 }
@@ -55,6 +51,7 @@ export async function POST(request: NextRequest) {
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error("❌ [LOGIN] Missing Supabase environment variables")
       console.error("❌ [LOGIN] Required: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
+      logApiResponse(request, 500, Date.now() - startTime)
       return NextResponse.json(
         { 
           error: "Server configuration error",
@@ -66,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     // Use service role client to bypass RLS for authentication
     // During login, user is not authenticated yet, so RLS would block the query
-    const supabase = createServiceClient()
+    const supabase = getMainClient()
     console.log("🔐 [LOGIN] Supabase service client created (bypasses RLS for authentication)")
 
     // Test database connection
@@ -83,6 +80,7 @@ export async function POST(request: NextRequest) {
         details: connectionError.details,
         hint: connectionError.hint,
       })
+      logApiResponse(request, 500, Date.now() - startTime, connectionError)
       return NextResponse.json(
         { error: "Database connection failed", details: connectionError.message },
         { status: 500 }
@@ -112,6 +110,7 @@ export async function POST(request: NextRequest) {
         details: accountError.details,
         hint: accountError.hint,
       })
+      logApiResponse(request, 500, Date.now() - startTime, accountError)
       return NextResponse.json(
         { error: "Database error", details: accountError.message },
         { status: 500 }
@@ -122,6 +121,7 @@ export async function POST(request: NextRequest) {
       console.log("❌ [LOGIN] Account not found for email:", email)
       console.log("💡 [LOGIN] Hint: No users exist in database. Run user setup script:")
       console.log("💡 [LOGIN]   - Run: supabase/migrations/004_manual_user_setup.sql")
+      logApiResponse(request, 401, Date.now() - startTime, { email })
       return NextResponse.json(
         { 
           error: "Invalid credentials",
@@ -145,6 +145,7 @@ export async function POST(request: NextRequest) {
     // Additional validation
     if (!account.password_hash) {
       console.error("❌ [LOGIN] Account has no password!")
+      logApiResponse(request, 500, Date.now() - startTime, { accountId: account.id })
       return NextResponse.json(
         { error: "Account configuration error" },
         { status: 500 }
@@ -181,6 +182,7 @@ export async function POST(request: NextRequest) {
 
     if (!isValid) {
       console.log("❌ [LOGIN] Password mismatch for email:", email)
+      logApiResponse(request, 401, Date.now() - startTime, { email })
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
@@ -196,6 +198,7 @@ export async function POST(request: NextRequest) {
       accountId: account.id,
       accountType: account.account_type,
       orgId: account.org_id,
+      email: account.email, // Include email for logging purposes
     }
     console.log("🔐 [LOGIN] Creating session with data:", sessionData)
 
@@ -228,10 +231,16 @@ export async function POST(request: NextRequest) {
     response.cookies.set("session", sessionToken, cookieOptions)
     console.log("✅ [LOGIN] Login successful, session cookie set")
 
+    logApiResponse(request, 200, Date.now() - startTime, { 
+      accountId: account.id, 
+      accountType: account.account_type,
+      email: account.email 
+    })
     return response
   } catch (error) {
     console.error("❌ [LOGIN] Unexpected error:", error)
     console.error("❌ [LOGIN] Error stack:", error instanceof Error ? error.stack : "No stack trace")
+    logApiResponse(request, 500, Date.now() - startTime, error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

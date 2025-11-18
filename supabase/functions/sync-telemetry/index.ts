@@ -25,10 +25,10 @@ serve(async (req) => {
       throw new Error("Missing Supabase environment variables. Ensure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.")
     }
 
-    // Main DB - use service role key to bypass RLS
+    // MAIN DB - Read plants from main database (separate Supabase instance)
     const mainSupabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Telemetry DB (separate instance) - use service role for write operations
+    // TELEMETRY DB - Write telemetry to telemetry database (separate Supabase instance)
     const telemetrySupabaseUrl = Deno.env.get("TELEMETRY_SUPABASE_URL") ?? ""
     const telemetrySupabaseServiceKey = Deno.env.get("TELEMETRY_SUPABASE_SERVICE_ROLE_KEY") ?? ""
 
@@ -38,7 +38,7 @@ serve(async (req) => {
 
     const telemetrySupabase = createClient(telemetrySupabaseUrl, telemetrySupabaseServiceKey)
 
-    // Get all active plants
+    // Read plants from MAIN DB
     const { data: plants, error: plantsError } = await mainSupabase
       .from("plants")
       .select(`
@@ -127,7 +127,7 @@ serve(async (req) => {
           continue
         }
 
-        // Store in telemetry DB
+        // Write telemetry to TELEMETRY DB (separate instance)
         const { error: insertError } = await telemetrySupabase
           .from("telemetry_readings")
           .insert({

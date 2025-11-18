@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getTelemetryClient } from "@/lib/supabase/pooled"
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const hours = parseInt(searchParams.get("hours") || "24")
 
-    const supabase = await createClient()
+    // Use TELEMETRY client - telemetry_readings table is in telemetry database
+    const supabase = getTelemetryClient()
 
     const startTime = new Date()
     startTime.setHours(startTime.getHours() - hours)
 
-    // Query all telemetry (global view)
+    // Query all telemetry from TELEMETRY DB (separate Supabase instance)
     const { data: telemetry, error } = await supabase
       .from("telemetry_readings")
       .select("*")

@@ -108,7 +108,6 @@ CREATE TABLE accounts (
 CREATE TABLE organizations (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
-  meta JSONB DEFAULT '{}',
   -- Auto-sync settings (enabled by default, 15 minutes interval)
   auto_sync_enabled BOOLEAN NOT NULL DEFAULT true,
   sync_interval_minutes INTEGER NOT NULL DEFAULT 15 CHECK (sync_interval_minutes > 0 AND sync_interval_minutes <= 1440), -- 1 minute to 24 hours

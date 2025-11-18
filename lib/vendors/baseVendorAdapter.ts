@@ -5,6 +5,7 @@ import type {
   Alert,
   RealtimeData,
 } from "./types"
+import { pooledFetch } from "./httpClient"
 
 /**
  * Base abstract class for all vendor adapters
@@ -91,7 +92,7 @@ export abstract class BaseVendorAdapter {
     const token = await this.authenticate()
     const url = `${this.getApiBaseUrl()}${endpoint}`
 
-    return fetch(url, {
+    return pooledFetch(url, {
       ...options,
       headers: {
         ...options.headers,

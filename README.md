@@ -319,7 +319,8 @@ Organizations that own solar plants.
 |--------|------|-------------|
 | `id` | SERIAL | Primary key |
 | `name` | TEXT | Organization name |
-| `meta` | JSONB | Additional metadata |
+| `auto_sync_enabled` | BOOLEAN | Auto-sync enabled flag (default: true) |
+| `sync_interval_minutes` | INTEGER | Sync interval in minutes (1-1440, default: 15) |
 | `created_at` | TIMESTAMPTZ | Creation timestamp |
 | `updated_at` | TIMESTAMPTZ | Last update timestamp |
 
@@ -990,8 +991,10 @@ List organizations (role-scoped).
     {
       "id": 1,
       "name": "Solar Energy Corp",
-      "meta": {},
-      "created_at": "2024-01-15T10:00:00Z"
+      "auto_sync_enabled": true,
+      "sync_interval_minutes": 15,
+      "created_at": "2024-01-15T10:00:00Z",
+      "updated_at": "2024-01-15T10:00:00Z"
     }
   ]
 }
@@ -1004,11 +1007,7 @@ Create organization (Super Admin only).
 **Request Body**:
 ```json
 {
-  "name": "New Organization",
-  "meta": {
-    "region": "North",
-    "established": "2020"
-  }
+  "name": "New Organization"
 }
 ```
 

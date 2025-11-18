@@ -67,21 +67,18 @@ export interface Database {
         Row: {
           id: number
           name: string
-          meta: Record<string, any>
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: number
           name: string
-          meta?: Record<string, any>
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: number
           name?: string
-          meta?: Record<string, any>
           created_at?: string
           updated_at?: string
         }

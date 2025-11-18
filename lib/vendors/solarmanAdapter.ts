@@ -6,6 +6,7 @@ import type {
   RealtimeData,
   VendorConfig,
 } from "./types"
+import { pooledFetch } from "./httpClient"
 
 interface SolarmanAuthResponse {
   access_token: string
@@ -142,8 +143,8 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     const startTime = Date.now()
 
     try {
-      // Make the actual fetch call
-      const response = await fetch(url, options)
+      // Make the actual fetch call using pooled HTTP client
+      const response = await pooledFetch(url, options)
       const duration = Date.now() - startTime
 
       // Clone response to read body without consuming it
@@ -276,6 +277,8 @@ export class SolarmanAdapter extends BaseVendorAdapter {
 
   /**
    * Check if token from DB is still valid
+   * Always checks DB - no in-memory caching
+   * Returns token only if it's valid and not expired
    */
   private async getTokenFromDB(): Promise<string | null> {
     if (!this.vendorId || !this.supabaseClient) {
@@ -293,24 +296,38 @@ export class SolarmanAdapter extends BaseVendorAdapter {
         return null
       }
 
-      // Check if token is expired
+      const now = Date.now()
+      const bufferMs = 5 * 60 * 1000 // 5 minute buffer for safety
+
+      // Check token_expires_at field first (most reliable)
       if (vendor.token_expires_at) {
         const expiresAt = new Date(vendor.token_expires_at).getTime()
-        // Add 5 minute buffer for safety
-        if (expiresAt > Date.now() + 5 * 60 * 1000) {
+        if (expiresAt > now + bufferMs) {
+          // Token is still valid
           return vendor.access_token
-        }
-      } else {
-        // If no expiry stored, try to decode JWT
-        const jwtExpiry = this.decodeJWTExpiry(vendor.access_token)
-        if (jwtExpiry && jwtExpiry > Date.now() + 5 * 60 * 1000) {
-          return vendor.access_token
+        } else {
+          // Token expired - return null to trigger regeneration
+          console.log('⚠️ [Solarman] Token from DB is expired (token_expires_at check)')
+          return null
         }
       }
 
+      // If no token_expires_at, try to decode JWT expiry
+      const jwtExpiry = this.decodeJWTExpiry(vendor.access_token)
+      if (jwtExpiry && jwtExpiry > now + bufferMs) {
+        // Token is still valid based on JWT expiry
+        return vendor.access_token
+      } else if (jwtExpiry) {
+        // JWT token expired
+        console.log('⚠️ [Solarman] Token from DB is expired (JWT expiry check)')
+        return null
+      }
+
+      // If we can't determine expiry, assume it's invalid for safety
+      console.log('⚠️ [Solarman] Cannot determine token expiry - treating as expired')
       return null
     } catch (error) {
-      console.error('Error fetching token from DB:', error)
+      console.error('❌ [Solarman] Error fetching token from DB:', error)
       return null
     }
   }
@@ -355,16 +372,16 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   }
 
   async authenticate(): Promise<string> {
-    // Check database for stored token (no in-memory cache - always fetch from DB)
+    // Always check database for stored token (no in-memory cache)
+    // getTokenFromDB() already validates expiry, so if it returns a token, it's valid
     const dbToken = await this.getTokenFromDB()
     if (dbToken) {
-      // Verify token is still valid by checking expiry
-      const jwtExpiry = this.decodeJWTExpiry(dbToken)
-      if (jwtExpiry && jwtExpiry > Date.now()) {
-        return dbToken
-      }
-      // Token expired, will need to re-authenticate
+      console.log('✅ [Solarman] Using valid token from DB')
+      return dbToken
     }
+
+    // Token not found or expired - regenerate it
+    console.log('🔄 [Solarman] Token expired or not found - regenerating token')
 
     // Need to authenticate
     const credentials = this.getCredentials() as {

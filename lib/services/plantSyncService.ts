@@ -1,8 +1,8 @@
-import { createClient } from "@supabase/supabase-js"
 import { VendorManager } from "@/lib/vendors/vendorManager"
 import type { VendorConfig } from "@/lib/vendors/types"
 import MDC from "@/lib/context/mdc"
 import { logger } from "@/lib/context/logger"
+import { getMainClient } from "@/lib/supabase/pooled"
 
 /**
  * Plant Sync Service
@@ -31,17 +31,6 @@ interface SyncSummary {
   totalPlantsUpdated: number
   results: SyncResult[]
   duration: number
-}
-
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
 }
 
 /**
@@ -370,9 +359,14 @@ function shouldSyncOrg(org: any): boolean {
  * Only syncs organizations that have auto_sync_enabled = true
  * and whose sync interval matches the current clock time
  */
+/**
+ * Sync plants for all active vendors across all organizations
+ * Uses MAIN CLIENT - plants are stored in the main database
+ */
 export async function syncAllPlants(): Promise<SyncSummary> {
   const startTime = Date.now()
-  const supabase = createServiceClient()
+  // Use MAIN client - plants table is in main database
+  const supabase = getMainClient()
 
   // Context is automatically propagated from caller (cron or user)
   const source = MDC.getSource() || "system"

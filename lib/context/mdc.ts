@@ -11,6 +11,7 @@ interface MDCContext {
   source: "user" | "cron" | "system" | "api"
   requestId?: string
   userId?: string
+  userEmail?: string
   accountType?: string
   orgId?: number
   
@@ -107,6 +108,12 @@ class MDC {
 
     const parts: string[] = []
     parts.push(`[${context.source.toUpperCase()}]`)
+    
+    if (context.userEmail) {
+      parts.push(`[User:${context.userEmail}]`)
+    } else if (context.userId) {
+      parts.push(`[User:${context.userId}]`)
+    }
     
     if (context.operation) {
       parts.push(`[${context.operation}]`)

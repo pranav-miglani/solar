@@ -1,117 +1,130 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
 import { requirePermission } from "@/lib/rbac"
+import { getMainClient } from "@/lib/supabase/pooled"
+import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
 
 // For plants API, we need to bypass RLS for write operations
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
 
 export async function GET(request: NextRequest) {
-  try {
-    const session = request.cookies.get("session")?.value
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Decode session
-    let sessionData
+  const startTime = Date.now()
+  
+  return withMDCContext(request, async () => {
+    logApiRequest(request)
+    
     try {
-      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
-    } catch {
-      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+      const session = request.cookies.get("session")?.value
+
+      if (!session) {
+        logApiResponse(request, 401, Date.now() - startTime)
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+
+      // Decode session
+      let sessionData
+      try {
+        sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+      } catch {
+        logApiResponse(request, 401, Date.now() - startTime)
+        return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+      }
+
+      const accountType = sessionData.accountType as string
+      const orgId = sessionData.orgId
+
+      requirePermission(accountType as any, "plants", "read")
+
+      // Use service role client to bypass RLS
+      const supabase = getMainClient()
+
+      let query = supabase
+        .from("plants")
+        .select("*, vendors(*), organizations(*)")
+
+      // Apply role-based filtering
+      if (accountType === "ORG" && orgId) {
+        query = query.eq("org_id", orgId)
+      }
+      // SUPERADMIN and GOVT can see all plants
+
+      const { data: plants, error } = await query
+
+      if (error) {
+        logApiResponse(request, 500, Date.now() - startTime, error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      logApiResponse(request, 200, Date.now() - startTime)
+      return NextResponse.json({ plants: plants || [] })
+    } catch (error: any) {
+      console.error("Plants GET error:", error)
+      logApiResponse(request, error.message?.includes("permission") ? 403 : 500, Date.now() - startTime, error)
+      return NextResponse.json(
+        { error: error.message || "Internal server error" },
+        { status: error.message?.includes("permission") ? 403 : 500 }
+      )
     }
-
-    const accountType = sessionData.accountType as string
-    const orgId = sessionData.orgId
-
-    requirePermission(accountType as any, "plants", "read")
-
-    // Use service role client to bypass RLS
-    const supabase = createServiceClient()
-
-    let query = supabase
-      .from("plants")
-      .select("*, vendors(*), organizations(*)")
-
-    // Apply role-based filtering
-    if (accountType === "ORG" && orgId) {
-      query = query.eq("org_id", orgId)
-    }
-    // SUPERADMIN and GOVT can see all plants
-
-    const { data: plants, error } = await query
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ plants: plants || [] })
-  } catch (error: any) {
-    console.error("Plants GET error:", error)
-    return NextResponse.json(
-      { error: error.message || "Internal server error" },
-      { status: error.message?.includes("permission") ? 403 : 500 }
-    )
-  }
+  })
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const session = request.cookies.get("session")?.value
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Decode session
-    let sessionData
+  const startTime = Date.now()
+  
+  return withMDCContext(request, async () => {
+    logApiRequest(request)
+    
     try {
-      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
-    } catch {
-      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
-    }
+      const session = request.cookies.get("session")?.value
 
-    const accountType = sessionData.accountType as string
+      if (!session) {
+        logApiResponse(request, 401, Date.now() - startTime)
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
 
-    // Only SUPERADMIN can create plants
-    requirePermission(accountType as any, "plants", "create")
+      // Decode session
+      let sessionData
+      try {
+        sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+      } catch {
+        logApiResponse(request, 401, Date.now() - startTime)
+        return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+      }
 
-    const body = await request.json()
-    const { org_id, vendor_id, vendor_plant_id, name, capacity_kw, location } =
-      body
+      const accountType = sessionData.accountType as string
 
-    // Use service role client to bypass RLS for insert
-    const supabase = createServiceClient()
+      // Only SUPERADMIN can create plants
+      requirePermission(accountType as any, "plants", "create")
 
-    const { data: plant, error } = await supabase
-      .from("plants")
-      .insert({
-        org_id,
-        vendor_id,
-        vendor_plant_id,
-        name,
-        capacity_kw,
-        location: location || {},
-      })
-      .select()
-      .single()
+      const body = await request.json()
+      const { org_id, vendor_id, vendor_plant_id, name, capacity_kw, location } =
+        body
 
-    if (error) {
+      // Use MAIN client - plants are stored in the main database
+      const supabase = getMainClient()
+
+      const { data: plant, error } = await supabase
+        .from("plants")
+        .insert({
+          org_id,
+          vendor_id,
+          vendor_plant_id,
+          name,
+          capacity_kw,
+          location: location || {},
+        })
+        .select()
+        .single()
+
+      if (error) {
+        logApiResponse(request, 500, Date.now() - startTime, error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      logApiResponse(request, 201, Date.now() - startTime, { plantId: plant.id, name: plant.name })
+      return NextResponse.json({ plant }, { status: 201 })
+    } catch (error: any) {
+      logApiResponse(request, 500, Date.now() - startTime, error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
-
-    return NextResponse.json({ plant }, { status: 201 })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+  })
 }
 
