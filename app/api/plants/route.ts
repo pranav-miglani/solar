@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { getServiceClient } from "@/lib/supabase/serviceClient"
 import { requirePermission } from "@/lib/rbac"
 
-// For plants API, we need to bypass RLS for write operations
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +25,7 @@ export async function GET(request: NextRequest) {
     requirePermission(accountType as any, "plants", "read")
 
     // Use service role client to bypass RLS
-    const supabase = createServiceClient()
+    const supabase = getServiceClient()
 
     let query = supabase
       .from("plants")
@@ -90,7 +79,7 @@ export async function POST(request: NextRequest) {
       body
 
     // Use service role client to bypass RLS for insert
-    const supabase = createServiceClient()
+    const supabase = getServiceClient()
 
     const { data: plant, error } = await supabase
       .from("plants")

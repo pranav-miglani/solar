@@ -6,6 +6,7 @@ import type {
   RealtimeData,
   VendorConfig,
 } from "./types"
+import { pooledFetch } from "../http/pooledClient"
 
 interface SolarmanAuthResponse {
   access_token: string
@@ -142,8 +143,8 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     const startTime = Date.now()
 
     try {
-      // Make the actual fetch call
-      const response = await fetch(url, options)
+      // Make the actual fetch call using pooledFetch for connection pooling
+      const response = await pooledFetch(url, options)
       const duration = Date.now() - startTime
 
       // Clone response to read body without consuming it
@@ -446,7 +447,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   async listPlants(): Promise<Plant[]> {
     const token = await this.authenticate()
     
-    // Always use PRO API (converts regular API URL to PRO if needed)
+    // Always try PRO API first (converts regular API URL to PRO if needed)
     const { url: proApiUrl, isExplicit } = this.getProApiBaseUrl()
     
     if (isExplicit) {
@@ -455,8 +456,30 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       console.log('⚠️ [Solarman] PRO API not explicitly configured - auto-converted to PRO API endpoint')
     }
     
-    console.log('📊 [Solarman] Fetching plants from PRO API:', proApiUrl)
-    return await this.listPlantsFromProApi(token, proApiUrl)
+    console.log('📊 [Solarman] Attempting to fetch plants from PRO API:', proApiUrl)
+    
+    try {
+      // Try PRO API first
+      return await this.listPlantsFromProApi(token, proApiUrl)
+    } catch (proApiError: any) {
+      // If PRO API fails, fallback to regular API
+      console.warn('⚠️ [Solarman] PRO API failed, falling back to regular API:', proApiError.message)
+      console.log('📊 [Solarman] Falling back to regular API endpoint')
+      
+      try {
+        return await this.listPlantsFromRegularApi(token)
+      } catch (regularApiError: any) {
+        // If both fail, throw with context
+        console.error('❌ [Solarman] Both PRO API and regular API failed')
+        console.error('  PRO API error:', proApiError.message)
+        console.error('  Regular API error:', regularApiError.message)
+        throw new Error(
+          `Failed to fetch plants from both PRO API and regular API. ` +
+          `PRO API error: ${proApiError.message}. ` +
+          `Regular API error: ${regularApiError.message}`
+        )
+      }
+    }
   }
 
   /**

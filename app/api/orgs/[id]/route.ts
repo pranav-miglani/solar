@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { getServiceClient } from "@/lib/supabase/serviceClient"
 import { requirePermission } from "@/lib/rbac"
 
-// For orgs API, we need to bypass RLS for write operations
-// We use service role key since RLS policies require auth.uid() which we don't have
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
 
 export async function PUT(
   request: NextRequest,
@@ -51,7 +39,7 @@ export async function PUT(
       }
     }
 
-    const supabase = createServiceClient()
+    const supabase = getServiceClient()
 
     // Update organization sync settings
     const updateData: any = {}
@@ -113,7 +101,7 @@ export async function DELETE(
     // Only SUPERADMIN can delete organizations
     requirePermission(accountType as any, "organizations", "delete")
 
-    const supabase = createServiceClient()
+    const supabase = getServiceClient()
 
     // Delete the organization
     // Cascade deletes will automatically handle:

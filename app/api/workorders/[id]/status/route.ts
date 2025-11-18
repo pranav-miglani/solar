@@ -1,18 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { getServiceClient } from "@/lib/supabase/serviceClient"
 
 // Note: Work orders are static (no status/lifecycle) per requirements
 // This endpoint may not be needed, but kept for backward compatibility
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
 
 export async function PUT(
   request: NextRequest,
@@ -33,7 +23,7 @@ export async function PUT(
     }
 
     // Use service role client
-    const supabase = createServiceClient()
+    const supabase = getServiceClient()
 
     // Note: Work orders are static per requirements - no status field exists
     // This endpoint returns an error to indicate work orders cannot be updated

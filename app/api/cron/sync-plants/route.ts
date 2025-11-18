@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { syncAllPlants } from "@/lib/services/plantSyncService"
-import MDC from "@/lib/context/mdc"
 import { logger } from "@/lib/context/logger"
-import { randomUUID } from "crypto"
+import { withMDCContextCron, withMDCContext } from "@/lib/api/mdcHelper"
 
 /**
  * Cron endpoint for syncing plant data from all vendors
@@ -15,15 +14,7 @@ import { randomUUID } from "crypto"
  * Security: Should be protected with a secret token
  */
 export async function GET(request: NextRequest) {
-  const requestId = randomUUID()
-  
-  return MDC.runAsync(
-    {
-      source: "cron",
-      requestId,
-      operation: "sync-plants",
-    },
-    async () => {
+  return withMDCContextCron("sync-plants", async () => {
       try {
         // Verify cron secret (if configured)
         const cronSecret = process.env.CRON_SECRET
@@ -132,46 +123,22 @@ export async function GET(request: NextRequest) {
  * POST endpoint for manual trigger (with authentication)
  */
 export async function POST(request: NextRequest) {
-  const requestId = randomUUID()
-  
-  return MDC.runAsync(
-    {
-      source: "user",
-      requestId,
-      operation: "sync-plants-manual",
-    },
-    async () => {
+  return withMDCContext(
+    request,
+    "sync-plants-manual",
+    async (sessionData, userEmail) => {
       try {
-        // Verify authentication
-        const session = request.cookies.get("session")?.value
-        if (!session) {
-          return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-        }
-
-        let sessionData
-        try {
-          sessionData = JSON.parse(Buffer.from(session, "base64").toString())
-        } catch {
-          return NextResponse.json({ error: "Invalid session" }, { status: 401 })
-        }
-
         // Only SUPERADMIN can manually trigger sync
         const accountType = sessionData.accountType as string
         if (accountType !== "SUPERADMIN") {
+          logger.warn("Attempted manual sync by non-SUPERADMIN user")
           return NextResponse.json(
             { error: "Forbidden - SUPERADMIN only" },
             { status: 403 }
           )
         }
 
-        // Update MDC context with user info
-        MDC.withContext({
-          userId: sessionData.accountId,
-          accountType: sessionData.accountType,
-          orgId: sessionData.orgId,
-        }, () => {
-          logger.info("🔄 Manual plant sync triggered", { userId: sessionData.accountId })
-        })
+        logger.info("🔄 Manual plant sync triggered")
 
         // Execute sync (context automatically propagated)
         const summary = await syncAllPlants()

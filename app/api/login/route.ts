@@ -1,21 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
 import bcrypt from "bcryptjs"
+import { getServiceClient } from "@/lib/supabase/serviceClient"
 
 // Password hashing: User inputs plain text, we hash and compare with stored hash
-
-// For login, we need to bypass RLS to query accounts table
-// We use service role key since user is not authenticated yet
-function createServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error("Missing Supabase service role key for authentication")
-  }
-
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Use service role client to bypass RLS for authentication
     // During login, user is not authenticated yet, so RLS would block the query
-    const supabase = createServiceClient()
+    const supabase = getServiceClient()
     console.log("🔐 [LOGIN] Supabase service client created (bypasses RLS for authentication)")
 
     // Test database connection
@@ -238,4 +225,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

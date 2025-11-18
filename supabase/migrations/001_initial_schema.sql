@@ -187,7 +187,11 @@ COMMENT ON COLUMN plants.yearly_energy_mwh IS 'Yearly energy generation in MWh (
 COMMENT ON COLUMN plants.total_energy_mwh IS 'Total cumulative energy generation in MWh (shown in Production Overview)';
 COMMENT ON COLUMN plants.performance_ratio IS 'Performance Ratio (PR) 0-1 range, displayed as percentage in circular indicator';
 COMMENT ON COLUMN plants.last_update_time IS 'Last time production data was updated from vendor (shown as "Last Updated" timestamp)';
+<<<<<<< HEAD
 COMMENT ON COLUMN plants.last_refreshed_at IS 'Last time this plant data was refreshed/synced in our database (shown as "Last Refresh" timestamp) - set to NOW() on every sync';
+=======
+COMMENT ON COLUMN plants.last_refreshed_at IS 'Last time this plant data was refreshed/synced in our database (set to NOW() on every insert/update during sync)';
+>>>>>>> main
 COMMENT ON COLUMN plants.contact_phone IS 'Contact phone number from vendor (refreshed on sync)';
 COMMENT ON COLUMN plants.network_status IS 'Network status from vendor. Valid values: NORMAL, ALL_OFFLINE, PARTIAL_OFFLINE. May include leading/trailing whitespace which is normalized during sync. Unknown values are displayed as N/A in UI.';
 COMMENT ON COLUMN plants.vendor_created_date IS 'Original creation date from vendor (Unix timestamp converted to TIMESTAMPTZ) - refreshed on sync';
@@ -375,12 +379,36 @@ BEGIN
     RAISE EXCEPTION 'last_refreshed_at column not found in plants table';
   END IF;
   
+<<<<<<< HEAD
   -- Verify api_base_url does NOT exist in vendors table (should be in env vars)
   IF EXISTS (
     SELECT 1 FROM information_schema.columns 
     WHERE table_name = 'vendors' AND column_name = 'api_base_url'
   ) THEN
     RAISE EXCEPTION 'api_base_url column should not exist in vendors table - it should be in environment variables';
+=======
+  -- Verify auto-sync fields exist in organizations table
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'organizations' AND column_name = 'auto_sync_enabled'
+  ) THEN
+    RAISE EXCEPTION 'auto_sync_enabled column not found in organizations table';
+  END IF;
+  
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'organizations' AND column_name = 'sync_interval_minutes'
+  ) THEN
+    RAISE EXCEPTION 'sync_interval_minutes column not found in organizations table';
+  END IF;
+  
+  -- Verify last_synced_at column exists in vendors table
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'vendors' AND column_name = 'last_synced_at'
+  ) THEN
+    RAISE EXCEPTION 'last_synced_at column not found in vendors table';
+>>>>>>> main
   END IF;
   
   RAISE NOTICE '✅ Schema verification complete - all required columns present';
@@ -388,5 +416,10 @@ BEGIN
   RAISE NOTICE '✅ org_id column verified in work_orders table for cascade delete';
   RAISE NOTICE '✅ Work orders location field verified';
   RAISE NOTICE '✅ last_refreshed_at column verified in plants table';
+<<<<<<< HEAD
   RAISE NOTICE '✅ api_base_url correctly removed from vendors table (using env vars)';
+=======
+  RAISE NOTICE '✅ Auto-sync fields verified in organizations table';
+  RAISE NOTICE '✅ last_synced_at column verified in vendors table';
+>>>>>>> main
 END $$;

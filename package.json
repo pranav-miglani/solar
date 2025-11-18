@@ -3,16 +3,18 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:debug": "NODE_OPTIONS='--inspect' next dev",
+    "dev": "node server.js",
+    "dev:next": "next dev",
+    "dev:debug": "NODE_OPTIONS='--inspect' node server.js",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_ENV=production node server.js",
+    "start:next": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
     "test:login": "bash scripts/test-login.sh",
     "verify:setup": "bash scripts/verify-setup.sh",
-    "debug": "NODE_OPTIONS='--inspect-brk' next dev"
+    "debug": "NODE_OPTIONS='--inspect-brk' node server.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
@@ -29,6 +31,7 @@
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.39.3",
     "@types/bcryptjs": "^2.4.6",
+    "@types/node-cron": "^3.0.11",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
@@ -37,12 +40,14 @@
     "lucide-react": "^0.309.0",
     "next": "^14.2.33",
     "next-themes": "^0.2.1",
+    "node-cron": "^4.2.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.49.3",
     "recharts": "^2.10.3",
     "tailwind-merge": "^2.2.0",
     "tailwindcss-animate": "^1.0.7",
+    "undici": "^7.16.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {

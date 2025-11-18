@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getServiceClient } from "@/lib/supabase/serviceClient"
+import { getTelemetryClient } from "@/lib/supabase/telemetryClient"
 
 export async function GET(
   request: NextRequest,
@@ -17,10 +18,13 @@ export async function GET(
       )
     }
 
-    const supabase = await createClient()
+    // Use service client for main DB queries (work orders)
+    const mainSupabase = getServiceClient()
+    // Use telemetry client for telemetry queries
+    const telemetrySupabase = getTelemetryClient()
 
     // Get plants in this work order
-    const { data: workOrderPlants, error: woError } = await supabase
+    const { data: workOrderPlants, error: woError } = await mainSupabase
       .from("work_order_plants")
       .select("plant_id")
       .eq("work_order_id", workOrderId)
@@ -38,7 +42,7 @@ export async function GET(
     startTime.setHours(startTime.getHours() - hours)
 
     // Query telemetry for all plants in work order
-    const { data: telemetry, error } = await supabase
+    const { data: telemetry, error } = await telemetrySupabase
       .from("telemetry_readings")
       .select("*")
       .in("plant_id", plantIds)
