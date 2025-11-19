@@ -85,6 +85,33 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   }
 
   /**
+   * Filter out noisy fields from response data for cleaner logs
+   */
+  private filterLogData(data: any): any {
+    if (data === null || data === undefined) {
+      return data
+    }
+
+    if (Array.isArray(data)) {
+      return data.map(item => this.filterLogData(item))
+    }
+
+    if (typeof data === 'object') {
+      const filtered: any = {}
+      for (const [key, value] of Object.entries(data)) {
+        // Skip noisy fields that clutter logs
+        if (key === 'tags' || key === 'following' || key === 'entityRel' || key === 'roleCode') {
+          continue
+        }
+        filtered[key] = this.filterLogData(value)
+      }
+      return filtered
+    }
+
+    return data
+  }
+
+  /**
    * Logged fetch adapter - logs all requests and responses to Solarman API
    * This wraps the native fetch to provide comprehensive logging
    */
@@ -184,17 +211,22 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       })
       responseLog.headers = responseHeaders
 
-      // Log response body (truncate if too large)
+      // Log response body (truncate if too large, filter noisy fields)
       if (responseBody) {
-        const bodyStr = typeof responseBody === 'string' 
-          ? responseBody 
-          : JSON.stringify(responseBody, null, 2)
+        // Filter out noisy fields before logging
+        const filteredBody = typeof responseBody === 'object' 
+          ? this.filterLogData(responseBody)
+          : responseBody
+        
+        const bodyStr = typeof filteredBody === 'string' 
+          ? filteredBody 
+          : JSON.stringify(filteredBody, null, 2)
         
         if (bodyStr.length > 10000) {
           responseLog.body = bodyStr.substring(0, 10000) + '...[truncated]'
           responseLog.bodySize = bodyStr.length
         } else {
-          responseLog.body = responseBody
+          responseLog.body = filteredBody
         }
       }
 

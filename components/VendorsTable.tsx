@@ -95,24 +95,19 @@ export function VendorsTable() {
 
   useEffect(() => {
     fetchVendors()
-    fetchOrgs()
   }, [])
 
-  async function fetchOrgs() {
+  async function fetchVendors() {
     try {
-      const response = await fetch("/api/orgs")
+      const response = await fetch("/api/vendors")
       const data = await response.json()
+      setVendors(data.vendors || [])
       setOrgs(data.orgs || [])
     } catch (error) {
-      console.error("Error fetching orgs:", error)
+      console.error("Error fetching vendors:", error)
+    } finally {
+      setLoading(false)
     }
-  }
-
-  async function fetchVendors() {
-    const response = await fetch("/api/vendors")
-    const data = await response.json()
-    setVendors(data.vendors || [])
-    setLoading(false)
   }
   
   function openSyncSettingsDialog(orgId: number, orgName: string) {

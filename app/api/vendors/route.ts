@@ -34,22 +34,41 @@ export async function GET(request: NextRequest) {
       // Use service role client to bypass RLS
       const supabase = getMainClient()
 
-      const { data: vendors, error } = await supabase
-        .from("vendors")
-        .select("*, organizations(id, name, auto_sync_enabled, sync_interval_minutes)")
-        .order("name")
+      // Fetch vendors and organizations in parallel for better performance
+      const [vendorsResult, orgsResult] = await Promise.all([
+        supabase
+          .from("vendors")
+          .select("*, organizations(id, name, auto_sync_enabled, sync_interval_minutes)")
+          .order("name"),
+        supabase
+          .from("organizations")
+          .select("*")
+          .order("name"),
+      ])
 
-      if (error) {
-        console.error("Vendors query error:", error)
-        logApiResponse(request, 500, Date.now() - startTime, error)
+      if (vendorsResult.error) {
+        console.error("Vendors query error:", vendorsResult.error)
+        logApiResponse(request, 500, Date.now() - startTime, vendorsResult.error)
         return NextResponse.json(
           { error: "Failed to fetch vendors" },
           { status: 500 }
         )
       }
 
+      if (orgsResult.error) {
+        console.error("Orgs query error:", orgsResult.error)
+        logApiResponse(request, 500, Date.now() - startTime, orgsResult.error)
+        return NextResponse.json(
+          { error: "Failed to fetch organizations" },
+          { status: 500 }
+        )
+      }
+
       logApiResponse(request, 200, Date.now() - startTime)
-      return NextResponse.json({ vendors: vendors || [] })
+      return NextResponse.json({
+        vendors: vendorsResult.data || [],
+        orgs: orgsResult.data || [],
+      })
     } catch (error: any) {
       console.error("Vendors error:", error)
       logApiResponse(request, 403, Date.now() - startTime, error)
