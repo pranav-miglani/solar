@@ -218,16 +218,33 @@ export async function POST(request: NextRequest) {
     })
 
     // Set session cookie
+    // Determine if request is over HTTPS (check protocol or X-Forwarded-Proto header)
+    const protocol = request.headers.get("x-forwarded-proto") || new URL(request.url).protocol
+    const isHttps = protocol === "https:" || protocol === "https"
+    
+    // Use environment variable if set, otherwise auto-detect from request
+    // COOKIE_SECURE=true forces secure cookies, COOKIE_SECURE=false disables it
+    // If not set, use HTTPS detection (secure only if request is HTTPS)
+    const cookieSecure = process.env.COOKIE_SECURE !== undefined
+      ? process.env.COOKIE_SECURE === "true"
+      : isHttps
+    
     const cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: cookieSecure,
       sameSite: "lax" as const,
       maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: "/", // Explicitly set path
     }
     console.log("🔐 [LOGIN] Setting session cookie with options:", {
-      ...cookieOptions,
+      httpOnly: cookieOptions.httpOnly,
       secure: cookieOptions.secure,
+      sameSite: cookieOptions.sameSite,
       maxAge: cookieOptions.maxAge,
+      path: cookieOptions.path,
+      requestProtocol: protocol,
+      isHttps,
+      cookieSecureEnv: process.env.COOKIE_SECURE,
       nodeEnv: process.env.NODE_ENV,
     })
 
