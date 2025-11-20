@@ -16,8 +16,24 @@ export async function GET(request: NextRequest) {
     
     try {
       const session = request.cookies.get("session")?.value
+      const allCookies = request.cookies.getAll()
+      const cookieHeader = request.headers.get("cookie")
+      
+      console.log("🍪 [ME] Cookie check:", {
+        hasSessionCookie: !!session,
+        sessionCookieLength: session?.length || 0,
+        sessionCookiePreview: session ? session.substring(0, 30) + "..." : null,
+        allCookiesCount: allCookies.length,
+        allCookiesNames: allCookies.map(c => c.name),
+        cookieHeader: cookieHeader || "(no Cookie header)",
+        cookieHeaderLength: cookieHeader?.length || 0,
+        requestUrl: request.url,
+        requestOrigin: request.headers.get("origin"),
+        requestHost: request.headers.get("host"),
+      })
 
       if (!session) {
+        console.log("❌ [ME] No session cookie found")
         logApiResponse(request, 401, Date.now() - startTime)
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
       }
@@ -26,7 +42,17 @@ export async function GET(request: NextRequest) {
       let sessionData
       try {
         sessionData = JSON.parse(Buffer.from(session, "base64").toString())
-      } catch {
+        console.log("✅ [ME] Session decoded successfully:", {
+          accountId: sessionData.accountId,
+          accountType: sessionData.accountType,
+          email: sessionData.email,
+          orgId: sessionData.orgId,
+        })
+      } catch (error) {
+        console.log("❌ [ME] Failed to decode session:", {
+          error: error instanceof Error ? error.message : String(error),
+          sessionPreview: session.substring(0, 50),
+        })
         logApiResponse(request, 401, Date.now() - startTime)
         return NextResponse.json({ error: "Invalid session" }, { status: 401 })
       }

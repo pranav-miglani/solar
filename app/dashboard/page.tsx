@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { DashboardSidebar } from "@/components/DashboardSidebar"
@@ -55,31 +55,11 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [accountType, setAccountType] = useState<string>("")
   const [orgId, setOrgId] = useState<number | null>(null)
-
-  useEffect(() => {
-    // Check authentication
-    fetch("/api/me")
-      .then((res) => {
-        if (!res.ok) {
-          router.push("/auth/login")
-          return null
-        }
-        return res.json()
-      })
-      .then((data) => {
-        if (data) {
-          setAccountType(data.account.accountType)
-          setOrgId(data.account.orgId)
-          loadDashboard(data.account.accountType, data.account.orgId)
-        }
-      })
-      .catch(() => {
-        router.push("/auth/login")
-      })
-  }, [router])
+  const hasLoadedRef = useRef(false)
 
   const loadDashboard = async (accountType: string, orgId: number | null) => {
     try {
+      console.log("📊 [DASHBOARD] Loading dashboard data for:", { accountType, orgId })
       const [dashboardRes, telemetryRes, alertsRes] = await Promise.all([
         fetch("/api/dashboard"),
         fetch(
@@ -99,12 +79,62 @@ export default function DashboardPage() {
       setDashboardData(dashboard)
       setTelemetryData(telemetry.data || [])
       setAlerts(alertsData.alerts || [])
+      console.log("✅ [DASHBOARD] Dashboard data loaded successfully")
     } catch (error) {
-      console.error("Failed to load dashboard:", error)
+      console.error("❌ [DASHBOARD] Failed to load dashboard:", error)
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    // Prevent multiple loads
+    if (hasLoadedRef.current) {
+      console.log("⏸️ [DASHBOARD] Already loaded, skipping...")
+      return
+    }
+    
+    let isMounted = true
+    hasLoadedRef.current = true
+    
+    console.log("📊 [DASHBOARD] Initializing dashboard...")
+    
+    // Check authentication
+    fetch("/api/me")
+      .then((res) => {
+        if (!isMounted) return null
+        if (!res.ok) {
+          console.log("❌ [DASHBOARD] Authentication failed, redirecting to login")
+          hasLoadedRef.current = false // Reset on auth failure
+          router.push("/auth/login")
+          return null
+        }
+        return res.json()
+      })
+      .then((data) => {
+        if (!isMounted) return
+        if (data) {
+          console.log("✅ [DASHBOARD] Authentication successful:", {
+            accountType: data.account.accountType,
+            orgId: data.account.orgId,
+          })
+          setAccountType(data.account.accountType)
+          setOrgId(data.account.orgId)
+          loadDashboard(data.account.accountType, data.account.orgId)
+        }
+      })
+      .catch((error) => {
+        if (!isMounted) return
+        console.error("❌ [DASHBOARD] Error loading dashboard:", error)
+        hasLoadedRef.current = false // Reset on error
+        router.push("/auth/login")
+      })
+    
+    return () => {
+      isMounted = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty deps - only run once, router.push is stable
 
   if (loading) {
     return (

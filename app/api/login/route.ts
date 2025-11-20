@@ -206,7 +206,39 @@ export async function POST(request: NextRequest) {
     console.log("🔐 [LOGIN] Creating session with data:", sessionData)
 
     const sessionToken = Buffer.from(JSON.stringify(sessionData)).toString("base64")
-    console.log("🔐 [LOGIN] Session token created (first 20 chars):", sessionToken.substring(0, 20) + "...")
+    console.log("🔐 [LOGIN] Session token created:", {
+      tokenLength: sessionToken.length,
+      firstChars: sessionToken.substring(0, 30) + "...",
+      lastChars: "..." + sessionToken.substring(sessionToken.length - 10),
+      decodedPreview: JSON.stringify(sessionData),
+    })
+
+    // Log request details that affect cookie behavior
+    const requestUrl = new URL(request.url)
+    const origin = request.headers.get("origin")
+    const host = request.headers.get("host")
+    const referer = request.headers.get("referer")
+    const userAgent = request.headers.get("user-agent")
+    const forwardedProto = request.headers.get("x-forwarded-proto")
+    const forwardedHost = request.headers.get("x-forwarded-host")
+    const forwardedFor = request.headers.get("x-forwarded-for")
+    
+    console.log("🔐 [LOGIN] Request details for cookie debugging:", {
+      requestUrl: requestUrl.toString(),
+      requestProtocol: requestUrl.protocol,
+      requestHost: requestUrl.host,
+      requestOrigin: requestUrl.origin,
+      requestPath: requestUrl.pathname,
+      headers: {
+        origin,
+        host,
+        referer,
+        "x-forwarded-proto": forwardedProto,
+        "x-forwarded-host": forwardedHost,
+        "x-forwarded-for": forwardedFor,
+        "user-agent": userAgent?.substring(0, 50) + "...",
+      },
+    })
 
     const response = NextResponse.json({
       account: {
@@ -219,7 +251,7 @@ export async function POST(request: NextRequest) {
 
     // Set session cookie
     // Determine if request is over HTTPS (check protocol or X-Forwarded-Proto header)
-    const protocol = request.headers.get("x-forwarded-proto") || new URL(request.url).protocol
+    const protocol = forwardedProto || requestUrl.protocol
     const isHttps = protocol === "https:" || protocol === "https"
     
     // Use environment variable if set, otherwise auto-detect from request
@@ -229,27 +261,79 @@ export async function POST(request: NextRequest) {
       ? process.env.COOKIE_SECURE === "true"
       : isHttps
     
+    // Determine cookie domain (if needed for cross-subdomain)
+    // Only set domain if explicitly configured, otherwise let browser use default
+    const cookieDomain = process.env.COOKIE_DOMAIN || undefined
+    
     const cookieOptions = {
       httpOnly: true,
       secure: cookieSecure,
       sameSite: "lax" as const,
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: "/", // Explicitly set path
+      ...(cookieDomain && { domain: cookieDomain }), // Only add domain if configured
     }
-    console.log("🔐 [LOGIN] Setting session cookie with options:", {
-      httpOnly: cookieOptions.httpOnly,
-      secure: cookieOptions.secure,
-      sameSite: cookieOptions.sameSite,
-      maxAge: cookieOptions.maxAge,
-      path: cookieOptions.path,
-      requestProtocol: protocol,
-      isHttps,
-      cookieSecureEnv: process.env.COOKIE_SECURE,
-      nodeEnv: process.env.NODE_ENV,
+    
+    console.log("🔐 [LOGIN] Cookie configuration:", {
+      cookieName: "session",
+      cookieValueLength: sessionToken.length,
+      cookieValuePreview: sessionToken.substring(0, 30) + "..." + sessionToken.substring(sessionToken.length - 10),
+      cookieOptions: {
+        httpOnly: cookieOptions.httpOnly,
+        secure: cookieOptions.secure,
+        sameSite: cookieOptions.sameSite,
+        maxAge: cookieOptions.maxAge,
+        path: cookieOptions.path,
+        domain: cookieOptions.domain || "(not set - browser default)",
+      },
+      environment: {
+        requestProtocol: protocol,
+        isHttps,
+        cookieSecureEnv: process.env.COOKIE_SECURE,
+        cookieDomainEnv: process.env.COOKIE_DOMAIN,
+        nodeEnv: process.env.NODE_ENV,
+      },
     })
 
+    // Set the cookie
     response.cookies.set("session", sessionToken, cookieOptions)
-    console.log("✅ [LOGIN] Login successful, session cookie set")
+    
+    // Verify cookie was set by reading it back
+    const setCookie = response.cookies.get("session")
+    const setCookieHeader = response.headers.get("set-cookie")
+    
+    console.log("🔐 [LOGIN] Cookie set verification:", {
+      cookieSet: !!setCookie,
+      cookieValue: setCookie?.value ? {
+        length: setCookie.value.length,
+        firstChars: setCookie.value.substring(0, 30) + "...",
+        matches: setCookie.value === sessionToken,
+      } : null,
+      setCookieHeader: setCookieHeader || "(not found in headers)",
+      setCookieHeaderLength: setCookieHeader?.length || 0,
+      allCookies: Array.from(response.cookies.getAll()).map(c => ({
+        name: c.name,
+        valueLength: c.value?.length || 0,
+        options: {
+          httpOnly: c.httpOnly,
+          secure: c.secure,
+          sameSite: c.sameSite,
+          maxAge: c.maxAge,
+          path: c.path,
+          domain: c.domain || "(not set)",
+        },
+      })),
+    })
+    
+    // Log all response headers that will be sent
+    console.log("🔐 [LOGIN] Response headers (cookie-related):", {
+      setCookie: setCookieHeader,
+      contentType: response.headers.get("content-type"),
+      allSetCookieHeaders: response.headers.getSetCookie(),
+      responseHeadersCount: Array.from(response.headers.entries()).length,
+    })
+    
+    console.log("✅ [LOGIN] Login successful, session cookie set and verified")
 
     logApiResponse(request, 200, Date.now() - startTime, { 
       accountId: account.id, 
