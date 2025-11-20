@@ -47,13 +47,8 @@ export function VendorSyncDashboard() {
   const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
+    // Initial fetch on component mount only
     fetchVendorSyncStatus()
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(() => {
-      fetchVendorSyncStatus()
-    }, 30000)
-
-    return () => clearInterval(interval)
   }, [])
 
   async function fetchVendorSyncStatus() {

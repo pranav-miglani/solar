@@ -164,43 +164,46 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        // Update MDC context with user info
-        MDC.withContext({
-          userId: sessionData.accountId,
-          accountType: sessionData.accountType,
-          orgId: sessionData.orgId,
-        }, () => {
-          logger.info("🔄 Manual plant sync triggered", { userId: sessionData.accountId })
-        })
-
-        // Execute sync (context automatically propagated)
-        const summary = await syncAllPlants()
-
-        return NextResponse.json({
-          success: true,
-          message: "Plant sync completed",
-          summary: {
-            totalVendors: summary.totalVendors,
-            successful: summary.successful,
-            failed: summary.failed,
-            totalPlantsSynced: summary.totalPlantsSynced,
-            totalPlantsCreated: summary.totalPlantsCreated,
-            totalPlantsUpdated: summary.totalPlantsUpdated,
-            duration: summary.duration,
-            results: summary.results.map((r) => ({
-              vendorId: r.vendorId,
-              vendorName: r.vendorName,
-              orgId: r.orgId,
-              orgName: r.orgName,
-              success: r.success,
-              synced: r.synced,
-              created: r.created,
-              updated: r.updated,
-              total: r.total,
-              error: r.error,
-            })),
+        // Update MDC context with user info and execute sync
+        return MDC.withContextAsync(
+          {
+            userId: sessionData.accountId,
+            accountType: sessionData.accountType,
+            orgId: sessionData.orgId,
           },
-        })
+          async () => {
+            logger.info("🔄 Manual plant sync triggered", { userId: sessionData.accountId })
+
+            // Execute sync (context automatically propagated)
+            const summary = await syncAllPlants()
+
+            return NextResponse.json({
+              success: true,
+              message: "Plant sync completed",
+              summary: {
+                totalVendors: summary.totalVendors,
+                successful: summary.successful,
+                failed: summary.failed,
+                totalPlantsSynced: summary.totalPlantsSynced,
+                totalPlantsCreated: summary.totalPlantsCreated,
+                totalPlantsUpdated: summary.totalPlantsUpdated,
+                duration: summary.duration,
+                results: summary.results.map((r) => ({
+                  vendorId: r.vendorId,
+                  vendorName: r.vendorName,
+                  orgId: r.orgId,
+                  orgName: r.orgName,
+                  success: r.success,
+                  synced: r.synced,
+                  created: r.created,
+                  updated: r.updated,
+                  total: r.total,
+                  error: r.error,
+                })),
+              },
+            })
+          }
+        )
       } catch (error: any) {
         logger.error("❌ Manual plant sync error", error)
         return NextResponse.json(
