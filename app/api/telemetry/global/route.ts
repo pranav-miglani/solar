@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getTelemetryClient } from "@/lib/supabase/pooled"
 
+// Mark route as dynamic to prevent static generation (uses request.url)
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)

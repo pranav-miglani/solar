@@ -77,6 +77,7 @@ export function WorkOrderDetail({ workOrderId }: { workOrderId: string }) {
     fetchWorkOrder()
     fetchEfficiency()
     fetchLogs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workOrderId])
 
   useEffect(() => {

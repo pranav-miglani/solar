@@ -4,6 +4,9 @@ import { getMainClient } from "@/lib/supabase/pooled"
 
 // For vendors API, we need to bypass RLS
 
+// Mark route as dynamic to prevent static generation (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

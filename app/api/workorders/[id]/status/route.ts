@@ -4,6 +4,9 @@ import { getMainClient } from "@/lib/supabase/pooled"
 // Note: Work orders are static (no status/lifecycle) per requirements
 // This endpoint may not be needed, but kept for backward compatibility
 
+// Mark route as dynamic to prevent static generation (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }

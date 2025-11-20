@@ -89,6 +89,7 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
   useEffect(() => {
     fetchWorkOrder()
     fetchProductionData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workOrderId])
 
   async function fetchWorkOrder() {
@@ -229,7 +230,7 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{workOrder.title}"? This action cannot be undone and will remove all associated plant mappings.
+                Are you sure you want to delete &quot;{workOrder.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -316,7 +317,7 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
       {productionData && (
         <ProductionOverview
           metrics={productionData.aggregated}
-          lastUpdated={lastUpdateTime}
+          lastUpdated={lastUpdateTime ?? undefined}
           title="Work Order Production Overview"
         />
       )}

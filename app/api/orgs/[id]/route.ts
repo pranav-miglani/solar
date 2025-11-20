@@ -5,6 +5,9 @@ import { getMainClient } from "@/lib/supabase/pooled"
 // For orgs API, we need to bypass RLS for write operations
 // We use service role key since RLS policies require auth.uid() which we don't have
 
+// Mark route as dynamic to prevent static generation (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }

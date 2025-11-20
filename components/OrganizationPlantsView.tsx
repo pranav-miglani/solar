@@ -83,6 +83,7 @@ export function OrganizationPlantsView({ orgId }: { orgId: string }) {
 
   useEffect(() => {
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId])
 
   async function fetchData() {

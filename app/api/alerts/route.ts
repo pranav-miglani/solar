@@ -3,6 +3,9 @@ import { getMainClient } from "@/lib/supabase/pooled"
 
 // For alerts API, we need to bypass RLS
 
+// Mark route as dynamic to prevent static generation (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const session = request.cookies.get("session")?.value

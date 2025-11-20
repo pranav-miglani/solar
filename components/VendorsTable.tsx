@@ -499,7 +499,7 @@ export function VendorsTable() {
                         No vendors found
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Click "Add Vendor" to create your first vendor integration
+                        Click &quot;Add Vendor&quot; to create your first vendor integration
                       </p>
                     </div>
                   </TableCell>
@@ -611,7 +611,7 @@ export function VendorsTable() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to delete "{vendor.name}"? This action cannot be undone and will remove all associated plants.
+                                Are you sure you want to delete &quot;{vendor.name}&quot;? This action cannot be undone and will remove all associated plants.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -644,7 +644,7 @@ export function VendorsTable() {
               No vendors found
             </p>
             <p className="text-sm text-muted-foreground">
-              Click "Add Vendor" to create your first vendor integration
+              Click &quot;Add Vendor&quot; to create your first vendor integration
             </p>
           </Card>
         ) : (
@@ -748,7 +748,7 @@ export function VendorsTable() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete "{vendor.name}"? This action cannot be undone and will remove all associated plants.
+                            Are you sure you want to delete &quot;{vendor.name}&quot;? This action cannot be undone and will remove all associated plants.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

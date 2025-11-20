@@ -3,6 +3,9 @@ import { getMainClient } from "@/lib/supabase/pooled"
 
 // For workorders plants API, we need to bypass RLS
 
+// Mark route as dynamic to prevent static generation (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }

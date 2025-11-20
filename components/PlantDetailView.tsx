@@ -71,6 +71,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
   useEffect(() => {
     fetchPlantData()
     fetchTelemetry()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plantId])
 
   async function fetchPlantData() {

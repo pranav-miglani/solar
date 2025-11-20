@@ -5,6 +5,9 @@ import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
 
 // For plants API, we need to bypass RLS for write operations
 
+// Mark route as dynamic to prevent static generation (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const startTime = Date.now()
   

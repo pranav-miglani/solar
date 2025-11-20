@@ -14,6 +14,10 @@ import { randomUUID } from "crypto"
  * 
  * Security: Should be protected with a secret token
  */
+
+// Mark route as dynamic (cron endpoints are always dynamic)
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const requestId = randomUUID()
   

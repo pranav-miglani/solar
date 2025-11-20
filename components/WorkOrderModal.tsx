@@ -63,6 +63,7 @@ export function WorkOrderModal({
       setSelectedOrgId(null)
       setSelectedPlantIds([])
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, workOrderId])
 
   async function fetchOrgs() {

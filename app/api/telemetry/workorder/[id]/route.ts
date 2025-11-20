@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getMainClient, getTelemetryClient } from "@/lib/supabase/pooled"
 
+// Mark route as dynamic to prevent static generation (uses request.url)
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

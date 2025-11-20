@@ -121,7 +121,7 @@ function getApiMDCContext(request: NextRequest): Partial<import("@/lib/context/m
     userEmail: user?.email,
     userId: user?.accountId,
     accountType: user?.accountType,
-    orgId: user?.orgId,
+    orgId: user?.orgId ?? undefined,
   }
 }
 
@@ -232,7 +232,7 @@ export async function withMDCContext<T>(
           userEmail: user.email,
           userId: user.accountId,
           accountType: user.accountType,
-          orgId: user.orgId,
+          orgId: user.orgId ?? undefined,
         },
         handler
       )

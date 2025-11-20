@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
 import { getMainClient } from "@/lib/supabase/pooled"
 
+// Mark route as dynamic to prevent static generation (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const session = request.cookies.get("session")?.value

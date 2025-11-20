@@ -343,7 +343,7 @@ export function OrgsTable() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete Organization</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to delete "{org.name}"? This action cannot be undone and will delete:
+                                  Are you sure you want to delete &quot;{org.name}&quot;? This action cannot be undone and will delete:
                                   <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
                                     <li>All associated work orders</li>
                                     <li>All associated plants</li>
@@ -478,7 +478,7 @@ export function OrgsTable() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete Organization</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Are you sure you want to delete "{org.name}"? This action cannot be undone and will delete:
+                              Are you sure you want to delete &quot;{org.name}&quot;? This action cannot be undone and will delete:
                               <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
                                 <li>All associated work orders</li>
                                 <li>All associated plants</li>

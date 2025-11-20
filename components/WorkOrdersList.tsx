@@ -200,7 +200,7 @@ export function WorkOrdersList() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Are you sure you want to delete "{wo.title}"? This action cannot be undone and will remove all associated plant mappings.
+                              Are you sure you want to delete &quot;{wo.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -278,7 +278,7 @@ export function WorkOrdersList() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Are you sure you want to delete "{wo.title}"? This action cannot be undone and will remove all associated plant mappings.
+                          Are you sure you want to delete &quot;{wo.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

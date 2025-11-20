@@ -6,6 +6,10 @@ import { requirePermission } from "@/lib/rbac"
  * Export CSV endpoint - GOVT only
  * Exports global system data to CSV format
  */
+
+// Mark route as dynamic to prevent static generation (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()

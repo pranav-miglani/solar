@@ -3,6 +3,9 @@ import type { AccountType } from "@/lib/rbac"
 import { getMainClient } from "@/lib/supabase/pooled"
 import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
 
+// Mark route as dynamic to prevent static generation (uses cookies)
+export const dynamic = 'force-dynamic'
+
 interface DashboardData {
   role: AccountType
   metrics: {

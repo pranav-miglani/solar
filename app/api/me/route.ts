@@ -5,6 +5,9 @@ import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
 // For /api/me, we need to bypass RLS to verify the account exists
 // We use service role key since RLS policies require auth.uid() which we don't have
 
+// Mark route as dynamic to prevent static generation (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const startTime = Date.now()
   

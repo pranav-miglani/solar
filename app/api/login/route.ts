@@ -8,6 +8,9 @@ import { logApiRequest, logApiResponse } from "@/lib/api-logger"
 // For login, we need to bypass RLS to query accounts table
 // We use service role key since user is not authenticated yet
 
+// Mark route as dynamic to prevent static generation (uses cookies)
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
   // Log login attempt (no user session yet)
