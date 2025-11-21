@@ -31,6 +31,7 @@ interface Vendor {
   vendor_type: string
   is_active: boolean
   last_synced_at: string | null
+  last_alert_synced_at: string | null
   created_at: string
   organizations: {
     id: number
@@ -285,7 +286,8 @@ export function VendorSyncDashboard() {
                   <TableHead>Organization</TableHead>
                   <TableHead>Auto-Sync</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Last Synced</TableHead>
+                  <TableHead>Last Plant Sync</TableHead>
+                  <TableHead>Last Alert Sync</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -357,6 +359,20 @@ export function VendorSyncDashboard() {
                           <span className="text-muted-foreground">Never</span>
                         )}
                       </TableCell>
+                      <TableCell>
+                        {vendor.last_alert_synced_at ? (
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium">
+                              {getLastSyncText(vendor.last_alert_synced_at)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {format(new Date(vendor.last_alert_synced_at), "PPp")}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Never</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -413,7 +429,7 @@ export function VendorSyncDashboard() {
                         )}
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Last Synced:</span>
+                        <span className="text-muted-foreground">Last Plant Sync:</span>
                         {vendor.last_synced_at ? (
                           <div className="text-right">
                             <div className="font-medium">
@@ -421,6 +437,21 @@ export function VendorSyncDashboard() {
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {format(new Date(vendor.last_synced_at), "PPp")}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Never</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Last Alert Sync:</span>
+                        {vendor.last_alert_synced_at ? (
+                          <div className="text-right">
+                            <div className="font-medium">
+                              {getLastSyncText(vendor.last_alert_synced_at)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {format(new Date(vendor.last_alert_synced_at), "PPp")}
                             </div>
                           </div>
                         ) : (

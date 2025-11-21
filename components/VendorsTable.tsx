@@ -253,26 +253,44 @@ export function VendorsTable() {
     setSyncProgress({ current: 0, total: 0 })
 
     try {
-      const response = await fetch(`/api/vendors/${vendorId}/sync-plants`, {
+      // Step 1: sync plants for this vendor
+      const plantsResponse = await fetch(`/api/vendors/${vendorId}/sync-plants`, {
         method: "POST",
       })
+      const plantsData = await plantsResponse.json()
 
-      const data = await response.json()
-
-      if (response.ok) {
-        setSyncProgress({ current: data.synced, total: data.total })
-        setTimeout(() => {
-          alert(`Successfully synced ${data.synced} plants (${data.created} created, ${data.updated} updated)`)
-          setSyncingVendorId(null)
-          setSyncProgress(null)
-        }, 500)
-      } else {
-        alert(data.error || "Failed to sync plants")
+      if (!plantsResponse.ok) {
+        alert(plantsData.error || "Failed to sync plants")
         setSyncingVendorId(null)
         setSyncProgress(null)
+        return
       }
+
+      setSyncProgress({ current: plantsData.synced, total: plantsData.total })
+
+      // Step 2: once plants are synced, trigger alert sync for the same vendor
+      const alertsResponse = await fetch(`/api/vendors/${vendorId}/sync-alerts`, {
+        method: "POST",
+      })
+      const alertsData = await alertsResponse.json()
+
+      if (!alertsResponse.ok) {
+        alert(
+          `Plants synced (${plantsData.synced} plants, ${plantsData.created} created, ${plantsData.updated} updated), but alert sync failed: ${
+            alertsData.error || "Unknown error"
+          }`
+        )
+      } else {
+        alert(
+          `Successfully synced ${plantsData.synced} plants (${plantsData.created} created, ${plantsData.updated} updated)\n` +
+            `and ${alertsData.synced} alerts (${alertsData.created} created, ${alertsData.updated} updated).`
+        )
+      }
+
+      setSyncingVendorId(null)
+      setSyncProgress(null)
     } catch (error: any) {
-      alert(`Error syncing plants: ${error.message}`)
+      alert(`Error syncing plants/alerts: ${error.message}`)
       setSyncingVendorId(null)
       setSyncProgress(null)
     }

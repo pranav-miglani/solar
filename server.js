@@ -30,21 +30,29 @@ app.prepare().then(() => {
     if (err) throw err
     console.log(`> Ready on http://${hostname}:${port}`)
     
-    // Start the plant sync cron job after server is ready
-    // Use setTimeout to ensure Next.js compilation is complete
+    // Start the cron jobs after server is ready.
+    // Use setTimeout to ensure Next.js compilation is complete.
     setTimeout(() => {
       try {
-        // Check if cron is enabled
-        const enableCron = process.env.ENABLE_PLANT_SYNC_CRON !== 'false'
-        
-        if (enableCron) {
+        // Plant sync cron
+        const enablePlantCron = process.env.ENABLE_PLANT_SYNC_CRON !== 'false'
+        if (enablePlantCron) {
           const { startPlantSyncCron } = require('./lib/cron/plantSyncCron')
           startPlantSyncCron()
         } else {
           console.log('⏸️ Plant sync cron is disabled (ENABLE_PLANT_SYNC_CRON=false)')
         }
+
+        // Alert sync cron (can be toggled independently)
+        const enableAlertCron = process.env.ENABLE_ALERT_SYNC_CRON !== 'false'
+        if (enableAlertCron) {
+          const { startAlertSyncCron } = require('./lib/cron/alertSyncCron')
+          startAlertSyncCron()
+        } else {
+          console.log('⏸️ Alert sync cron is disabled (ENABLE_ALERT_SYNC_CRON=false)')
+        }
       } catch (error) {
-        console.error('Failed to start cron job:', error)
+        console.error('Failed to start cron job(s):', error)
       }
     }, 2000) // Wait 2 seconds for Next.js to finish compilation
   })
