@@ -49,7 +49,7 @@ export abstract class BaseVendorAdapter {
   /**
    * Get active alerts for a specific plant
    */
-  abstract getAlerts(plantId: string): Promise<Alert[]>
+  abstract getAlerts(plantId: string, startTime?: Date, endTime?: Date): Promise<Alert[]>
 
   /**
    * Normalize vendor-specific telemetry data to standard format
@@ -66,18 +66,18 @@ export abstract class BaseVendorAdapter {
     if (this.config.apiBaseUrl) {
       return this.config.apiBaseUrl
     }
-    
+
     // Get vendor-specific base URL from environment variables
     const vendorType = this.config.vendorType.toUpperCase()
     const envVarName = `${vendorType}_API_BASE_URL`
     const baseUrl = process.env[envVarName]
-    
+
     if (!baseUrl) {
       throw new Error(
         `API base URL not configured. Please set ${envVarName} environment variable or provide apiBaseUrl in config.`
       )
     }
-    
+
     return baseUrl
   }
 

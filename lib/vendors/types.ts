@@ -9,6 +9,7 @@ export interface VendorConfig {
   apiBaseUrl?: string // Optional - can be read from environment variables instead
   credentials: VendorCredentials
   isActive: boolean
+  metadata?: Record<string, any> // For additional config like alertSyncStartDate
 }
 
 export interface Plant {
@@ -40,6 +41,12 @@ export interface Alert {
   title: string
   description?: string
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  status: 'ACTIVE' | 'RESOLVED' | 'ACKNOWLEDGED'
+  alertTime?: Date
+  endTime?: Date
+  durationSeconds?: number
+  deviceSn?: string
+  deviceType?: string
   metadata?: Record<string, any>
 }
 

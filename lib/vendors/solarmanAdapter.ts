@@ -140,7 +140,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       const headerEntries = options.headers instanceof Headers
         ? Array.from(options.headers.entries())
         : Object.entries(options.headers as Record<string, string>)
-      
+
       headerEntries.forEach(([key, value]) => {
         // Sanitize authorization header
         if (key.toLowerCase() === 'authorization') {
@@ -214,14 +214,14 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       // Log response body (truncate if too large, filter noisy fields)
       if (responseBody) {
         // Filter out noisy fields before logging
-        const filteredBody = typeof responseBody === 'object' 
+        const filteredBody = typeof responseBody === 'object'
           ? this.filterLogData(responseBody)
           : responseBody
-        
-        const bodyStr = typeof filteredBody === 'string' 
-          ? filteredBody 
+
+        const bodyStr = typeof filteredBody === 'string'
+          ? filteredBody
           : JSON.stringify(filteredBody, null, 2)
-        
+
         if (bodyStr.length > 10000) {
           responseLog.body = bodyStr.substring(0, 10000) + '...[truncated]'
           responseLog.bodySize = bodyStr.length
@@ -264,7 +264,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       console.log('🔵 [Solarman] Using PRO API base URL from SOLARMAN_PRO_API_BASE_URL:', proApiUrl)
       return { url: proApiUrl, isExplicit: true }
     }
-    
+
     // If not set, convert regular API base URL to PRO URL
     const regularApiUrl = this.getApiBaseUrl()
     if (regularApiUrl.includes('globalapi')) {
@@ -272,13 +272,13 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       console.log('🟡 [Solarman] PRO API base URL not set, auto-converting from regular API:', regularApiUrl, '→', convertedUrl)
       return { url: convertedUrl, isExplicit: false }
     }
-    
+
     // If already globalpro, return as is
     if (regularApiUrl.includes('globalpro')) {
       console.log('🟡 [Solarman] Using regular API URL (already globalpro):', regularApiUrl)
       return { url: regularApiUrl, isExplicit: false }
     }
-    
+
     // Default fallback
     console.log('🟠 [Solarman] Using default PRO API base URL:', 'https://globalpro.solarmanpv.com')
     return { url: 'https://globalpro.solarmanpv.com', isExplicit: false }
@@ -375,7 +375,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     try {
       // Calculate expiry timestamp (expiresIn is in seconds)
       const expiresAt = new Date(Date.now() + expiresIn * 1000)
-      
+
       // Also try to decode JWT expiry if it's a JWT
       const jwtExpiry = this.decodeJWTExpiry(token)
       const finalExpiresAt = jwtExpiry ? new Date(jwtExpiry) : expiresAt
@@ -447,16 +447,16 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     // Ensure we use the correct base URL (globalapi, not globalpro for auth)
     // Authentication endpoint is always on globalapi.solarmanpv.com
     let authBaseUrl = this.getApiBaseUrl()
-    
+
     // Replace globalpro with globalapi for authentication
     if (authBaseUrl.includes('globalpro')) {
       authBaseUrl = authBaseUrl.replace('globalpro', 'globalapi')
     }
-    
+
     // Extract just the domain (remove any paths)
     const urlObj = new URL(authBaseUrl)
     const baseDomain = `${urlObj.protocol}//${urlObj.host}`
-    
+
     // appId goes in query parameter, not body
     const url = `${baseDomain}/account/v1.0/token?appId=${credentials.appId}`
 
@@ -494,16 +494,16 @@ export class SolarmanAdapter extends BaseVendorAdapter {
 
   async listPlants(): Promise<Plant[]> {
     const token = await this.authenticate()
-    
+
     // Always use PRO API (converts regular API URL to PRO if needed)
     const { url: proApiUrl, isExplicit } = this.getProApiBaseUrl()
-    
+
     if (isExplicit) {
       console.log('✅ [Solarman] PRO API explicitly configured - using PRO API endpoint')
     } else {
       console.log('⚠️ [Solarman] PRO API not explicitly configured - auto-converted to PRO API endpoint')
     }
-    
+
     console.log('📊 [Solarman] Fetching plants from PRO API:', proApiUrl)
     return await this.listPlantsFromProApi(token, proApiUrl)
   }
@@ -514,7 +514,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
    */
   private async listPlantsFromProApi(token: string, proApiBaseUrl: string): Promise<Plant[]> {
     const url = `${proApiBaseUrl}/maintain-s/operating/station/v2/search`
-    
+
     // PRO API request body
     const requestBody = {
       station: {
@@ -568,10 +568,10 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       // Extract station ID and name
       const stationId = station.id
       const stationName = station.name || `Station ${stationId}`
-      
+
       // Capacity is already in kW (installedCapacity field)
       const capacityKw = station.installedCapacity || 0
-      
+
       // Handle location - fields are separate (locationLat, locationLng, locationAddress)
       let location: any = undefined
       const locationAddress = station.locationAddress || null
@@ -586,33 +586,33 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       // Extract production metrics from PRO API response
       // generationPower is in W, convert to kW
       const currentPowerKw = station.generationPower ? station.generationPower / 1000 : null
-      
+
       // PRO API provides richer energy data
       // generationValue: daily energy (kWh), convert to MWh
       const dailyEnergyMwh = station.generationValue ? station.generationValue / 1000 : null
-      
+
       // generationMonth: monthly energy (kWh), convert to MWh
       const monthlyEnergyMwh = station.generationMonth ? station.generationMonth / 1000 : null
-      
+
       // generationYear: yearly energy (kWh), convert to MWh
       const yearlyEnergyMwh = station.generationYear ? station.generationYear / 1000 : null
-      
+
       // generationTotal: total energy (kWh), convert to MWh
       const totalEnergyMwh = station.generationTotal ? station.generationTotal / 1000 : null
-      
+
       // Performance Ratio: PRO API may have prYesterday, or we can calculate from generationCapacity
       // PR = (Actual Generation / Expected Generation) where Expected = Capacity * Hours * Efficiency
       // For now, use prYesterday if available, otherwise null (will be calculated elsewhere if needed)
-      const performanceRatio = station.prYesterday !== null && station.prYesterday !== undefined 
-        ? station.prYesterday 
+      const performanceRatio = station.prYesterday !== null && station.prYesterday !== undefined
+        ? station.prYesterday
         : (station.generationCapacity !== null && station.generationCapacity !== undefined && station.installedCapacity > 0
           ? station.generationCapacity / station.installedCapacity
           : null)
-      
+
       // lastUpdateTime is Unix timestamp (seconds), convert to ISO string
       // PRO API returns as float (e.g., 1763468017.000000000)
-      const lastUpdateTime = station.lastUpdateTime 
-        ? new Date(Math.floor(station.lastUpdateTime) * 1000).toISOString() 
+      const lastUpdateTime = station.lastUpdateTime
+        ? new Date(Math.floor(station.lastUpdateTime) * 1000).toISOString()
         : null
 
       // createdDate is Unix timestamp (seconds), convert to ISO string
@@ -685,16 +685,16 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   private async listPlantsFromRegularApi(token: string): Promise<Plant[]> {
     // Get base URL and ensure we use globalapi for /station/v1.0/list endpoint
     let baseUrl = this.getApiBaseUrl()
-    
+
     // /station/v1.0/list endpoint is always on globalapi, not globalpro
     if (baseUrl.includes('globalpro')) {
       baseUrl = baseUrl.replace('globalpro', 'globalapi')
     }
-    
+
     // Extract just the domain (remove any paths)
     const urlObj = new URL(baseUrl)
     const apiBaseUrl = `${urlObj.protocol}//${urlObj.host}`
-    
+
     const url = `${apiBaseUrl}/station/v1.0/list`
     const pageSize = 100 // Maximum page size
     let allStations: any[] = []
@@ -710,9 +710,9 @@ export class SolarmanAdapter extends BaseVendorAdapter {
         page: currentPage,
         size: pageSize,
       }
-      
+
       console.log(`📊 [Solarman] Fetching page ${currentPage} with size ${pageSize}`)
-      
+
       const response = await this.loggedFetch(url, {
         method: "POST",
         headers: {
@@ -736,7 +736,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       }
 
       const data = await response.json()
-      
+
       // Handle different response formats
       if (data.success === false) {
         throw new Error(`Failed to fetch stations from Solarman: ${data.msg || data.message || 'Unknown error'}`)
@@ -776,10 +776,10 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       // Extract station ID and name
       const stationId = station.id
       const stationName = station.name || `Station ${stationId}`
-      
+
       // Capacity is already in kW (installedCapacity field)
       const capacityKw = station.installedCapacity || 0
-      
+
       // Handle location - fields are separate (locationLat, locationLng, locationAddress)
       let location: any = undefined
       if (station.locationLat || station.locationLng || station.locationAddress) {
@@ -793,10 +793,10 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       // Extract production metrics from response
       // generationPower is in W, convert to kW
       const currentPowerKw = station.generationPower ? station.generationPower / 1000 : null
-      
+
       // lastUpdateTime is Unix timestamp (seconds), convert to ISO string
-      const lastUpdateTime = station.lastUpdateTime 
-        ? new Date(station.lastUpdateTime * 1000).toISOString() 
+      const lastUpdateTime = station.lastUpdateTime
+        ? new Date(station.lastUpdateTime * 1000).toISOString()
         : null
 
       // createdDate is Unix timestamp (seconds), convert to ISO string
@@ -851,11 +851,11 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     endTime: Date
   ): Promise<TelemetryData[]> {
     const token = await this.authenticate()
-    
+
     // According to SOLARMAN_DOC.md, historical data uses /device/v1.0/historical
     // But we need deviceId, not stationId. This method signature might need adjustment.
     // For now, we'll use the station-based approach if available, or device-based if we have deviceId
-    
+
     // Format dates as YYYY-MM-DD for Solarman API
     const startDate = startTime.toISOString().split('T')[0]
     const endDate = endTime.toISOString().split('T')[0]
@@ -873,7 +873,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     timeType: 1 | 2 | 3 | 4 = 1 // 1=frame, 2=daily, 3=monthly, 4=yearly
   ): Promise<TelemetryData[]> {
     const token = await this.authenticate()
-    
+
     const startDate = startTime.toISOString().split('T')[0]
     const endDate = endTime.toISOString().split('T')[0]
 
@@ -906,12 +906,12 @@ export class SolarmanAdapter extends BaseVendorAdapter {
 
     // Transform Solarman historical response to our format
     const telemetryData: TelemetryData[] = []
-    
+
     if (data.paramDataList) {
       for (const paramData of data.paramDataList) {
         const timestamp = new Date(paramData.collectTime)
         const metrics: any = {}
-        
+
         if (paramData.dataList) {
           for (const item of paramData.dataList) {
             // Map Solarman keys to normalized keys
@@ -968,7 +968,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
 
   async getDeviceRealtime(deviceId: number | string): Promise<RealtimeData> {
     const token = await this.authenticate()
-    
+
     const requestBody: any = {}
     if (typeof deviceId === "number") {
       requestBody.deviceId = deviceId
@@ -1025,10 +1025,107 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     }
   }
 
-  async getAlerts(plantId: string): Promise<Alert[]> {
-    // Note: According to SOLARMAN_DOC.md, alerts use /device/v1.0/alertList
-    // which requires deviceId, not stationId
-    throw new Error("getAlerts requires deviceId. Use getDeviceAlerts(deviceId, ...) instead.")
+  async getAlerts(plantId: string, startTime?: Date, endTime?: Date): Promise<Alert[]> {
+    const token = await this.authenticate()
+    const { url: proApiUrl } = this.getProApiBaseUrl()
+    const url = `${proApiUrl}/maintain-s/operating/station/alert?order.direction=ASC&order.property=alertTime`
+
+    const pageSize = 100
+    let currentPage = 1
+    let hasMore = true
+    const allAlerts: Alert[] = []
+
+    // Determine start date
+    // Use passed startTime, or config metadata, or default to 1 year ago
+    let queryStartDate = startTime
+    if (!queryStartDate && this.config.metadata?.alertSyncStartDate) {
+      queryStartDate = new Date(this.config.metadata.alertSyncStartDate)
+    }
+    if (!queryStartDate) {
+      const oneYearAgo = new Date()
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+      queryStartDate = oneYearAgo
+    }
+
+    // Format startDay as YYYY-MM-DD if available
+    const startDay = queryStartDate ? queryStartDate.toISOString().split('T')[0] : null
+
+    console.log(`🔔 [Solarman] Fetching alerts for plant ${plantId} starting from ${startDay || 'beginning'}`)
+
+    while (hasMore) {
+      const requestBody = {
+        language: "en",
+        status: "-1", // All statuses
+        timeZone: "Asia/Calcutta", // Should ideally be dynamic based on plant location
+        plantIdList: [parseInt(plantId)],
+        startDay: startDay,
+        page: currentPage,
+        size: pageSize
+      }
+
+      const response = await this.loggedFetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      }, {
+        operation: 'GET_ALERTS',
+        description: `Fetch alerts page ${currentPage} for plant ${plantId}`,
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch alerts: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+
+      if (!data.data || !Array.isArray(data.data)) {
+        break
+      }
+
+      const pageAlerts = data.data
+
+      // Filter and map alerts
+      for (const rawAlert of pageAlerts) {
+        // Filter by deviceType: INVERTER only
+        if (rawAlert.deviceType !== "INVERTER") {
+          continue
+        }
+
+        // Check date range if needed (API might not filter perfectly)
+        if (queryStartDate && rawAlert.alertTime) {
+          const alertTime = new Date(rawAlert.alertTime * 1000)
+          if (alertTime < queryStartDate) {
+            continue
+          }
+        }
+
+        if (endTime && rawAlert.alertTime) {
+          const alertTime = new Date(rawAlert.alertTime * 1000)
+          if (alertTime > endTime) {
+            // Since we order ASC, if we pass endTime, we can stop?
+            // But we might have mixed dates? No, sorted by alertTime.
+            // So we can stop here?
+            // Let's just continue for safety
+            continue
+          }
+        }
+
+        allAlerts.push(this.normalizeAlert(rawAlert))
+      }
+
+      // Check if we have more pages
+      if (pageAlerts.length < pageSize || allAlerts.length >= data.total) {
+        hasMore = false
+      } else {
+        currentPage++
+        await new Promise(resolve => setTimeout(resolve, 100)) // Rate limit
+      }
+    }
+
+    return allAlerts
   }
 
   async getDeviceAlerts(
@@ -1039,7 +1136,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     size: number = 10
   ): Promise<Alert[]> {
     const token = await this.authenticate()
-    
+
     const requestBody: any = {
       deviceId,
       page,
@@ -1097,34 +1194,57 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   }
 
   protected normalizeAlert(rawData: any): Alert {
-    // Map Solarman alert levels to our severity per SOLARMAN_DOC.md section 8
-    // level: 0=Info, 1=Warning, 2=Error
+    // Map Solarman alert levels to our severity
     const severityMap: Record<number, Alert["severity"]> = {
       0: "LOW",      // Info
       1: "MEDIUM",   // Warning
       2: "HIGH",     // Error
     }
 
-    // Map influence to severity if level doesn't provide enough detail
-    // influence: 0=No impact, 1=Production, 2=Safety, 3=Production+Safety
     let severity = severityMap[rawData.level] || "MEDIUM"
     if (rawData.influence === 2 || rawData.influence === 3) {
-      severity = "CRITICAL" // Safety impact is critical
+      severity = "CRITICAL"
     } else if (rawData.influence === 1 && severity === "LOW") {
-      severity = "MEDIUM" // Production impact at least medium
+      severity = "MEDIUM"
+    }
+
+    // Parse timestamps (Solarman returns Unix timestamp in seconds)
+    const alertTime = rawData.alertTime ? new Date(rawData.alertTime * 1000) : undefined
+    const endTime = rawData.endTime ? new Date(rawData.endTime * 1000) : undefined
+
+    // Calculate duration in seconds
+    let durationSeconds: number | undefined = undefined
+    if (alertTime && endTime) {
+      durationSeconds = Math.floor((endTime.getTime() - alertTime.getTime()) / 1000)
+    }
+
+    // Map status
+    // Solarman status: 1=Active (maybe?), 0=Resolved? 
+    // The curl response shows "status": 1 for an alert with endTime: null.
+    // Usually if endTime is present, it's resolved.
+    let status: Alert["status"] = "ACTIVE"
+    if (endTime || rawData.status === 0) { // Assuming 0 is resolved or based on endTime
+      status = "RESOLVED"
     }
 
     return {
-      vendorAlertId: rawData.alertId?.toString(),
+      vendorAlertId: rawData.id?.toString() || rawData.alertId?.toString(), // Use composite ID if available
       title: rawData.alertName || "Alert",
       description: rawData.description || rawData.addr || "",
       severity,
+      status,
+      alertTime,
+      endTime,
+      durationSeconds,
+      deviceSn: rawData.deviceSn,
+      deviceType: rawData.deviceType,
       metadata: {
         ...rawData,
         code: rawData.code,
         level: rawData.level,
         influence: rawData.influence,
-        alertTime: rawData.alertTime,
+        ruleId: rawData.ruleId,
+        deviceId: rawData.deviceId,
       },
     }
   }
@@ -1132,7 +1252,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   // Helper method to get plant base information per SOLARMAN_DOC.md section 3.1
   async getPlantBaseInfo(stationId: number): Promise<Plant> {
     const token = await this.authenticate()
-    
+
     const response = await this.loggedFetch(
       `${this.getApiBaseUrl()}/station/v1.0/base?language=en`,
       {
@@ -1161,10 +1281,10 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       capacityKw: data.installedCapacity ? data.installedCapacity / 1000 : 0, // Convert W to kW
       location: data.location
         ? {
-            lat: parseFloat(data.location.lat),
-            lng: parseFloat(data.location.lng),
-            address: data.location.address,
-          }
+          lat: parseFloat(data.location.lat),
+          lng: parseFloat(data.location.lng),
+          address: data.location.address,
+        }
         : undefined,
       metadata: {
         stationId: data.stationId,
@@ -1180,7 +1300,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   // Helper method to get device list per SOLARMAN_DOC.md section 3.2
   async getPlantDevices(stationId: number): Promise<any[]> {
     const token = await this.authenticate()
-    
+
     const response = await this.loggedFetch(
       `${this.getApiBaseUrl()}/station/v1.0/device`,
       {
