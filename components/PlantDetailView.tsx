@@ -61,16 +61,30 @@ interface TelemetryData {
   generation_power_kw: number
 }
 
+interface PlantAlert {
+  id: number
+  title: string | null
+  description: string | null
+  severity: string | null
+  status: string | null
+  alert_time: string | null
+  end_time: string | null
+  grid_down_seconds: number | null
+}
+
 export function PlantDetailView({ plantId }: { plantId: string }) {
   const router = useRouter()
   const [plant, setPlant] = useState<Plant | null>(null)
   const [telemetry, setTelemetry] = useState<TelemetryData[]>([])
+  const [alerts, setAlerts] = useState<PlantAlert[]>([])
+  const [alertsLoading, setAlertsLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPlantData()
     fetchTelemetry()
+    fetchAlerts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plantId])
 
@@ -102,6 +116,24 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
       }
     } catch (err) {
       console.error("Failed to fetch telemetry:", err)
+    }
+  }
+
+  async function fetchAlerts() {
+    try {
+      setAlertsLoading(true)
+      const response = await fetch(`/api/alerts?plantId=${plantId}&limit=5`)
+      if (!response.ok) {
+        setAlerts([])
+        return
+      }
+      const result = await response.json()
+      setAlerts(result.alerts || [])
+    } catch (err) {
+      console.error("Failed to fetch alerts:", err)
+      setAlerts([])
+    } finally {
+      setAlertsLoading(false)
     }
   }
 
@@ -409,24 +441,90 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
           </CardContent>
         </Card>
 
-        {/* Telemetry Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Telemetry (24h)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {telemetry.length > 0 ? (
-              <TelemetryChart data={telemetry} title="Generation Power (24h)" />
-            ) : (
-              <div className="flex items-center justify-center h-64 text-muted-foreground">
-                <div className="text-center">
-                  <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No telemetry data available</p>
+        {/* Telemetry Chart + Recent Alerts */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Telemetry (24h)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {telemetry.length > 0 ? (
+                <TelemetryChart data={telemetry} title="Generation Power (24h)" />
+              ) : (
+                <div className="flex items-center justify-center h-64 text-muted-foreground">
+                  <div className="text-center">
+                    <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No telemetry data available</p>
+                  </div>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                Recent Alerts
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {alertsLoading ? (
+                <div className="flex items-center justify-center h-20 text-xs text-muted-foreground">
+                  Loading alerts...
+                </div>
+              ) : alerts.length === 0 ? (
+                <div className="flex items-center justify-center h-20 text-xs text-muted-foreground text-center">
+                  No recent alerts for this plant.
+                </div>
+              ) : (
+                <div className="space-y-2 text-xs">
+                  {alerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className="rounded-md border bg-card/60 px-3 py-2 flex flex-col gap-1"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium truncate">
+                          {alert.title || "No Mains Voltage"}
+                        </span>
+                        {alert.severity && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {alert.severity}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                        {alert.alert_time && (
+                          <span>
+                            Start: {new Date(alert.alert_time).toLocaleString()}
+                          </span>
+                        )}
+                        {alert.end_time && (
+                          <span>
+                            End: {new Date(alert.end_time).toLocaleString()}
+                          </span>
+                        )}
+                        {typeof alert.grid_down_seconds === "number" && (
+                          <span>
+                            Grid down: {(alert.grid_down_seconds / 60).toFixed(1)} min
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-3 flex justify-end">
+                <Link href={`/alerts/vendor/${plant.vendors.id}/plant/${plant.id}`}>
+                  <Button variant="outline" size="xs">
+                    View full alert history
+                  </Button>
+                </Link>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

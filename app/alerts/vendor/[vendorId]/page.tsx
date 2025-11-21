@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
-import Link from "next/link"
 import { getMainClient } from "@/lib/supabase/pooled"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Factory, Leaf, ArrowLeft } from "lucide-react"
+import Link from "next/link"
+import { DashboardSidebar } from "@/components/DashboardSidebar"
 
 export const dynamic = "force-dynamic"
 
@@ -69,6 +70,7 @@ export default async function AlertsVendorPlantsPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <DashboardSidebar accountType={accountType} />
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         <div className="mb-6 md:mb-8 flex items-center justify-between">
           <div>
@@ -80,54 +82,75 @@ export default async function AlertsVendorPlantsPage({ params }: PageProps) {
             </p>
           </div>
           <Link href="/alerts">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back to vendors
+            <Button variant="outline" size="sm" className="gap-1">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Back to vendors</span>
+              <span className="sm:hidden">Back</span>
             </Button>
           </Link>
         </div>
 
-          <div className="mb-4 flex items-center gap-3">
-          <span className="inline-flex h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 p-1.5">
+        <div className="mb-6 flex items-center gap-3">
+          <span className="inline-flex h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 p-2 shadow-md">
             <Factory className="h-full w-full text-white" />
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold">{vendor.name}</span>
-              <Badge variant="outline">{vendor.vendor_type}</Badge>
+              <span className="font-semibold text-base md:text-lg">{vendor.name}</span>
+              <Badge variant="outline" className="text-[10px] md:text-xs">
+                {vendor.vendor_type}
+              </Badge>
             </div>
-              {Array.isArray((vendor as any).organizations) &&
-                (vendor as any).organizations.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Organization: {(vendor as any).organizations[0].name}
-                  </p>
-                )}
+            {Array.isArray((vendor as any).organizations) &&
+              (vendor as any).organizations.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Organization: {(vendor as any).organizations[0].name}
+                </p>
+              )}
+            <p className="text-[11px] text-muted-foreground/80 mt-1">
+              {plantsWithAlerts.length} plant
+              {plantsWithAlerts.length === 1 ? "" : "s"} with active or historical alerts
+            </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {plantsWithAlerts.map((plant: any) => (
+          {plantsWithAlerts.map((plant: any, index: number) => (
             <Link
               key={plant.id}
               href={`/alerts/vendor/${vendor.id}/plant/${plant.id}`}
             >
-              <Card className="group hover:shadow-xl transition-all duration-200 cursor-pointer">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <Card
+                className="group relative overflow-hidden border-2 border-transparent bg-gradient-to-br from-background to-muted/60 hover:from-background hover:to-muted shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer animate-in fade-in-50 zoom-in-95"
+                style={{ animationDelay: `${index * 40}ms` }}
+              >
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br from-emerald-500/5 via-teal-500/5 to-cyan-500/5" />
+                <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <span className="inline-flex h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 p-1.5">
+                    <span className="inline-flex h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 p-1.5 shadow-sm">
                       <Leaf className="h-full w-full text-white" />
                     </span>
                     <span className="truncate">{plant.name}</span>
                   </CardTitle>
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] px-2 py-0.5 bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-300/60 dark:border-emerald-700/60"
+                  >
+                    {Array.isArray(plant.alerts) ? plant.alerts.length : 0} alerts
+                  </Badge>
                 </CardHeader>
-                <CardContent className="space-y-1 text-xs text-muted-foreground">
-                  <p>Vendor plant ID: {plant.vendor_plant_id}</p>
-                  <p>
-                    Alerts:{" "}
-                    {Array.isArray(plant.alerts) ? plant.alerts.length : 0}
+                <CardContent className="relative space-y-1 text-xs text-muted-foreground">
+                  <p className="font-mono text-[11px]">
+                    Vendor plant ID:{" "}
+                    <span className="text-foreground">{plant.vendor_plant_id}</span>
                   </p>
                   {plant.last_refreshed_at && (
-                    <p>Last plant sync: {new Date(plant.last_refreshed_at).toLocaleString()}</p>
+                    <p>
+                      Last plant sync:{" "}
+                      <span className="text-foreground">
+                        {new Date(plant.last_refreshed_at).toLocaleString()}
+                      </span>
+                    </p>
                   )}
                 </CardContent>
               </Card>

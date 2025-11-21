@@ -24,6 +24,11 @@ export async function GET(request: NextRequest) {
     const accountType = sessionData.accountType
     const orgId = sessionData.orgId
 
+    const url = new URL(request.url)
+    const plantIdParam = url.searchParams.get("plantId")
+    const limitParam = url.searchParams.get("limit")
+    const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 100, 200) : 100
+
     // Use service role client to bypass RLS
     const supabase = getMainClient()
 
@@ -35,6 +40,13 @@ export async function GET(request: NextRequest) {
         org_id
       )
     `)
+
+    if (plantIdParam) {
+      const plantId = parseInt(plantIdParam, 10)
+      if (!Number.isNaN(plantId)) {
+        query = query.eq("plant_id", plantId)
+      }
+    }
 
     // Filter based on role
     if (accountType === "ORG" && orgId) {
@@ -57,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     const { data: alerts, error } = await query
       .order("created_at", { ascending: false })
-      .limit(100)
+      .limit(limit)
 
     if (error) {
       console.error("Alerts query error:", error)

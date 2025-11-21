@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
-import Link from "next/link"
 import { getMainClient } from "@/lib/supabase/pooled"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Factory, AlertTriangle, Clock } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
+import Link from "next/link"
+import { DashboardSidebar } from "@/components/DashboardSidebar"
 
 export const dynamic = "force-dynamic"
 
@@ -54,7 +55,7 @@ export default async function AlertsVendorsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      {/* Sidebar is rendered by layout; just content here */}
+      <DashboardSidebar accountType={accountType} />
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         <div className="mb-6 md:mb-8">
           <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/60 bg-clip-text text-transparent">

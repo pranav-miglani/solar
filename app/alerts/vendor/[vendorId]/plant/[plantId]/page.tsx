@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
-import Link from "next/link"
 import { getMainClient } from "@/lib/supabase/pooled"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Leaf, ArrowLeft, AlertTriangle } from "lucide-react"
+import Link from "next/link"
+import { DashboardSidebar } from "@/components/DashboardSidebar"
 
 export const dynamic = "force-dynamic"
 
@@ -87,6 +88,7 @@ export default async function PlantAlertsPage({ params, searchParams }: PageProp
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <DashboardSidebar accountType={accountType} />
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         <div className="mb-4 flex items-center justify-between">
           <div>
