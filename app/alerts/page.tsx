@@ -4,7 +4,7 @@ import { getMainClient } from "@/lib/supabase/pooled"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Factory, AlertTriangle, Clock } from "lucide-react"
+import { Factory, AlertTriangle, Clock, Building2 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import Link from "next/link"
 import { DashboardSidebar } from "@/components/DashboardSidebar"
@@ -73,42 +73,54 @@ export default async function AlertsVendorsPage() {
                 ? vendor.organizations[0].name
                 : null
             return (
-            <Link key={vendor.id} href={`/alerts/vendor/${vendor.id}`}>
-              <Card className="group hover:shadow-xl transition-all duration-200 cursor-pointer">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <span className="inline-flex h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 p-1.5">
-                      <Factory className="h-full w-full text-white" />
-                    </span>
-                    <span className="truncate">{vendor.name}</span>
-                  </CardTitle>
-                  <Badge variant="outline">{vendor.vendor_type}</Badge>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <AlertTriangle className="h-4 w-4" />
-                    <span>{orgName || "No organization"}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    <span>
-                      Last alert sync:{" "}
-                      {vendor.last_alert_synced_at
-                        ? formatDistanceToNow(new Date(vendor.last_alert_synced_at), {
-                            addSuffix: true,
-                          })
-                        : "Never"}
-                    </span>
-                  </div>
-                  <div className="pt-2">
-                    <Button variant="outline" size="sm" className="w-full justify-center">
-                      View plants
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          )})}
+              <Link key={vendor.id} href={`/alerts/vendor/${vendor.id}`}>
+                <Card className="group hover:shadow-xl transition-all duration-200 cursor-pointer">
+                  <CardHeader className="space-y-2 pb-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className="inline-flex h-7 w-7 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 items-center justify-center">
+                        <Building2 className="h-4 w-4 text-slate-700 dark:text-slate-200" />
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {orgName || "Organization"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="text-base font-semibold flex items-center gap-2">
+                        <span className="inline-flex h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 p-1.5">
+                          <Factory className="h-full w-full text-white" />
+                        </span>
+                        <span className="truncate">{vendor.name}</span>
+                      </CardTitle>
+                      <Badge variant="outline">{vendor.vendor_type}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <AlertTriangle className="h-3 w-3" />
+                      <span>Alerts synced at vendor level</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span>
+                        Last alert sync:{" "}
+                        {vendor.last_alert_synced_at
+                          ? formatDistanceToNow(new Date(vendor.last_alert_synced_at), {
+                              addSuffix: true,
+                            })
+                          : "Never"}
+                      </span>
+                    </div>
+                    <div className="pt-2">
+                      <Button variant="outline" size="sm" className="w-full justify-center">
+                        View plants & alerts
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )
+          })}
 
           {(!vendors || vendors.length === 0) && (
             <Card className="p-6 flex flex-col items-center justify-center">
