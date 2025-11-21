@@ -72,6 +72,7 @@ export function VendorsTable() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null)
   const [syncingVendorId, setSyncingVendorId] = useState<number | null>(null)
+  const [syncingAlertsVendorId, setSyncingAlertsVendorId] = useState<number | null>(null)
   const [deletingVendorId, setDeletingVendorId] = useState<number | null>(null)
   const [syncProgress, setSyncProgress] = useState<{
     current: number
@@ -293,6 +294,29 @@ export function VendorsTable() {
       alert(`Error syncing plants/alerts: ${error.message}`)
       setSyncingVendorId(null)
       setSyncProgress(null)
+    }
+  }
+
+  async function handleSyncAlerts(vendorId: number) {
+    setSyncingAlertsVendorId(vendorId)
+    try {
+      const response = await fetch(`/api/vendors/${vendorId}/sync-alerts`, {
+        method: "POST",
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        alert(
+          `Alert sync completed for vendor ${data.vendorName || vendorId}.\n` +
+            `Alerts synced: ${data.synced} (${data.created} created, ${data.updated} updated).`
+        )
+      } else {
+        alert(data.error || "Failed to sync alerts")
+      }
+    } catch (error: any) {
+      alert(`Error syncing alerts: ${error.message}`)
+    } finally {
+      setSyncingAlertsVendorId(null)
     }
   }
 
@@ -611,6 +635,27 @@ export function VendorsTable() {
                             )}
                           </Button>
                         </motion.div>
+                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSyncAlerts(vendor.id)}
+                            disabled={syncingAlertsVendorId === vendor.id}
+                            className="transition-all duration-200 hover:scale-110 hover:bg-primary/10"
+                          >
+                            {syncingAlertsVendorId === vendor.id ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                Alerts...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-1" />
+                                Alerts
+                              </>
+                            )}
+                          </Button>
+                        </motion.div>
                         <AlertDialog open={deletingVendorId === vendor.id} onOpenChange={(open: boolean) => !open && setDeletingVendorId(null)}>
                           <AlertDialogTrigger asChild>
                             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -735,6 +780,25 @@ export function VendorsTable() {
                         <>
                           <RefreshCw className="h-4 w-4 mr-2" />
                           Plants
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSyncAlerts(vendor.id)}
+                      disabled={syncingAlertsVendorId === vendor.id}
+                      className="w-full"
+                    >
+                      {syncingAlertsVendorId === vendor.id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Alerts...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Alerts
                         </>
                       )}
                     </Button>
