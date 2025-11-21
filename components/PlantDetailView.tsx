@@ -517,7 +517,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
               )}
               <div className="mt-3 flex justify-end">
                 <Link href={`/alerts/vendor/${plant.vendors.id}/plant/${plant.id}`}>
-                  <Button variant="outline" size="xs">
+                  <Button variant="outline" size="sm" className="h-7 px-3 text-xs">
                     View full alert history
                   </Button>
                 </Link>
