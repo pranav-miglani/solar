@@ -228,7 +228,8 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
       const url = `${proBaseUrl}/maintain-s/operating/station/alert?${query.toString()}`
 
       const body = {
-        alertQueryName: null, // null => all alert types
+        // Filter alerts to the specific rule "No Mains Voltage"
+        alertQueryName: "No Mains Voltage",
         language: "en",
         status: "-1", // all
         timeZone: "Asia/Calcutta",
