@@ -78,6 +78,10 @@ export function VendorsTable() {
     current: number
     total: number
   } | null>(null)
+  const [alertsSyncProgress, setAlertsSyncProgress] = useState<{
+    current: number
+    total: number
+  } | null>(null)
   const [syncSettingsDialogOpen, setSyncSettingsDialogOpen] = useState(false)
   const [selectedOrgForSync, setSelectedOrgForSync] = useState<{ id: number, name: string } | null>(null)
   const [syncSettings, setSyncSettings] = useState<{ enabled: boolean, interval: number }>({ enabled: true, interval: 15 })
@@ -299,6 +303,7 @@ export function VendorsTable() {
 
   async function handleSyncAlerts(vendorId: number) {
     setSyncingAlertsVendorId(vendorId)
+    setAlertsSyncProgress({ current: 0, total: 0 })
     try {
       const response = await fetch(`/api/vendors/${vendorId}/sync-alerts`, {
         method: "POST",
@@ -306,6 +311,7 @@ export function VendorsTable() {
       const data = await response.json()
 
       if (response.ok) {
+        setAlertsSyncProgress({ current: data.synced || 0, total: data.total || data.synced || 0 })
         alert(
           `Alert sync completed for vendor ${data.vendorName || vendorId}.\n` +
             `Alerts synced: ${data.synced} (${data.created} created, ${data.updated} updated).`
@@ -317,6 +323,7 @@ export function VendorsTable() {
       alert(`Error syncing alerts: ${error.message}`)
     } finally {
       setSyncingAlertsVendorId(null)
+      setTimeout(() => setAlertsSyncProgress(null), 800)
     }
   }
 
@@ -641,7 +648,7 @@ export function VendorsTable() {
                             size="sm"
                             onClick={() => handleSyncAlerts(vendor.id)}
                             disabled={syncingAlertsVendorId === vendor.id}
-                            className="transition-all duration-200 hover:scale-110 hover:bg-primary/10"
+                            className="transition-all duration-200 hover:scale-110 bg-gradient-to-r from-amber-500/90 to-rose-500/90 text-white shadow-md hover:shadow-lg disabled:opacity-60"
                           >
                             {syncingAlertsVendorId === vendor.id ? (
                               <>
@@ -784,11 +791,11 @@ export function VendorsTable() {
                       )}
                     </Button>
                     <Button
-                      variant="outline"
+                      variant="default"
                       size="sm"
                       onClick={() => handleSyncAlerts(vendor.id)}
                       disabled={syncingAlertsVendorId === vendor.id}
-                      className="w-full"
+                      className="w-full bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white disabled:opacity-60"
                     >
                       {syncingAlertsVendorId === vendor.id ? (
                         <>
@@ -874,6 +881,34 @@ export function VendorsTable() {
           ) : (
             <div className="h-2 bg-secondary rounded-full overflow-hidden">
               <div className="h-full bg-primary animate-pulse" style={{ width: "50%" }} />
+            </div>
+          )}
+        </Card>
+      )}
+      {syncingAlertsVendorId && alertsSyncProgress && (
+        <Card className="p-4 border-2 bg-gradient-to-br from-amber-50/60 via-orange-50/60 to-rose-50/60 dark:from-amber-950/20 dark:via-orange-950/20 dark:to-rose-950/20">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
+              <span className="text-sm font-semibold">Syncing alerts...</span>
+            </div>
+            <span className="text-sm text-muted-foreground">
+              {alertsSyncProgress.total > 0
+                ? `${alertsSyncProgress.current} / ${alertsSyncProgress.total}`
+                : "Fetching alerts..."}
+            </span>
+          </div>
+          {alertsSyncProgress.total > 0 ? (
+            <Progress
+              value={(alertsSyncProgress.current / alertsSyncProgress.total) * 100}
+              className="h-2"
+            />
+          ) : (
+            <div className="h-2 bg-secondary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-amber-500 to-rose-500 animate-pulse"
+                style={{ width: "50%" }}
+              />
             </div>
           )}
         </Card>
