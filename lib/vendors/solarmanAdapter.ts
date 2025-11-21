@@ -143,11 +143,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
 
       headerEntries.forEach(([key, value]) => {
         // Sanitize authorization header
-        if (key.toLowerCase() === 'authorization') {
-          headers[key] = value ? `${value.substring(0, 20)}...` : 'N/A'
-        } else {
-          headers[key] = value
-        }
+        headers[key] = value
       })
     }
     requestLog.headers = headers
