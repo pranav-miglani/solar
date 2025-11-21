@@ -231,13 +231,8 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
         // Filter alerts to the specific rule "No Mains Voltage"
         alertQueryName: "No Mains Voltage",
         language: "en",
-        status: "-1", // all
+        status: "-1", // all statuses
         timeZone: "Asia/Calcutta",
-        deviceId: null,
-        endDay,
-        plantIdList: null,
-        groupIdList: null,
-        startDay,
       }
 
       const response = await (adapter as any).loggedFetch(
