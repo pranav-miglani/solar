@@ -598,10 +598,10 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       const yearlyEnergyMwh = station.generationYear ? station.generationYear / 1000 : null
       
       // generationUploadTotalOffset: actual total energy till date (kWh), convert to MWh
-      // This is the actual cumulative energy generated, more accurate than generationTotal
+      // This is the actual cumulative energy generated
       const totalEnergyMwh = station.generationUploadTotalOffset 
         ? station.generationUploadTotalOffset / 1000 
-        : (station.generationTotal ? station.generationTotal / 1000 : null)
+        : null
       
       // Performance Ratio: PRO API may have prYesterday, or we can calculate from generationCapacity
       // PR = (Actual Generation / Expected Generation) where Expected = Capacity * Hours * Efficiency
@@ -642,7 +642,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           dailyEnergyKwh: dailyEnergyKwh, // From generationValue (kWh, stored directly)
           monthlyEnergyMwh: monthlyEnergyMwh, // From generationMonth (kWh -> MWh)
           yearlyEnergyMwh: yearlyEnergyMwh, // From generationYear (kWh -> MWh)
-          totalEnergyMwh: totalEnergyMwh, // From generationUploadTotalOffset (actual energy till date) or generationTotal (kWh -> MWh)
+          totalEnergyMwh: totalEnergyMwh, // From generationUploadTotalOffset (actual energy till date) 
           performanceRatio: performanceRatio, // From prYesterday or calculated from generationCapacity
           // Additional PRO API fields
           fullPowerHoursDay: station.fullPowerHoursDay || null,
