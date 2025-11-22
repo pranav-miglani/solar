@@ -92,7 +92,7 @@ export function CreateWorkOrderForm() {
     <div className="bg-card border border-border rounded-lg shadow-sm p-6 md:p-8">
       <form onSubmit={handleSubmit} className="space-y-6 w-full">
         <div className="space-y-2">
-          <Label htmlFor="title" className="text-sm font-semibold">Title *</Label>
+          <Label htmlFor="title" className="text-sm font-semibold text-foreground">Title *</Label>
           <Input
             id="title"
             value={formData.title}
@@ -106,7 +106,7 @@ export function CreateWorkOrderForm() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="description" className="text-sm font-semibold">Description</Label>
+          <Label htmlFor="description" className="text-sm font-semibold text-foreground">Description</Label>
           <Textarea
             id="description"
             value={formData.description}
@@ -120,7 +120,7 @@ export function CreateWorkOrderForm() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="organization" className="text-sm font-semibold">Organization *</Label>
+          <Label htmlFor="organization" className="text-sm font-semibold text-foreground">Organization *</Label>
           <Select
             value={selectedOrgId?.toString() || ""}
             onValueChange={(value) => {
@@ -131,9 +131,13 @@ export function CreateWorkOrderForm() {
             <SelectTrigger id="organization" className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 bg-background text-foreground">
               <SelectValue placeholder="Select an organization" />
             </SelectTrigger>
-            <SelectContent className="bg-popover text-popover-foreground">
+            <SelectContent className="bg-popover text-popover-foreground border-border">
               {orgs.map((org) => (
-                <SelectItem key={org.id} value={org.id.toString()}>
+                <SelectItem 
+                  key={org.id} 
+                  value={org.id.toString()}
+                  className="focus:bg-accent focus:text-accent-foreground"
+                >
                   {org.name}
                 </SelectItem>
               ))}
@@ -154,7 +158,7 @@ export function CreateWorkOrderForm() {
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
+        <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border">
           <Button 
             type="submit" 
             disabled={loading || selectedPlantIds.length === 0}

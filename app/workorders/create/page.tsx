@@ -55,7 +55,7 @@ export default function CreateWorkOrderPage() {
       <DashboardSidebar accountType={accountType} />
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6">Create Work Order</h1>
+          <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6 text-foreground">Create Work Order</h1>
           <CreateWorkOrderForm />
         </div>
       </div>
