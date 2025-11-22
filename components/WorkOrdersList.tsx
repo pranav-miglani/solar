@@ -109,7 +109,7 @@ export function WorkOrdersList() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-4 p-4 md:p-6 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-4 p-4 md:p-6 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border border-border shadow-sm">
         <motion.div 
           whileHover={{ scale: 1.05 }} 
           whileTap={{ scale: 0.95 }}
@@ -118,7 +118,7 @@ export function WorkOrdersList() {
           <Button 
             onClick={handleCreate}
             size="lg"
-            className="w-full sm:w-auto transition-all duration-200 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white shadow-lg hover:shadow-xl font-semibold text-base"
+            className="w-full sm:w-auto transition-all duration-200 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg hover:shadow-xl font-semibold text-base"
           >
             <Plus className="h-5 w-5 mr-2" />
             Create Work Order
@@ -127,7 +127,7 @@ export function WorkOrdersList() {
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden md:block border rounded-lg overflow-hidden shadow-sm bg-card">
+      <div className="hidden md:block border border-border rounded-lg overflow-hidden shadow-sm bg-card">
         <div className="overflow-x-auto">
           <Table>
           <TableHeader className="bg-muted/50">
@@ -227,14 +227,14 @@ export function WorkOrdersList() {
       {/* Mobile Card View */}
       <div className="md:hidden space-y-3">
         {workOrders.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground border rounded-lg">
+          <div className="text-center py-12 text-muted-foreground border border-border rounded-lg">
             No work orders found
           </div>
         ) : (
           workOrders.map((wo, index) => (
             <div
               key={wo.id}
-              className="border rounded-lg p-4 bg-card hover:bg-primary/5 cursor-pointer transition-all duration-200 animate-in shadow-sm"
+              className="border border-border rounded-lg p-4 bg-card hover:bg-primary/5 cursor-pointer transition-all duration-200 animate-in shadow-sm"
               style={{
                 animationDelay: `${index * 50}ms`
               }}
