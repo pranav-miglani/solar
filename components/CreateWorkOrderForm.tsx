@@ -89,7 +89,7 @@ export function CreateWorkOrderForm() {
   }
 
   return (
-    <div className="bg-card border rounded-lg shadow-sm p-6 md:p-8">
+    <div className="bg-card border border-border rounded-lg shadow-sm p-6 md:p-8">
       <form onSubmit={handleSubmit} className="space-y-6 w-full">
         <div className="space-y-2">
           <Label htmlFor="title" className="text-sm font-semibold">Title *</Label>
@@ -101,7 +101,7 @@ export function CreateWorkOrderForm() {
             }
             required
             placeholder="Enter work order title"
-            className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+            className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 bg-background text-foreground"
           />
         </div>
 
@@ -115,7 +115,7 @@ export function CreateWorkOrderForm() {
             }
             rows={4}
             placeholder="Enter work order description (optional)"
-            className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 resize-none"
+            className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 resize-none bg-background text-foreground"
           />
         </div>
 
@@ -128,10 +128,10 @@ export function CreateWorkOrderForm() {
               setSelectedPlantIds([]) // Reset plant selection when org changes
             }}
           >
-            <SelectTrigger id="organization" className="transition-all duration-200 focus:ring-2 focus:ring-primary/20">
+            <SelectTrigger id="organization" className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 bg-background text-foreground">
               <SelectValue placeholder="Select an organization" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-popover text-popover-foreground">
               {orgs.map((org) => (
                 <SelectItem key={org.id} value={org.id.toString()}>
                   {org.name}
