@@ -29,7 +29,7 @@ interface Plant {
   name: string
   capacity_kw: number
   current_power_kw: number | null
-  daily_energy_mwh: number | null
+  daily_energy_kwh: number | null
   monthly_energy_mwh: number | null
   yearly_energy_mwh: number | null
   total_energy_mwh: number | null
@@ -310,8 +310,8 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Daily Energy</p>
               <p className="text-xl font-bold">
-                {plant.daily_energy_mwh !== null
-                  ? `${plant.daily_energy_mwh.toFixed(3)} MWh`
+                {plant.daily_energy_kwh !== null
+                  ? `${plant.daily_energy_kwh.toFixed(2)} kWh`
                   : "N/A"}
               </p>
             </div>

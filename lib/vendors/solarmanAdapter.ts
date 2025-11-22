@@ -588,8 +588,8 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       const currentPowerKw = station.generationPower ? station.generationPower / 1000 : null
       
       // PRO API provides richer energy data
-      // generationValue: daily energy (kWh), convert to MWh
-      const dailyEnergyMwh = station.generationValue ? station.generationValue / 1000 : null
+      // generationValue: daily energy (kWh), store directly in kWh (no conversion)
+      const dailyEnergyKwh = station.generationValue || null
       
       // generationMonth: monthly energy (kWh), convert to MWh
       const monthlyEnergyMwh = station.generationMonth ? station.generationMonth / 1000 : null
@@ -597,8 +597,11 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       // generationYear: yearly energy (kWh), convert to MWh
       const yearlyEnergyMwh = station.generationYear ? station.generationYear / 1000 : null
       
-      // generationTotal: total energy (kWh), convert to MWh
-      const totalEnergyMwh = station.generationTotal ? station.generationTotal / 1000 : null
+      // generationUploadTotalOffset: actual total energy till date (kWh), convert to MWh
+      // This is the actual cumulative energy generated, more accurate than generationTotal
+      const totalEnergyMwh = station.generationUploadTotalOffset 
+        ? station.generationUploadTotalOffset / 1000 
+        : (station.generationTotal ? station.generationTotal / 1000 : null)
       
       // Performance Ratio: PRO API may have prYesterday, or we can calculate from generationCapacity
       // PR = (Actual Generation / Expected Generation) where Expected = Capacity * Hours * Efficiency
@@ -636,10 +639,10 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           stationId: stationId,
           // Production metrics from PRO API (richer data)
           currentPowerKw: currentPowerKw, // Converted from W to kW
-          dailyEnergyMwh: dailyEnergyMwh, // From generationValue (kWh -> MWh)
+          dailyEnergyKwh: dailyEnergyKwh, // From generationValue (kWh, stored directly)
           monthlyEnergyMwh: monthlyEnergyMwh, // From generationMonth (kWh -> MWh)
           yearlyEnergyMwh: yearlyEnergyMwh, // From generationYear (kWh -> MWh)
-          totalEnergyMwh: totalEnergyMwh, // From generationTotal (kWh -> MWh)
+          totalEnergyMwh: totalEnergyMwh, // From generationUploadTotalOffset (actual energy till date) or generationTotal (kWh -> MWh)
           performanceRatio: performanceRatio, // From prYesterday or calculated from generationCapacity
           // Additional PRO API fields
           fullPowerHoursDay: station.fullPowerHoursDay || null,

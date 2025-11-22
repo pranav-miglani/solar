@@ -32,7 +32,7 @@ interface Plant {
   name: string
   capacity_kw: number
   current_power_kw: number | null
-  daily_energy_mwh: number | null
+  daily_energy_kwh: number | null
   monthly_energy_mwh: number | null
   yearly_energy_mwh: number | null
   total_energy_mwh: number | null

@@ -42,7 +42,7 @@ interface Plant {
   name: string
   capacity_kw: number
   current_power_kw: number | null
-  daily_energy_mwh: number | null
+  daily_energy_kwh: number | null
   monthly_energy_mwh: number | null
   yearly_energy_mwh: number | null
   total_energy_mwh: number | null
@@ -182,7 +182,7 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
   const aggregatedMetrics = {
     installedCapacityKw: activePlants.reduce((sum, p) => sum + (p.capacity_kw || 0), 0),
     currentPowerKw: activePlants.reduce((sum, p) => sum + (p.current_power_kw || 0), 0),
-    dailyEnergyMwh: activePlants.reduce((sum, p) => sum + (p.daily_energy_mwh || 0), 0),
+    dailyEnergyKwh: activePlants.reduce((sum, p) => sum + (p.daily_energy_kwh || 0), 0),
     monthlyEnergyMwh: activePlants.reduce((sum, p) => sum + (p.monthly_energy_mwh || 0), 0),
     yearlyEnergyMwh: activePlants.reduce((sum, p) => sum + (p.yearly_energy_mwh || 0), 0),
     totalEnergyMwh: activePlants.reduce((sum, p) => sum + (p.total_energy_mwh || 0), 0),
@@ -395,8 +395,8 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1 text-xs">
-                          {plant.daily_energy_mwh !== null && (
-                            <div>Daily: {plant.daily_energy_mwh.toFixed(2)} MWh</div>
+                          {plant.daily_energy_kwh !== null && (
+                            <div>Daily: {plant.daily_energy_kwh.toFixed(2)} kWh</div>
                           )}
                           {plant.monthly_energy_mwh !== null && (
                             <div>Monthly: {plant.monthly_energy_mwh.toFixed(2)} MWh</div>
@@ -460,8 +460,8 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                       </div>
                     )}
                     <div className="space-y-1 text-xs border-t pt-3">
-                      {plant.daily_energy_mwh !== null && (
-                        <div>Daily: {plant.daily_energy_mwh.toFixed(2)} MWh</div>
+                      {plant.daily_energy_kwh !== null && (
+                        <div>Daily: {plant.daily_energy_kwh.toFixed(2)} kWh</div>
                       )}
                       {plant.monthly_energy_mwh !== null && (
                         <div>Monthly: {plant.monthly_energy_mwh.toFixed(2)} MWh</div>

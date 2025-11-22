@@ -161,7 +161,7 @@ CREATE TABLE plants (
   location JSONB DEFAULT '{}',
   -- Production metrics (from Production Overview dashboard)
   current_power_kw NUMERIC(10, 3), -- Current Power in kW
-  daily_energy_mwh NUMERIC(10, 3), -- Daily Energy in MWh
+  daily_energy_kwh NUMERIC(10, 3), -- Daily Energy in kWh (stored in kWh to avoid rounding errors)
   monthly_energy_mwh NUMERIC(10, 3), -- Monthly Energy in MWh
   yearly_energy_mwh NUMERIC(10, 3), -- Yearly Energy in MWh
   total_energy_mwh NUMERIC(10, 3), -- Total Energy in MWh
@@ -180,7 +180,7 @@ CREATE TABLE plants (
 
 -- Add comments for plant production metrics
 COMMENT ON COLUMN plants.current_power_kw IS 'Current generation power in kW (shown in Production Overview)';
-COMMENT ON COLUMN plants.daily_energy_mwh IS 'Daily energy generation in MWh (shown in Production Overview)';
+COMMENT ON COLUMN plants.daily_energy_kwh IS 'Daily energy generation in kWh (shown in Production Overview). Stored in kWh to avoid rounding errors when converting between units.';
 COMMENT ON COLUMN plants.monthly_energy_mwh IS 'Monthly energy generation in MWh (shown in Production Overview)';
 COMMENT ON COLUMN plants.yearly_energy_mwh IS 'Yearly energy generation in MWh (shown in Production Overview)';
 COMMENT ON COLUMN plants.total_energy_mwh IS 'Total cumulative energy generation in MWh (shown in Production Overview)';
