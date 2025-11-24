@@ -87,10 +87,10 @@ Build a production-ready **Work Order Management System (WOMS)** for managing so
 - `location` (JSONB) - { lat, lng, address }
 - **Production Metrics**:
   - `current_power_kw` (NUMERIC(10, 3))
-  - `daily_energy_mwh` (NUMERIC(10, 3))
+  - `daily_energy_kwh` (NUMERIC(10, 3)) - Daily energy in kWh (stored in kWh to avoid rounding errors)
   - `monthly_energy_mwh` (NUMERIC(10, 3))
   - `yearly_energy_mwh` (NUMERIC(10, 3))
-  - `total_energy_mwh` (NUMERIC(10, 3))
+  - `total_energy_mwh` (NUMERIC(10, 3)) - Total cumulative energy (from `generationUploadTotalOffset` for Solarman)
   - `performance_ratio` (NUMERIC(5, 4)) - 0-1 range
 - `last_update_time` (TIMESTAMPTZ) - last vendor update
 - `last_refreshed_at` (TIMESTAMPTZ) - last DB sync
@@ -152,9 +152,17 @@ Build a production-ready **Work Order Management System (WOMS)** for managing so
 - `created_at` (TIMESTAMPTZ)
 
 ### Telemetry Database (Separate Instance)
-- Time-series table for plant telemetry data
-- Columns: `ts` (TIMESTAMPTZ), `plant_id` (INTEGER), `generation_power_kw` (NUMERIC)
-- Indexed on `plant_id` and `ts` for efficient queries
+- **Separate PostgreSQL instance** for high-volume time-series records
+- **Table**: `telemetry_15m`
+  - `ts` (TIMESTAMPTZ) - Timestamp at 15-minute interval
+  - `plant_id` (INTEGER) - Foreign key reference to main database `plants.id`
+  - `total_energy_mwh` (NUMERIC(12, 3)) - Cumulative energy at this timestamp
+  - `power_kw` (NUMERIC(12, 3)) - Instantaneous power
+  - `raw` (JSONB) - Vendor raw telemetry snapshot (untouched vendor data)
+- **Indexes**:
+  - `(plant_id, ts)` btree (mandatory for efficient queries)
+  - `(ts)` for dashboard queries
+- **Retention**: 31-day rolling window for summary data, long-term data stays indefinitely in raw 15-minute table
 
 ### Indexes
 - Indexes on all foreign keys
@@ -216,14 +224,26 @@ Build a production-ready **Work Order Management System (WOMS)** for managing so
 abstract class BaseVendorAdapter {
   abstract authenticate(): Promise<void>
   abstract listPlants(): Promise<NormalizedPlant[]>
-  abstract getTelemetry(plantId: string, start: Date, end: Date): Promise<TelemetryData[]>
+  abstract getTelemetry(
+    plantVendorId: string,
+    start: Date,
+    end: Date
+  ): Promise<NormalizedTelemetry[]>
   abstract getRealtime(plantId: string): Promise<RealtimeData>
   abstract getAlerts(plantId: string, startDate: Date, endDate: Date): Promise<NormalizedAlert[]>
   
   // Normalization methods
   normalizePlant(vendorPlant: any): NormalizedPlant
-  normalizeTelemetry(vendorData: any): TelemetryData
+  normalizeTelemetry(raw: any): TelemetryData
   normalizeAlert(vendorAlert: any): NormalizedAlert
+}
+
+// Telemetry Data Structure
+interface TelemetryData {
+  ts: Date
+  totalEnergyMWh: number
+  powerKW: number
+  raw: any  // Vendor-specific untouched value
 }
 ```
 
@@ -238,6 +258,12 @@ abstract class BaseVendorAdapter {
   - Maps vendor plant data to normalized format
   - Upserts into `plants` table
   - Updates `last_synced_at` on vendor
+- **Telemetry Sync**:
+  - Fetches telemetry data from Solarman PRO API
+  - Maps vendor-specific fields to normalized `TelemetryData` format
+  - Handles pagination for long date ranges
+  - Preserves raw vendor data in `raw` JSONB field
+  - Supports both real-time and historical backfill modes
 - **Alert Sync**:
   - Paginated API calls (size: 100)
   - Filters by `deviceType === "INVERTER"`
@@ -287,8 +313,10 @@ abstract class BaseVendorAdapter {
 ### Telemetry
 - `GET /api/telemetry/global` - Global telemetry (SUPERADMIN/GOVT)
 - `GET /api/telemetry/org/[id]` - Organization telemetry
-- `GET /api/telemetry/plant/[id]` - Plant telemetry (supports `hours` query param)
+- `GET /api/telemetry/plant/[id]` - Plant telemetry (supports `hours` query param, optimized for 31-day window)
 - `GET /api/telemetry/workorder/[id]` - Work order telemetry
+- `POST /api/telemetry/plant/[id]/backfill` - Trigger one-time backfill for a plant (SUPERADMIN only)
+- `POST /api/telemetry/sync-all` - Trigger daily sync for all plants (requires CRON_SECRET or SUPERADMIN)
 
 ### Work Orders
 - `GET /api/workorders` - List work orders
@@ -413,6 +441,219 @@ abstract class BaseVendorAdapter {
 - `syncSolarmanVendorAlerts(vendor)` - Syncs alerts for Solarman vendor
 - Handles pagination, filtering (INVERTER only), date ranges, and database upserts
 
+### Telemetry Sync Service
+- **File**: `lib/services/telemetrySyncService.ts`
+- **Vendor-Agnostic Architecture**: Adapter-driven system that works with any vendor
+- **Process Flow**:
+  1. Fetch raw telemetry from vendor API via adapter
+  2. Normalize into unified standard format
+  3. Persist in Telemetry DB (15-minute resolution)
+  4. Compute daily/monthly/yearly aggregates
+  5. Update plant metrics in main database
+- **Functions**:
+  - `syncPlantTelemetry(plantId: number)` - Sync telemetry for a single plant
+    - Determines sync window (daily: last 24h, one-time: entire history)
+    - Fetches → normalizes → stores
+    - Updates plant metrics (daily/monthly/yearly energy, current power)
+  - `syncAllPlantsDaily()` - Daily sync for all plants
+    - Runs for all organizations where `auto_sync_enabled = true`
+    - Uses org-level `sync_interval_minutes`
+    - Updates `generation_month_energy`, `generation_year_energy`, `generation_last_day_energy`, `generation_current_energy`
+    - Maintains 31-day rolling telemetry window
+    - Auto-deletes data older than 31 days (summary table only)
+  - `backfillPlantTelemetry(plantId: number)` - One-time historical backfill
+    - Mandatory backfill: Year-on-Year, Month-on-Month, Till last day cumulative energy
+    - Full 15-min time-series reconstruction (if vendor supports)
+    - Supports paginated vendor APIs
+    - Long date-range pulling
+    - Partial backfill continuation if interrupted
+    - Saves in chunks (7-day or vendor-max)
+- **Sync Modes**:
+  - **One-Time Reload (Backfill Mode)**: Full historical data reconstruction
+  - **Daily Sync (Scheduled)**: Runs every day at 00:15 local time for all plants
+- **Data Normalization**:
+  - Every record standardized to `TelemetryData` interface
+  - Vendor-specific fields preserved in `raw` JSONB field
+  - Maintains monotonic cumulative energy (handles broken vendor values)
+- **Aggregate Computation**:
+  - `daily_energy_mwh = max(totalEnergy) - min(totalEnergy)` per plant
+  - `monthly_energy_mwh` from 1st of month
+  - `yearly_energy_mwh` from 1st Jan
+  - `current_power_kw` from latest timestamp
+- **Failure Recovery**:
+  - Retry API failures
+  - Resume partial backfills
+  - Skip corrupted vendor data
+  - Log vendor and plant-level failures in `vendor_sync_logs` table
+- **Database Operations**:
+  - Upsert on `(plant_id, ts)` to handle duplicates
+  - Optimized queries by `(plant_id, ts)` index
+  - No blocking long scans
+
+## Telemetry System - Complete Specification
+
+### Overview
+
+The Telemetry module is a **vendor-agnostic, adapter-driven, time-series ingestion system**. Every vendor exposes different telemetry fields, but the overall process remains identical across all vendors:
+
+1. **Fetch raw telemetry** from vendor API
+2. **Normalize** into unified standard format
+3. **Persist** in Telemetry DB (15-minute resolution)
+4. **Compute** daily/monthly/yearly aggregates
+5. **Maintain** 31-day rolling window for graphing
+
+This ensures **scalability, consistency, and extensibility** across Solarman, Sungrow, Growatt, and future vendors.
+
+### Telemetry Database Structure
+
+**Telemetry DB** is a separate PostgreSQL instance designed for high-volume time-series records.
+
+#### Table: `telemetry_15m`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ts` | TIMESTAMPTZ | Timestamp (15-minute interval) |
+| `plant_id` | INTEGER | FK reference to main database `plants.id` |
+| `total_energy_mwh` | NUMERIC(12,3) | Cumulative energy at this timestamp |
+| `power_kw` | NUMERIC(12,3) | Instantaneous power |
+| `raw` | JSONB | Vendor raw telemetry snapshot (untouched) |
+
+#### Indexes
+
+- `(plant_id, ts)` btree (mandatory for efficient queries)
+- `(ts)` for dashboard queries
+
+#### Retention Policy
+
+- **31-day rolling window**: Summary data auto-deleted after 31 days
+- **Long-term storage**: Raw 15-minute data stays indefinitely in `telemetry_15m` table
+
+### Telemetry Sync Modes
+
+#### 1. One-Time Reload (Backfill Mode)
+
+For each plant, mandatory backfill includes:
+
+- **Year-on-Year** cumulative energy
+- **Month-on-Month** cumulative energy
+- **Till last day** cumulative energy history
+- **Full 15-min time-series** reconstruction (if vendor supports)
+
+**Backfill Logic Requirements**:
+
+- Support paginated vendor APIs
+- Long date-range pulling
+- Partial backfill continuation if interrupted
+- Chunked processing (7-day or vendor-max chunks)
+
+#### 2. Daily Sync (Scheduled)
+
+Runs for all plants every day at **00:15 local time**.
+
+**Updates**:
+
+- `generation_month_energy`
+- `generation_year_energy`
+- `generation_last_day_energy`
+- `generation_current_energy`
+- `instantaneous power_kw` (optional depending on vendor)
+
+**31-Day Rolling Window**:
+
+- Maintain last 31 days of 15-minute data
+- Auto-delete anything older than 31 days (summary table only)
+- Long-term data stays indefinitely in raw 15-minute table
+
+### Telemetry Process Flow (Generic Vendor)
+
+#### Step 1 – Adapter Invoked
+
+```typescript
+adapter.getTelemetry(plantVendorId, start, end)
+```
+
+#### Step 2 – Normalize
+
+Every record must be standardized:
+
+```typescript
+interface TelemetryData {
+  ts: Date
+  totalEnergyMWh: number
+  powerKW: number
+  raw: any  // Vendor-specific untouched value
+}
+```
+
+#### Step 3 – Insert into Telemetry DB
+
+- **Upsert** on `(plant_id, ts)` to handle duplicates
+- **Maintain monotonic** cumulative energy if vendor sends broken values
+- **Preserve raw data** in `raw` JSONB field
+
+#### Step 4 – Aggregate Computation
+
+Per plant:
+
+- `daily_energy_mwh = max(totalEnergy) - min(totalEnergy)` (for the day)
+- `monthly_energy_mwh` = from 1st of month
+- `yearly_energy_mwh` = from 1st Jan
+- `current_power_kw` = from latest timestamp
+
+### Telemetry Adapter Architecture (Generic)
+
+Extend the existing vendor adapter pattern:
+
+```typescript
+abstract class BaseVendorAdapter {
+  abstract getTelemetry(
+    plantVendorId: string,
+    start: Date,
+    end: Date
+  ): Promise<NormalizedTelemetry[]>
+  
+  protected abstract normalizeTelemetry(raw: any): TelemetryData
+}
+```
+
+**Vendor Implementations**:
+
+- `SolarmanTelemetryAdapter` - Maps Solarman fields → normalized fields
+- `SungrowTelemetryAdapter` - Maps Sungrow fields → normalized fields
+- `OtherVendorTelemetryAdapter` - Maps other vendor fields → normalized fields
+
+### Graph & Visualization Requirements
+
+**Frontend Presentation**:
+
+1. **15-min energy graph** (last 31 days)
+2. **Power vs Time graph** (realtime/day)
+3. **Daily energy bar chart** (last 31 days)
+
+**Backend Requirements**:
+
+- Query optimized by `(plant_id, ts)` index
+- No blocking long scans
+- Efficient pagination for large datasets
+- Support for real-time updates (WebSocket or polling)
+
+### Failure Recovery
+
+Telemetry Sync must:
+
+- **Retry API failures** with exponential backoff
+- **Resume partial backfills** from last successful timestamp
+- **Skip corrupted vendor data** and log warnings
+- **Log vendor and plant-level failures** in `vendor_sync_logs` table
+
+### Cron Job Integration
+
+- **Daily Sync Cron**: `lib/cron/telemetrySyncCron.js`
+  - **Schedule**: Every day at 00:15 local time
+  - **Trigger**: `GET /api/cron/sync-telemetry?secret={CRON_SECRET}`
+  - **Logic**: Calls `telemetrySyncService.syncAllPlantsDaily()`
+  - **Enabled**: `ENABLE_TELEMETRY_SYNC_CRON` environment variable
+
 ## Database Client Utilities
 
 ### Pooled Clients
@@ -455,6 +696,7 @@ SOLARMAN_PRO_API_BASE_URL=https://globalpro.solarmanpv.com
 # Cron Jobs
 ENABLE_PLANT_SYNC_CRON=true
 ENABLE_ALERT_SYNC_CRON=true
+ENABLE_TELEMETRY_SYNC_CRON=true
 CRON_SECRET=your-secret-key
 
 # Application
@@ -530,6 +772,15 @@ NODE_ENV=production
 6. **Animations**: Smooth transitions (Framer Motion)
 7. **Accessibility**: ARIA labels, keyboard navigation, screen reader support
 
+### Telemetry Visualization Requirements
+
+1. **15-Minute Energy Graph**: Display last 31 days of 15-minute resolution energy data
+2. **Power vs Time Graph**: Real-time and daily power visualization
+3. **Daily Energy Bar Chart**: Last 31 days of daily energy aggregation
+4. **Query Optimization**: Backend ensures queries optimized by `(plant_id, ts)` index
+5. **No Blocking Scans**: Long-running queries must not block UI
+6. **Real-Time Updates**: Support for live telemetry updates (WebSocket or polling)
+
 ## Future Extensibility
 
 1. **Vendor Adapters**: Easy to add new vendors by implementing `BaseVendorAdapter`
@@ -553,7 +804,18 @@ NODE_ENV=production
 - [ ] Build work order management pages
 - [ ] Implement alert sync and display
 - [ ] Set up cron jobs for plant and alert syncing
-- [ ] Add telemetry visualization
+- [ ] **Implement Telemetry System**:
+  - [ ] Create `telemetry_15m` table in telemetry database
+  - [ ] Implement `telemetrySyncService.ts` with sync modes (daily, backfill)
+  - [ ] Add telemetry methods to `BaseVendorAdapter`
+  - [ ] Implement vendor-specific telemetry adapters (Solarman, etc.)
+  - [ ] Create telemetry API routes (plant, org, workorder, global)
+  - [ ] Implement backfill functionality with pagination support
+  - [ ] Set up daily sync cron (00:15 local time)
+  - [ ] Implement 31-day rolling window retention
+  - [ ] Add aggregate computation (daily/monthly/yearly)
+  - [ ] Create failure recovery and logging
+- [ ] Add telemetry visualization (15-min graphs, power charts, daily bars)
 - [ ] Implement efficiency calculations
 - [ ] Add error handling and logging
 - [ ] Write comprehensive documentation

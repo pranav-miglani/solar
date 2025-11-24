@@ -178,6 +178,13 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
     ?.filter((wop) => wop.is_active)
     .map((wop) => wop.plants) || []
 
+  const formatNumber = (value: number | null | undefined, fractionDigits = 2, unit?: string) => {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return "N/A"
+    }
+    return `${value.toFixed(fractionDigits)}${unit ? ` ${unit}` : ""}`
+  }
+
   // Calculate aggregated metrics
   const aggregatedMetrics = {
     installedCapacityKw: activePlants.reduce((sum, p) => sum + (p.capacity_kw || 0), 0),
@@ -304,7 +311,7 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                   Total Capacity
                 </p>
                 <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                  {aggregatedMetrics.installedCapacityKw.toFixed(1)} kW
+                  {formatNumber(aggregatedMetrics.installedCapacityKw, 1, "kW")}
                 </p>
               </div>
               <Zap className="h-8 w-8 text-purple-500" />
@@ -371,11 +378,11 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                       <TableCell>
                         <Badge variant="outline">{plant.vendors.name}</Badge>
                       </TableCell>
-                      <TableCell>{plant.capacity_kw.toFixed(2)} kW</TableCell>
+                      <TableCell>{formatNumber(plant.capacity_kw, 2, "kW")}</TableCell>
                       <TableCell>
                         {plant.current_power_kw !== null ? (
                           <span className="text-green-600 dark:text-green-400 font-medium">
-                            {plant.current_power_kw.toFixed(2)} kW
+                            {formatNumber(plant.current_power_kw, 2, "kW")}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">N/A</span>
@@ -396,13 +403,13 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                       <TableCell>
                         <div className="space-y-1 text-xs">
                           {plant.daily_energy_kwh !== null && (
-                            <div>Daily: {plant.daily_energy_kwh.toFixed(2)} kWh</div>
+                            <div>Daily: {formatNumber(plant.daily_energy_kwh, 2, "kWh")}</div>
                           )}
                           {plant.monthly_energy_mwh !== null && (
-                            <div>Monthly: {plant.monthly_energy_mwh.toFixed(2)} MWh</div>
+                            <div>Monthly: {formatNumber(plant.monthly_energy_mwh, 2, "MWh")}</div>
                           )}
                           {plant.performance_ratio !== null && (
-                            <div>PR: {(plant.performance_ratio * 100).toFixed(2)}%</div>
+                            <div>PR: {formatNumber(plant.performance_ratio * 100, 2, "%")}</div>
                           )}
                         </div>
                       </TableCell>
@@ -438,14 +445,14 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>
                         <p className="text-muted-foreground">Capacity</p>
-                        <p className="font-medium">{plant.capacity_kw.toFixed(2)} kW</p>
+                        <p className="font-medium">{formatNumber(plant.capacity_kw, 2, "kW")}</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Current Power</p>
                         <p className="font-medium">
                           {plant.current_power_kw !== null ? (
                             <span className="text-green-600 dark:text-green-400">
-                              {plant.current_power_kw.toFixed(2)} kW
+                              {formatNumber(plant.current_power_kw, 2, "kW")}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">N/A</span>
@@ -461,13 +468,13 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                     )}
                     <div className="space-y-1 text-xs border-t pt-3">
                       {plant.daily_energy_kwh !== null && (
-                        <div>Daily: {plant.daily_energy_kwh.toFixed(2)} kWh</div>
+                        <div>Daily: {formatNumber(plant.daily_energy_kwh, 2, "kWh")}</div>
                       )}
                       {plant.monthly_energy_mwh !== null && (
-                        <div>Monthly: {plant.monthly_energy_mwh.toFixed(2)} MWh</div>
+                        <div>Monthly: {formatNumber(plant.monthly_energy_mwh, 2, "MWh")}</div>
                       )}
                       {plant.performance_ratio !== null && (
-                        <div>PR: {(plant.performance_ratio * 100).toFixed(2)}%</div>
+                        <div>PR: {formatNumber(plant.performance_ratio * 100, 2, "%")}</div>
                       )}
                     </div>
                     <Link href={`/plants/${plant.id}`}>

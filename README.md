@@ -66,10 +66,17 @@ WOMS is a comprehensive platform that enables:
 - **Error Handling**: Robust error handling and retry logic
 
 #### 3. Telemetry Management
-- **24-Hour Window**: Automatic data retention (24 hours)
+- **Vendor-Agnostic Architecture**: Adapter-driven system works with any vendor
+- **15-Minute Resolution**: High-resolution time-series data stored in `telemetry_15m` table
+- **31-Day Rolling Window**: Maintains last 31 days for visualization, long-term data stored indefinitely
+- **Dual Sync Modes**:
+  - **One-Time Backfill**: Full historical reconstruction (Year-on-Year, Month-on-Month, daily cumulative)
+  - **Daily Sync**: Scheduled sync at 00:15 local time for all plants
 - **Multiple Aggregation Levels**: Plant, Work Order, Organization, and Global views
 - **Real-Time Updates**: Edge Functions sync data from vendor APIs
 - **Efficient Storage**: Separate database instance for time-series data
+- **Data Normalization**: Vendor-specific data normalized to unified format with raw data preserved
+- **Failure Recovery**: Retry logic, partial backfill resumption, error logging
 
 #### 4. Work Order System
 - **Static Work Orders**: No status lifecycle - work orders are static records
@@ -145,7 +152,7 @@ WOMS is a comprehensive platform that enables:
 
 ### Data Flow
 
-1. **Telemetry Sync**: Edge Function → Vendor API → Telemetry DB (24h retention)
+1. **Telemetry Sync**: Edge Function → Vendor API → Telemetry DB (15-min resolution, 31-day rolling window)
 2. **Alert Sync**: Edge Function → Vendor API → Main DB (alerts table)
 3. **User Request**: Frontend → API Route → Main DB (with RLS enforcement)
 4. **Efficiency Calculation**: API Trigger → Edge Function → Telemetry DB → Main DB
@@ -431,26 +438,24 @@ Efficiency metrics for work order plants.
 
 ### Telemetry Database (Separate Instance)
 
-#### `telemetry_readings`
-24-hour telemetry window.
+#### `telemetry_15m`
+15-minute resolution time-series telemetry data.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID | Primary key |
-| `plant_id` | INTEGER | Plant ID (reference, not FK) |
-| `org_id` | INTEGER | Organization ID (denormalized) |
-| `work_order_id` | INTEGER | Work order ID (optional) |
-| `ts` | TIMESTAMPTZ | Timestamp |
-| `generation_power_kw` | NUMERIC(10,2) | Generation power |
-| `voltage` | NUMERIC(10,2) | Voltage (optional) |
-| `current` | NUMERIC(10,2) | Current (optional) |
-| `temperature` | NUMERIC(5,2) | Temperature (optional) |
-| `irradiance` | NUMERIC(8,2) | Irradiance (optional) |
-| `efficiency_pct` | NUMERIC(5,2) | Efficiency (optional) |
-| `metadata` | JSONB | Additional data |
-| `created_at` | TIMESTAMPTZ | Creation timestamp |
+| `ts` | TIMESTAMPTZ | Timestamp (15-minute interval) |
+| `plant_id` | INTEGER | Plant ID (reference to main database) |
+| `total_energy_mwh` | NUMERIC(12,3) | Cumulative energy at this timestamp |
+| `power_kw` | NUMERIC(12,3) | Instantaneous power |
+| `raw` | JSONB | Vendor raw telemetry snapshot (untouched) |
 
-**Retention**: Data older than 24 hours is automatically deleted.
+**Indexes**:
+- `(plant_id, ts)` btree (mandatory for efficient queries)
+- `(ts)` for dashboard queries
+
+**Retention Policy**:
+- **31-day rolling window**: Summary data auto-deleted after 31 days
+- **Long-term storage**: Raw 15-minute data stays indefinitely in `telemetry_15m` table
 
 ## Account Types & Permissions
 
@@ -1176,19 +1181,29 @@ Generic vendor authentication with token caching.
 
 Poll vendor APIs and store telemetry in telemetry DB.
 
-**Purpose**: Periodically fetch telemetry data from vendor APIs and store in telemetry database.
+**Purpose**: Periodically fetch telemetry data from vendor APIs and store in telemetry database with 15-minute resolution.
 
 **Process**:
 1. Fetch all active plants from main DB
 2. For each plant, get vendor adapter
-3. Fetch realtime data from vendor API
-4. Store in telemetry DB with 24h retention
+3. Fetch telemetry data from vendor API (normalized to standard format)
+4. Store in `telemetry_15m` table with 15-minute resolution
+5. Compute daily/monthly/yearly aggregates
+6. Update plant metrics in main database
+7. Maintain 31-day rolling window (auto-delete older summary data)
 
-**Scheduling**: Should run every 15 minutes
+**Sync Modes**:
+- **Daily Sync**: Runs every day at 00:15 local time for all plants
+- **One-Time Backfill**: Full historical reconstruction (Year-on-Year, Month-on-Month, daily cumulative)
+
+**Scheduling**: 
+- Daily sync: Every day at 00:15 local time
+- Real-time sync: Every 15 minutes (optional, for current power updates)
 
 **Environment Variables Required**:
 - `TELEMETRY_SUPABASE_URL`
 - `TELEMETRY_SUPABASE_SERVICE_ROLE_KEY` (uses service role to bypass RLS for writes)
+- `ENABLE_TELEMETRY_SYNC_CRON` (optional, default: true)
 
 **Output**:
 ```json
@@ -1196,9 +1211,16 @@ Poll vendor APIs and store telemetry in telemetry DB.
   "success": true,
   "synced": 150,
   "total": 150,
+  "aggregatesUpdated": 150,
   "errors": []
 }
 ```
+
+**Data Structure**:
+- **15-minute resolution**: `telemetry_15m` table stores high-resolution time-series data
+- **Normalized format**: All vendor data normalized to `{ts, totalEnergyMWh, powerKW, raw}`
+- **Raw preservation**: Vendor-specific data preserved in `raw` JSONB field
+- **Retention**: 31-day rolling window for visualization, long-term data stored indefinitely
 
 ### sync-alerts
 
@@ -1405,7 +1427,9 @@ Calculate efficiency metrics for work orders.
 - Configure connection pooling
 
 #### Telemetry Database
-- Set up automatic cleanup (24h retention)
+- Set up `telemetry_15m` table with proper indexes `(plant_id, ts)` and `(ts)`
+- Configure 31-day rolling window retention (summary data only)
+- Long-term data stays indefinitely in raw 15-minute table
 - Configure indexes for time-series queries
 - Consider partitioning for large datasets
 
@@ -1430,7 +1454,7 @@ Plant synchronization is automatically enabled for all organizations by default 
 
 Configure scheduled execution in Supabase:
 
-1. **sync-telemetry**: Every 15 minutes
+1. **sync-telemetry**: Daily at 00:15 local time (full sync), optional 15-minute intervals (real-time updates)
 2. **sync-alerts**: Every 30 minutes
 3. **compute-efficiency**: On-demand (via API)
 
@@ -1565,7 +1589,7 @@ npm start
    **Note**: Edge Functions use the service role key for telemetry DB to bypass RLS policies when inserting/reading telemetry data.
 
 6. **Schedule functions** (in Supabase dashboard):
-   - `sync-telemetry`: Cron `*/15 * * * *` (every 15 minutes)
+   - `sync-telemetry`: Cron `15 0 * * *` (daily at 00:15 local time) for full sync, optional `*/15 * * * *` (every 15 minutes) for real-time updates
    - `sync-alerts`: Cron `*/30 * * * *` (every 30 minutes)
 
 ### Post-Deployment Checklist
@@ -1633,9 +1657,11 @@ npm start
 
 ### Telemetry Database
 
-1. **24-Hour Retention**: Automatic cleanup keeps database size manageable
-2. **Indexes**: Optimized for time-series queries
-3. **Partitioning**: Consider partitioning for very large datasets
+1. **15-Minute Resolution**: High-resolution time-series data in `telemetry_15m` table
+2. **31-Day Rolling Window**: Summary data auto-deleted after 31 days, raw data stored indefinitely
+3. **Indexes**: Optimized for time-series queries `(plant_id, ts)` and `(ts)`
+4. **Data Normalization**: Vendor-agnostic format with raw data preservation
+5. **Partitioning**: Consider partitioning for very large datasets
 
 ### Edge Functions
 
