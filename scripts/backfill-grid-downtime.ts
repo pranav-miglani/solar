@@ -9,11 +9,24 @@
 
 import { config } from "dotenv"
 import { resolve } from "path"
+import { existsSync } from "fs"
 import { createClient } from "@supabase/supabase-js"
 import { calculateGridDownBenefitKwh } from "@/lib/services/alertSyncService"
 
-const envPath = resolve(process.cwd(), ".env.local")
-config({ path: envPath })
+const envLocalPath = resolve(process.cwd(), ".env.local")
+const envDefaultPath = resolve(process.cwd(), ".env")
+const envPath = existsSync(envLocalPath)
+  ? envLocalPath
+  : existsSync(envDefaultPath)
+    ? envDefaultPath
+    : null
+
+if (envPath) {
+  config({ path: envPath })
+} else {
+  config() // fall back to process.env
+  console.warn("⚠️ No .env.local or .env file found; relying on existing environment variables.")
+}
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
