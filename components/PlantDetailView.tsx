@@ -24,6 +24,9 @@ import Link from "next/link"
 import { TelemetryChart } from "@/components/TelemetryChart"
 import { format } from "date-fns"
 
+// Main plant payload for detail view. Energy values follow our kWh/MWh schema:
+// - daily_energy_kwh is in kWh (per latest migrations)
+// - monthly/yearly/total energy stay in MWh.
 interface Plant {
   id: number
   name: string
@@ -61,6 +64,8 @@ interface TelemetryData {
   generation_power_kw: number
 }
 
+// Recent alert snapshot used for the sidebar card. Note the combination of
+// downtime seconds (raw vendor duration) and derived benefit in kWh.
 interface PlantAlert {
   id: number
   title: string | null
@@ -107,6 +112,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
     }
   }
 
+  // Pull the last 24h of normalized telemetry (15-min granularity) for charts.
   async function fetchTelemetry() {
     try {
       const response = await fetch(`/api/telemetry/plant/${plantId}?hours=24`)
@@ -120,6 +126,8 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
     }
   }
 
+  // Fetch the latest alerts for this plant (limited via API default) so users see
+  // quick downtime context without leaving the detail view.
   async function fetchAlerts() {
     try {
       setAlertsLoading(true)
@@ -470,7 +478,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {alertsLoading ? (
+      {alertsLoading ? (
                 <div className="flex items-center justify-center h-20 text-xs text-muted-foreground">
                   Loading alerts...
                 </div>

@@ -8,6 +8,12 @@ import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
 // Mark route as dynamic to prevent static generation (uses cookies)
 export const dynamic = 'force-dynamic'
 
+/**
+ * GET /api/vendors
+ * - Validates the custom session cookie
+ * - Enforces RBAC (read permission)
+ * - Returns both vendors and organizations so the UI can cross-link
+ */
 export async function GET(request: NextRequest) {
   const startTime = Date.now()
   
@@ -83,6 +89,12 @@ export async function GET(request: NextRequest) {
   })
 }
 
+/**
+ * POST /api/vendors
+ * - Authenticates + enforces "create" permission
+ * - Inserts a vendor (credentials JSON lives as-is)
+ * - Responds with the created vendor record
+ */
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
   

@@ -86,8 +86,13 @@ function mapSolarmanSeverity(level: number | null | undefined, influence: number
   return severity
 }
 
+// Cache of Intl.DateTimeFormat instances per timezone to avoid recreating objects in loops
 const TIMEZONE_FORMATTERS = new Map<string, Intl.DateTimeFormat>()
 
+/**
+ * Lazily create / reuse a formatter for the requested timezone so that downstream helpers
+ * can convert dates without repeatedly allocating expensive Intl objects.
+ */
 function getTimeZoneFormatter(timeZone: string) {
   if (!TIMEZONE_FORMATTERS.has(timeZone)) {
     TIMEZONE_FORMATTERS.set(
@@ -107,6 +112,10 @@ function getTimeZoneFormatter(timeZone: string) {
   return TIMEZONE_FORMATTERS.get(timeZone)!
 }
 
+/**
+ * Break a UTC date into local (year/month/day/hour/...) parts for a timezone. Returns null
+ * when the timezone cannot be resolved, letting callers fall back gracefully.
+ */
 function getDatePartsForTimeZone(date: Date, timeZone: string) {
   try {
     const formatter = getTimeZoneFormatter(timeZone)
@@ -134,6 +143,10 @@ function getDatePartsForTimeZone(date: Date, timeZone: string) {
   }
 }
 
+/**
+ * Compute the offset between UTC and the provided timezone for a specific instant.
+ * Used to translate the 9AM–4PM window from local time back into UTC boundaries.
+ */
 function getTimeZoneOffsetMs(date: Date, timeZone: string) {
   const parts = getDatePartsForTimeZone(date, timeZone)
   if (!parts) return 0
@@ -148,6 +161,10 @@ function getTimeZoneOffsetMs(date: Date, timeZone: string) {
   return asUTC - date.getTime()
 }
 
+/**
+ * Build a Date representing the provided local (year/month/day/hour/minute) in the requested
+ * timezone, but expressed in UTC so arithmetic can be done with standard JS Dates.
+ */
 function zonedDateTimeToUtc(
   year: number,
   month: number,

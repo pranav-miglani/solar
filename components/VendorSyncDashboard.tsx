@@ -41,6 +41,10 @@ interface Vendor {
   } | null
 }
 
+/**
+ * Read-only dashboard that surfaces plant/alert sync recency per vendor and lets
+ * admins trigger the global plant sync cron manually.
+ */
 export function VendorSyncDashboard() {
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
@@ -52,6 +56,7 @@ export function VendorSyncDashboard() {
     fetchVendorSyncStatus()
   }, [])
 
+  // Fetch latest sync timestamps+org metadata for display.
   async function fetchVendorSyncStatus() {
     try {
       const response = await fetch("/api/vendors/sync-status")
@@ -67,6 +72,7 @@ export function VendorSyncDashboard() {
     }
   }
 
+  // Call the plant sync cron endpoint manually; reloads table afterward.
   async function triggerManualSync() {
     setSyncing(true)
     try {
@@ -88,6 +94,7 @@ export function VendorSyncDashboard() {
     }
   }
 
+  // Translate last sync timestamp into a human-friendly badge so stale vendors pop visually.
   const getSyncStatusBadge = (vendor: Vendor) => {
     if (!vendor.is_active) {
       return (
@@ -134,6 +141,7 @@ export function VendorSyncDashboard() {
     }
   }
 
+  // Helper to display "minutes/hours ago" style text in both table+cards.
   const getLastSyncText = (lastSyncedAt: string | null) => {
     if (!lastSyncedAt) {
       return "Never"

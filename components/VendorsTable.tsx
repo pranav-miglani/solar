@@ -65,6 +65,11 @@ interface Vendor {
   }
 }
 
+/**
+ * Admin/vendor maintenance table: handles CRUD for vendors, manual sync triggers,
+ * and organization-level auto-sync settings. Because it orchestrates several API
+ * flows, inline helpers document why each call is made.
+ */
 export function VendorsTable() {
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [orgs, setOrgs] = useState<Organization[]>([])
@@ -102,6 +107,7 @@ export function VendorsTable() {
     fetchVendors()
   }, [])
 
+  // Load vendors + org metadata for display. Keeps local state in sync after every mutation.
   async function fetchVendors() {
     try {
       const response = await fetch("/api/vendors")
@@ -115,6 +121,7 @@ export function VendorsTable() {
     }
   }
   
+  // Populate the auto-sync dialog from whichever vendor currently holds org-level settings.
   function openSyncSettingsDialog(orgId: number, orgName: string) {
     // Find the org's current sync settings from vendors
     const vendor = vendors.find((v) => v.organizations?.id === orgId)
@@ -130,6 +137,7 @@ export function VendorsTable() {
     setSyncSettingsDialogOpen(true)
   }
   
+  // Persist updated auto-sync toggles/intervals back to the org via API.
   async function saveSyncSettings() {
     if (!selectedOrgForSync) return
     
@@ -157,6 +165,7 @@ export function VendorsTable() {
     }
   }
 
+  // Open the create/edit dialog, pre-filling credentials when editing.
   function openDialog(vendor?: Vendor) {
     if (vendor) {
       setEditingVendor(vendor)
@@ -190,6 +199,7 @@ export function VendorsTable() {
     setDialogOpen(true)
   }
 
+  // Create or update a vendor record using the form payload (credentials live in JSON).
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
@@ -239,6 +249,7 @@ export function VendorsTable() {
     }
   }
 
+  // Remove a vendor and refresh table once the backend confirms deletion.
   async function handleDelete(id: number) {
     const response = await fetch(`/api/vendors/${id}`, {
       method: "DELETE",
@@ -253,6 +264,7 @@ export function VendorsTable() {
     }
   }
 
+  // Full sync action used by "Plants" button: first plants, then alerts. Tracks progress for UI.
   async function handleSyncPlants(vendorId: number) {
     setSyncingVendorId(vendorId)
     setSyncProgress({ current: 0, total: 0 })
@@ -301,6 +313,7 @@ export function VendorsTable() {
     }
   }
 
+  // Alert-only sync (separate button) so admins can re-run the alert cron independently.
   async function handleSyncAlerts(vendorId: number) {
     setSyncingAlertsVendorId(vendorId)
     setAlertsSyncProgress({ current: 0, total: 0 })

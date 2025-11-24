@@ -178,6 +178,7 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
     ?.filter((wop) => wop.is_active)
     .map((wop) => wop.plants) || []
 
+  // Helper to guard .toFixed usage whenever vendor data is missing/NaN.
   const formatNumber = (value: number | null | undefined, fractionDigits = 2, unit?: string) => {
     if (value === null || value === undefined || Number.isNaN(value)) {
       return "N/A"
@@ -186,6 +187,8 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
   }
 
   // Calculate aggregated metrics
+  // Aggregate summary uses raw plant payloads (already in kW / kWh / MWh). Keep units aligned
+  // with DB schema: capacity/currentPower in kW, dailyEnergy in kWh, monthly/yearly in MWh.
   const aggregatedMetrics = {
     installedCapacityKw: activePlants.reduce((sum, p) => sum + (p.capacity_kw || 0), 0),
     currentPowerKw: activePlants.reduce((sum, p) => sum + (p.current_power_kw || 0), 0),
