@@ -28,6 +28,15 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   auth: { persistSession: false },
 })
 
+type AlertPlant =
+  | {
+      capacity_kw: number | null
+    }
+  | {
+      capacity_kw: number | null
+    }[]
+  | null
+
 type AlertRecord = {
   id: number
   alert_time: string | null
@@ -35,9 +44,7 @@ type AlertRecord = {
   grid_down_seconds: number | null
   grid_down_benefit_kwh: number | null
   metadata: Record<string, any> | null
-  plants: {
-    capacity_kw: number | null
-  } | null
+  plants: AlertPlant
 }
 
 const BATCH_SIZE = 200
@@ -50,6 +57,13 @@ function getTimezone(metadata: Record<string, any> | null): string {
     metadata.time_zone ||
     "Asia/Calcutta"
   )
+}
+
+function normalizeCapacityKw(input: AlertPlant): number | null {
+  if (!input) return null
+  const source = Array.isArray(input) ? input[0] : input
+  if (!source) return null
+  return parseCapacityKw(source.capacity_kw)
 }
 
 function parseCapacityKw(value: number | string | null | undefined): number | null {
@@ -98,7 +112,7 @@ async function backfillGridDowntime() {
 
       const start = alert.alert_time ? new Date(alert.alert_time) : null
       const end = alert.end_time ? new Date(alert.end_time) : null
-      const capacityKw = parseCapacityKw(alert.plants?.capacity_kw)
+      const capacityKw = normalizeCapacityKw(alert.plants)
       const timezone = getTimezone(alert.metadata)
 
       const updates: Record<string, any> = {}
