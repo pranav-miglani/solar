@@ -70,6 +70,7 @@ interface PlantAlert {
   alert_time: string | null
   end_time: string | null
   grid_down_seconds: number | null
+  grid_down_benefit_kwh: number | null
 }
 
 export function PlantDetailView({ plantId }: { plantId: string }) {
@@ -508,6 +509,11 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                         {typeof alert.grid_down_seconds === "number" && (
                           <span>
                             Grid down: {(alert.grid_down_seconds / 60).toFixed(1)} min
+                          </span>
+                        )}
+                        {typeof alert.grid_down_benefit_kwh === "number" && (
+                          <span>
+                            Grid downtime benefit: {alert.grid_down_benefit_kwh.toFixed(2)} kWh
                           </span>
                         )}
                       </div>

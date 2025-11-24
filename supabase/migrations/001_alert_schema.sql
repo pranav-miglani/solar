@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS alerts (
   alert_time TIMESTAMPTZ, -- When the alert started (vendor timestamp)
   end_time TIMESTAMPTZ, -- When the alert ended / was cleared (if provided by vendor)
   grid_down_seconds INTEGER, -- Computed grid downtime in seconds: max(0, end_time - alert_time)
+  grid_down_benefit_kwh NUMERIC(12,3), -- Derived grid downtime benefit energy (kWh) using 0.5 x hours(9am-4pm overlap) x installed capacity
   title TEXT NOT NULL,
   description TEXT,
   severity alert_severity NOT NULL DEFAULT 'MEDIUM',
@@ -66,7 +67,8 @@ ALTER TABLE alerts
   ADD COLUMN IF NOT EXISTS device_type TEXT,
   ADD COLUMN IF NOT EXISTS alert_time TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS end_time TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS grid_down_seconds INTEGER;
+  ADD COLUMN IF NOT EXISTS grid_down_seconds INTEGER,
+  ADD COLUMN IF NOT EXISTS grid_down_benefit_kwh NUMERIC(12,3);
 
 COMMENT ON COLUMN alerts.vendor_id IS 'Vendor that generated this alert (helps disambiguate vendor_alert_id across vendors).';
 COMMENT ON COLUMN alerts.vendor_plant_id IS 'Vendor-specific plant/station identifier (e.g., Solarman stationId as string).';
@@ -75,6 +77,7 @@ COMMENT ON COLUMN alerts.device_type IS 'Vendor-specific device type (e.g., INVE
 COMMENT ON COLUMN alerts.alert_time IS 'Timestamp when the alert started (converted from vendor-specific epoch/format).';
 COMMENT ON COLUMN alerts.end_time IS 'Timestamp when the alert ended / was cleared (if provided by vendor).';
 COMMENT ON COLUMN alerts.grid_down_seconds IS 'Computed grid downtime in seconds for this alert: max(0, end_time - alert_time) when both are present.';
+COMMENT ON COLUMN alerts.grid_down_benefit_kwh IS 'Calculated downtime benefit energy in kWh: 0.5 × (hours overlapping 9:00-16:00 local window) × installed capacity (kW).';
 
 -- ============================================
 -- ALERT INDEXES

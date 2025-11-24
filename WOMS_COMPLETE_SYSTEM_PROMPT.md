@@ -116,6 +116,7 @@ Build a production-ready **Work Order Management System (WOMS)** for managing so
 - `alert_time` (TIMESTAMPTZ) - when alert started
 - `end_time` (TIMESTAMPTZ, nullable) - when alert ended
 - `grid_down_seconds` (INTEGER) - calculated as max(0, end_time - alert_time)
+- `grid_down_benefit_kwh` (NUMERIC(12,3)) - downtime benefit energy computed as `0.5 × hours(overlap between 9AM-4PM local window) × installed capacity (kW)`
 - `metadata` (JSONB, default '{}') - vendor-specific data
 - `created_at`, `updated_at` (TIMESTAMPTZ)
 - **Unique constraint**: (vendor_id, vendor_alert_id, plant_id)
@@ -269,7 +270,8 @@ interface TelemetryData {
   - Filters by `deviceType === "INVERTER"`
   - Uses `alertsStartDate` from vendor credentials (default: 1 year lookback)
   - Maps vendor alerts to normalized format
-  - Calculates `grid_down_seconds` from alert_time and end_time
+- Calculates `grid_down_seconds` from alert_time and end_time
+- Derives `grid_down_benefit_kwh` using `0.5 × hours(9AM-4PM overlap) × installed capacity`
   - Upserts into `alerts` table
   - Updates `last_alert_synced_at` on vendor
 

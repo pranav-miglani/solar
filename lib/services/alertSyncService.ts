@@ -86,6 +86,136 @@ function mapSolarmanSeverity(level: number | null | undefined, influence: number
   return severity
 }
 
+const TIMEZONE_FORMATTERS = new Map<string, Intl.DateTimeFormat>()
+
+function getTimeZoneFormatter(timeZone: string) {
+  if (!TIMEZONE_FORMATTERS.has(timeZone)) {
+    TIMEZONE_FORMATTERS.set(
+      timeZone,
+      new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      })
+    )
+  }
+  return TIMEZONE_FORMATTERS.get(timeZone)!
+}
+
+function getDatePartsForTimeZone(date: Date, timeZone: string) {
+  try {
+    const formatter = getTimeZoneFormatter(timeZone)
+    const parts = formatter.formatToParts(date)
+    const values: Record<string, number> = {}
+    for (const part of parts) {
+      if (part.type !== "literal") {
+        values[part.type] = parseInt(part.value, 10)
+      }
+    }
+    if (!values.year || !values.month || !values.day) {
+      return null
+    }
+    return {
+      year: values.year,
+      month: values.month,
+      day: values.day,
+      hour: values.hour ?? 0,
+      minute: values.minute ?? 0,
+      second: values.second ?? 0,
+    }
+  } catch (error) {
+    logger.warn(`⚠️ Failed to resolve timezone parts for ${timeZone}`, error)
+    return null
+  }
+}
+
+function getTimeZoneOffsetMs(date: Date, timeZone: string) {
+  const parts = getDatePartsForTimeZone(date, timeZone)
+  if (!parts) return 0
+  const asUTC = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  )
+  return asUTC - date.getTime()
+}
+
+function zonedDateTimeToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  timeZone: string
+) {
+  const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute, 0, 0))
+  const offset = getTimeZoneOffsetMs(utcDate, timeZone)
+  return new Date(utcDate.getTime() - offset)
+}
+
+export function calculateGridDownHoursWithinWindow(
+  start: Date,
+  end: Date,
+  timeZone: string
+): number {
+  if (!start || !end || end <= start) return 0
+  const tz = timeZone || "Asia/Calcutta"
+  let totalMs = 0
+  let cursor = start
+
+  while (cursor < end) {
+    const parts = getDatePartsForTimeZone(cursor, tz)
+    if (!parts) {
+      break
+    }
+
+    const windowStart = zonedDateTimeToUtc(parts.year, parts.month, parts.day, 9, 0, tz)
+    const windowEnd = zonedDateTimeToUtc(parts.year, parts.month, parts.day, 16, 0, tz)
+    const overlapStart = Math.max(cursor.getTime(), windowStart.getTime())
+    const overlapEnd = Math.min(end.getTime(), windowEnd.getTime())
+
+    if (overlapEnd > overlapStart) {
+      totalMs += overlapEnd - overlapStart
+    }
+
+    const nextDayUtc = zonedDateTimeToUtc(parts.year, parts.month, parts.day + 1, 0, 0, tz)
+    if (nextDayUtc.getTime() <= cursor.getTime()) {
+      cursor = new Date(cursor.getTime() + 60 * 1000)
+    } else {
+      cursor = nextDayUtc
+    }
+  }
+
+  return totalMs / (1000 * 60 * 60)
+}
+
+export function calculateGridDownBenefitKwh(
+  start: Date | null,
+  end: Date | null,
+  capacityKw: number | null | undefined,
+  timeZone: string | undefined
+): number | null {
+  if (!start || !end || !capacityKw || capacityKw <= 0) {
+    return null
+  }
+
+  const hours = calculateGridDownHoursWithinWindow(start, end, timeZone || "Asia/Calcutta")
+  if (hours <= 0) {
+    return null
+  }
+
+  const benefit = 0.5 * hours * capacityKw
+  return Number(benefit.toFixed(3))
+}
+
 /**
  * Map Solarman alert status / endTime to our alert_status enum
  *
@@ -164,20 +294,24 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
     // Build plant mapping: Solarman stationId -> internal plant_id
     const { data: plants, error: plantsError } = await supabase
       .from("plants")
-      .select("id, vendor_plant_id")
+      .select("id, vendor_plant_id, capacity_kw")
       .eq("vendor_id", vendor.id)
 
     if (plantsError) {
       throw new Error(`Failed to fetch plants for vendor ${vendor.id}: ${plantsError.message}`)
     }
 
-    const stationToPlant = new Map<number, { plantId: number; vendorPlantId: string }>()
+    const stationToPlant = new Map<
+      number,
+      { plantId: number; vendorPlantId: string; capacityKw: number | null }
+    >()
     ;(plants || []).forEach((p: any) => {
       const stationId = Number(p.vendor_plant_id)
       if (!Number.isNaN(stationId)) {
         stationToPlant.set(stationId, {
           plantId: p.id,
           vendorPlantId: p.vendor_plant_id as string,
+          capacityKw: typeof p.capacity_kw === "number" ? p.capacity_kw : Number(p.capacity_kw) || null,
         })
       }
     })
@@ -297,6 +431,13 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
           gridDownSeconds = diff > 0 ? diff : 0
         }
 
+        const gridDownBenefitKwh = calculateGridDownBenefitKwh(
+          alertTimeDate,
+          endTimeDate,
+          mapping.capacityKw,
+          raw.timezone
+        )
+
         const severity = mapSolarmanSeverity(raw.level, raw.influence)
         const status = mapAlertStatus(raw.endTime)
 
@@ -333,6 +474,7 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
           alert_time: alertTimeDate ? alertTimeDate.toISOString() : null,
           end_time: endTimeDate ? endTimeDate.toISOString() : null,
           grid_down_seconds: gridDownSeconds,
+          grid_down_benefit_kwh: gridDownBenefitKwh,
           metadata: raw,
         }
 

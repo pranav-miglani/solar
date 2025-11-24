@@ -77,7 +77,7 @@ export default async function PlantAlertsPage({ params, searchParams }: PageProp
   // Fetch alerts for this plant in the selected month
   const { data: alerts } = await supabase
     .from("alerts")
-    .select("id, title, description, severity, status, alert_time, end_time, grid_down_seconds, vendor_plant_id")
+    .select("id, title, description, severity, status, alert_time, end_time, grid_down_seconds, grid_down_benefit_kwh, vendor_plant_id")
     .eq("plant_id", plant.id)
     .gte("alert_time", start.toISOString())
     .lt("alert_time", end.toISOString())
@@ -198,6 +198,11 @@ export default async function PlantAlertsPage({ params, searchParams }: PageProp
                       {typeof alert.grid_down_seconds === "number" && (
                         <span>
                           Grid downtime: {(alert.grid_down_seconds / 60).toFixed(1)} min
+                        </span>
+                      )}
+                      {typeof alert.grid_down_benefit_kwh === "number" && (
+                        <span>
+                          Grid downtime benefit: {alert.grid_down_benefit_kwh.toFixed(2)} kWh
                         </span>
                       )}
                     </div>
