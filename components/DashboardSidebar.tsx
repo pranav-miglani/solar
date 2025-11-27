@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -24,6 +24,36 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
   const pathname = usePathname()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const [userLogoUrl, setUserLogoUrl] = useState<string | null>(null)
+  const [superAdminLogoUrl, setSuperAdminLogoUrl] = useState<string | null>(null)
+  const [superAdminDisplayName, setSuperAdminDisplayName] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Fetch user info to get logo URL
+    fetch("/api/me")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.account) {
+          // Use account logo_url for all users (ORG, GOVT, SUPERADMIN)
+          // For ORG users, this represents the organization logo (since each org has one account)
+          setUserLogoUrl(data.account.logoUrl || null)
+          
+          // For SUPERADMIN, also set footer info from their own account
+          if (data.account.accountType === "SUPERADMIN") {
+            setSuperAdminLogoUrl(data.account.logoUrl || null)
+            setSuperAdminDisplayName(data.account.displayName || null)
+          }
+        }
+        // For non-SUPERADMIN users, get SUPERADMIN info for footer
+        if (data.superAdmin) {
+          setSuperAdminLogoUrl(data.superAdmin.logoUrl || null)
+          setSuperAdminDisplayName(data.superAdmin.displayName || null)
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to fetch user info:", error)
+      })
+  }, [])
 
   const handleLogout = () => {
     document.cookie = "session=; path=/; max-age=0"
@@ -99,10 +129,32 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
       >
         <div className="flex h-full flex-col">
           <div className="mb-8">
-            <h1 className="text-2xl font-bold">WOMS</h1>
-            <p className="text-sm text-muted-foreground">
-              Work Order Management System
-            </p>
+            {userLogoUrl ? (
+              <div className="flex flex-col items-center justify-center mb-2">
+                <img 
+                  src={userLogoUrl} 
+                  alt="Logo" 
+                  className="h-12 w-auto max-w-full object-contain mb-2"
+                  onError={(e) => {
+                    // Hide image on error and show fallback
+                    (e.target as HTMLImageElement).style.display = 'none'
+                  }}
+                />
+                <div style={{ display: 'none' }} className="text-center">
+                  <h1 className="text-2xl font-bold">WOMS</h1>
+                  <p className="text-sm text-muted-foreground">
+                    Work Order Management System
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold">WOMS</h1>
+                <p className="text-sm text-muted-foreground">
+                  Work Order Management System
+                </p>
+              </>
+            )}
           </div>
 
           <nav className="flex-1 space-y-2">
@@ -130,7 +182,27 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
             })}
           </nav>
 
-          <div className="mt-auto">
+          <div className="mt-auto space-y-4">
+            {/* Footer with SUPERADMIN logo and "Powered by" text */}
+            {(superAdminLogoUrl || superAdminDisplayName) && (
+              <div className="pt-4 border-t border-border">
+                <div className="flex flex-col items-center gap-2">
+                  {superAdminLogoUrl && (
+                    <img 
+                      src={superAdminLogoUrl} 
+                      alt="Powered by" 
+                      className="h-8 w-auto max-w-full object-contain opacity-70"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none'
+                      }}
+                    />
+                  )}
+                  <p className="text-xs text-muted-foreground text-center">
+                    Powered by {superAdminDisplayName || "Gigasolar"}
+                  </p>
+                </div>
+              </div>
+            )}
             <Button
               variant="ghost"
               className="w-full justify-start text-destructive hover:text-destructive"

@@ -8,6 +8,57 @@ import { getMainClient } from "@/lib/supabase/pooled"
 // Mark route as dynamic to prevent static generation (uses cookies)
 export const dynamic = 'force-dynamic'
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = request.cookies.get("session")?.value
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    let sessionData
+    try {
+      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+    } catch {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+    }
+
+    const supabase = getMainClient()
+
+    const { data: org, error } = await supabase
+      .from("organizations")
+      .select("*")
+      .eq("id", params.id)
+      .single()
+
+    if (error) {
+      console.error("Get organization error:", error)
+      return NextResponse.json(
+        { error: "Failed to fetch organization" },
+        { status: 500 }
+      )
+    }
+
+    if (!org) {
+      return NextResponse.json(
+        { error: "Organization not found" },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({ org })
+  } catch (error: any) {
+    console.error("Get organization error:", error)
+    return NextResponse.json(
+      { error: error.message || "Internal server error" },
+      { status: 500 }
+    )
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }

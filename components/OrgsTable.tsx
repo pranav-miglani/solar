@@ -47,6 +47,7 @@ interface Account {
   account_type: string
   org_id: number | null
   display_name: string | null
+  logo_url: string | null
 }
 
 interface OrgsTableProps {
@@ -78,7 +79,9 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
     display_name: "",
   })
   const [editingDisplayName, setEditingDisplayName] = useState<string>("")
+  const [editingLogoUrl, setEditingLogoUrl] = useState<string>("")
   const [savingDisplayName, setSavingDisplayName] = useState(false)
+  const [savingLogoUrl, setSavingLogoUrl] = useState(false)
   const [deletingGovtAccountId, setDeletingGovtAccountId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -93,17 +96,19 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
       if (updated) {
         setSelectedGovtAccount(updated)
         setEditingDisplayName(updated.display_name || "")
+        setEditingLogoUrl(updated.logo_url || "")
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts])
 
-  // Initialize editingDisplayName when account dialog opens for existing account
+  // Initialize editingDisplayName and logo URL when account dialog opens for existing account
   useEffect(() => {
     if (accountDialogOpen && selectedOrg) {
       const orgAcc = accounts.find((acc) => acc.org_id === selectedOrg.id)
       if (orgAcc) {
         setEditingDisplayName(orgAcc.display_name || "")
+        setEditingLogoUrl(orgAcc.logo_url || "")
       }
     }
   }, [accountDialogOpen, selectedOrg, accounts])
@@ -244,6 +249,34 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
       setSavingDisplayName(false)
     }
   }
+
+  // Update logo URL for an account
+  async function handleUpdateLogoUrl(accountId: string) {
+    setSavingLogoUrl(true)
+    try {
+      const response = await fetch(`/api/accounts/${accountId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          logo_url: editingLogoUrl || null,
+        }),
+      })
+
+      if (response.ok) {
+        fetchAccounts()
+        setEditingLogoUrl("")
+      } else {
+        const error = await response.json()
+        alert(error.error || "Failed to update logo URL")
+      }
+    } catch (error) {
+      console.error("Error updating logo URL:", error)
+      alert("Failed to update logo URL")
+    } finally {
+      setSavingLogoUrl(false)
+    }
+  }
+
 
   async function handleDeleteGovtAccount(accountId: string) {
     try {
@@ -555,6 +588,7 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                                     setAccountFormData({ email: "", password: "", display_name: "" })
                                     const orgAcc = accounts.find((acc) => acc.org_id === org.id)
                                     setEditingDisplayName(orgAcc?.display_name || "")
+                                    setEditingLogoUrl(orgAcc?.logo_url || "")
                                     setAccountDialogOpen(true)
                                   }}
                                   className="border-2 border-border bg-background hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 whitespace-nowrap font-medium shadow-sm hover:shadow-md px-3"
@@ -714,7 +748,9 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                             onClick={() => {
                               setSelectedOrg(org)
                               setAccountFormData({ email: "", password: "", display_name: "" })
-                              setEditingDisplayName("")
+                              const orgAcc = accounts.find((acc) => acc.org_id === org.id)
+                              setEditingDisplayName(orgAcc?.display_name || "")
+                              setEditingLogoUrl(orgAcc?.logo_url || "")
                               setAccountDialogOpen(true)
                             }}
                             className="w-full border-2 border-border hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
@@ -821,6 +857,7 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                                   onClick={() => {
                                     setSelectedGovtAccount(acc)
                                     setEditingDisplayName(acc.display_name || "")
+                                    setEditingLogoUrl(acc.logo_url || "")
                                     setGovtAccountDialogOpen(true)
                                   }}
                                   className="border-2 border-border hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
@@ -938,6 +975,47 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                           <p className="text-xs text-muted-foreground">
                             Current: {accounts.find((acc) => acc.org_id === selectedOrg?.id)?.display_name}
                           </p>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Organization Logo URL (SVG recommended)</Label>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="url"
+                            value={editingLogoUrl}
+                            onChange={(e) => setEditingLogoUrl(e.target.value)}
+                            placeholder="https://example.com/logo.svg"
+                            className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              const orgAcc = accounts.find((acc) => acc.org_id === selectedOrg?.id)
+                              if (orgAcc) {
+                                handleUpdateLogoUrl(orgAcc.id)
+                              }
+                            }}
+                            disabled={savingLogoUrl}
+                            size="sm"
+                            className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
+                          >
+                            {savingLogoUrl ? "Saving..." : "Save"}
+                          </Button>
+                        </div>
+                        {accounts.find((acc) => acc.org_id === selectedOrg?.id)?.logo_url && (
+                          <div className="mt-2">
+                            <p className="text-xs text-muted-foreground mb-1">Current Logo:</p>
+                            <img 
+                              src={accounts.find((acc) => acc.org_id === selectedOrg?.id)?.logo_url || ""} 
+                              alt="Organization logo" 
+                              className="h-12 w-auto max-w-full object-contain"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none'
+                              }}
+                            />
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1085,6 +1163,42 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                       )}
                     </div>
                   </div>
+                  <div>
+                    <Label className="text-sm font-semibold text-muted-foreground">Logo URL (SVG recommended)</Label>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="url"
+                          value={editingLogoUrl}
+                          onChange={(e) => setEditingLogoUrl(e.target.value)}
+                          placeholder="https://example.com/logo.svg"
+                          className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => handleUpdateLogoUrl(selectedGovtAccount.id)}
+                          disabled={savingLogoUrl}
+                          size="sm"
+                          className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
+                        >
+                          {savingLogoUrl ? "Saving..." : "Save"}
+                        </Button>
+                      </div>
+                      {selectedGovtAccount.logo_url && (
+                        <div className="mt-2">
+                          <p className="text-xs text-muted-foreground mb-1">Current Logo:</p>
+                          <img 
+                            src={selectedGovtAccount.logo_url} 
+                            alt="GOVT user logo" 
+                            className="h-12 w-auto max-w-full object-contain"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </Card>
               <div className="flex justify-end gap-2 pt-4 border-t">
@@ -1095,6 +1209,7 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                     setGovtAccountDialogOpen(false)
                     setSelectedGovtAccount(null)
                     setEditingDisplayName("")
+                    setEditingLogoUrl("")
                   }}
                   className="transition-all duration-200"
                 >

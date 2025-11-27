@@ -52,15 +52,23 @@ export async function PATCH(
       }
 
       const body = await request.json()
-      const { display_name } = body
+      const { display_name, logo_url } = body
 
       const supabase = getMainClient()
 
+      const updateData: any = {}
+      if (display_name !== undefined) {
+        updateData.display_name = display_name || null
+      }
+      if (logo_url !== undefined) {
+        updateData.logo_url = logo_url || null
+      }
+
       const { data, error } = await supabase
         .from("accounts")
-        .update({ display_name: display_name || null })
+        .update(updateData)
         .eq("id", accountId)
-        .select("id, email, account_type, org_id, created_at, display_name")
+        .select("id, email, account_type, org_id, created_at, display_name, logo_url")
         .single()
 
       if (error) {
