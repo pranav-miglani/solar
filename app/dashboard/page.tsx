@@ -47,6 +47,9 @@ export default function DashboardPage() {
   const [accountType, setAccountType] = useState<string>("")
   const [orgId, setOrgId] = useState<number | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
+  const [userLogoUrl, setUserLogoUrl] = useState<string | null>(null)
+  const [superAdminLogoUrl, setSuperAdminLogoUrl] = useState<string | null>(null)
+  const [superAdminDisplayName, setSuperAdminDisplayName] = useState<string | null>(null)
   const hasLoadedRef = useRef(false)
 
   const loadDashboard = async (accountType: string, orgId: number | null) => {
@@ -130,6 +133,22 @@ export default function DashboardPage() {
           setAccountType(data.account.accountType)
           setOrgId(data.account.orgId)
           setDisplayName(data.account.displayName)
+          
+          // Set logo URLs from the same API call
+          setUserLogoUrl(data.account.logoUrl || null)
+          
+          // For SUPERADMIN, also set footer info from their own account
+          if (data.account.accountType === "SUPERADMIN") {
+            setSuperAdminLogoUrl(data.account.logoUrl || null)
+            setSuperAdminDisplayName(data.account.displayName || null)
+          }
+          
+          // For non-SUPERADMIN users, get SUPERADMIN info for footer
+          if (data.superAdmin) {
+            setSuperAdminLogoUrl(data.superAdmin.logoUrl || null)
+            setSuperAdminDisplayName(data.superAdmin.displayName || null)
+          }
+          
           loadDashboard(data.account.accountType, data.account.orgId)
         }
       })
@@ -165,7 +184,12 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <DashboardSidebar accountType={accountType} />
+      <DashboardSidebar 
+        accountType={accountType}
+        userLogoUrl={userLogoUrl}
+        superAdminLogoUrl={superAdminLogoUrl}
+        superAdminDisplayName={superAdminDisplayName}
+      />
 
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         {/* Top Bar */}
