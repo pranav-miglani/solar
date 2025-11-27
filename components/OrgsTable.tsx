@@ -54,6 +54,7 @@ interface OrgsTableProps {
 
 export function OrgsTable({ accountType }: OrgsTableProps) {
   const isSuperAdmin = accountType === "SUPERADMIN"
+  const isGovt = accountType === "GOVT"
   const [orgs, setOrgs] = useState<Org[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
@@ -374,9 +375,18 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
             <Table>
             <TableHeader>
               <TableRow className="bg-gradient-to-r from-muted/50 to-muted/30 border-b-2">
-                <TableHead className="font-bold text-base w-[25%]">Organization Name</TableHead>
-                <TableHead className="font-bold text-base w-[30%]">Account</TableHead>
-                <TableHead className="font-bold text-base text-right w-[45%]">Actions</TableHead>
+                <TableHead className="font-bold text-base w-[25%]">
+                  Organization Name
+                </TableHead>
+                {/* Account column is only relevant for SUPERADMIN/ORG views */}
+                {!isGovt && (
+                  <TableHead className="font-bold text-base w-[30%]">
+                    Account
+                  </TableHead>
+                )}
+                <TableHead className="font-bold text-base text-right w-[45%]">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -410,24 +420,29 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                           <span className="truncate">{org.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="py-4 align-middle">
-                        {orgAccount ? (
-                          <div className="space-y-1 min-w-0">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              <span className="font-medium truncate">{orgAccount.email}</span>
+                      {/* For GOVT users, hide account details entirely */}
+                      {!isGovt && (
+                        <TableCell className="py-4 align-middle">
+                          {orgAccount ? (
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <span className="font-medium truncate">
+                                  {orgAccount.email}
+                                </span>
+                              </div>
+                              <Badge variant="secondary" className="text-xs w-fit">
+                                {orgAccount.account_type}
+                              </Badge>
                             </div>
-                            <Badge variant="secondary" className="text-xs w-fit">
-                              {orgAccount.account_type}
-                            </Badge>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm flex items-center gap-2">
-                            <User className="h-4 w-4 flex-shrink-0" />
-                            <span>No account</span>
-                          </span>
-                        )}
-                      </TableCell>
+                          ) : (
+                            <span className="text-muted-foreground text-sm flex items-center gap-2">
+                              <User className="h-4 w-4 flex-shrink-0" />
+                              <span>No account</span>
+                            </span>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="py-4 align-middle">
                         <div className="flex items-center justify-end gap-2 flex-nowrap">
                           <Link href={`/orgs/${org.id}/plants`}>
@@ -554,24 +569,29 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-bold text-lg truncate">{org.name}</h3>
-                          {orgAccount ? (
-                            <div className="flex items-center gap-2 mt-1">
-                              <Mail className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                              <span className="text-sm text-muted-foreground truncate">
-                                {orgAccount.email}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 mt-1">
-                              <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                              <span className="text-sm text-muted-foreground">
-                                No account
-                              </span>
-                            </div>
+                          {/* For GOVT users, we hide account information */}
+                          {!isGovt && (
+                            <>
+                              {orgAccount ? (
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Mail className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                  <span className="text-sm text-muted-foreground truncate">
+                                    {orgAccount.email}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 mt-1">
+                                  <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                  <span className="text-sm text-muted-foreground">
+                                    No account
+                                  </span>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
-                      {orgAccount && (
+                      {!isGovt && orgAccount && (
                         <Badge variant="secondary" className="text-xs flex-shrink-0">
                           {orgAccount.account_type}
                         </Badge>
