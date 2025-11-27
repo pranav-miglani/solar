@@ -24,9 +24,11 @@ interface DashboardMetricsProps {
     totalWorkOrders?: number
     totalGeneration24h?: number
   }
+  // Optional account type so we can tweak which cards appear per role (e.g. hide alerts for GOVT)
+  accountType?: string
 }
 
-export function DashboardMetrics({ metrics }: DashboardMetricsProps) {
+export function DashboardMetrics({ metrics, accountType }: DashboardMetricsProps) {
   const totalPlants = metrics.totalPlants ?? 0
   const unmappedPlants = metrics.unmappedPlants ?? 0
   const mappedPlants = metrics.mappedPlants ?? 0
@@ -76,9 +78,15 @@ export function DashboardMetrics({ metrics }: DashboardMetricsProps) {
     },
   ]
 
+  // GOVT users should not see the Active Alerts card on the dashboard.
+  const visibleMetricItems =
+    accountType === "GOVT"
+      ? metricItems.filter((m) => m.label !== "Active Alerts")
+      : metricItems
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {metricItems.map((metric, index) => {
+      {visibleMetricItems.map((metric, index) => {
         const Icon = metric.icon
         return (
           <motion.div

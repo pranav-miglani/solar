@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       // Get account to verify it still exists
       const { data: account, error } = await supabase
         .from("accounts")
-        .select("*")
+        .select("id, email, account_type, org_id, display_name")
         .eq("id", sessionData.accountId)
         .single()
 
@@ -87,6 +87,7 @@ export async function GET(request: NextRequest) {
           email: account.email,
           accountType: account.account_type,
           orgId: account.org_id,
+          displayName: account.display_name,
         },
       })
     } catch (error) {

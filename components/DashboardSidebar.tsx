@@ -9,7 +9,6 @@ import {
   Factory,
   FileText,
   AlertTriangle,
-  BarChart3,
   LogOut,
   Menu,
   X,
@@ -68,12 +67,6 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
       icon: AlertTriangle,
       roles: ["SUPERADMIN", "ORG", "GOVT"],
     },
-    {
-      title: "Analytics (Coming Soon)",
-      href: "/analytics",
-      icon: BarChart3,
-      roles: ["SUPERADMIN", "ORG", "GOVT"],
-    },
   ].filter((item) => item.roles.includes(accountType))
 
   return (
@@ -116,7 +109,6 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
             {navItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
-              const isAnalyticsComingSoon = item.href === "/analytics"
               return (
                 <Link
                   key={item.href}
@@ -127,25 +119,11 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
                     variant={isActive ? "secondary" : "ghost"}
                     className={cn(
                       "w-full justify-start",
-                      isActive && "bg-secondary/50",
-                      isAnalyticsComingSoon &&
-                        "border border-purple-400/50 bg-gradient-to-r from-purple-500/10 via-fuchsia-500/5 to-indigo-500/10 hover:from-purple-500/20 hover:via-fuchsia-500/10 hover:to-indigo-500/20 shadow-sm hover:shadow-lg transition-all duration-200"
+                      isActive && "bg-secondary/50"
                     )}
                   >
-                    <Icon
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        isAnalyticsComingSoon && "text-purple-400"
-                      )}
-                    />
-                    <span className="flex items-center gap-2">
-                      {item.title}
-                      {isAnalyticsComingSoon && (
-                        <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-100 border border-purple-400/60 shadow-sm">
-                          Gen UI
-                        </span>
-                      )}
-                    </span>
+                    <Icon className="mr-2 h-4 w-4" />
+                    {item.title}
                   </Button>
                 </Link>
               )

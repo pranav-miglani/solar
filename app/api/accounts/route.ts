@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
       const { data: accounts, error } = await supabase
         .from("accounts")
-        .select("id, email, account_type, org_id, created_at")
+        .select("id, email, account_type, org_id, created_at, display_name")
         .order("email")
 
       if (error) {
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       }
 
       const body = await request.json()
-      const { email, password, account_type, org_id } = body
+      const { email, password, account_type, org_id, display_name } = body
 
       if (!email || !password || !account_type) {
         logApiResponse(request, 400, Date.now() - startTime)
@@ -183,8 +183,9 @@ export async function POST(request: NextRequest) {
           password_hash: passwordHash,
           account_type,
           org_id: account_type === "ORG" ? org_id : null,
+          display_name: display_name || null,
         })
-        .select("id, email, account_type, org_id, created_at")
+        .select("id, email, account_type, org_id, created_at, display_name")
         .single()
 
       if (error) {

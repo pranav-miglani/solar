@@ -167,7 +167,7 @@ export default function DashboardPage() {
 
         {/* Metrics */}
         <div className="mb-8">
-          <DashboardMetrics metrics={metrics} />
+          <DashboardMetrics metrics={metrics} accountType={accountType} />
         </div>
 
         {/* Action Cards for SUPERADMIN */}
