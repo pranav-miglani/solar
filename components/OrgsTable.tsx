@@ -23,7 +23,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
-import { ExternalLink, Building2, Plus, User, Mail, Trash2 } from "lucide-react"
+import { ExternalLink, Building2, Plus, User, Mail, Trash2, FileText } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -531,6 +531,19 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                               </Button>
                             </motion.div>
                           </Link>
+                          <Link href={`/orgs/${org.id}/workorders`}>
+                            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white shadow-md hover:shadow-lg transition-all duration-200 whitespace-nowrap font-medium px-3"
+                              >
+                                <FileText className="h-4 w-4 mr-1.5" />
+                                <span className="hidden lg:inline">Work Orders</span>
+                                <span className="lg:hidden">WO</span>
+                              </Button>
+                            </motion.div>
+                          </Link>
                           {isSuperAdmin && (
                             <>
                               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -681,6 +694,16 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                         >
                           <ExternalLink className="h-4 w-4 mr-2" />
                           View Plants
+                        </Button>
+                      </Link>
+                      <Link href={`/orgs/${org.id}/workorders`}>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white shadow-md hover:shadow-lg transition-all duration-200 font-medium"
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          View Work Orders
                         </Button>
                       </Link>
                       {isSuperAdmin && (

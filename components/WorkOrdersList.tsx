@@ -40,9 +40,11 @@ interface WorkOrder {
 
 interface WorkOrdersListProps {
   accountType: string
+  orgId?: number | null
+  organizationName?: string
 }
 
-export function WorkOrdersList({ accountType }: WorkOrdersListProps) {
+export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrdersListProps) {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -53,10 +55,12 @@ export function WorkOrdersList({ accountType }: WorkOrdersListProps) {
 
   useEffect(() => {
     fetchWorkOrders()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId])
 
   async function fetchWorkOrders() {
-    const response = await fetch(`/api/workorders`)
+    const url = orgId ? `/api/workorders?orgId=${orgId}` : `/api/workorders`
+    const response = await fetch(url)
     const data = await response.json()
     setWorkOrders(data.workOrders || [])
     setLoading(false)
@@ -105,7 +109,7 @@ export function WorkOrdersList({ accountType }: WorkOrdersListProps) {
   }
 
   const editingWorkOrder = workOrders.find((wo) => wo.id === editingWorkOrderId)
-  const organizationName = editingWorkOrder?.work_order_plants?.[0]?.plants?.organizations?.name
+  const editingWorkOrderOrgName = editingWorkOrder?.work_order_plants?.[0]?.plants?.organizations?.name
 
   if (loading) {
     return (
@@ -328,7 +332,7 @@ export function WorkOrdersList({ accountType }: WorkOrdersListProps) {
           open={modalOpen}
           onOpenChange={handleModalClose}
           workOrderId={editingWorkOrderId}
-          organizationName={organizationName}
+          organizationName={organizationName || editingWorkOrderOrgName}
         />
       )}
     </div>

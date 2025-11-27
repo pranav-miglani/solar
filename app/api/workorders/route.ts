@@ -25,6 +25,11 @@ export async function GET(request: NextRequest) {
     const accountType = sessionData.accountType
     const orgId = sessionData.orgId
 
+    // Get orgId from query parameter if provided (for filtering by organization)
+    const { searchParams } = new URL(request.url)
+    const filterOrgId = searchParams.get("orgId")
+    const targetOrgId = filterOrgId ? parseInt(filterOrgId, 10) : null
+
     // Use service role client to bypass RLS
     const supabase = getMainClient()
 
@@ -37,6 +42,7 @@ export async function GET(request: NextRequest) {
         location,
         created_at,
         updated_at,
+        org_id,
         work_order_plants(
           *,
           plants:plant_id (
@@ -50,8 +56,10 @@ export async function GET(request: NextRequest) {
       `)
       .order("created_at", { ascending: false })
 
-    // Filter based on role
-    if (accountType === "ORG" && orgId) {
+    // Filter by organization if orgId query parameter is provided
+    if (targetOrgId) {
+      query = query.eq("org_id", targetOrgId)
+    } else if (accountType === "ORG" && orgId) {
       // Get plant IDs for this org
       const { data: orgPlants } = await supabase
         .from("plants")
