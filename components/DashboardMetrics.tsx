@@ -32,6 +32,11 @@ export function DashboardMetrics({ metrics }: DashboardMetricsProps) {
   const mappedPlants = metrics.mappedPlants ?? 0
   const mappedPercentage = totalPlants > 0 ? (mappedPlants / totalPlants) * 100 : 0
 
+  // NOTE on alert counting semantics:
+  // - The "Active Alerts" card now shows ONLY active alerts for every role.
+  // - The dashboard API is responsible for populating `metrics.activeAlerts`
+  //   as the count of alerts where status = 'ACTIVE' (no total alerts metric
+  //   is exposed on the dashboard anymore).
   const metricItems: Metric[] = [
     {
       label: "Total Plants",
@@ -45,7 +50,7 @@ export function DashboardMetrics({ metrics }: DashboardMetricsProps) {
     },
     {
       label: "Active Alerts",
-      value: metrics.activeAlerts ?? metrics.totalAlerts ?? 0,
+      value: metrics.activeAlerts ?? 0,
       icon: AlertTriangle,
       gradient: "from-amber-500 via-orange-500 to-red-500",
       bgGradient: "from-amber-50/80 to-red-50/80 dark:from-amber-950/50 dark:to-red-950/50",

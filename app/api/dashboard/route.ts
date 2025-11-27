@@ -67,19 +67,20 @@ export async function GET(request: NextRequest) {
     }
 
     if (accountType === "SUPERADMIN") {
-      // Get all metrics
-      const [plantsResult, alertsResult, workOrdersResult] = await Promise.all([
+      // For SUPERADMIN, compute counts for:
+      // - Plants
+      // - Active alerts only (status = 'ACTIVE')
+      // - Work orders
+      const [plantsResult, activeAlertsResult, workOrdersResult] = await Promise.all([
         supabase.from("plants").select("id", { count: "exact", head: true }),
-        supabase.from("alerts").select("id", { count: "exact", head: true }),
+        supabase
+          .from("alerts")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "ACTIVE"),
         supabase
           .from("work_orders")
           .select("id", { count: "exact", head: true }),
       ])
-
-      const activeAlertsResult = await supabase
-        .from("alerts")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "ACTIVE")
 
       // Get mapped plants (plants in active work orders)
       const { data: mappedPlantsData } = await supabase
@@ -97,7 +98,6 @@ export async function GET(request: NextRequest) {
         totalPlants,
         unmappedPlants,
         mappedPlants,
-        totalAlerts: alertsResult.count || 0,
         activeAlerts: activeAlertsResult.count || 0,
         totalWorkOrders: workOrdersResult.count || 0,
       }
@@ -112,10 +112,15 @@ export async function GET(request: NextRequest) {
         showWorkOrdersSummary: true,
       }
     } else if (accountType === "GOVT") {
-      // Get global metrics
-      const [plantsResult, alertsResult, workOrdersResult] = await Promise.all([
+      // GOVT sees global metrics based ONLY on active alerts:
+      // - `activeAlerts` is the count of alerts where status = 'ACTIVE'
+      // - No total alerts metric is exposed on the dashboard.
+      const [plantsResult, activeAlertsResult, workOrdersResult] = await Promise.all([
         supabase.from("plants").select("id", { count: "exact", head: true }),
-        supabase.from("alerts").select("id", { count: "exact", head: true }),
+        supabase
+          .from("alerts")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "ACTIVE"),
         supabase
           .from("work_orders")
           .select("id", { count: "exact", head: true }),
@@ -137,7 +142,7 @@ export async function GET(request: NextRequest) {
         totalPlants,
         unmappedPlants,
         mappedPlants,
-        totalAlerts: alertsResult.count || 0,
+        activeAlerts: activeAlertsResult.count || 0,
         totalWorkOrders: workOrdersResult.count || 0,
       }
 
@@ -149,7 +154,7 @@ export async function GET(request: NextRequest) {
         showExportCSV: true,
       }
     } else if (accountType === "ORG" && orgId) {
-      // Get org-specific metrics
+      // ORG users see org-specific metrics based ONLY on active alerts
       const plantsResult = await supabase
         .from("plants")
         .select("id", { count: "exact", head: true })
@@ -176,10 +181,11 @@ export async function GET(request: NextRequest) {
       const totalPlants = plantsResult.count || 0
       const unmappedPlants = totalPlants - mappedPlants
 
-      // Get alerts for org plants
-      const alertsResult = await supabase
+      // Get ACTIVE alerts for org plants only
+      const activeAlertsResult = await supabase
         .from("alerts")
         .select("id", { count: "exact", head: true })
+        .eq("status", "ACTIVE")
         .in("plant_id", plantIds)
 
       // Get work orders for org plants
@@ -201,7 +207,7 @@ export async function GET(request: NextRequest) {
         totalPlants,
         unmappedPlants,
         mappedPlants,
-        totalAlerts: alertsResult.count || 0,
+        activeAlerts: activeAlertsResult.count || 0,
         totalWorkOrders: workOrdersResult.count || 0,
       }
 
