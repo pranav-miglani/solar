@@ -16,12 +16,15 @@ interface ProductionOverviewProps {
   metrics: ProductionMetrics
   lastUpdated?: string
   title?: string
+  // When true, hide the performance ratio (PR) gauge entirely.
+  hidePerformanceRatio?: boolean
 }
 
 export function ProductionOverview({
   metrics,
   lastUpdated,
   title = "Production Overview",
+  hidePerformanceRatio = false,
 }: ProductionOverviewProps) {
   const averagePerformanceRatio = Math.max(
     0,
@@ -67,42 +70,44 @@ export function ProductionOverview({
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* PR Indicator */}
-        <div className="flex justify-center">
-          <div className="relative w-32 h-32">
-            <svg className="transform -rotate-90 w-32 h-32">
-              <circle
-                cx="64"
-                cy="64"
-                r="56"
-                stroke="currentColor"
-                strokeWidth="8"
-                fill="none"
-                className="text-gray-200"
-              />
-              <circle
-                cx="64"
-                cy="64"
-                r="56"
-                stroke="currentColor"
-                strokeWidth="8"
-                fill="none"
-                strokeDasharray={`${2 * Math.PI * 56}`}
-                strokeDashoffset={`${2 * Math.PI * 56 * (1 - averagePerformanceRatio)}`}
-                className="text-blue-600"
-                strokeLinecap="round"
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {prPercentage}%
+        {/* PR Indicator (optional) */}
+        {!hidePerformanceRatio && (
+          <div className="flex justify-center">
+            <div className="relative w-32 h-32">
+              <svg className="transform -rotate-90 w-32 h-32">
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="56"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="none"
+                  className="text-gray-200"
+                />
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="56"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="none"
+                  strokeDasharray={`${2 * Math.PI * 56}`}
+                  strokeDashoffset={`${2 * Math.PI * 56 * (1 - averagePerformanceRatio)}`}
+                  className="text-blue-600"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {prPercentage}%
+                  </div>
+                  <div className="text-xs text-muted-foreground">PR</div>
                 </div>
-                <div className="text-xs text-muted-foreground">PR</div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Key Metrics Grid */}
         <div className="grid grid-cols-2 gap-4">

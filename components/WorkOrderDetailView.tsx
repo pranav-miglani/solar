@@ -77,7 +77,12 @@ interface WorkOrder {
   }>
 }
 
-export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
+interface WorkOrderDetailViewProps {
+  workOrderId: string
+  accountType: string
+}
+
+export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetailViewProps) {
   const router = useRouter()
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null)
   const [loading, setLoading] = useState(true)
@@ -85,6 +90,9 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
   const [productionData, setProductionData] = useState<any>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  const isSuperAdmin = accountType === "SUPERADMIN"
+  const isGovt = accountType === "GOVT"
 
   useEffect(() => {
     fetchWorkOrder()
@@ -123,7 +131,7 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
   }
 
   async function handleDelete() {
-    if (!workOrder) return
+    if (!isSuperAdmin || !workOrder) return
 
     setDeleting(true)
     try {
@@ -225,43 +233,45 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
             Created {new Date(workOrder.created_at).toLocaleDateString()}
           </p>
         </div>
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogTrigger asChild>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Work Order
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete &quot;{workOrder.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDelete}
-                disabled={deleting}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+        {isSuperAdmin && (
+          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg"
               >
-                {deleting ? (
-                  <span className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Deleting...
-                  </span>
-                ) : (
-                  "Delete"
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Work Order
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete &quot;{workOrder.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {deleting ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Deleting...
+                    </span>
+                  ) : (
+                    "Delete"
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
 
       {/* Organization & Summary Cards */}
@@ -329,6 +339,7 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
           metrics={productionData.aggregated}
           lastUpdated={lastUpdateTime ?? undefined}
           title="Work Order Production Overview"
+          hidePerformanceRatio={isGovt}
         />
       )}
 
@@ -411,7 +422,7 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                           {plant.monthly_energy_mwh !== null && (
                             <div>Monthly: {formatNumber(plant.monthly_energy_mwh, 2, "MWh")}</div>
                           )}
-                          {plant.performance_ratio !== null && (
+                          {!isGovt && plant.performance_ratio !== null && (
                             <div>PR: {formatNumber(plant.performance_ratio * 100, 2, "%")}</div>
                           )}
                         </div>
@@ -476,7 +487,7 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                       {plant.monthly_energy_mwh !== null && (
                         <div>Monthly: {formatNumber(plant.monthly_energy_mwh, 2, "MWh")}</div>
                       )}
-                      {plant.performance_ratio !== null && (
+                      {!isGovt && plant.performance_ratio !== null && (
                         <div>PR: {formatNumber(plant.performance_ratio * 100, 2, "%")}</div>
                       )}
                     </div>
