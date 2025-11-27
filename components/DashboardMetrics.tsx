@@ -42,9 +42,11 @@ export function DashboardMetrics({ metrics, accountType }: DashboardMetricsProps
   const metricItems: Metric[] = [
     {
       label: "Total Plants",
-      value: totalPlants > 0 
-        ? `${totalPlants} (${unmappedPlants})`
-        : 0,
+      value: accountType === "GOVT"
+        ? mappedPlants // For GOVT users, show only mapped plants count (no unmapped)
+        : totalPlants > 0 
+          ? `${totalPlants} (${unmappedPlants})`
+          : 0,
       icon: Zap,
       gradient: "from-blue-500 via-blue-600 to-indigo-600",
       bgGradient: "from-blue-50/80 to-indigo-50/80 dark:from-blue-950/50 dark:to-indigo-950/50",
@@ -111,7 +113,7 @@ export function DashboardMetrics({ metrics, accountType }: DashboardMetricsProps
                     </p>
                   </div>
                   <div className={`relative h-12 w-12 rounded-xl bg-gradient-to-br ${metric.gradient || 'from-primary to-primary/60'} p-2.5 shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110`}>
-                    {metric.label === "Total Plants" && totalPlants > 0 ? (
+                    {metric.label === "Total Plants" && totalPlants > 0 && accountType !== "GOVT" ? (
                       <>
                         {/* Background icon (unmapped portion - always visible) */}
                         <Zap className="absolute inset-0 h-full w-full text-white opacity-30 p-2.5" />
