@@ -46,6 +46,7 @@ interface Account {
   email: string
   account_type: string
   org_id: number | null
+  display_name: string | null
 }
 
 interface OrgsTableProps {
@@ -61,23 +62,51 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [accountDialogOpen, setAccountDialogOpen] = useState(false)
   const [govtDialogOpen, setGovtDialogOpen] = useState(false)
+  const [govtAccountDialogOpen, setGovtAccountDialogOpen] = useState(false)
   const [selectedOrg, setSelectedOrg] = useState<Org | null>(null)
+  const [selectedGovtAccount, setSelectedGovtAccount] = useState<Account | null>(null)
   const [deletingOrgId, setDeletingOrgId] = useState<number | null>(null)
   const [formData, setFormData] = useState({ name: "" })
   const [accountFormData, setAccountFormData] = useState({
     email: "",
     password: "",
+    display_name: "",
   })
   const [govtFormData, setGovtFormData] = useState({
     email: "",
     password: "",
+    display_name: "",
   })
+  const [editingDisplayName, setEditingDisplayName] = useState<string>("")
+  const [savingDisplayName, setSavingDisplayName] = useState(false)
   const [deletingGovtAccountId, setDeletingGovtAccountId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchOrgs()
     fetchAccounts()
   }, [])
+
+  // Update selectedGovtAccount when accounts are refreshed
+  useEffect(() => {
+    if (selectedGovtAccount) {
+      const updated = accounts.find((acc) => acc.id === selectedGovtAccount.id)
+      if (updated) {
+        setSelectedGovtAccount(updated)
+        setEditingDisplayName(updated.display_name || "")
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts])
+
+  // Initialize editingDisplayName when account dialog opens for existing account
+  useEffect(() => {
+    if (accountDialogOpen && selectedOrg) {
+      const orgAcc = accounts.find((acc) => acc.org_id === selectedOrg.id)
+      if (orgAcc) {
+        setEditingDisplayName(orgAcc.display_name || "")
+      }
+    }
+  }, [accountDialogOpen, selectedOrg, accounts])
 
   async function fetchOrgs() {
     const response = await fetch("/api/orgs")
@@ -148,12 +177,13 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
         password: accountFormData.password,
         account_type: "ORG",
         org_id: selectedOrg.id,
+        display_name: accountFormData.display_name || null,
       }),
     })
 
     if (response.ok) {
       setAccountDialogOpen(false)
-      setAccountFormData({ email: "", password: "" })
+      setAccountFormData({ email: "", password: "", display_name: "" })
       fetchAccounts()
       fetchOrgs()
     } else {
@@ -174,16 +204,44 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
         password: govtFormData.password,
         account_type: "GOVT",
         org_id: null,
+        display_name: govtFormData.display_name || null,
       }),
     })
 
     if (response.ok) {
       setGovtDialogOpen(false)
-      setGovtFormData({ email: "", password: "" })
+      setGovtFormData({ email: "", password: "", display_name: "" })
       fetchAccounts()
     } else {
       const error = await response.json()
       alert(error.error || "Failed to create GOVT user")
+    }
+  }
+
+  // Update display name for an account
+  async function handleUpdateDisplayName(accountId: string) {
+    setSavingDisplayName(true)
+    try {
+      const response = await fetch(`/api/accounts/${accountId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          display_name: editingDisplayName || null,
+        }),
+      })
+
+      if (response.ok) {
+        fetchAccounts()
+        setEditingDisplayName("")
+      } else {
+        const error = await response.json()
+        alert(error.error || "Failed to update display name")
+      }
+    } catch (error) {
+      console.error("Error updating display name:", error)
+      alert("Failed to update display name")
+    } finally {
+      setSavingDisplayName(false)
     }
   }
 
@@ -232,7 +290,7 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                 className="w-full sm:w-auto"
               >
                 <Button
-                  onClick={() => setGovtFormData({ email: "", password: "" })}
+                  onClick={() => setGovtFormData({ email: "", password: "", display_name: "" })}
                   variant="outline"
                   size="lg"
                   className="border-2 border-border bg-background hover:bg-primary/10 hover:border-primary/40 text-foreground shadow-sm hover:shadow-md transition-all duration-200 font-semibold w-full sm:w-auto"
@@ -278,6 +336,21 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                     }
                     required
                     placeholder="Enter password"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="govt-display-name" className="text-sm font-semibold">
+                    Display Name (Optional)
+                  </Label>
+                  <Input
+                    id="govt-display-name"
+                    type="text"
+                    value={govtFormData.display_name}
+                    onChange={(e) =>
+                      setGovtFormData((prev) => ({ ...prev, display_name: e.target.value }))
+                    }
+                    placeholder="Enter display name"
                     className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
@@ -466,7 +539,9 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                                   size="sm"
                                   onClick={() => {
                                     setSelectedOrg(org)
-                                    setAccountFormData({ email: "", password: "" })
+                                    setAccountFormData({ email: "", password: "", display_name: "" })
+                                    const orgAcc = accounts.find((acc) => acc.org_id === org.id)
+                                    setEditingDisplayName(orgAcc?.display_name || "")
                                     setAccountDialogOpen(true)
                                   }}
                                   className="border-2 border-border bg-background hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 whitespace-nowrap font-medium shadow-sm hover:shadow-md px-3"
@@ -615,7 +690,8 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                             size="sm"
                             onClick={() => {
                               setSelectedOrg(org)
-                              setAccountFormData({ email: "", password: "" })
+                              setAccountFormData({ email: "", password: "", display_name: "" })
+                              setEditingDisplayName("")
                               setAccountDialogOpen(true)
                             }}
                             className="w-full border-2 border-border hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
@@ -715,42 +791,57 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                           <div className="flex items-center gap-3">
                             <span>Global (no org)</span>
                             {isSuperAdmin && (
-                              <AlertDialog
-                                open={deletingGovtAccountId === acc.id}
-                                onOpenChange={(open: boolean) =>
-                                  !open && setDeletingGovtAccountId(null)
-                                }
-                              >
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setDeletingGovtAccountId(acc.id)}
-                                    className="border-2 border-destructive/30 hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-all duration-200 font-medium shadow-sm hover:shadow-md"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-1.5" />
-                                    Delete
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete GOVT User</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Are you sure you want to delete GOVT user &quot;
-                                      {acc.email}&quot;? This action cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDeleteGovtAccount(acc.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedGovtAccount(acc)
+                                    setEditingDisplayName(acc.display_name || "")
+                                    setGovtAccountDialogOpen(true)
+                                  }}
+                                  className="border-2 border-border hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
+                                >
+                                  <User className="h-4 w-4 mr-1.5" />
+                                  View Account
+                                </Button>
+                                <AlertDialog
+                                  open={deletingGovtAccountId === acc.id}
+                                  onOpenChange={(open: boolean) =>
+                                    !open && setDeletingGovtAccountId(null)
+                                  }
+                                >
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setDeletingGovtAccountId(acc.id)}
+                                      className="border-2 border-destructive/30 hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-all duration-200 font-medium shadow-sm hover:shadow-md"
                                     >
+                                      <Trash2 className="h-4 w-4 mr-1.5" />
                                       Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete GOVT User</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete GOVT user &quot;
+                                        {acc.email}&quot;? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteGovtAccount(acc.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
                             )}
                           </div>
                         </TableCell>
@@ -792,6 +883,39 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                         <Badge variant="secondary" className="text-sm">
                           {accounts.find((acc) => acc.org_id === selectedOrg?.id)?.account_type}
                         </Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Display Name</Label>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="text"
+                            value={editingDisplayName}
+                            onChange={(e) => setEditingDisplayName(e.target.value)}
+                            placeholder="Enter display name"
+                            className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              const orgAcc = accounts.find((acc) => acc.org_id === selectedOrg?.id)
+                              if (orgAcc) {
+                                handleUpdateDisplayName(orgAcc.id)
+                              }
+                            }}
+                            disabled={savingDisplayName}
+                            size="sm"
+                            className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
+                          >
+                            {savingDisplayName ? "Saving..." : "Save"}
+                          </Button>
+                        </div>
+                        {accounts.find((acc) => acc.org_id === selectedOrg?.id)?.display_name && (
+                          <p className="text-xs text-muted-foreground">
+                            Current: {accounts.find((acc) => acc.org_id === selectedOrg?.id)?.display_name}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -841,6 +965,24 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                     className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="display-name" className="text-sm font-semibold">
+                    Display Name (Optional)
+                  </Label>
+                  <Input
+                    id="display-name"
+                    type="text"
+                    value={accountFormData.display_name}
+                    onChange={(e) =>
+                      setAccountFormData({
+                        ...accountFormData,
+                        display_name: e.target.value,
+                      })
+                    }
+                    placeholder="Enter display name"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
                 <div className="flex justify-end gap-2 pt-4 border-t">
                   <Button
                     type="button"
@@ -859,6 +1001,84 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                 </div>
               </form>
             )}
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* GOVT Account View/Edit Dialog */}
+      {isSuperAdmin && selectedGovtAccount && (
+        <Dialog open={govtAccountDialogOpen} onOpenChange={setGovtAccountDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                GOVT User Account
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Card className="p-4 bg-gradient-to-br from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20 border-2">
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-sm font-semibold text-muted-foreground">Email</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Mail className="h-4 w-4 text-primary" />
+                      <div className="text-base font-semibold">
+                        {selectedGovtAccount.email}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-semibold text-muted-foreground">Account Type</Label>
+                    <div className="mt-1">
+                      <Badge variant="secondary" className="text-sm">
+                        {selectedGovtAccount.account_type}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-semibold text-muted-foreground">Display Name</Label>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="text"
+                          value={editingDisplayName}
+                          onChange={(e) => setEditingDisplayName(e.target.value)}
+                          placeholder="Enter display name"
+                          className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => handleUpdateDisplayName(selectedGovtAccount.id)}
+                          disabled={savingDisplayName}
+                          size="sm"
+                          className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
+                        >
+                          {savingDisplayName ? "Saving..." : "Save"}
+                        </Button>
+                      </div>
+                      {selectedGovtAccount.display_name && (
+                        <p className="text-xs text-muted-foreground">
+                          Current: {selectedGovtAccount.display_name}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setGovtAccountDialogOpen(false)
+                    setSelectedGovtAccount(null)
+                    setEditingDisplayName("")
+                  }}
+                  className="transition-all duration-200"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       )}
