@@ -31,12 +31,9 @@ export function DashboardSidebar() {
   const superAdminLogoUrl = superAdmin?.logoUrl || null
   const superAdminDisplayName = superAdmin?.displayName || null
 
-  // Filter nav items based on account type (only if account is loaded)
-  const filteredNavItems = account
-    ? navItems.filter((item) => item.roles.includes(account.accountType))
-    : []
-
   const handleLogout = () => {
+    // Clear user cache on logout
+    clearUserCache()
     document.cookie = "session=; path=/; max-age=0"
     window.location.href = "/auth/login"
   }
@@ -78,7 +75,12 @@ export function DashboardSidebar() {
       icon: AlertTriangle,
       roles: ["SUPERADMIN", "ORG", "GOVT"],
     },
-  ].filter((item) => item.roles.includes(accountType))
+  ]
+
+  // Filter nav items based on account type (only if account is loaded)
+  const filteredNavItems = account
+    ? navItems.filter((item) => item.roles.includes(account.accountType))
+    : []
 
   return (
     <>
