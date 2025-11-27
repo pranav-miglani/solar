@@ -214,6 +214,7 @@ export async function GET(request: NextRequest) {
           vendor_type,
           is_active,
           last_synced_at,
+          last_alert_synced_at,
           created_at,
           organizations (
             id,

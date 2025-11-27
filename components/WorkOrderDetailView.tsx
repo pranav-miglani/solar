@@ -42,7 +42,7 @@ interface Plant {
   name: string
   capacity_kw: number
   current_power_kw: number | null
-  daily_energy_mwh: number | null
+  daily_energy_kwh: number | null
   monthly_energy_mwh: number | null
   yearly_energy_mwh: number | null
   total_energy_mwh: number | null
@@ -77,7 +77,12 @@ interface WorkOrder {
   }>
 }
 
-export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
+interface WorkOrderDetailViewProps {
+  workOrderId: string
+  accountType: string
+}
+
+export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetailViewProps) {
   const router = useRouter()
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null)
   const [loading, setLoading] = useState(true)
@@ -85,6 +90,9 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
   const [productionData, setProductionData] = useState<any>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  const isSuperAdmin = accountType === "SUPERADMIN"
+  const isGovt = accountType === "GOVT"
 
   useEffect(() => {
     fetchWorkOrder()
@@ -123,7 +131,7 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
   }
 
   async function handleDelete() {
-    if (!workOrder) return
+    if (!isSuperAdmin || !workOrder) return
 
     setDeleting(true)
     try {
@@ -178,11 +186,21 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
     ?.filter((wop) => wop.is_active)
     .map((wop) => wop.plants) || []
 
+  // Helper to guard .toFixed usage whenever vendor data is missing/NaN.
+  const formatNumber = (value: number | null | undefined, fractionDigits = 2, unit?: string) => {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return "N/A"
+    }
+    return `${value.toFixed(fractionDigits)}${unit ? ` ${unit}` : ""}`
+  }
+
   // Calculate aggregated metrics
+  // Aggregate summary uses raw plant payloads (already in kW / kWh / MWh). Keep units aligned
+  // with DB schema: capacity/currentPower in kW, dailyEnergy in kWh, monthly/yearly in MWh.
   const aggregatedMetrics = {
     installedCapacityKw: activePlants.reduce((sum, p) => sum + (p.capacity_kw || 0), 0),
     currentPowerKw: activePlants.reduce((sum, p) => sum + (p.current_power_kw || 0), 0),
-    dailyEnergyMwh: activePlants.reduce((sum, p) => sum + (p.daily_energy_mwh || 0), 0),
+    dailyEnergyKwh: activePlants.reduce((sum, p) => sum + (p.daily_energy_kwh || 0), 0),
     monthlyEnergyMwh: activePlants.reduce((sum, p) => sum + (p.monthly_energy_mwh || 0), 0),
     yearlyEnergyMwh: activePlants.reduce((sum, p) => sum + (p.yearly_energy_mwh || 0), 0),
     totalEnergyMwh: activePlants.reduce((sum, p) => sum + (p.total_energy_mwh || 0), 0),
@@ -215,43 +233,45 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
             Created {new Date(workOrder.created_at).toLocaleDateString()}
           </p>
         </div>
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogTrigger asChild>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Work Order
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete &quot;{workOrder.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDelete}
-                disabled={deleting}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+        {isSuperAdmin && (
+          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="transition-all duration-200 hover:scale-105 shadow-md hover:shadow-lg"
               >
-                {deleting ? (
-                  <span className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Deleting...
-                  </span>
-                ) : (
-                  "Delete"
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Work Order
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete &quot;{workOrder.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {deleting ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Deleting...
+                    </span>
+                  ) : (
+                    "Delete"
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
 
       {/* Organization & Summary Cards */}
@@ -304,7 +324,7 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                   Total Capacity
                 </p>
                 <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                  {aggregatedMetrics.installedCapacityKw.toFixed(1)} kW
+                  {formatNumber(aggregatedMetrics.installedCapacityKw, 1, "kW")}
                 </p>
               </div>
               <Zap className="h-8 w-8 text-purple-500" />
@@ -319,6 +339,7 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
           metrics={productionData.aggregated}
           lastUpdated={lastUpdateTime ?? undefined}
           title="Work Order Production Overview"
+          hidePerformanceRatio={isGovt}
         />
       )}
 
@@ -371,11 +392,11 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                       <TableCell>
                         <Badge variant="outline">{plant.vendors.name}</Badge>
                       </TableCell>
-                      <TableCell>{plant.capacity_kw.toFixed(2)} kW</TableCell>
+                      <TableCell>{formatNumber(plant.capacity_kw, 2, "kW")}</TableCell>
                       <TableCell>
                         {plant.current_power_kw !== null ? (
                           <span className="text-green-600 dark:text-green-400 font-medium">
-                            {plant.current_power_kw.toFixed(2)} kW
+                            {formatNumber(plant.current_power_kw, 2, "kW")}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">N/A</span>
@@ -395,14 +416,14 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1 text-xs">
-                          {plant.daily_energy_mwh !== null && (
-                            <div>Daily: {plant.daily_energy_mwh.toFixed(2)} MWh</div>
+                          {plant.daily_energy_kwh !== null && (
+                            <div>Daily: {formatNumber(plant.daily_energy_kwh, 2, "kWh")}</div>
                           )}
                           {plant.monthly_energy_mwh !== null && (
-                            <div>Monthly: {plant.monthly_energy_mwh.toFixed(2)} MWh</div>
+                            <div>Monthly: {formatNumber(plant.monthly_energy_mwh, 2, "MWh")}</div>
                           )}
-                          {plant.performance_ratio !== null && (
-                            <div>PR: {(plant.performance_ratio * 100).toFixed(2)}%</div>
+                          {!isGovt && plant.performance_ratio !== null && (
+                            <div>PR: {formatNumber(plant.performance_ratio * 100, 2, "%")}</div>
                           )}
                         </div>
                       </TableCell>
@@ -438,14 +459,14 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>
                         <p className="text-muted-foreground">Capacity</p>
-                        <p className="font-medium">{plant.capacity_kw.toFixed(2)} kW</p>
+                        <p className="font-medium">{formatNumber(plant.capacity_kw, 2, "kW")}</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Current Power</p>
                         <p className="font-medium">
                           {plant.current_power_kw !== null ? (
                             <span className="text-green-600 dark:text-green-400">
-                              {plant.current_power_kw.toFixed(2)} kW
+                              {formatNumber(plant.current_power_kw, 2, "kW")}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">N/A</span>
@@ -460,14 +481,14 @@ export function WorkOrderDetailView({ workOrderId }: { workOrderId: string }) {
                       </div>
                     )}
                     <div className="space-y-1 text-xs border-t pt-3">
-                      {plant.daily_energy_mwh !== null && (
-                        <div>Daily: {plant.daily_energy_mwh.toFixed(2)} MWh</div>
+                      {plant.daily_energy_kwh !== null && (
+                        <div>Daily: {formatNumber(plant.daily_energy_kwh, 2, "kWh")}</div>
                       )}
                       {plant.monthly_energy_mwh !== null && (
-                        <div>Monthly: {plant.monthly_energy_mwh.toFixed(2)} MWh</div>
+                        <div>Monthly: {formatNumber(plant.monthly_energy_mwh, 2, "MWh")}</div>
                       )}
-                      {plant.performance_ratio !== null && (
-                        <div>PR: {(plant.performance_ratio * 100).toFixed(2)}%</div>
+                      {!isGovt && plant.performance_ratio !== null && (
+                        <div>PR: {formatNumber(plant.performance_ratio * 100, 2, "%")}</div>
                       )}
                     </div>
                     <Link href={`/plants/${plant.id}`}>

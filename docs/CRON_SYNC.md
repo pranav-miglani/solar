@@ -20,8 +20,11 @@ The Plant Sync Cron Job automatically synchronizes plant data from all active ve
 Add these to your `.env.local` or deployment environment:
 
 ```bash
-# Enable/disable the cron job (default: true)
+# Enable/disable the plant sync cron job (default: true)
 ENABLE_PLANT_SYNC_CRON=true
+
+# Enable/disable the alert sync cron job (default: true)
+ENABLE_ALERT_SYNC_CRON=true
 
 # Secret token for securing the cron endpoint (optional but recommended)
 CRON_SECRET=your-secret-token-here

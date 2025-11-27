@@ -23,6 +23,10 @@ export async function GET(
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
+    const sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+    const accountType = sessionData.accountType as string
+    const orgId = sessionData.orgId as number | null
+
     // Use service role client to bypass RLS
     const supabase = getMainClient()
 
@@ -35,6 +39,7 @@ export async function GET(
         location,
         created_at,
         updated_at,
+        org_id,
         work_order_plants(
           *,
           plants(
@@ -49,6 +54,14 @@ export async function GET(
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Enforce org scoping for ORG users: only allow access to work orders
+    // that belong to their own organization.
+    if (accountType === "ORG") {
+      if (!orgId || !workOrder || workOrder.org_id !== orgId) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 })
+      }
     }
 
     // Extract networkStatus from plant metadata if available

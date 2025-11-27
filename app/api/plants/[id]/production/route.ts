@@ -67,7 +67,7 @@ export async function GET(
         name: plant.name,
         capacityKw: plant.capacity_kw, // Installed Capacity
         currentPowerKw: plant.current_power_kw,
-        dailyEnergyMwh: plant.daily_energy_mwh,
+        dailyEnergyKwh: plant.daily_energy_kwh,
         monthlyEnergyMwh: plant.monthly_energy_mwh,
         yearlyEnergyMwh: plant.yearly_energy_mwh,
         totalEnergyMwh: plant.total_energy_mwh,

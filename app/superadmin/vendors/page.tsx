@@ -20,16 +20,16 @@ export default async function VendorsPage() {
     redirect("/auth/login")
   }
 
-  const accountType = sessionData.accountType
+  const accountType = sessionData.accountType as "SUPERADMIN" | "ORG" | "GOVT"
 
-  // Only SUPERADMIN can access this page
-  if (accountType !== "SUPERADMIN") {
+  // SUPERADMIN can manage vendors, GOVT can only view (read-only)
+  if (accountType !== "SUPERADMIN" && accountType !== "GOVT") {
     redirect("/dashboard")
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <DashboardSidebar accountType={accountType} />
+      <DashboardSidebar />
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         <div className="mb-6 md:mb-8">
           <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/60 bg-clip-text text-transparent">
@@ -39,7 +39,7 @@ export default async function VendorsPage() {
             Manage vendor integrations and sync plant data
           </p>
         </div>
-        <VendorsTable />
+        <VendorsTable accountType={accountType} />
       </div>
     </div>
   )

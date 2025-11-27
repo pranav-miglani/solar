@@ -185,7 +185,7 @@ async function syncVendorPlants(
         location: location, // Includes address, lat, lng
         // Production metrics
         current_power_kw: metadata.currentPowerKw || null, // generationPower from vendor (converted to kW)
-        daily_energy_mwh: metadata.dailyEnergyMwh || null,
+        daily_energy_kwh: metadata.dailyEnergyKwh || null,
         monthly_energy_mwh: metadata.monthlyEnergyMwh || null,
         yearly_energy_mwh: metadata.yearlyEnergyMwh || null,
         total_energy_mwh: metadata.totalEnergyMwh || null,

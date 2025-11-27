@@ -15,7 +15,7 @@ interface DashboardData {
     totalAlerts?: number
     activeAlerts?: number
     totalWorkOrders?: number
-    totalGeneration24h?: number
+    totalEnergyMwh?: number
   }
   widgets: {
     showOrganizations?: boolean
@@ -67,19 +67,20 @@ export async function GET(request: NextRequest) {
     }
 
     if (accountType === "SUPERADMIN") {
-      // Get all metrics
-      const [plantsResult, alertsResult, workOrdersResult] = await Promise.all([
+      // For SUPERADMIN, compute counts for:
+      // - Plants
+      // - Active alerts only (status = 'ACTIVE')
+      // - Work orders
+      const [plantsResult, activeAlertsResult, workOrdersResult] = await Promise.all([
         supabase.from("plants").select("id", { count: "exact", head: true }),
-        supabase.from("alerts").select("id", { count: "exact", head: true }),
+        supabase
+          .from("alerts")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "ACTIVE"),
         supabase
           .from("work_orders")
           .select("id", { count: "exact", head: true }),
       ])
-
-      const activeAlertsResult = await supabase
-        .from("alerts")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "ACTIVE")
 
       // Get mapped plants (plants in active work orders)
       const { data: mappedPlantsData } = await supabase
@@ -93,13 +94,20 @@ export async function GET(request: NextRequest) {
       const totalPlants = plantsResult.count || 0
       const unmappedPlants = totalPlants - mappedPlants
 
+      // Calculate total energy generation (sum of total_energy_mwh from all plants)
+      const { data: allPlants } = await supabase
+        .from("plants")
+        .select("total_energy_mwh")
+
+      const totalEnergyMwh = allPlants?.reduce((sum, p) => sum + (p.total_energy_mwh || 0), 0) || 0
+
       dashboardData.metrics = {
         totalPlants,
         unmappedPlants,
         mappedPlants,
-        totalAlerts: alertsResult.count || 0,
         activeAlerts: activeAlertsResult.count || 0,
         totalWorkOrders: workOrdersResult.count || 0,
+        totalEnergyMwh,
       }
 
       dashboardData.widgets = {
@@ -112,33 +120,62 @@ export async function GET(request: NextRequest) {
         showWorkOrdersSummary: true,
       }
     } else if (accountType === "GOVT") {
-      // Get global metrics
-      const [plantsResult, alertsResult, workOrdersResult] = await Promise.all([
-        supabase.from("plants").select("id", { count: "exact", head: true }),
-        supabase.from("alerts").select("id", { count: "exact", head: true }),
-        supabase
-          .from("work_orders")
-          .select("id", { count: "exact", head: true }),
-      ])
-
-      // Get mapped plants (plants in active work orders)
-      const { data: mappedPlantsData } = await supabase
+      // GOVT sees metrics based ONLY on plants mapped to work orders:
+      // - Only count plants that are in active work orders
+      // - `activeAlerts` is the count of alerts where status = 'ACTIVE' for those plants
+      // - No total alerts metric is exposed on the dashboard.
+      
+      // Get plant IDs from active work orders
+      const { data: workOrderPlantsData } = await supabase
         .from("work_order_plants")
         .select("plant_id")
         .eq("is_active", true)
 
-      const mappedPlants = mappedPlantsData
-        ? new Set(mappedPlantsData.map((wop) => wop.plant_id)).size
-        : 0
+      const mappedPlantIds = workOrderPlantsData
+        ? workOrderPlantsData.map((wop) => wop.plant_id)
+        : []
+
+      const mappedPlants = mappedPlantIds.length
+
+      // Get metrics only for plants in work orders
+      const [plantsResult, activeAlertsResult, workOrdersResult] = await Promise.all([
+        mappedPlantIds.length > 0
+          ? supabase
+              .from("plants")
+              .select("id", { count: "exact", head: true })
+              .in("id", mappedPlantIds)
+          : { count: 0, data: null, error: null },
+        mappedPlantIds.length > 0
+          ? supabase
+              .from("alerts")
+              .select("id", { count: "exact", head: true })
+              .eq("status", "ACTIVE")
+              .in("plant_id", mappedPlantIds)
+          : { count: 0, data: null, error: null },
+        supabase
+          .from("work_orders")
+          .select("id", { count: "exact", head: true }),
+      ])
       const totalPlants = plantsResult.count || 0
-      const unmappedPlants = totalPlants - mappedPlants
+      const unmappedPlants = 0 // GOVT users don't see unmapped plants
+
+      // Calculate total energy generation (sum of total_energy_mwh from plants in work orders only)
+      const { data: allPlants } = mappedPlantIds.length > 0
+        ? await supabase
+            .from("plants")
+            .select("total_energy_mwh")
+            .in("id", mappedPlantIds)
+        : { data: [] as any[] }
+
+      const totalEnergyMwh = allPlants?.reduce((sum, p) => sum + (p.total_energy_mwh || 0), 0) || 0
 
       dashboardData.metrics = {
         totalPlants,
         unmappedPlants,
         mappedPlants,
-        totalAlerts: alertsResult.count || 0,
+        activeAlerts: activeAlertsResult.count || 0,
         totalWorkOrders: workOrdersResult.count || 0,
+        totalEnergyMwh,
       }
 
       dashboardData.widgets = {
@@ -149,7 +186,7 @@ export async function GET(request: NextRequest) {
         showExportCSV: true,
       }
     } else if (accountType === "ORG" && orgId) {
-      // Get org-specific metrics
+      // ORG users see org-specific metrics based ONLY on active alerts
       const plantsResult = await supabase
         .from("plants")
         .select("id", { count: "exact", head: true })
@@ -176,10 +213,11 @@ export async function GET(request: NextRequest) {
       const totalPlants = plantsResult.count || 0
       const unmappedPlants = totalPlants - mappedPlants
 
-      // Get alerts for org plants
-      const alertsResult = await supabase
+      // Get ACTIVE alerts for org plants only
+      const activeAlertsResult = await supabase
         .from("alerts")
         .select("id", { count: "exact", head: true })
+        .eq("status", "ACTIVE")
         .in("plant_id", plantIds)
 
       // Get work orders for org plants
@@ -197,12 +235,21 @@ export async function GET(request: NextRequest) {
         .select("id", { count: "exact", head: true })
         .in("id", workOrderIds.length > 0 ? workOrderIds : [-1]) // Use -1 to return empty if no work orders
 
+      // Calculate total energy generation (sum of total_energy_mwh from org plants)
+      const { data: orgPlantsData } = await supabase
+        .from("plants")
+        .select("total_energy_mwh")
+        .eq("org_id", orgId)
+
+      const totalEnergyMwh = orgPlantsData?.reduce((sum, p) => sum + (p.total_energy_mwh || 0), 0) || 0
+
       dashboardData.metrics = {
         totalPlants,
         unmappedPlants,
         mappedPlants,
-        totalAlerts: alertsResult.count || 0,
+        activeAlerts: activeAlertsResult.count || 0,
         totalWorkOrders: workOrdersResult.count || 0,
+        totalEnergyMwh,
       }
 
       dashboardData.widgets = {

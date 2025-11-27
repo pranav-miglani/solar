@@ -22,22 +22,31 @@ interface DashboardMetricsProps {
     totalAlerts?: number
     activeAlerts?: number
     totalWorkOrders?: number
-    totalGeneration24h?: number
+    totalEnergyMwh?: number
   }
+  // Optional account type so we can tweak which cards appear per role (e.g. hide alerts for GOVT)
+  accountType?: string
 }
 
-export function DashboardMetrics({ metrics }: DashboardMetricsProps) {
+export function DashboardMetrics({ metrics, accountType }: DashboardMetricsProps) {
   const totalPlants = metrics.totalPlants ?? 0
   const unmappedPlants = metrics.unmappedPlants ?? 0
   const mappedPlants = metrics.mappedPlants ?? 0
   const mappedPercentage = totalPlants > 0 ? (mappedPlants / totalPlants) * 100 : 0
 
+  // NOTE on alert counting semantics:
+  // - The "Active Alerts" card now shows ONLY active alerts for every role.
+  // - The dashboard API is responsible for populating `metrics.activeAlerts`
+  //   as the count of alerts where status = 'ACTIVE' (no total alerts metric
+  //   is exposed on the dashboard anymore).
   const metricItems: Metric[] = [
     {
       label: "Total Plants",
-      value: totalPlants > 0 
-        ? `${totalPlants} (${unmappedPlants})`
-        : 0,
+      value: accountType === "GOVT"
+        ? mappedPlants // For GOVT users, show only mapped plants count (no unmapped)
+        : totalPlants > 0 
+          ? `${totalPlants} (${unmappedPlants})`
+          : 0,
       icon: Zap,
       gradient: "from-blue-500 via-blue-600 to-indigo-600",
       bgGradient: "from-blue-50/80 to-indigo-50/80 dark:from-blue-950/50 dark:to-indigo-950/50",
@@ -45,7 +54,7 @@ export function DashboardMetrics({ metrics }: DashboardMetricsProps) {
     },
     {
       label: "Active Alerts",
-      value: metrics.activeAlerts ?? metrics.totalAlerts ?? 0,
+      value: metrics.activeAlerts ?? 0,
       icon: AlertTriangle,
       gradient: "from-amber-500 via-orange-500 to-red-500",
       bgGradient: "from-amber-50/80 to-red-50/80 dark:from-amber-950/50 dark:to-red-950/50",
@@ -60,9 +69,9 @@ export function DashboardMetrics({ metrics }: DashboardMetricsProps) {
       borderColor: "border-purple-200 dark:border-purple-800",
     },
     {
-      label: "24h Generation",
-      value: metrics.totalGeneration24h
-        ? `${(metrics.totalGeneration24h / 1000).toFixed(1)} MWh`
+      label: "Total Energy Generation",
+      value: metrics.totalEnergyMwh
+        ? `${metrics.totalEnergyMwh.toFixed(1)} MWh`
         : "0 MWh",
       icon: TrendingUp,
       gradient: "from-emerald-500 via-green-500 to-teal-500",
@@ -71,9 +80,15 @@ export function DashboardMetrics({ metrics }: DashboardMetricsProps) {
     },
   ]
 
+  // GOVT users should not see the Active Alerts card on the dashboard.
+  const visibleMetricItems =
+    accountType === "GOVT"
+      ? metricItems.filter((m) => m.label !== "Active Alerts")
+      : metricItems
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {metricItems.map((metric, index) => {
+      {visibleMetricItems.map((metric, index) => {
         const Icon = metric.icon
         return (
           <motion.div
@@ -98,7 +113,7 @@ export function DashboardMetrics({ metrics }: DashboardMetricsProps) {
                     </p>
                   </div>
                   <div className={`relative h-12 w-12 rounded-xl bg-gradient-to-br ${metric.gradient || 'from-primary to-primary/60'} p-2.5 shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110`}>
-                    {metric.label === "Total Plants" && totalPlants > 0 ? (
+                    {metric.label === "Total Plants" && totalPlants > 0 && accountType !== "GOVT" ? (
                       <>
                         {/* Background icon (unmapped portion - always visible) */}
                         <Zap className="absolute inset-0 h-full w-full text-white opacity-30 p-2.5" />

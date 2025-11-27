@@ -3,35 +3,56 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface ProductionMetrics {
-  installedCapacityKw: number
-  currentPowerKw: number
-  dailyEnergyMwh: number
-  monthlyEnergyMwh: number
-  yearlyEnergyMwh: number
-  totalEnergyMwh: number
-  averagePerformanceRatio: number
+  installedCapacityKw?: number | null
+  currentPowerKw?: number | null
+  dailyEnergyMwh?: number | null
+  monthlyEnergyMwh?: number | null
+  yearlyEnergyMwh?: number | null
+  totalEnergyMwh?: number | null
+  averagePerformanceRatio?: number | null
 }
 
 interface ProductionOverviewProps {
   metrics: ProductionMetrics
   lastUpdated?: string
   title?: string
+  // When true, hide the performance ratio (PR) gauge entirely.
+  hidePerformanceRatio?: boolean
 }
 
 export function ProductionOverview({
   metrics,
   lastUpdated,
   title = "Production Overview",
+  hidePerformanceRatio = false,
 }: ProductionOverviewProps) {
+  const averagePerformanceRatio = Math.max(
+    0,
+    Math.min(1, metrics.averagePerformanceRatio ?? 0)
+  )
+  const formatValue = (
+    value?: number | null,
+    fractionDigits = 3,
+    fallback = "0.000"
+  ) => {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return fallback
+    }
+    return Number(value).toFixed(fractionDigits)
+  }
+
   // Calculate PR percentage (0-100%)
-  const prPercentage = metrics.averagePerformanceRatio
-    ? (metrics.averagePerformanceRatio * 100).toFixed(3)
-    : "0.000"
+  const prPercentage =
+    averagePerformanceRatio > 0 ? formatValue(averagePerformanceRatio * 100) : "0.000"
 
   // Calculate current power percentage of installed capacity
   const currentPowerPercentage =
-    metrics.installedCapacityKw > 0
-      ? ((metrics.currentPowerKw / metrics.installedCapacityKw) * 100).toFixed(3)
+    (metrics.installedCapacityKw || 0) > 0 && metrics.currentPowerKw !== null && metrics.currentPowerKw !== undefined
+      ? formatValue(
+          ((metrics.currentPowerKw || 0) /
+            (metrics.installedCapacityKw || 1)) *
+            100
+        )
       : "0.000"
 
   return (
@@ -49,42 +70,44 @@ export function ProductionOverview({
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* PR Indicator */}
-        <div className="flex justify-center">
-          <div className="relative w-32 h-32">
-            <svg className="transform -rotate-90 w-32 h-32">
-              <circle
-                cx="64"
-                cy="64"
-                r="56"
-                stroke="currentColor"
-                strokeWidth="8"
-                fill="none"
-                className="text-gray-200"
-              />
-              <circle
-                cx="64"
-                cy="64"
-                r="56"
-                stroke="currentColor"
-                strokeWidth="8"
-                fill="none"
-                strokeDasharray={`${2 * Math.PI * 56}`}
-                strokeDashoffset={`${2 * Math.PI * 56 * (1 - metrics.averagePerformanceRatio)}`}
-                className="text-blue-600"
-                strokeLinecap="round"
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {prPercentage}%
+        {/* PR Indicator (optional) */}
+        {!hidePerformanceRatio && (
+          <div className="flex justify-center">
+            <div className="relative w-32 h-32">
+              <svg className="transform -rotate-90 w-32 h-32">
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="56"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="none"
+                  className="text-gray-200"
+                />
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="56"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="none"
+                  strokeDasharray={`${2 * Math.PI * 56}`}
+                  strokeDashoffset={`${2 * Math.PI * 56 * (1 - averagePerformanceRatio)}`}
+                  className="text-blue-600"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {prPercentage}%
+                  </div>
+                  <div className="text-xs text-muted-foreground">PR</div>
                 </div>
-                <div className="text-xs text-muted-foreground">PR</div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Key Metrics Grid */}
         <div className="grid grid-cols-2 gap-4">
@@ -94,7 +117,7 @@ export function ProductionOverview({
                 Current Power
               </div>
               <div className="text-2xl font-bold text-blue-700 mt-1">
-                {metrics.currentPowerKw.toFixed(3)} kW
+                {formatValue(metrics.currentPowerKw)} kW
               </div>
             </CardContent>
           </Card>
@@ -105,7 +128,7 @@ export function ProductionOverview({
                 Installed Capacity
               </div>
               <div className="text-2xl font-bold text-green-700 mt-1">
-                {metrics.installedCapacityKw.toFixed(3)} KWp
+                {formatValue(metrics.installedCapacityKw)} KWp
               </div>
             </CardContent>
           </Card>
@@ -119,7 +142,7 @@ export function ProductionOverview({
                 Daily Energy
               </div>
               <div className="text-xl font-bold text-blue-700 mt-1">
-                {metrics.dailyEnergyMwh.toFixed(3)} MWh
+                {formatValue(metrics.dailyEnergyMwh)} MWh
               </div>
             </CardContent>
           </Card>
@@ -130,7 +153,7 @@ export function ProductionOverview({
                 Monthly Energy
               </div>
               <div className="text-xl font-bold text-pink-700 mt-1">
-                {metrics.monthlyEnergyMwh.toFixed(3)} MWh
+                {formatValue(metrics.monthlyEnergyMwh)} MWh
               </div>
             </CardContent>
           </Card>
@@ -141,7 +164,7 @@ export function ProductionOverview({
                 Yearly Energy
               </div>
               <div className="text-xl font-bold text-yellow-700 mt-1">
-                {metrics.yearlyEnergyMwh.toFixed(3)} MWh
+                {formatValue(metrics.yearlyEnergyMwh)} MWh
               </div>
             </CardContent>
           </Card>
@@ -152,7 +175,7 @@ export function ProductionOverview({
                 Total Energy
               </div>
               <div className="text-xl font-bold text-green-700 mt-1">
-                {metrics.totalEnergyMwh.toFixed(3)} MWh
+                {formatValue(metrics.totalEnergyMwh)} MWh
               </div>
             </CardContent>
           </Card>

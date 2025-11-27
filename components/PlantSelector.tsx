@@ -235,8 +235,8 @@ export function PlantSelector({
   }
 
   return (
-    <Card className="shadow-lg border-2 w-full">
-      <CardHeader className="border-b bg-gradient-to-r from-muted/50 to-muted/30 p-4 md:p-6">
+    <Card className="shadow-lg border-2 border-border w-full">
+      <CardHeader className="border-b border-border bg-gradient-to-r from-muted/50 to-muted/30 p-4 md:p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <CardTitle className="text-base md:text-lg font-bold">Select Plants</CardTitle>
           <div className="text-sm text-muted-foreground">
@@ -246,7 +246,7 @@ export function PlantSelector({
       </CardHeader>
       <CardContent className="p-0">
         {/* Search Bar */}
-        <div className="p-3 md:p-4 border-b bg-background/50">
+        <div className="p-3 md:p-4 border-b border-border bg-background/50">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -278,8 +278,8 @@ export function PlantSelector({
                         key={plant.id}
                         className={cn(
                           "flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer",
-                          "bg-primary/10 border-primary/50 shadow-sm",
-                          "hover:bg-primary/15 hover:border-primary/60"
+                          "bg-primary/10 border-primary/50 dark:border-primary/60 shadow-sm",
+                          "hover:bg-primary/15 hover:border-primary/60 dark:hover:border-primary/70"
                         )}
                         onClick={() => {
                           onSelectionChange(selectedPlantIds.filter((id) => id !== plant.id))
@@ -329,8 +329,8 @@ export function PlantSelector({
                       <div
                         key={plant.id}
                         className={cn(
-                          "flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer",
-                          "hover:bg-primary/5 hover:border-primary/30 hover:shadow-sm"
+                          "flex items-center gap-3 p-3 rounded-lg border border-border transition-all duration-200 cursor-pointer",
+                          "hover:bg-primary/5 hover:border-primary/30 dark:hover:border-primary/40 hover:shadow-sm"
                         )}
                         onClick={() => {
                           onSelectionChange([...selectedPlantIds, plant.id])

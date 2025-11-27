@@ -43,6 +43,7 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Switch } from "@/components/ui/switch"
 import { Loader2, Factory, Plus, Pencil, Trash2, RefreshCw, Building2, CheckCircle2, XCircle, Settings, Clock } from "lucide-react"
+import type { AccountType } from "@/lib/rbac"
 
 interface Organization {
   id: number
@@ -65,15 +66,31 @@ interface Vendor {
   }
 }
 
-export function VendorsTable() {
+interface VendorsTableProps {
+  accountType: AccountType
+}
+
+/**
+ * Admin/vendor maintenance table: handles CRUD for vendors, manual sync triggers,
+ * and organization-level auto-sync settings.
+ *
+ * GOVT accounts are allowed **read-only** access: they can see the vendor list
+ * but cannot add/edit/delete or trigger sync actions.
+ */
+export function VendorsTable({ accountType }: VendorsTableProps) {
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [orgs, setOrgs] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null)
   const [syncingVendorId, setSyncingVendorId] = useState<number | null>(null)
+  const [syncingAlertsVendorId, setSyncingAlertsVendorId] = useState<number | null>(null)
   const [deletingVendorId, setDeletingVendorId] = useState<number | null>(null)
   const [syncProgress, setSyncProgress] = useState<{
+    current: number
+    total: number
+  } | null>(null)
+  const [alertsSyncProgress, setAlertsSyncProgress] = useState<{
     current: number
     total: number
   } | null>(null)
@@ -97,6 +114,7 @@ export function VendorsTable() {
     fetchVendors()
   }, [])
 
+  // Load vendors + org metadata for display. Keeps local state in sync after every mutation.
   async function fetchVendors() {
     try {
       const response = await fetch("/api/vendors")
@@ -110,6 +128,7 @@ export function VendorsTable() {
     }
   }
   
+  // Populate the auto-sync dialog from whichever vendor currently holds org-level settings.
   function openSyncSettingsDialog(orgId: number, orgName: string) {
     // Find the org's current sync settings from vendors
     const vendor = vendors.find((v) => v.organizations?.id === orgId)
@@ -125,6 +144,7 @@ export function VendorsTable() {
     setSyncSettingsDialogOpen(true)
   }
   
+  // Persist updated auto-sync toggles/intervals back to the org via API.
   async function saveSyncSettings() {
     if (!selectedOrgForSync) return
     
@@ -152,6 +172,7 @@ export function VendorsTable() {
     }
   }
 
+  // Open the create/edit dialog, pre-filling credentials when editing.
   function openDialog(vendor?: Vendor) {
     if (vendor) {
       setEditingVendor(vendor)
@@ -185,6 +206,7 @@ export function VendorsTable() {
     setDialogOpen(true)
   }
 
+  // Create or update a vendor record using the form payload (credentials live in JSON).
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
@@ -234,6 +256,7 @@ export function VendorsTable() {
     }
   }
 
+  // Remove a vendor and refresh table once the backend confirms deletion.
   async function handleDelete(id: number) {
     const response = await fetch(`/api/vendors/${id}`, {
       method: "DELETE",
@@ -248,35 +271,83 @@ export function VendorsTable() {
     }
   }
 
+  // Full sync action used by "Plants" button: first plants, then alerts. Tracks progress for UI.
   async function handleSyncPlants(vendorId: number) {
     setSyncingVendorId(vendorId)
     setSyncProgress({ current: 0, total: 0 })
 
     try {
-      const response = await fetch(`/api/vendors/${vendorId}/sync-plants`, {
+      // Step 1: sync plants for this vendor
+      const plantsResponse = await fetch(`/api/vendors/${vendorId}/sync-plants`, {
         method: "POST",
       })
+      const plantsData = await plantsResponse.json()
 
-      const data = await response.json()
-
-      if (response.ok) {
-        setSyncProgress({ current: data.synced, total: data.total })
-        setTimeout(() => {
-          alert(`Successfully synced ${data.synced} plants (${data.created} created, ${data.updated} updated)`)
-          setSyncingVendorId(null)
-          setSyncProgress(null)
-        }, 500)
-      } else {
-        alert(data.error || "Failed to sync plants")
+      if (!plantsResponse.ok) {
+        alert(plantsData.error || "Failed to sync plants")
         setSyncingVendorId(null)
         setSyncProgress(null)
+        return
       }
+
+      setSyncProgress({ current: plantsData.synced, total: plantsData.total })
+
+      // Step 2: once plants are synced, trigger alert sync for the same vendor
+      const alertsResponse = await fetch(`/api/vendors/${vendorId}/sync-alerts`, {
+        method: "POST",
+      })
+      const alertsData = await alertsResponse.json()
+
+      if (!alertsResponse.ok) {
+        alert(
+          `Plants synced (${plantsData.synced} plants, ${plantsData.created} created, ${plantsData.updated} updated), but alert sync failed: ${
+            alertsData.error || "Unknown error"
+          }`
+        )
+      } else {
+        alert(
+          `Successfully synced ${plantsData.synced} plants (${plantsData.created} created, ${plantsData.updated} updated)\n` +
+            `and ${alertsData.synced} alerts (${alertsData.created} created, ${alertsData.updated} updated).`
+        )
+      }
+
+      setSyncingVendorId(null)
+      setSyncProgress(null)
     } catch (error: any) {
-      alert(`Error syncing plants: ${error.message}`)
+      alert(`Error syncing plants/alerts: ${error.message}`)
       setSyncingVendorId(null)
       setSyncProgress(null)
     }
   }
+
+  // Alert-only sync (separate button) so admins can re-run the alert cron independently.
+  async function handleSyncAlerts(vendorId: number) {
+    setSyncingAlertsVendorId(vendorId)
+    setAlertsSyncProgress({ current: 0, total: 0 })
+    try {
+      const response = await fetch(`/api/vendors/${vendorId}/sync-alerts`, {
+        method: "POST",
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        setAlertsSyncProgress({ current: data.synced || 0, total: data.total || data.synced || 0 })
+        alert(
+          `Alert sync completed for vendor ${data.vendorName || vendorId}.\n` +
+            `Alerts synced: ${data.synced} (${data.created} created, ${data.updated} updated).`
+        )
+      } else {
+        alert(data.error || "Failed to sync alerts")
+      }
+    } catch (error: any) {
+      alert(`Error syncing alerts: ${error.message}`)
+    } finally {
+      setSyncingAlertsVendorId(null)
+      setTimeout(() => setAlertsSyncProgress(null), 800)
+    }
+  }
+
+  const isReadOnlyGovt = accountType === "GOVT"
 
   if (loading) {
     return (
@@ -292,25 +363,26 @@ export function VendorsTable() {
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border">
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                onClick={() => openDialog()}
-                className="w-full sm:w-auto transition-all duration-200 hover:scale-105 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg hover:shadow-xl"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Vendor
-              </Button>
-            </motion.div>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                {editingVendor ? "Edit Vendor" : "Add Vendor"}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        {!isReadOnlyGovt && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button
+                  onClick={() => openDialog()}
+                  className="w-full sm:w-auto transition-all duration-200 hover:scale-105 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg hover:shadow-xl"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Vendor
+                </Button>
+              </motion.div>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  {editingVendor ? "Edit Vendor" : "Add Vendor"}
+                </DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="name">Name *</Label>
                 <Input
@@ -456,24 +528,25 @@ export function VendorsTable() {
                 />
                 <Label htmlFor="is_active">Active</Label>
               </div>
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-                >
-                  Save
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                  >
+                    Save
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Desktop Table View */}
@@ -486,7 +559,11 @@ export function VendorsTable() {
                 <TableHead className="font-bold text-base">Type</TableHead>
                 <TableHead className="font-bold text-base">Organization</TableHead>
                 <TableHead className="font-bold text-base">Status</TableHead>
-                <TableHead className="font-bold text-base text-right">Actions</TableHead>
+                {!isReadOnlyGovt && (
+                  <TableHead className="font-bold text-base text-right">
+                    Actions
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -498,9 +575,11 @@ export function VendorsTable() {
                       <p className="text-muted-foreground font-medium">
                         No vendors found
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        Click &quot;Add Vendor&quot; to create your first vendor integration
-                      </p>
+                      {!isReadOnlyGovt && (
+                        <p className="text-sm text-muted-foreground">
+                          Click &quot;Add Vendor&quot; to create your first vendor integration
+                        </p>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -546,8 +625,9 @@ export function VendorsTable() {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-2">
+                    {!isReadOnlyGovt && (
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-2">
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                           <Button
                             variant="outline"
@@ -593,6 +673,27 @@ export function VendorsTable() {
                             )}
                           </Button>
                         </motion.div>
+                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSyncAlerts(vendor.id)}
+                            disabled={syncingAlertsVendorId === vendor.id}
+                            className="transition-all duration-200 hover:scale-110 bg-gradient-to-r from-amber-500/90 to-rose-500/90 text-white shadow-md hover:shadow-lg disabled:opacity-60"
+                          >
+                            {syncingAlertsVendorId === vendor.id ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                Alerts...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-1" />
+                                Alerts
+                              </>
+                            )}
+                          </Button>
+                        </motion.div>
                         <AlertDialog open={deletingVendorId === vendor.id} onOpenChange={(open: boolean) => !open && setDeletingVendorId(null)}>
                           <AlertDialogTrigger asChild>
                             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -625,8 +726,9 @@ export function VendorsTable() {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
-                      </div>
-                    </TableCell>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}
@@ -638,14 +740,16 @@ export function VendorsTable() {
       {/* Mobile Card View */}
       <div className="lg:hidden space-y-4">
         {vendors.length === 0 ? (
-          <Card className="p-8 text-center">
+            <Card className="p-8 text-center">
             <Factory className="h-12 w-12 text-muted-foreground opacity-50 mx-auto mb-4" />
             <p className="text-muted-foreground font-medium mb-2">
               No vendors found
             </p>
-            <p className="text-sm text-muted-foreground">
-              Click &quot;Add Vendor&quot; to create your first vendor integration
-            </p>
+              {!isReadOnlyGovt && (
+                <p className="text-sm text-muted-foreground">
+                  Click &quot;Add Vendor&quot; to create your first vendor integration
+                </p>
+              )}
           </Card>
         ) : (
           vendors.map((vendor, index) => (
@@ -691,78 +795,99 @@ export function VendorsTable() {
                     </div>
                     {/* API Base URL removed from mobile view - configured via environment variables */}
                   </div>
-                  <div className="flex flex-col gap-2 pt-2 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openDialog(vendor)}
-                      className="w-full"
-                    >
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleSyncPlants(vendor.id)}
-                      disabled={syncingVendorId === vendor.id || !vendor.org_id}
-                      className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white disabled:opacity-50"
-                    >
-                      {syncingVendorId === vendor.id ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Syncing...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Plants
-                        </>
-                      )}
-                    </Button>
-                    {vendor.organizations && (
+                  {!isReadOnlyGovt && (
+                    <div className="flex flex-col gap-2 pt-2 border-t">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => openSyncSettingsDialog(vendor.organizations!.id, vendor.organizations!.name)}
+                        onClick={() => openDialog(vendor)}
                         className="w-full"
-                        title="Sync Settings"
                       >
-                        <Settings className="h-4 w-4 mr-2" />
-                        Sync Settings
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
                       </Button>
-                    )}
-                    <AlertDialog open={deletingVendorId === vendor.id} onOpenChange={(open: boolean) => !open && setDeletingVendorId(null)}>
-                      <AlertDialogTrigger asChild>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleSyncPlants(vendor.id)}
+                        disabled={syncingVendorId === vendor.id || !vendor.org_id}
+                        className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white disabled:opacity-50"
+                      >
+                        {syncingVendorId === vendor.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Syncing...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Plants
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleSyncAlerts(vendor.id)}
+                        disabled={syncingAlertsVendorId === vendor.id}
+                        className="w-full bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white disabled:opacity-60"
+                      >
+                        {syncingAlertsVendorId === vendor.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Alerts...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Alerts
+                          </>
+                        )}
+                      </Button>
+                      {vendor.organizations && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setDeletingVendorId(vendor.id)}
-                          className="w-full hover:bg-destructive/10 hover:border-destructive hover:text-destructive"
+                          onClick={() => openSyncSettingsDialog(vendor.organizations!.id, vendor.organizations!.name)}
+                          className="w-full"
+                          title="Sync Settings"
                         >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
+                          <Settings className="h-4 w-4 mr-2" />
+                          Sync Settings
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete &quot;{vendor.name}&quot;? This action cannot be undone and will remove all associated plants.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDelete(vendor.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      )}
+                      <AlertDialog open={deletingVendorId === vendor.id} onOpenChange={(open: boolean) => !open && setDeletingVendorId(null)}>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDeletingVendorId(vendor.id)}
+                            className="w-full hover:bg-destructive/10 hover:border-destructive hover:text-destructive"
                           >
+                            <Trash2 className="h-4 w-4 mr-2" />
                             Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete &quot;{vendor.name}&quot;? This action cannot be undone and will remove all associated plants.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(vendor.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  )}
                 </div>
               </Card>
             </motion.div>
@@ -792,6 +917,34 @@ export function VendorsTable() {
           ) : (
             <div className="h-2 bg-secondary rounded-full overflow-hidden">
               <div className="h-full bg-primary animate-pulse" style={{ width: "50%" }} />
+            </div>
+          )}
+        </Card>
+      )}
+      {syncingAlertsVendorId && alertsSyncProgress && (
+        <Card className="p-4 border-2 bg-gradient-to-br from-amber-50/60 via-orange-50/60 to-rose-50/60 dark:from-amber-950/20 dark:via-orange-950/20 dark:to-rose-950/20">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin text-amber-500" />
+              <span className="text-sm font-semibold">Syncing alerts...</span>
+            </div>
+            <span className="text-sm text-muted-foreground">
+              {alertsSyncProgress.total > 0
+                ? `${alertsSyncProgress.current} / ${alertsSyncProgress.total}`
+                : "Fetching alerts..."}
+            </span>
+          </div>
+          {alertsSyncProgress.total > 0 ? (
+            <Progress
+              value={(alertsSyncProgress.current / alertsSyncProgress.total) * 100}
+              className="h-2"
+            />
+          ) : (
+            <div className="h-2 bg-secondary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-amber-500 to-rose-500 animate-pulse"
+                style={{ width: "50%" }}
+              />
             </div>
           )}
         </Card>

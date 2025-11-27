@@ -8,16 +8,9 @@ import { DashboardMetrics } from "@/components/DashboardMetrics"
 import { TelemetryChart } from "@/components/TelemetryChart"
 import { AlertsFeed } from "@/components/AlertsFeed"
 import { EfficiencySummary } from "@/components/EfficiencySummary"
-import { OrgBreakdown } from "@/components/OrgBreakdown"
 import { ThemeToggle } from "@/components/ThemeToggle"
-import { Button } from "@/components/ui/button"
-import {
-  Building2,
-  Factory,
-  Plus,
-  FileText,
-  Download,
-} from "lucide-react"
+import { useUser } from "@/context/UserContext"
+import { Building2, Factory, Plus, FileText } from "lucide-react"
 import Link from "next/link"
 
 interface DashboardData {
@@ -39,23 +32,25 @@ interface DashboardData {
     showTelemetryChart?: boolean
     showAlertsFeed?: boolean
     showWorkOrdersSummary?: boolean
-    showOrgBreakdown?: boolean
-    showExportCSV?: boolean
     showEfficiencySummary?: boolean
   }
 }
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { account, loading: userLoading, error: userError } = useUser()
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(
     null
   )
   const [telemetryData, setTelemetryData] = useState<any[]>([])
   const [alerts, setAlerts] = useState<any[]>([])
+  const [organizationName, setOrganizationName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [accountType, setAccountType] = useState<string>("")
-  const [orgId, setOrgId] = useState<number | null>(null)
   const hasLoadedRef = useRef(false)
+
+  const accountType = account?.accountType || ""
+  const orgId = account?.orgId || null
+  const displayName = account?.displayName || null
 
   const loadDashboard = async (accountType: string, orgId: number | null) => {
     try {
@@ -79,6 +74,22 @@ export default function DashboardPage() {
       setDashboardData(dashboard)
       setTelemetryData(telemetry.data || [])
       setAlerts(alertsData.alerts || [])
+      
+      // Fetch organization name for ORG users
+      if (accountType === "ORG" && orgId) {
+        try {
+          const orgRes = await fetch(`/api/orgs/${orgId}`)
+          if (orgRes.ok) {
+            const orgData = await orgRes.json()
+            if (orgData.org) {
+              setOrganizationName(orgData.org.name)
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch organization name:", error)
+        }
+      }
+      
       console.log("✅ [DASHBOARD] Dashboard data loaded successfully")
     } catch (error) {
       console.error("❌ [DASHBOARD] Failed to load dashboard:", error)
@@ -88,55 +99,37 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
+    // Wait for user context to load
+    if (userLoading) {
+      return
+    }
+
+    // Check for authentication error
+    if (userError || !account) {
+      console.log("❌ [DASHBOARD] Authentication failed, redirecting to login")
+      router.push("/auth/login")
+      return
+    }
+
     // Prevent multiple loads
     if (hasLoadedRef.current) {
       console.log("⏸️ [DASHBOARD] Already loaded, skipping...")
       return
     }
     
-    let isMounted = true
     hasLoadedRef.current = true
     
-    console.log("📊 [DASHBOARD] Initializing dashboard...")
+    console.log("✅ [DASHBOARD] User context loaded:", {
+      accountType: account.accountType,
+      orgId: account.orgId,
+      displayName: account.displayName,
+    })
     
-    // Check authentication
-    fetch("/api/me")
-      .then((res) => {
-        if (!isMounted) return null
-        if (!res.ok) {
-          console.log("❌ [DASHBOARD] Authentication failed, redirecting to login")
-          hasLoadedRef.current = false // Reset on auth failure
-          router.push("/auth/login")
-          return null
-        }
-        return res.json()
-      })
-      .then((data) => {
-        if (!isMounted) return
-        if (data) {
-          console.log("✅ [DASHBOARD] Authentication successful:", {
-            accountType: data.account.accountType,
-            orgId: data.account.orgId,
-          })
-          setAccountType(data.account.accountType)
-          setOrgId(data.account.orgId)
-          loadDashboard(data.account.accountType, data.account.orgId)
-        }
-      })
-      .catch((error) => {
-        if (!isMounted) return
-        console.error("❌ [DASHBOARD] Error loading dashboard:", error)
-        hasLoadedRef.current = false // Reset on error
-        router.push("/auth/login")
-      })
-    
-    return () => {
-      isMounted = false
-    }
+    loadDashboard(account.accountType, account.orgId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Empty deps - only run once, router.push is stable
+  }, [userLoading, userError, account, router])
 
-  if (loading) {
+  if (userLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -155,7 +148,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <DashboardSidebar accountType={accountType} />
+      <DashboardSidebar />
 
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         {/* Top Bar */}
@@ -169,7 +162,9 @@ export default function DashboardPage() {
               Dashboard
             </h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">
-              Welcome back, <span className="font-semibold text-foreground">{role === "SUPERADMIN" ? "Super Admin" : role === "GOVT" ? "Government Agency" : "Organization"}</span>
+              Welcome back, <span className="font-semibold text-foreground">
+                {displayName || (role === "SUPERADMIN" ? "Super Admin" : role === "GOVT" ? "Government Agency" : "Organization")}
+              </span>
             </p>
           </div>
           <ThemeToggle />
@@ -177,7 +172,7 @@ export default function DashboardPage() {
 
         {/* Metrics */}
         <div className="mb-8">
-          <DashboardMetrics metrics={metrics} />
+          <DashboardMetrics metrics={metrics} accountType={accountType} />
         </div>
 
         {/* Action Cards for SUPERADMIN */}
@@ -280,27 +275,6 @@ export default function DashboardPage() {
           </motion.div>
         )}
 
-        {/* Export CSV for GOVT */}
-        {role === "GOVT" && widgets.showExportCSV && (
-          <div className="mb-8">
-            <Button
-              className="glass"
-              onClick={() => {
-                window.location.href = "/api/export/csv"
-              }}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export CSV
-            </Button>
-          </div>
-        )}
-
-        {/* Org Breakdown for GOVT */}
-        {role === "GOVT" && widgets.showOrgBreakdown && (
-          <div className="mb-8">
-            <OrgBreakdown />
-          </div>
-        )}
 
         {/* Efficiency Summary for ORG */}
         {role === "ORG" && widgets.showEfficiencySummary && orgId && (

@@ -168,8 +168,8 @@ export function WorkOrderModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[95vh] md:max-h-[90vh] overflow-hidden flex flex-col p-0 mx-4">
-        <DialogHeader className="border-b pb-4 px-4 md:px-6 pt-4 md:pt-6 pr-12 md:pr-16">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[95vh] md:max-h-[90vh] overflow-hidden flex flex-col p-0 mx-4 bg-background text-foreground">
+        <DialogHeader className="border-b border-border pb-4 px-4 md:px-6 pt-4 md:pt-6 pr-12 md:pr-16">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
             <DialogTitle className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent flex-1 min-w-0">
               <span className="block sm:inline">
@@ -292,7 +292,7 @@ export function WorkOrderModal({
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t px-4 md:px-6 pb-4 md:pb-6">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-border px-4 md:px-6 pb-4 md:pb-6">
             <Button
               type="button"
               variant="outline"

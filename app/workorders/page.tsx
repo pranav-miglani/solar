@@ -1,37 +1,22 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardSidebar } from "@/components/DashboardSidebar"
 import { WorkOrdersList } from "@/components/WorkOrdersList"
+import { useUser } from "@/context/UserContext"
 
 export default function WorkOrdersPage() {
   const router = useRouter()
-  const [accountType, setAccountType] = useState<string>("")
-  const [loading, setLoading] = useState(true)
+  const { account, loading, error } = useUser()
 
   useEffect(() => {
-    // Check authentication
-    fetch("/api/me")
-      .then((res) => {
-        if (!res.ok) {
-          router.push("/auth/login")
-          return null
-        }
-        return res.json()
-      })
-      .then((data) => {
-        if (data) {
-          setAccountType(data.account.accountType)
-        }
-      })
-      .catch(() => {
-        router.push("/auth/login")
-      })
-      .finally(() => {
-        setLoading(false)
-      })
-  }, [router])
+    if (loading) return
+    
+    if (error || !account) {
+      router.push("/auth/login")
+    }
+  }, [loading, error, account, router])
 
   if (loading) {
     return (
@@ -44,9 +29,15 @@ export default function WorkOrdersPage() {
     )
   }
 
+  if (!account) {
+    return null
+  }
+
+  const accountType = account.accountType
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <DashboardSidebar accountType={accountType} />
+      <DashboardSidebar />
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         <div className="mb-6 md:mb-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -60,7 +51,7 @@ export default function WorkOrdersPage() {
             </div>
           </div>
         </div>
-        <WorkOrdersList />
+        <WorkOrdersList accountType={accountType} />
       </div>
     </div>
   )

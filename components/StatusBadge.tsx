@@ -6,19 +6,19 @@ interface StatusBadgeProps {
 }
 
 const statusColors: Record<work_order_status, string> = {
-  OPEN: "bg-blue-100 text-blue-800 border-blue-200",
-  ASSIGNED: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  IN_PROGRESS: "bg-purple-100 text-purple-800 border-purple-200",
-  WAITING_VALIDATION: "bg-orange-100 text-orange-800 border-orange-200",
-  BLOCKED: "bg-red-100 text-red-800 border-red-200",
-  CLOSED: "bg-green-100 text-green-800 border-green-200",
+  OPEN: "bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+  ASSIGNED: "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800",
+  IN_PROGRESS: "bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800",
+  WAITING_VALIDATION: "bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800",
+  BLOCKED: "bg-red-500/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800",
+  CLOSED: "bg-green-500/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800",
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {
   return (
     <Badge
       variant="outline"
-      className={statusColors[status] || "bg-gray-100 text-gray-800"}
+      className={statusColors[status] || "bg-muted text-muted-foreground border-border"}
     >
       {status.replace("_", " ")}
     </Badge>

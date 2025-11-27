@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
@@ -9,7 +10,6 @@ import {
   Factory,
   FileText,
   AlertTriangle,
-  BarChart3,
   LogOut,
   Menu,
   X,
@@ -17,16 +17,23 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useUser } from "@/context/UserContext"
+import { clearUserCache } from "@/context/UserContext"
 
-interface DashboardSidebarProps {
-  accountType: string
-}
-
-export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
+export function DashboardSidebar() {
   const pathname = usePathname()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const { account, superAdmin, loading } = useUser()
+
+  // Get accountType from context, fallback to empty string if loading
+  const accountType = account?.accountType || ""
+  const userLogoUrl = account?.logoUrl || null
+  const superAdminLogoUrl = superAdmin?.logoUrl || null
+  const superAdminDisplayName = superAdmin?.displayName || null
 
   const handleLogout = () => {
+    // Clear user cache on logout
+    clearUserCache()
     document.cookie = "session=; path=/; max-age=0"
     window.location.href = "/auth/login"
   }
@@ -40,9 +47,9 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
     },
     {
       title: "Organizations",
-      href: "/superadmin/orgs",
+      href: "/orgs",
       icon: Building2,
-      roles: ["SUPERADMIN"],
+      roles: ["SUPERADMIN", "GOVT"],
     },
     {
       title: "Vendors",
@@ -68,13 +75,12 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
       icon: AlertTriangle,
       roles: ["SUPERADMIN", "ORG", "GOVT"],
     },
-    {
-      title: "Analytics",
-      href: "/analytics",
-      icon: BarChart3,
-      roles: ["SUPERADMIN", "ORG", "GOVT"],
-    },
-  ].filter((item) => item.roles.includes(accountType))
+  ]
+
+  // Filter nav items based on account type (only if account is loaded)
+  const filteredNavItems = account
+    ? navItems.filter((item) => item.roles.includes(account.accountType))
+    : []
 
   return (
     <>
@@ -106,14 +112,27 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
       >
         <div className="flex h-full flex-col">
           <div className="mb-8">
-            <h1 className="text-2xl font-bold">WOMS</h1>
-            <p className="text-sm text-muted-foreground">
-              Work Order Management System
-            </p>
+            {userLogoUrl && (
+              <div className="flex flex-col items-center justify-center mb-2">
+                <div className="relative h-12 w-48 mb-2">
+                  <Image 
+                    src={userLogoUrl} 
+                    alt="Logo" 
+                    fill
+                    className="object-contain"
+                    unoptimized
+                    onError={(e) => {
+                      // Hide image on error
+                      (e.target as HTMLImageElement).style.display = 'none'
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <nav className="flex-1 space-y-2">
-            {navItems.map((item) => {
+            {filteredNavItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
               return (
@@ -137,7 +156,31 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
             })}
           </nav>
 
-          <div className="mt-auto">
+          <div className="mt-auto space-y-4">
+            {/* Footer with SUPERADMIN logo and "Powered by" text */}
+            {(superAdminLogoUrl || superAdminDisplayName) && (
+              <div className="pt-4 border-t border-border">
+                <div className="flex flex-col items-center gap-2">
+                  {superAdminLogoUrl && (
+                    <div className="relative h-8 w-32 opacity-70">
+                      <Image 
+                        src={superAdminLogoUrl} 
+                        alt="Powered by" 
+                        fill
+                        className="object-contain"
+                        unoptimized
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none'
+                        }}
+                      />
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground text-center">
+                    Powered by {superAdminDisplayName || "Gigasolar"}
+                  </p>
+                </div>
+              </div>
+            )}
             <Button
               variant="ghost"
               className="w-full justify-start text-destructive hover:text-destructive"

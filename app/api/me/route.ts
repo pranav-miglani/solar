@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       // Get account to verify it still exists
       const { data: account, error } = await supabase
         .from("accounts")
-        .select("*")
+        .select("id, email, account_type, org_id, display_name, logo_url")
         .eq("id", sessionData.accountId)
         .single()
 
@@ -79,7 +79,28 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Account not found" }, { status: 404 })
       }
 
+      // Get SUPERADMIN account for footer
+      // If current user is SUPERADMIN, use their own info; otherwise get first SUPERADMIN
+      let superAdminLogoUrl = null
+      let superAdminDisplayName = null
+      if (account.account_type === "SUPERADMIN") {
+        // Use current user's info for footer
+        superAdminLogoUrl = account.logo_url || null
+        superAdminDisplayName = account.display_name || null
+      } else {
+        // Get first SUPERADMIN account for footer
+        const { data: superAdmin } = await supabase
+          .from("accounts")
+          .select("logo_url, display_name")
+          .eq("account_type", "SUPERADMIN")
+          .limit(1)
+          .single()
+        superAdminLogoUrl = superAdmin?.logo_url || null
+        superAdminDisplayName = superAdmin?.display_name || null
+      }
+
       // Return account data from session (faster) but verified against DB
+      // For ORG users, logoUrl represents the organization logo (since each org has one account)
       logApiResponse(request, 200, Date.now() - startTime)
       return NextResponse.json({
         account: {
@@ -87,6 +108,12 @@ export async function GET(request: NextRequest) {
           email: account.email,
           accountType: account.account_type,
           orgId: account.org_id,
+          displayName: account.display_name,
+          logoUrl: account.logo_url,
+        },
+        superAdmin: {
+          logoUrl: superAdminLogoUrl,
+          displayName: superAdminDisplayName,
         },
       })
     } catch (error) {

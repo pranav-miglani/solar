@@ -31,6 +31,7 @@ interface Vendor {
   vendor_type: string
   is_active: boolean
   last_synced_at: string | null
+  last_alert_synced_at: string | null
   created_at: string
   organizations: {
     id: number
@@ -40,6 +41,10 @@ interface Vendor {
   } | null
 }
 
+/**
+ * Read-only dashboard that surfaces plant/alert sync recency per vendor and lets
+ * admins trigger the global plant sync cron manually.
+ */
 export function VendorSyncDashboard() {
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,6 +56,7 @@ export function VendorSyncDashboard() {
     fetchVendorSyncStatus()
   }, [])
 
+  // Fetch latest sync timestamps+org metadata for display.
   async function fetchVendorSyncStatus() {
     try {
       const response = await fetch("/api/vendors/sync-status")
@@ -66,6 +72,7 @@ export function VendorSyncDashboard() {
     }
   }
 
+  // Call the plant sync cron endpoint manually; reloads table afterward.
   async function triggerManualSync() {
     setSyncing(true)
     try {
@@ -87,6 +94,7 @@ export function VendorSyncDashboard() {
     }
   }
 
+  // Translate last sync timestamp into a human-friendly badge so stale vendors pop visually.
   const getSyncStatusBadge = (vendor: Vendor) => {
     if (!vendor.is_active) {
       return (
@@ -133,6 +141,7 @@ export function VendorSyncDashboard() {
     }
   }
 
+  // Helper to display "minutes/hours ago" style text in both table+cards.
   const getLastSyncText = (lastSyncedAt: string | null) => {
     if (!lastSyncedAt) {
       return "Never"
@@ -285,7 +294,8 @@ export function VendorSyncDashboard() {
                   <TableHead>Organization</TableHead>
                   <TableHead>Auto-Sync</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Last Synced</TableHead>
+                  <TableHead>Last Plant Sync</TableHead>
+                  <TableHead>Last Alert Sync</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -357,6 +367,20 @@ export function VendorSyncDashboard() {
                           <span className="text-muted-foreground">Never</span>
                         )}
                       </TableCell>
+                      <TableCell>
+                        {vendor.last_alert_synced_at ? (
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium">
+                              {getLastSyncText(vendor.last_alert_synced_at)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {format(new Date(vendor.last_alert_synced_at), "PPp")}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Never</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -413,7 +437,7 @@ export function VendorSyncDashboard() {
                         )}
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Last Synced:</span>
+                        <span className="text-muted-foreground">Last Plant Sync:</span>
                         {vendor.last_synced_at ? (
                           <div className="text-right">
                             <div className="font-medium">
@@ -421,6 +445,21 @@ export function VendorSyncDashboard() {
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {format(new Date(vendor.last_synced_at), "PPp")}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Never</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Last Alert Sync:</span>
+                        {vendor.last_alert_synced_at ? (
+                          <div className="text-right">
+                            <div className="font-medium">
+                              {getLastSyncText(vendor.last_alert_synced_at)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {format(new Date(vendor.last_alert_synced_at), "PPp")}
                             </div>
                           </div>
                         ) : (

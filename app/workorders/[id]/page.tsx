@@ -16,12 +16,15 @@ export default async function WorkOrderDetailPage({
   }
 
   // Decode session (middleware already validates, but we decode for component)
+  let sessionData
   try {
-    JSON.parse(Buffer.from(session, "base64").toString())
+    sessionData = JSON.parse(Buffer.from(session, "base64").toString())
   } catch {
     redirect("/auth/login")
   }
 
-  return <WorkOrderDetailView workOrderId={params.id} />
+  const accountType = sessionData.accountType as string
+
+  return <WorkOrderDetailView workOrderId={params.id} accountType={accountType} />
 }
 

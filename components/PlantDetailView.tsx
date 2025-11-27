@@ -24,12 +24,15 @@ import Link from "next/link"
 import { TelemetryChart } from "@/components/TelemetryChart"
 import { format } from "date-fns"
 
+// Main plant payload for detail view. Energy values follow our kWh/MWh schema:
+// - daily_energy_kwh is in kWh (per latest migrations)
+// - monthly/yearly/total energy stay in MWh.
 interface Plant {
   id: number
   name: string
   capacity_kw: number
   current_power_kw: number | null
-  daily_energy_mwh: number | null
+  daily_energy_kwh: number | null
   monthly_energy_mwh: number | null
   yearly_energy_mwh: number | null
   total_energy_mwh: number | null
@@ -61,16 +64,33 @@ interface TelemetryData {
   generation_power_kw: number
 }
 
+// Recent alert snapshot used for the sidebar card. Note the combination of
+// downtime seconds (raw vendor duration) and derived benefit in kWh.
+interface PlantAlert {
+  id: number
+  title: string | null
+  description: string | null
+  severity: string | null
+  status: string | null
+  alert_time: string | null
+  end_time: string | null
+  grid_down_seconds: number | null
+  grid_down_benefit_kwh: number | null
+}
+
 export function PlantDetailView({ plantId }: { plantId: string }) {
   const router = useRouter()
   const [plant, setPlant] = useState<Plant | null>(null)
   const [telemetry, setTelemetry] = useState<TelemetryData[]>([])
+  const [alerts, setAlerts] = useState<PlantAlert[]>([])
+  const [alertsLoading, setAlertsLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPlantData()
     fetchTelemetry()
+    fetchAlerts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plantId])
 
@@ -92,6 +112,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
     }
   }
 
+  // Pull the last 24h of normalized telemetry (15-min granularity) for charts.
   async function fetchTelemetry() {
     try {
       const response = await fetch(`/api/telemetry/plant/${plantId}?hours=24`)
@@ -102,6 +123,26 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
       }
     } catch (err) {
       console.error("Failed to fetch telemetry:", err)
+    }
+  }
+
+  // Fetch the latest alerts for this plant (limited via API default) so users see
+  // quick downtime context without leaving the detail view.
+  async function fetchAlerts() {
+    try {
+      setAlertsLoading(true)
+      const response = await fetch(`/api/alerts?plantId=${plantId}&limit=5`)
+      if (!response.ok) {
+        setAlerts([])
+        return
+      }
+      const result = await response.json()
+      setAlerts(result.alerts || [])
+    } catch (err) {
+      console.error("Failed to fetch alerts:", err)
+      setAlerts([])
+    } finally {
+      setAlertsLoading(false)
     }
   }
 
@@ -278,8 +319,8 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Daily Energy</p>
               <p className="text-xl font-bold">
-                {plant.daily_energy_mwh !== null
-                  ? `${plant.daily_energy_mwh.toFixed(3)} MWh`
+                {plant.daily_energy_kwh !== null
+                  ? `${plant.daily_energy_kwh.toFixed(2)} kWh`
                   : "N/A"}
               </p>
             </div>
@@ -409,24 +450,95 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
           </CardContent>
         </Card>
 
-        {/* Telemetry Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Telemetry (24h)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {telemetry.length > 0 ? (
-              <TelemetryChart data={telemetry} title="Generation Power (24h)" />
-            ) : (
-              <div className="flex items-center justify-center h-64 text-muted-foreground">
-                <div className="text-center">
-                  <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No telemetry data available</p>
+        {/* Telemetry Chart + Recent Alerts */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Telemetry (24h)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {telemetry.length > 0 ? (
+                <TelemetryChart data={telemetry} title="Generation Power (24h)" />
+              ) : (
+                <div className="flex items-center justify-center h-64 text-muted-foreground">
+                  <div className="text-center">
+                    <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No telemetry data available</p>
+                  </div>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                Recent Alerts
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+      {alertsLoading ? (
+                <div className="flex items-center justify-center h-20 text-xs text-muted-foreground">
+                  Loading alerts...
+                </div>
+              ) : alerts.length === 0 ? (
+                <div className="flex items-center justify-center h-20 text-xs text-muted-foreground text-center">
+                  No recent alerts for this plant.
+                </div>
+              ) : (
+                <div className="space-y-2 text-xs">
+                  {alerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className="rounded-md border bg-card/60 px-3 py-2 flex flex-col gap-1"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium truncate">
+                          {alert.title || "No Mains Voltage"}
+                        </span>
+                        {alert.severity && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {alert.severity}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                        {alert.alert_time && (
+                          <span>
+                            Start: {new Date(alert.alert_time).toLocaleString()}
+                          </span>
+                        )}
+                        {alert.end_time && (
+                          <span>
+                            End: {new Date(alert.end_time).toLocaleString()}
+                          </span>
+                        )}
+                        {typeof alert.grid_down_seconds === "number" && (
+                          <span>
+                            Grid down: {(alert.grid_down_seconds / 60).toFixed(1)} min
+                          </span>
+                        )}
+                        {typeof alert.grid_down_benefit_kwh === "number" && (
+                          <span>
+                            Grid downtime benefit: {alert.grid_down_benefit_kwh.toFixed(2)} kWh
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-3 flex justify-end">
+                <Link href={`/alerts/vendor/${plant.vendors.id}/plant/${plant.id}`}>
+                  <Button variant="outline" size="sm" className="h-7 px-3 text-xs">
+                    View full alert history
+                  </Button>
+                </Link>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

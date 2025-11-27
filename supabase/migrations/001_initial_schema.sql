@@ -161,7 +161,7 @@ CREATE TABLE plants (
   location JSONB DEFAULT '{}',
   -- Production metrics (from Production Overview dashboard)
   current_power_kw NUMERIC(10, 3), -- Current Power in kW
-  daily_energy_mwh NUMERIC(10, 3), -- Daily Energy in MWh
+  daily_energy_kwh NUMERIC(10, 3), -- Daily Energy in kWh (stored in kWh to avoid rounding errors)
   monthly_energy_mwh NUMERIC(10, 3), -- Monthly Energy in MWh
   yearly_energy_mwh NUMERIC(10, 3), -- Yearly Energy in MWh
   total_energy_mwh NUMERIC(10, 3), -- Total Energy in MWh
@@ -180,7 +180,7 @@ CREATE TABLE plants (
 
 -- Add comments for plant production metrics
 COMMENT ON COLUMN plants.current_power_kw IS 'Current generation power in kW (shown in Production Overview)';
-COMMENT ON COLUMN plants.daily_energy_mwh IS 'Daily energy generation in MWh (shown in Production Overview)';
+COMMENT ON COLUMN plants.daily_energy_kwh IS 'Daily energy generation in kWh (shown in Production Overview). Stored in kWh to avoid rounding errors when converting between units.';
 COMMENT ON COLUMN plants.monthly_energy_mwh IS 'Monthly energy generation in MWh (shown in Production Overview)';
 COMMENT ON COLUMN plants.yearly_energy_mwh IS 'Yearly energy generation in MWh (shown in Production Overview)';
 COMMENT ON COLUMN plants.total_energy_mwh IS 'Total cumulative energy generation in MWh (shown in Production Overview)';
@@ -221,20 +221,9 @@ CREATE TABLE work_order_plants (
 CREATE UNIQUE INDEX uq_active_plant ON work_order_plants (plant_id)
 WHERE is_active = true;
 
--- Alerts table
-CREATE TABLE alerts (
-  id SERIAL PRIMARY KEY,
-  plant_id INTEGER NOT NULL REFERENCES plants(id) ON DELETE CASCADE,
-  vendor_alert_id TEXT, -- Original alert ID from vendor
-  title TEXT NOT NULL,
-  description TEXT,
-  severity alert_severity NOT NULL DEFAULT 'MEDIUM',
-  status alert_status NOT NULL DEFAULT 'ACTIVE',
-  metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  resolved_at TIMESTAMPTZ
-);
+-- Alerts schema is defined in a dedicated migration:
+--   008_initial_alert_schema.sql
+-- This keeps the core initial schema focused on accounts/orgs/vendors/plants/work orders.
 
 -- Work Order Plant Efficiency table
 CREATE TABLE work_order_plant_eff (
@@ -266,9 +255,6 @@ CREATE INDEX idx_work_orders_location ON work_orders(location) WHERE location IS
 CREATE INDEX idx_work_orders_created_by ON work_orders(created_by) WHERE created_by IS NOT NULL;
 CREATE INDEX idx_work_order_plants_work_order_id ON work_order_plants(work_order_id);
 CREATE INDEX idx_work_order_plants_plant_id ON work_order_plants(plant_id);
-CREATE INDEX idx_alerts_plant_id ON alerts(plant_id);
-CREATE INDEX idx_alerts_status ON alerts(status);
-CREATE INDEX idx_alerts_created_at ON alerts(created_at);
 CREATE INDEX idx_work_order_plant_eff_work_order_id ON work_order_plant_eff(work_order_id);
 CREATE INDEX idx_work_order_plant_eff_plant_id ON work_order_plant_eff(plant_id);
 
@@ -301,9 +287,6 @@ CREATE TRIGGER update_plants_updated_at BEFORE UPDATE ON plants
 CREATE TRIGGER update_work_orders_updated_at BEFORE UPDATE ON work_orders
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_alerts_updated_at BEFORE UPDATE ON alerts
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
 -- ============================================
 -- VERIFY SCHEMA CREATION
 -- ============================================
@@ -317,14 +300,14 @@ BEGIN
   WHERE table_schema = 'public'
     AND table_name IN (
       'accounts', 'organizations', 'vendors', 'plants',
-      'work_orders', 'work_order_plants', 'alerts', 'work_order_plant_eff'
+      'work_orders', 'work_order_plants', 'work_order_plant_eff'
     );
   
-  IF table_count < 8 THEN
-    RAISE EXCEPTION 'Not all tables were created. Expected 8, found %', table_count;
+  IF table_count < 7 THEN
+    RAISE EXCEPTION 'Not all core tables were created. Expected 7, found %', table_count;
   END IF;
   
-  RAISE NOTICE '✅ All 8 tables created successfully';
+  RAISE NOTICE '✅ Core tables created successfully (accounts, organizations, vendors, plants, work_orders, work_order_plants, work_order_plant_eff)';
   
   -- Verify production metrics columns exist in plants table
   IF NOT EXISTS (

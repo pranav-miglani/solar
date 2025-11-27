@@ -20,26 +20,28 @@ export default async function OrgsPage() {
     redirect("/auth/login")
   }
 
-  const accountType = sessionData.accountType
+  const accountType = sessionData.accountType as string
 
-  // Only SUPERADMIN can access this page
-  if (accountType !== "SUPERADMIN") {
+  // SUPERADMIN has full access, GOVT has read-only access
+  if (accountType !== "SUPERADMIN" && accountType !== "GOVT") {
     redirect("/dashboard")
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <DashboardSidebar accountType={accountType} />
+      <DashboardSidebar />
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         <div className="mb-6 md:mb-8">
           <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/60 bg-clip-text text-transparent">
             Organizations
           </h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
-            Manage all organizations and their accounts
+            {accountType === "SUPERADMIN"
+              ? "Manage all organizations and their accounts"
+              : "View all organizations and their accounts (read-only)"}
           </p>
         </div>
-        <OrgsTable />
+        <OrgsTable accountType={accountType} />
       </div>
     </div>
   )
