@@ -46,8 +46,23 @@ export async function GET(request: NextRequest) {
       // Apply role-based filtering
       if (accountType === "ORG" && orgId) {
         query = query.eq("org_id", orgId)
+      } else if (accountType === "GOVT") {
+        // GOVT users can only see plants that are mapped to work orders
+        // Get plant IDs from active work orders
+        const { data: workOrderPlants } = await supabase
+          .from("work_order_plants")
+          .select("plant_id")
+          .eq("is_active", true)
+
+        if (workOrderPlants && workOrderPlants.length > 0) {
+          const plantIds = workOrderPlants.map((wop) => wop.plant_id)
+          query = query.in("id", plantIds)
+        } else {
+          // No plants in work orders, return empty array
+          query = query.eq("id", -1) // This will return no results
+        }
       }
-      // SUPERADMIN and GOVT can see all plants
+      // SUPERADMIN can see all plants
 
       const { data: plants, error } = await query
 
