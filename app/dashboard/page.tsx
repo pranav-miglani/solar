@@ -8,7 +8,6 @@ import { DashboardMetrics } from "@/components/DashboardMetrics"
 import { TelemetryChart } from "@/components/TelemetryChart"
 import { AlertsFeed } from "@/components/AlertsFeed"
 import { EfficiencySummary } from "@/components/EfficiencySummary"
-import { OrganizationProductionOverview } from "@/components/OrganizationProductionOverview"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { Building2, Factory, Plus, FileText } from "lucide-react"
 import Link from "next/link"
@@ -41,10 +40,9 @@ export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(
     null
   )
-  const [telemetryData, setTelemetryData] = useState<any[]>([])
-  const [alerts, setAlerts] = useState<any[]>([])
-  const [organizations, setOrganizations] = useState<any[]>([])
-  const [organizationName, setOrganizationName] = useState<string | null>(null)
+      const [telemetryData, setTelemetryData] = useState<any[]>([])
+      const [alerts, setAlerts] = useState<any[]>([])
+      const [organizationName, setOrganizationName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [accountType, setAccountType] = useState<string>("")
   const [orgId, setOrgId] = useState<number | null>(null)
@@ -54,7 +52,7 @@ export default function DashboardPage() {
   const loadDashboard = async (accountType: string, orgId: number | null) => {
     try {
       console.log("📊 [DASHBOARD] Loading dashboard data for:", { accountType, orgId })
-      const [dashboardRes, telemetryRes, alertsRes, orgsRes] = await Promise.all([
+      const [dashboardRes, telemetryRes, alertsRes] = await Promise.all([
         fetch("/api/dashboard"),
         fetch(
           accountType === "GOVT"
@@ -64,19 +62,15 @@ export default function DashboardPage() {
             : "/api/telemetry/global"
         ),
         fetch("/api/alerts"),
-        // Fetch organizations for GOVT users to show metrics for each org
-        accountType === "GOVT" ? fetch("/api/orgs") : Promise.resolve({ json: async () => ({ orgs: [] }) }),
       ])
 
       const dashboard = await dashboardRes.json()
       const telemetry = await telemetryRes.json()
       const alertsData = await alertsRes.json()
-      const orgsData = await orgsRes.json()
 
       setDashboardData(dashboard)
       setTelemetryData(telemetry.data || [])
       setAlerts(alertsData.alerts || [])
-      setOrganizations(orgsData.orgs || [])
       
       // Fetch organization name for ORG users
       if (accountType === "ORG" && orgId) {
@@ -298,30 +292,6 @@ export default function DashboardPage() {
           </motion.div>
         )}
 
-        {/* Organization Production Overview for ORG users */}
-        {role === "ORG" && orgId && (
-          <div className="mb-8">
-            <OrganizationProductionOverview
-              orgId={orgId}
-              organizationName={organizationName || undefined}
-              accountType={accountType}
-            />
-          </div>
-        )}
-
-        {/* Organization Production Overview for GOVT users (show all orgs) */}
-        {role === "GOVT" && organizations.length > 0 && (
-          <div className="mb-8 space-y-6">
-            {organizations.map((org) => (
-              <OrganizationProductionOverview
-                key={org.id}
-                orgId={org.id}
-                organizationName={org.name}
-                accountType={accountType}
-              />
-            ))}
-          </div>
-        )}
 
         {/* Efficiency Summary for ORG */}
         {role === "ORG" && widgets.showEfficiencySummary && orgId && (

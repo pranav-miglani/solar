@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { DashboardSidebar } from "@/components/DashboardSidebar"
 import { WorkOrdersList } from "@/components/WorkOrdersList"
+import { OrganizationProductionOverview } from "@/components/OrganizationProductionOverview"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -96,6 +97,18 @@ export default function OrgWorkOrdersPage() {
             </div>
           </div>
         </div>
+        
+        {/* Organization Production Overview - shown for all users */}
+        {orgId && (
+          <div className="mb-8">
+            <OrganizationProductionOverview
+              orgId={orgId}
+              organizationName={organizationName || undefined}
+              accountType={accountType}
+            />
+          </div>
+        )}
+        
         <WorkOrdersList accountType={accountType} orgId={orgId} organizationName={organizationName} />
       </div>
     </div>
