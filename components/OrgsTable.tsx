@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Image from "next/image"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -1007,14 +1008,18 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                         {accounts.find((acc) => acc.org_id === selectedOrg?.id)?.logo_url && (
                           <div className="mt-2">
                             <p className="text-xs text-muted-foreground mb-1">Current Logo:</p>
-                            <img 
-                              src={accounts.find((acc) => acc.org_id === selectedOrg?.id)?.logo_url || ""} 
-                              alt="Organization logo" 
-                              className="h-12 w-auto max-w-full object-contain"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none'
-                              }}
-                            />
+                            <div className="relative h-12 w-48">
+                              <Image 
+                                src={accounts.find((acc) => acc.org_id === selectedOrg?.id)?.logo_url || ""} 
+                                alt="Organization logo" 
+                                fill
+                                className="object-contain"
+                                unoptimized
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none'
+                                }}
+                              />
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1187,14 +1192,18 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                       {selectedGovtAccount.logo_url && (
                         <div className="mt-2">
                           <p className="text-xs text-muted-foreground mb-1">Current Logo:</p>
-                          <img 
-                            src={selectedGovtAccount.logo_url} 
-                            alt="GOVT user logo" 
-                            className="h-12 w-auto max-w-full object-contain"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none'
-                            }}
-                          />
+                          <div className="relative h-12 w-48">
+                            <Image 
+                              src={selectedGovtAccount.logo_url} 
+                              alt="GOVT user logo" 
+                              fill
+                              className="object-contain"
+                              unoptimized
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none'
+                              }}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
@@ -131,15 +132,19 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
           <div className="mb-8">
             {userLogoUrl && (
               <div className="flex flex-col items-center justify-center mb-2">
-                <img 
-                  src={userLogoUrl} 
-                  alt="Logo" 
-                  className="h-12 w-auto max-w-full object-contain mb-2"
-                  onError={(e) => {
-                    // Hide image on error
-                    (e.target as HTMLImageElement).style.display = 'none'
-                  }}
-                />
+                <div className="relative h-12 w-48 mb-2">
+                  <Image 
+                    src={userLogoUrl} 
+                    alt="Logo" 
+                    fill
+                    className="object-contain"
+                    unoptimized
+                    onError={(e) => {
+                      // Hide image on error
+                      (e.target as HTMLImageElement).style.display = 'none'
+                    }}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -175,14 +180,18 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
               <div className="pt-4 border-t border-border">
                 <div className="flex flex-col items-center gap-2">
                   {superAdminLogoUrl && (
-                    <img 
-                      src={superAdminLogoUrl} 
-                      alt="Powered by" 
-                      className="h-8 w-auto max-w-full object-contain opacity-70"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none'
-                      }}
-                    />
+                    <div className="relative h-8 w-32 opacity-70">
+                      <Image 
+                        src={superAdminLogoUrl} 
+                        alt="Powered by" 
+                        fill
+                        className="object-contain"
+                        unoptimized
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none'
+                        }}
+                      />
+                    </div>
                   )}
                   <p className="text-xs text-muted-foreground text-center">
                     Powered by {superAdminDisplayName || "Gigasolar"}
