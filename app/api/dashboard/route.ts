@@ -15,7 +15,7 @@ interface DashboardData {
     totalAlerts?: number
     activeAlerts?: number
     totalWorkOrders?: number
-    totalGeneration24h?: number
+    totalEnergyMwh?: number
   }
   widgets: {
     showOrganizations?: boolean
@@ -94,12 +94,20 @@ export async function GET(request: NextRequest) {
       const totalPlants = plantsResult.count || 0
       const unmappedPlants = totalPlants - mappedPlants
 
+      // Calculate total energy generation (sum of total_energy_mwh from all plants)
+      const { data: allPlants } = await supabase
+        .from("plants")
+        .select("total_energy_mwh")
+
+      const totalEnergyMwh = allPlants?.reduce((sum, p) => sum + (p.total_energy_mwh || 0), 0) || 0
+
       dashboardData.metrics = {
         totalPlants,
         unmappedPlants,
         mappedPlants,
         activeAlerts: activeAlertsResult.count || 0,
         totalWorkOrders: workOrdersResult.count || 0,
+        totalEnergyMwh,
       }
 
       dashboardData.widgets = {
@@ -138,12 +146,20 @@ export async function GET(request: NextRequest) {
       const totalPlants = plantsResult.count || 0
       const unmappedPlants = totalPlants - mappedPlants
 
+      // Calculate total energy generation (sum of total_energy_mwh from all plants)
+      const { data: allPlants } = await supabase
+        .from("plants")
+        .select("total_energy_mwh")
+
+      const totalEnergyMwh = allPlants?.reduce((sum, p) => sum + (p.total_energy_mwh || 0), 0) || 0
+
       dashboardData.metrics = {
         totalPlants,
         unmappedPlants,
         mappedPlants,
         activeAlerts: activeAlertsResult.count || 0,
         totalWorkOrders: workOrdersResult.count || 0,
+        totalEnergyMwh,
       }
 
       dashboardData.widgets = {
@@ -203,12 +219,21 @@ export async function GET(request: NextRequest) {
         .select("id", { count: "exact", head: true })
         .in("id", workOrderIds.length > 0 ? workOrderIds : [-1]) // Use -1 to return empty if no work orders
 
+      // Calculate total energy generation (sum of total_energy_mwh from org plants)
+      const { data: orgPlantsData } = await supabase
+        .from("plants")
+        .select("total_energy_mwh")
+        .eq("org_id", orgId)
+
+      const totalEnergyMwh = orgPlantsData?.reduce((sum, p) => sum + (p.total_energy_mwh || 0), 0) || 0
+
       dashboardData.metrics = {
         totalPlants,
         unmappedPlants,
         mappedPlants,
         activeAlerts: activeAlertsResult.count || 0,
         totalWorkOrders: workOrdersResult.count || 0,
+        totalEnergyMwh,
       }
 
       dashboardData.widgets = {

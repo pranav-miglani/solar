@@ -22,7 +22,7 @@ interface DashboardMetricsProps {
     totalAlerts?: number
     activeAlerts?: number
     totalWorkOrders?: number
-    totalGeneration24h?: number
+    totalEnergyMwh?: number
   }
   // Optional account type so we can tweak which cards appear per role (e.g. hide alerts for GOVT)
   accountType?: string
@@ -67,9 +67,9 @@ export function DashboardMetrics({ metrics, accountType }: DashboardMetricsProps
       borderColor: "border-purple-200 dark:border-purple-800",
     },
     {
-      label: "24h Generation",
-      value: metrics.totalGeneration24h
-        ? `${(metrics.totalGeneration24h / 1000).toFixed(1)} MWh`
+      label: "Total Energy Generation",
+      value: metrics.totalEnergyMwh
+        ? `${metrics.totalEnergyMwh.toFixed(1)} MWh`
         : "0 MWh",
       icon: TrendingUp,
       gradient: "from-emerald-500 via-green-500 to-teal-500",
