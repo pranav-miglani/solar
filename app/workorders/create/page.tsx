@@ -1,43 +1,23 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardSidebar } from "@/components/DashboardSidebar"
 import { CreateWorkOrderForm } from "@/components/CreateWorkOrderForm"
+import { useAuth } from "@/hooks/useAuth"
 
 export default function CreateWorkOrderPage() {
   const router = useRouter()
-  const [accountType, setAccountType] = useState<string>("")
-  const [loading, setLoading] = useState(true)
+  const { account, loading } = useAuth()
 
   useEffect(() => {
-    // Check authentication
-    fetch("/api/me")
-      .then((res) => {
-        if (!res.ok) {
-          router.push("/auth/login")
-          return null
-        }
-        return res.json()
-      })
-      .then((data) => {
-        if (data) {
-          const userAccountType = data.account.accountType
-          setAccountType(userAccountType)
-          
-          // Only SUPERADMIN can create work orders
-          if (userAccountType !== "SUPERADMIN") {
-            router.push("/dashboard")
-          }
-        }
-      })
-      .catch(() => {
-        router.push("/auth/login")
-      })
-      .finally(() => {
-        setLoading(false)
-      })
-  }, [router])
+    if (loading) return
+    
+    // Only SUPERADMIN can create work orders
+    if (account && account.accountType !== "SUPERADMIN") {
+      router.push("/dashboard")
+    }
+  }, [account, loading, router])
 
   if (loading) {
     return (
@@ -50,9 +30,13 @@ export default function CreateWorkOrderPage() {
     )
   }
 
+  if (!account) {
+    return null
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <DashboardSidebar accountType={accountType} />
+      <DashboardSidebar />
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6 text-foreground">Create Work Order</h1>

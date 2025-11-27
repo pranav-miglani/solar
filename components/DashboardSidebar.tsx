@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
@@ -17,126 +17,24 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useUser } from "@/context/UserContext"
+import { clearUserCache } from "@/context/UserContext"
 
-interface DashboardSidebarProps {
-  accountType: string
-  userLogoUrl?: string | null
-  superAdminLogoUrl?: string | null
-  superAdminDisplayName?: string | null
-}
-
-export function DashboardSidebar({ 
-  accountType, 
-  userLogoUrl: propUserLogoUrl,
-  superAdminLogoUrl: propSuperAdminLogoUrl,
-  superAdminDisplayName: propSuperAdminDisplayName,
-}: DashboardSidebarProps) {
+export function DashboardSidebar() {
   const pathname = usePathname()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
-  const [userLogoUrl, setUserLogoUrl] = useState<string | null>(null)
-  const [superAdminLogoUrl, setSuperAdminLogoUrl] = useState<string | null>(null)
-  const [superAdminDisplayName, setSuperAdminDisplayName] = useState<string | null>(null)
+  const { account, superAdmin, loading } = useUser()
 
-  useEffect(() => {
-    // If props are provided, use them and cache in sessionStorage
-    if (propUserLogoUrl !== undefined) {
-      setUserLogoUrl(propUserLogoUrl)
-      if (propUserLogoUrl) {
-        sessionStorage.setItem("userLogoUrl", propUserLogoUrl)
-      }
-    }
-    if (propSuperAdminLogoUrl !== undefined) {
-      setSuperAdminLogoUrl(propSuperAdminLogoUrl)
-      if (propSuperAdminLogoUrl) {
-        sessionStorage.setItem("superAdminLogoUrl", propSuperAdminLogoUrl)
-      }
-    }
-    if (propSuperAdminDisplayName !== undefined) {
-      setSuperAdminDisplayName(propSuperAdminDisplayName)
-      if (propSuperAdminDisplayName) {
-        sessionStorage.setItem("superAdminDisplayName", propSuperAdminDisplayName)
-      }
-    }
+  // Get accountType from context, fallback to empty string if loading
+  const accountType = account?.accountType || ""
+  const userLogoUrl = account?.logoUrl || null
+  const superAdminLogoUrl = superAdmin?.logoUrl || null
+  const superAdminDisplayName = superAdmin?.displayName || null
 
-    // Check if we need to fetch any data
-    const needsUserLogo = propUserLogoUrl === undefined
-    const needsSuperAdminInfo = propSuperAdminLogoUrl === undefined || propSuperAdminDisplayName === undefined
-    
-    // If props not provided, check sessionStorage first
-    if (needsUserLogo) {
-      const cachedUserLogo = sessionStorage.getItem("userLogoUrl")
-      if (cachedUserLogo) {
-        setUserLogoUrl(cachedUserLogo)
-      }
-    }
-    
-    if (needsSuperAdminInfo) {
-      const cachedSuperAdminLogo = sessionStorage.getItem("superAdminLogoUrl")
-      const cachedSuperAdminName = sessionStorage.getItem("superAdminDisplayName")
-      
-      if (cachedSuperAdminLogo) {
-        setSuperAdminLogoUrl(cachedSuperAdminLogo)
-      }
-      if (cachedSuperAdminName) {
-        setSuperAdminDisplayName(cachedSuperAdminName)
-      }
-    }
-    
-    // Only make a single API call if we need data that's not in props or cache
-    const needsFetch = 
-      (needsUserLogo && !sessionStorage.getItem("userLogoUrl")) ||
-      (needsSuperAdminInfo && (!sessionStorage.getItem("superAdminLogoUrl") || !sessionStorage.getItem("superAdminDisplayName")))
-    
-    if (needsFetch) {
-      fetch("/api/me")
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.account) {
-            // Set user logo if needed
-            if (needsUserLogo && !sessionStorage.getItem("userLogoUrl")) {
-              const logoUrl = data.account.logoUrl || null
-              setUserLogoUrl(logoUrl)
-              if (logoUrl) {
-                sessionStorage.setItem("userLogoUrl", logoUrl)
-              }
-            }
-            
-            // For SUPERADMIN, also set footer info from their own account
-            if (data.account.accountType === "SUPERADMIN") {
-              if (needsSuperAdminInfo) {
-                const superAdminLogo = data.account.logoUrl || null
-                const superAdminName = data.account.displayName || null
-                setSuperAdminLogoUrl(superAdminLogo)
-                setSuperAdminDisplayName(superAdminName)
-                if (superAdminLogo) {
-                  sessionStorage.setItem("superAdminLogoUrl", superAdminLogo)
-                }
-                if (superAdminName) {
-                  sessionStorage.setItem("superAdminDisplayName", superAdminName)
-                }
-              }
-            }
-          }
-          
-          // For non-SUPERADMIN users, get SUPERADMIN info for footer
-          if (needsSuperAdminInfo && data.superAdmin) {
-            const superAdminLogo = data.superAdmin.logoUrl || null
-            const superAdminName = data.superAdmin.displayName || null
-            setSuperAdminLogoUrl(superAdminLogo)
-            setSuperAdminDisplayName(superAdminName)
-            if (superAdminLogo) {
-              sessionStorage.setItem("superAdminLogoUrl", superAdminLogo)
-            }
-            if (superAdminName) {
-              sessionStorage.setItem("superAdminDisplayName", superAdminName)
-            }
-          }
-        })
-        .catch((error) => {
-          console.error("Failed to fetch user info:", error)
-        })
-    }
-  }, [propUserLogoUrl, propSuperAdminLogoUrl, propSuperAdminDisplayName])
+  // Filter nav items based on account type (only if account is loaded)
+  const filteredNavItems = account
+    ? navItems.filter((item) => item.roles.includes(account.accountType))
+    : []
 
   const handleLogout = () => {
     document.cookie = "session=; path=/; max-age=0"
@@ -232,7 +130,7 @@ export function DashboardSidebar({
           </div>
 
           <nav className="flex-1 space-y-2">
-            {navItems.map((item) => {
+            {filteredNavItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
               return (

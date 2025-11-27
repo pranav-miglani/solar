@@ -9,6 +9,7 @@ import { TelemetryChart } from "@/components/TelemetryChart"
 import { AlertsFeed } from "@/components/AlertsFeed"
 import { EfficiencySummary } from "@/components/EfficiencySummary"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { useUser } from "@/context/UserContext"
 import { Building2, Factory, Plus, FileText } from "lucide-react"
 import Link from "next/link"
 
@@ -37,20 +38,19 @@ interface DashboardData {
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { account, loading: userLoading, error: userError } = useUser()
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(
     null
   )
-      const [telemetryData, setTelemetryData] = useState<any[]>([])
-      const [alerts, setAlerts] = useState<any[]>([])
-      const [organizationName, setOrganizationName] = useState<string | null>(null)
+  const [telemetryData, setTelemetryData] = useState<any[]>([])
+  const [alerts, setAlerts] = useState<any[]>([])
+  const [organizationName, setOrganizationName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [accountType, setAccountType] = useState<string>("")
-  const [orgId, setOrgId] = useState<number | null>(null)
-  const [displayName, setDisplayName] = useState<string | null>(null)
-  const [userLogoUrl, setUserLogoUrl] = useState<string | null>(null)
-  const [superAdminLogoUrl, setSuperAdminLogoUrl] = useState<string | null>(null)
-  const [superAdminDisplayName, setSuperAdminDisplayName] = useState<string | null>(null)
   const hasLoadedRef = useRef(false)
+
+  const accountType = account?.accountType || ""
+  const orgId = account?.orgId || null
+  const displayName = account?.displayName || null
 
   const loadDashboard = async (accountType: string, orgId: number | null) => {
     try {
@@ -99,73 +99,37 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
+    // Wait for user context to load
+    if (userLoading) {
+      return
+    }
+
+    // Check for authentication error
+    if (userError || !account) {
+      console.log("❌ [DASHBOARD] Authentication failed, redirecting to login")
+      router.push("/auth/login")
+      return
+    }
+
     // Prevent multiple loads
     if (hasLoadedRef.current) {
       console.log("⏸️ [DASHBOARD] Already loaded, skipping...")
       return
     }
     
-    let isMounted = true
     hasLoadedRef.current = true
     
-    console.log("📊 [DASHBOARD] Initializing dashboard...")
+    console.log("✅ [DASHBOARD] User context loaded:", {
+      accountType: account.accountType,
+      orgId: account.orgId,
+      displayName: account.displayName,
+    })
     
-    // Check authentication
-    fetch("/api/me")
-      .then((res) => {
-        if (!isMounted) return null
-        if (!res.ok) {
-          console.log("❌ [DASHBOARD] Authentication failed, redirecting to login")
-          hasLoadedRef.current = false // Reset on auth failure
-          router.push("/auth/login")
-          return null
-        }
-        return res.json()
-      })
-      .then((data) => {
-        if (!isMounted) return
-        if (data) {
-          console.log("✅ [DASHBOARD] Authentication successful:", {
-            accountType: data.account.accountType,
-            orgId: data.account.orgId,
-            displayName: data.account.displayName,
-          })
-          setAccountType(data.account.accountType)
-          setOrgId(data.account.orgId)
-          setDisplayName(data.account.displayName)
-          
-          // Set logo URLs from the same API call
-          setUserLogoUrl(data.account.logoUrl || null)
-          
-          // For SUPERADMIN, also set footer info from their own account
-          if (data.account.accountType === "SUPERADMIN") {
-            setSuperAdminLogoUrl(data.account.logoUrl || null)
-            setSuperAdminDisplayName(data.account.displayName || null)
-          }
-          
-          // For non-SUPERADMIN users, get SUPERADMIN info for footer
-          if (data.superAdmin) {
-            setSuperAdminLogoUrl(data.superAdmin.logoUrl || null)
-            setSuperAdminDisplayName(data.superAdmin.displayName || null)
-          }
-          
-          loadDashboard(data.account.accountType, data.account.orgId)
-        }
-      })
-      .catch((error) => {
-        if (!isMounted) return
-        console.error("❌ [DASHBOARD] Error loading dashboard:", error)
-        hasLoadedRef.current = false // Reset on error
-        router.push("/auth/login")
-      })
-    
-    return () => {
-      isMounted = false
-    }
+    loadDashboard(account.accountType, account.orgId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Empty deps - only run once, router.push is stable
+  }, [userLoading, userError, account, router])
 
-  if (loading) {
+  if (userLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -184,12 +148,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <DashboardSidebar 
-        accountType={accountType}
-        userLogoUrl={userLogoUrl}
-        superAdminLogoUrl={superAdminLogoUrl}
-        superAdminDisplayName={superAdminDisplayName}
-      />
+      <DashboardSidebar />
 
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         {/* Top Bar */}

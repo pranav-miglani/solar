@@ -29,7 +29,7 @@ export default async function VendorsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <DashboardSidebar accountType={accountType} />
+      <DashboardSidebar />
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         <div className="mb-6 md:mb-8">
           <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/60 bg-clip-text text-transparent">

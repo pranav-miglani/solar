@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation"
 import { DashboardSidebar } from "@/components/DashboardSidebar"
 import { WorkOrdersList } from "@/components/WorkOrdersList"
 import { OrganizationProductionOverview } from "@/components/OrganizationProductionOverview"
+import { useUser } from "@/context/UserContext"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -13,11 +14,8 @@ export default function OrgWorkOrdersPage() {
   const router = useRouter()
   const params = useParams()
   const orgId = params?.id ? parseInt(params.id as string, 10) : null
-  const [accountType, setAccountType] = useState<string>("")
+  const { account, loading: userLoading, error: userError } = useUser()
   const [organizationName, setOrganizationName] = useState<string>("")
-  const [userLogoUrl, setUserLogoUrl] = useState<string | null>(null)
-  const [superAdminLogoUrl, setSuperAdminLogoUrl] = useState<string | null>(null)
-  const [superAdminDisplayName, setSuperAdminDisplayName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -26,56 +24,32 @@ export default function OrgWorkOrdersPage() {
       return
     }
 
-    // Check authentication
-    fetch("/api/me")
-      .then((res) => {
-        if (!res.ok) {
-          router.push("/auth/login")
-          return null
-        }
-        return res.json()
-      })
-      .then((data) => {
-        if (data) {
-          setAccountType(data.account.accountType)
-          
-          // Set logo URLs from the same API call
-          setUserLogoUrl(data.account.logoUrl || null)
-          
-          // For SUPERADMIN, also set footer info from their own account
-          if (data.account.accountType === "SUPERADMIN") {
-            setSuperAdminLogoUrl(data.account.logoUrl || null)
-            setSuperAdminDisplayName(data.account.displayName || null)
-          }
-          
-          // For non-SUPERADMIN users, get SUPERADMIN info for footer
-          if (data.superAdmin) {
-            setSuperAdminLogoUrl(data.superAdmin.logoUrl || null)
-            setSuperAdminDisplayName(data.superAdmin.displayName || null)
-          }
-          
-          // Fetch organization name
-          fetch(`/api/orgs/${orgId}`)
-            .then((res) => res.json())
-            .then((orgData) => {
-              if (orgData.org) {
-                setOrganizationName(orgData.org.name)
-              }
-            })
-            .catch(() => {
-              // If org fetch fails, continue anyway
-            })
-            .finally(() => {
-              setLoading(false)
-            })
+    if (userLoading) {
+      return
+    }
+
+    if (userError || !account) {
+      router.push("/auth/login")
+      return
+    }
+
+    // Fetch organization name
+    fetch(`/api/orgs/${orgId}`)
+      .then((res) => res.json())
+      .then((orgData) => {
+        if (orgData.org) {
+          setOrganizationName(orgData.org.name)
         }
       })
       .catch(() => {
-        router.push("/auth/login")
+        // If org fetch fails, continue anyway
       })
-  }, [orgId, router])
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [orgId, router, userLoading, userError, account])
 
-  if (loading) {
+  if (userLoading || loading || !account) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -86,14 +60,11 @@ export default function OrgWorkOrdersPage() {
     )
   }
 
+  const accountType = account.accountType
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <DashboardSidebar 
-        accountType={accountType}
-        userLogoUrl={userLogoUrl}
-        superAdminLogoUrl={superAdminLogoUrl}
-        superAdminDisplayName={superAdminDisplayName}
-      />
+      <DashboardSidebar />
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         <div className="mb-6 md:mb-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
