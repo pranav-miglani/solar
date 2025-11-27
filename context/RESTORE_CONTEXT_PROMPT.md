@@ -85,7 +85,7 @@ You are an expert full-stack engineer continuing development on **WOMS (Work Ord
 - Global telemetry chart, alerts feed, work orders summary
 
 **GOVT**:
-- Global 24h generation, alerts across all orgs, org breakdown, read-only WO list, Export CSV
+- Global 24h generation, alerts across all orgs, org breakdown, read-only WO list
 
 **ORG**:
 - Own plants only, own alerts, own work orders, org telemetry 24h, efficiency summary

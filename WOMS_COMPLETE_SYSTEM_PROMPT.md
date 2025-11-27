@@ -337,9 +337,6 @@ interface TelemetryData {
 - `GET /api/cron/sync-plants` - Trigger plant sync (requires CRON_SECRET)
 - `GET /api/cron/sync-alerts` - Trigger alert sync (requires CRON_SECRET)
 
-### Export
-- `GET /api/export/csv` - Export data as CSV
-
 ## UI Pages Structure
 
 ### Public Pages

@@ -8,16 +8,8 @@ import { DashboardMetrics } from "@/components/DashboardMetrics"
 import { TelemetryChart } from "@/components/TelemetryChart"
 import { AlertsFeed } from "@/components/AlertsFeed"
 import { EfficiencySummary } from "@/components/EfficiencySummary"
-import { OrgBreakdown } from "@/components/OrgBreakdown"
 import { ThemeToggle } from "@/components/ThemeToggle"
-import { Button } from "@/components/ui/button"
-import {
-  Building2,
-  Factory,
-  Plus,
-  FileText,
-  Download,
-} from "lucide-react"
+import { Building2, Factory, Plus, FileText } from "lucide-react"
 import Link from "next/link"
 
 interface DashboardData {
@@ -39,8 +31,6 @@ interface DashboardData {
     showTelemetryChart?: boolean
     showAlertsFeed?: boolean
     showWorkOrdersSummary?: boolean
-    showOrgBreakdown?: boolean
-    showExportCSV?: boolean
     showEfficiencySummary?: boolean
   }
 }
@@ -278,28 +268,6 @@ export default function DashboardPage() {
               </motion.div>
             </Link>
           </motion.div>
-        )}
-
-        {/* Export CSV for GOVT */}
-        {role === "GOVT" && widgets.showExportCSV && (
-          <div className="mb-8">
-            <Button
-              className="glass"
-              onClick={() => {
-                window.location.href = "/api/export/csv"
-              }}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export CSV
-            </Button>
-          </div>
-        )}
-
-        {/* Org Breakdown for GOVT */}
-        {role === "GOVT" && widgets.showOrgBreakdown && (
-          <div className="mb-8">
-            <OrgBreakdown />
-          </div>
         )}
 
         {/* Efficiency Summary for ORG */}

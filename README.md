@@ -49,7 +49,7 @@ WOMS is a comprehensive platform that enables:
 #### 1. Unified Dashboard
 - **Role-Adaptive Interface**: Dashboard content automatically adjusts based on user role
   - **Super Admin**: Full system controls, management panels, global metrics
-  - **Government**: Read-only global view with export capabilities
+  - **Government**: Read-only global view across all organizations
   - **Organization**: Read-only view limited to own organization's data
 - **Real-Time Metrics**: Live system statistics (plants, alerts, work orders, generation)
 - **Interactive Charts**: Animated telemetry charts using Recharts
@@ -496,7 +496,6 @@ Efficiency metrics for work order plants.
 **Capabilities**:
 - Read-only global access
 - View all organizations, plants, work orders, alerts
-- Export data to CSV
 - Monitor system-wide telemetry
 
 **Permissions**:
@@ -517,7 +516,6 @@ Efficiency metrics for work order plants.
 - All alerts across organizations
 - Organization-wise breakdown cards
 - Read-only work order list
-- Export CSV button
 - Global telemetry chart
 
 ### ORG (Organization)

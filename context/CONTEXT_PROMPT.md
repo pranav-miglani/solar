@@ -100,7 +100,6 @@ You are an expert full-stack engineer continuing development on a **Work Order M
 - Alerts across all orgs
 - Org-wise breakdown cards
 - Read-only WO list
-- Export CSV button
 
 **ORG**:
 - Only their own plants
@@ -302,8 +301,7 @@ npm run lint
 4. Add vendor adapter implementations (beyond Solarman)
 5. Deploy Edge Functions to cloud Supabase
 6. Add comprehensive error handling and user feedback
-7. Implement CSV export for GOVT users
-8. Add efficiency calculations and display
+7. Add efficiency calculations and display
 
 ---
 
