@@ -69,7 +69,7 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
       roles: ["SUPERADMIN", "ORG", "GOVT"],
     },
     {
-      title: "Analytics",
+      title: "Analytics (Coming Soon)",
       href: "/analytics",
       icon: BarChart3,
       roles: ["SUPERADMIN", "ORG", "GOVT"],
