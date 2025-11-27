@@ -129,31 +129,18 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
       >
         <div className="flex h-full flex-col">
           <div className="mb-8">
-            {userLogoUrl ? (
+            {userLogoUrl && (
               <div className="flex flex-col items-center justify-center mb-2">
                 <img 
                   src={userLogoUrl} 
                   alt="Logo" 
                   className="h-12 w-auto max-w-full object-contain mb-2"
                   onError={(e) => {
-                    // Hide image on error and show fallback
+                    // Hide image on error
                     (e.target as HTMLImageElement).style.display = 'none'
                   }}
                 />
-                <div style={{ display: 'none' }} className="text-center">
-                  <h1 className="text-2xl font-bold">WOMS</h1>
-                  <p className="text-sm text-muted-foreground">
-                    Work Order Management System
-                  </p>
-                </div>
               </div>
-            ) : (
-              <>
-                <h1 className="text-2xl font-bold">WOMS</h1>
-                <p className="text-sm text-muted-foreground">
-                  Work Order Management System
-                </p>
-              </>
             )}
           </div>
 

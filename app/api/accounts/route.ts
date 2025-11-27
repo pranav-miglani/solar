@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
       const { data: accounts, error } = await supabase
         .from("accounts")
-        .select("id, email, account_type, org_id, created_at, display_name")
+        .select("id, email, account_type, org_id, created_at, display_name, logo_url")
         .order("email")
 
       if (error) {
