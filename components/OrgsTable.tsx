@@ -54,12 +54,17 @@ export function OrgsTable() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [accountDialogOpen, setAccountDialogOpen] = useState(false)
+  const [govtDialogOpen, setGovtDialogOpen] = useState(false)
   const [selectedOrg, setSelectedOrg] = useState<Org | null>(null)
   const [deletingOrgId, setDeletingOrgId] = useState<number | null>(null)
   const [formData, setFormData] = useState({ name: "" })
-  const [accountFormData, setAccountFormData] = useState({ 
-    email: "", 
-    password: "" 
+  const [accountFormData, setAccountFormData] = useState({
+    email: "",
+    password: "",
+  })
+  const [govtFormData, setGovtFormData] = useState({
+    email: "",
+    password: "",
   })
 
   useEffect(() => {
@@ -150,6 +155,31 @@ export function OrgsTable() {
     }
   }
 
+  // Create a GOVT account (not tied to any single organization).
+  async function handleCreateGovtAccount(e: React.FormEvent) {
+    e.preventDefault()
+
+    const response = await fetch("/api/accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: govtFormData.email,
+        password: govtFormData.password,
+        account_type: "GOVT",
+        org_id: null,
+      }),
+    })
+
+    if (response.ok) {
+      setGovtDialogOpen(false)
+      setGovtFormData({ email: "", password: "" })
+      fetchAccounts()
+    } else {
+      const error = await response.json()
+      alert(error.error || "Failed to create GOVT user")
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -163,12 +193,95 @@ export function OrgsTable() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="flex justify-end">
+      <div className="flex flex-col sm:flex-row justify-between gap-3">
+        {/* GOVT user onboarding */}
+        <Dialog open={govtDialogOpen} onOpenChange={setGovtDialogOpen}>
+          <DialogTrigger asChild>
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="w-full sm:w-auto"
+            >
+              <Button
+                onClick={() => setGovtFormData({ email: "", password: "" })}
+                variant="outline"
+                size="lg"
+                className="border-2 border-border bg-background hover:bg-primary/10 hover:border-primary/40 text-foreground shadow-sm hover:shadow-md transition-all duration-200 font-semibold w-full sm:w-auto"
+              >
+                <User className="h-4 w-4 mr-2" />
+                Create GOVT User
+              </Button>
+            </motion.div>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                Create GOVT User
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleCreateGovtAccount} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="govt-email" className="text-sm font-semibold">
+                  Email
+                </Label>
+                <Input
+                  id="govt-email"
+                  type="email"
+                  value={govtFormData.email}
+                  onChange={(e) =>
+                    setGovtFormData((prev) => ({ ...prev, email: e.target.value }))
+                  }
+                  required
+                  placeholder="govt@example.com"
+                  className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="govt-password" className="text-sm font-semibold">
+                  Password
+                </Label>
+                <Input
+                  id="govt-password"
+                  type="password"
+                  value={govtFormData.password}
+                  onChange={(e) =>
+                    setGovtFormData((prev) => ({ ...prev, password: e.target.value }))
+                  }
+                  required
+                  placeholder="Enter password"
+                  className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                GOVT users have read-only access across all organizations, vendors, plants and alerts.
+              </p>
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setGovtDialogOpen(false)}
+                  className="transition-all duration-200"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
+                >
+                  Create GOVT User
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Organization onboarding */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <motion.div
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
+              className="w-full sm:w-auto text-right"
             >
               <Button
                 onClick={() => setFormData({ name: "" })}
