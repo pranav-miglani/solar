@@ -71,6 +71,7 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
     email: "",
     password: "",
   })
+  const [deletingGovtAccountId, setDeletingGovtAccountId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchOrgs()
@@ -182,6 +183,27 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
     } else {
       const error = await response.json()
       alert(error.error || "Failed to create GOVT user")
+    }
+  }
+
+  async function handleDeleteGovtAccount(accountId: string) {
+    try {
+      const response = await fetch(`/api/accounts/${accountId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        alert(error.error || "Failed to delete GOVT user")
+        return
+      }
+
+      // Refresh GOVT users list
+      fetchAccounts()
+      setDeletingGovtAccountId(null)
+    } catch (error) {
+      console.error("Error deleting GOVT user:", error)
+      alert("Failed to delete GOVT user")
     }
   }
 
@@ -648,7 +670,9 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                   <TableRow className="bg-muted/40">
                     <TableHead className="font-semibold w-1/2">Email</TableHead>
                     <TableHead className="font-semibold w-1/4">Type</TableHead>
-                    <TableHead className="font-semibold w-1/4">Org</TableHead>
+                    <TableHead className="font-semibold w-1/4">
+                      {isSuperAdmin ? "Org / Actions" : "Org"}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -668,7 +692,47 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                           </Badge>
                         </TableCell>
                         <TableCell className="py-3 text-sm text-muted-foreground">
-                          Global (no org)
+                          <div className="flex items-center gap-3">
+                            <span>Global (no org)</span>
+                            {isSuperAdmin && (
+                              <AlertDialog
+                                open={deletingGovtAccountId === acc.id}
+                                onOpenChange={(open: boolean) =>
+                                  !open && setDeletingGovtAccountId(null)
+                                }
+                              >
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setDeletingGovtAccountId(acc.id)}
+                                    className="border-2 border-destructive/30 hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-all duration-200 font-medium shadow-sm hover:shadow-md"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-1.5" />
+                                    Delete
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete GOVT User</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete GOVT user &quot;
+                                      {acc.email}&quot;? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteGovtAccount(acc.id)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
