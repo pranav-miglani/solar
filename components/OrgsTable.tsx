@@ -48,7 +48,12 @@ interface Account {
   org_id: number | null
 }
 
-export function OrgsTable() {
+interface OrgsTableProps {
+  accountType: string
+}
+
+export function OrgsTable({ accountType }: OrgsTableProps) {
+  const isSuperAdmin = accountType === "SUPERADMIN"
   const [orgs, setOrgs] = useState<Org[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
@@ -194,146 +199,150 @@ export function OrgsTable() {
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between gap-3">
-        {/* GOVT user onboarding */}
-        <Dialog open={govtDialogOpen} onOpenChange={setGovtDialogOpen}>
-          <DialogTrigger asChild>
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full sm:w-auto"
-            >
-              <Button
-                onClick={() => setGovtFormData({ email: "", password: "" })}
-                variant="outline"
-                size="lg"
-                className="border-2 border-border bg-background hover:bg-primary/10 hover:border-primary/40 text-foreground shadow-sm hover:shadow-md transition-all duration-200 font-semibold w-full sm:w-auto"
+        {/* GOVT user onboarding (SUPERADMIN only) */}
+        {isSuperAdmin && (
+          <Dialog open={govtDialogOpen} onOpenChange={setGovtDialogOpen}>
+            <DialogTrigger asChild>
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full sm:w-auto"
               >
-                <User className="h-4 w-4 mr-2" />
-                Create GOVT User
-              </Button>
-            </motion.div>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                Create GOVT User
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreateGovtAccount} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="govt-email" className="text-sm font-semibold">
-                  Email
-                </Label>
-                <Input
-                  id="govt-email"
-                  type="email"
-                  value={govtFormData.email}
-                  onChange={(e) =>
-                    setGovtFormData((prev) => ({ ...prev, email: e.target.value }))
-                  }
-                  required
-                  placeholder="govt@example.com"
-                  className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="govt-password" className="text-sm font-semibold">
-                  Password
-                </Label>
-                <Input
-                  id="govt-password"
-                  type="password"
-                  value={govtFormData.password}
-                  onChange={(e) =>
-                    setGovtFormData((prev) => ({ ...prev, password: e.target.value }))
-                  }
-                  required
-                  placeholder="Enter password"
-                  className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                GOVT users have read-only access across all organizations, vendors, plants and alerts.
-              </p>
-              <div className="flex justify-end gap-2 pt-4 border-t">
                 <Button
-                  type="button"
+                  onClick={() => setGovtFormData({ email: "", password: "" })}
                   variant="outline"
-                  onClick={() => setGovtDialogOpen(false)}
-                  className="transition-all duration-200"
+                  size="lg"
+                  className="border-2 border-border bg-background hover:bg-primary/10 hover:border-primary/40 text-foreground shadow-sm hover:shadow-md transition-all duration-200 font-semibold w-full sm:w-auto"
                 >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
-                >
+                  <User className="h-4 w-4 mr-2" />
                   Create GOVT User
                 </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+              </motion.div>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  Create GOVT User
+                </DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreateGovtAccount} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="govt-email" className="text-sm font-semibold">
+                    Email
+                  </Label>
+                  <Input
+                    id="govt-email"
+                    type="email"
+                    value={govtFormData.email}
+                    onChange={(e) =>
+                      setGovtFormData((prev) => ({ ...prev, email: e.target.value }))
+                    }
+                    required
+                    placeholder="govt@example.com"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="govt-password" className="text-sm font-semibold">
+                    Password
+                  </Label>
+                  <Input
+                    id="govt-password"
+                    type="password"
+                    value={govtFormData.password}
+                    onChange={(e) =>
+                      setGovtFormData((prev) => ({ ...prev, password: e.target.value }))
+                    }
+                    required
+                    placeholder="Enter password"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                  GOVT users have read-only access across all organizations, vendors, plants and alerts.
+                </p>
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setGovtDialogOpen(false)}
+                    className="transition-all duration-200"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
+                  >
+                    Create GOVT User
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
 
-        {/* Organization onboarding */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full sm:w-auto text-right"
-            >
-              <Button
-                onClick={() => setFormData({ name: "" })}
-                size="lg"
-                className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 font-semibold"
+        {/* Organization onboarding (SUPERADMIN only) */}
+        {isSuperAdmin && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full sm:w-auto text-right"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Organization
-              </Button>
-            </motion.div>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                Create Organization
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-semibold">
-                  Organization Name
-                </Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  required
-                  placeholder="Enter organization name"
-                  className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-4 border-t">
                 <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                  className="transition-all duration-200"
+                  onClick={() => setFormData({ name: "" })}
+                  size="lg"
+                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 font-semibold"
                 >
-                  Cancel
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Organization
                 </Button>
-                <Button
-                  type="submit"
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
-                >
-                  Create
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+              </motion.div>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                  Create Organization
+                </DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-sm font-semibold">
+                    Organization Name
+                  </Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    required
+                    placeholder="Enter organization name"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDialogOpen(false)}
+                    className="transition-all duration-200"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
+                  >
+                    Create
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Desktop Table View */}
@@ -412,70 +421,74 @@ export function OrgsTable() {
                               </Button>
                             </motion.div>
                           </Link>
-                          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedOrg(org)
-                                setAccountFormData({ email: "", password: "" })
-                                setAccountDialogOpen(true)
-                              }}
-                              className="border-2 border-border bg-background hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 whitespace-nowrap font-medium shadow-sm hover:shadow-md px-3"
-                            >
-                              {orgAccount ? (
-                                <>
-                                  <User className="h-4 w-4 mr-1.5" />
-                                  <span className="hidden lg:inline">View Account</span>
-                                  <span className="lg:hidden">Account</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Plus className="h-4 w-4 mr-1.5" />
-                                  <span className="hidden lg:inline">Create Account</span>
-                                  <span className="lg:hidden">Create</span>
-                                </>
-                              )}
-                            </Button>
-                          </motion.div>
-                          <AlertDialog open={deletingOrgId === org.id} onOpenChange={(open: boolean) => !open && setDeletingOrgId(null)}>
-                            <AlertDialogTrigger asChild>
+                          {isSuperAdmin && (
+                            <>
                               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => setDeletingOrgId(org.id)}
-                                  className="border-2 border-destructive/30 bg-background hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-all duration-200 whitespace-nowrap font-medium shadow-sm hover:shadow-md px-3"
+                                  onClick={() => {
+                                    setSelectedOrg(org)
+                                    setAccountFormData({ email: "", password: "" })
+                                    setAccountDialogOpen(true)
+                                  }}
+                                  className="border-2 border-border bg-background hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 whitespace-nowrap font-medium shadow-sm hover:shadow-md px-3"
                                 >
-                                  <Trash2 className="h-4 w-4 mr-1.5" />
-                                  Delete
+                                  {orgAccount ? (
+                                    <>
+                                      <User className="h-4 w-4 mr-1.5" />
+                                      <span className="hidden lg:inline">View Account</span>
+                                      <span className="lg:hidden">Account</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plus className="h-4 w-4 mr-1.5" />
+                                      <span className="hidden lg:inline">Create Account</span>
+                                      <span className="lg:hidden">Create</span>
+                                    </>
+                                  )}
                                 </Button>
                               </motion.div>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Organization</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete &quot;{org.name}&quot;? This action cannot be undone and will delete:
-                                  <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
-                                    <li>All associated work orders</li>
-                                    <li>All associated plants</li>
-                                    <li>All associated vendors</li>
-                                    <li>All associated accounts</li>
-                                  </ul>
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(org.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                              <AlertDialog open={deletingOrgId === org.id} onOpenChange={(open: boolean) => !open && setDeletingOrgId(null)}>
+                                <AlertDialogTrigger asChild>
+                                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setDeletingOrgId(org.id)}
+                                      className="border-2 border-destructive/30 bg-background hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-all duration-200 whitespace-nowrap font-medium shadow-sm hover:shadow-md px-3"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-1.5" />
+                                      Delete
+                                    </Button>
+                                  </motion.div>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Organization</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete &quot;{org.name}&quot;? This action cannot be undone and will delete:
+                                      <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                                        <li>All associated work orders</li>
+                                        <li>All associated plants</li>
+                                        <li>All associated vendors</li>
+                                        <li>All associated accounts</li>
+                                      </ul>
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDelete(org.id)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -553,64 +566,68 @@ export function OrgsTable() {
                           View Plants
                         </Button>
                       </Link>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedOrg(org)
-                          setAccountFormData({ email: "", password: "" })
-                          setAccountDialogOpen(true)
-                        }}
-                        className="w-full border-2 border-border hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
-                      >
-                        {orgAccount ? (
-                          <>
-                            <User className="h-4 w-4 mr-2" />
-                            View Account
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Create Account
-                          </>
-                        )}
-                      </Button>
-                      <AlertDialog open={deletingOrgId === org.id} onOpenChange={(open: boolean) => !open && setDeletingOrgId(null)}>
-                        <AlertDialogTrigger asChild>
+                      {isSuperAdmin && (
+                        <>
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setDeletingOrgId(org.id)}
-                            className="w-full border-2 border-destructive/30 hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-all duration-200 font-medium shadow-sm hover:shadow-md"
+                            onClick={() => {
+                              setSelectedOrg(org)
+                              setAccountFormData({ email: "", password: "" })
+                              setAccountDialogOpen(true)
+                            }}
+                            className="w-full border-2 border-border hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete Organization
+                            {orgAccount ? (
+                              <>
+                                <User className="h-4 w-4 mr-2" />
+                                View Account
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Create Account
+                              </>
+                            )}
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Organization</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete &quot;{org.name}&quot;? This action cannot be undone and will delete:
-                              <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
-                                <li>All associated work orders</li>
-                                <li>All associated plants</li>
-                                <li>All associated vendors</li>
-                                <li>All associated accounts</li>
-                              </ul>
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(org.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                          <AlertDialog open={deletingOrgId === org.id} onOpenChange={(open: boolean) => !open && setDeletingOrgId(null)}>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setDeletingOrgId(org.id)}
+                                className="w-full border-2 border-destructive/30 hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-all duration-200 font-medium shadow-sm hover:shadow-md"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Organization
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Organization</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete &quot;{org.name}&quot;? This action cannot be undone and will delete:
+                                  <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                                    <li>All associated work orders</li>
+                                    <li>All associated plants</li>
+                                    <li>All associated vendors</li>
+                                    <li>All associated accounts</li>
+                                  </ul>
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDelete(org.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </>
+                      )}
                     </div>
                   </div>
                 </Card>
@@ -662,103 +679,105 @@ export function OrgsTable() {
         </div>
       )}
 
-      <Dialog open={accountDialogOpen} onOpenChange={setAccountDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-              {accounts.find((acc) => acc.org_id === selectedOrg?.id)
-                ? "Organization Account"
-                : `Create Account for ${selectedOrg?.name}`}
-            </DialogTitle>
-          </DialogHeader>
-          {accounts.find((acc) => acc.org_id === selectedOrg?.id) ? (
-            <div className="space-y-4">
-              <Card className="p-4 bg-gradient-to-br from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20 border-2">
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-sm font-semibold text-muted-foreground">Email</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Mail className="h-4 w-4 text-primary" />
-                      <div className="text-base font-semibold">
-                        {accounts.find((acc) => acc.org_id === selectedOrg?.id)?.email}
+      {isSuperAdmin && (
+        <Dialog open={accountDialogOpen} onOpenChange={setAccountDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                {accounts.find((acc) => acc.org_id === selectedOrg?.id)
+                  ? "Organization Account"
+                  : `Create Account for ${selectedOrg?.name}`}
+              </DialogTitle>
+            </DialogHeader>
+            {accounts.find((acc) => acc.org_id === selectedOrg?.id) ? (
+              <div className="space-y-4">
+                <Card className="p-4 bg-gradient-to-br from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20 border-2">
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Email</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Mail className="h-4 w-4 text-primary" />
+                        <div className="text-base font-semibold">
+                          {accounts.find((acc) => acc.org_id === selectedOrg?.id)?.email}
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Account Type</Label>
+                      <div className="mt-1">
+                        <Badge variant="secondary" className="text-sm">
+                          {accounts.find((acc) => acc.org_id === selectedOrg?.id)?.account_type}
+                        </Badge>
                       </div>
                     </div>
                   </div>
-                  <div>
-                    <Label className="text-sm font-semibold text-muted-foreground">Account Type</Label>
-                    <div className="mt-1">
-                      <Badge variant="secondary" className="text-sm">
-                        {accounts.find((acc) => acc.org_id === selectedOrg?.id)?.account_type}
-                      </Badge>
-                    </div>
-                  </div>
+                </Card>
+                <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                  Each organization has one account. To change the account, delete
+                  the existing one and create a new one.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleCreateAccount} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-semibold">
+                    Email
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={accountFormData.email}
+                    onChange={(e) =>
+                      setAccountFormData({
+                        ...accountFormData,
+                        email: e.target.value,
+                      })
+                    }
+                    required
+                    placeholder="org@example.com"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                  />
                 </div>
-              </Card>
-              <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                Each organization has one account. To change the account, delete
-                the existing one and create a new one.
-              </p>
-            </div>
-          ) : (
-            <form onSubmit={handleCreateAccount} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-semibold">
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={accountFormData.email}
-                  onChange={(e) =>
-                    setAccountFormData({
-                      ...accountFormData,
-                      email: e.target.value,
-                    })
-                  }
-                  required
-                  placeholder="org@example.com"
-                  className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-semibold">
-                  Password
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={accountFormData.password}
-                  onChange={(e) =>
-                    setAccountFormData({
-                      ...accountFormData,
-                      password: e.target.value,
-                    })
-                  }
-                  required
-                  placeholder="Enter password"
-                  className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setAccountDialogOpen(false)}
-                  className="transition-all duration-200"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
-                >
-                  Create Account
-                </Button>
-              </div>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm font-semibold">
+                    Password
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={accountFormData.password}
+                    onChange={(e) =>
+                      setAccountFormData({
+                        ...accountFormData,
+                        password: e.target.value,
+                      })
+                    }
+                    required
+                    placeholder="Enter password"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setAccountDialogOpen(false)}
+                    className="transition-all duration-200"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
+                  >
+                    Create Account
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

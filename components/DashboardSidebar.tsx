@@ -42,7 +42,7 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
       title: "Organizations",
       href: "/superadmin/orgs",
       icon: Building2,
-      roles: ["SUPERADMIN"],
+      roles: ["SUPERADMIN", "GOVT"],
     },
     {
       title: "Vendors",
