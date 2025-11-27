@@ -58,31 +58,19 @@ export function DashboardSidebar({
       }
     }
 
+    // Check if we need to fetch any data
+    const needsUserLogo = propUserLogoUrl === undefined
+    const needsSuperAdminInfo = propSuperAdminLogoUrl === undefined || propSuperAdminDisplayName === undefined
+    
     // If props not provided, check sessionStorage first
-    if (propUserLogoUrl === undefined) {
+    if (needsUserLogo) {
       const cachedUserLogo = sessionStorage.getItem("userLogoUrl")
       if (cachedUserLogo) {
         setUserLogoUrl(cachedUserLogo)
-      } else {
-        // Only fetch if not cached and props not provided
-        fetch("/api/me")
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.account) {
-              const logoUrl = data.account.logoUrl || null
-              setUserLogoUrl(logoUrl)
-              if (logoUrl) {
-                sessionStorage.setItem("userLogoUrl", logoUrl)
-              }
-            }
-          })
-          .catch((error) => {
-            console.error("Failed to fetch user info:", error)
-          })
       }
     }
     
-    if (propSuperAdminLogoUrl === undefined || propSuperAdminDisplayName === undefined) {
+    if (needsSuperAdminInfo) {
       const cachedSuperAdminLogo = sessionStorage.getItem("superAdminLogoUrl")
       const cachedSuperAdminName = sessionStorage.getItem("superAdminDisplayName")
       
@@ -92,43 +80,61 @@ export function DashboardSidebar({
       if (cachedSuperAdminName) {
         setSuperAdminDisplayName(cachedSuperAdminName)
       }
-      
-      // Only fetch if not cached and props not provided
-      if (!cachedSuperAdminLogo || !cachedSuperAdminName) {
-        fetch("/api/me")
-          .then((res) => res.json())
-          .then((data) => {
+    }
+    
+    // Only make a single API call if we need data that's not in props or cache
+    const needsFetch = 
+      (needsUserLogo && !sessionStorage.getItem("userLogoUrl")) ||
+      (needsSuperAdminInfo && (!sessionStorage.getItem("superAdminLogoUrl") || !sessionStorage.getItem("superAdminDisplayName")))
+    
+    if (needsFetch) {
+      fetch("/api/me")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.account) {
+            // Set user logo if needed
+            if (needsUserLogo && !sessionStorage.getItem("userLogoUrl")) {
+              const logoUrl = data.account.logoUrl || null
+              setUserLogoUrl(logoUrl)
+              if (logoUrl) {
+                sessionStorage.setItem("userLogoUrl", logoUrl)
+              }
+            }
+            
             // For SUPERADMIN, also set footer info from their own account
-            if (data.account?.accountType === "SUPERADMIN") {
-              const superAdminLogo = data.account.logoUrl || null
-              const superAdminName = data.account.displayName || null
-              setSuperAdminLogoUrl(superAdminLogo)
-              setSuperAdminDisplayName(superAdminName)
-              if (superAdminLogo) {
-                sessionStorage.setItem("superAdminLogoUrl", superAdminLogo)
-              }
-              if (superAdminName) {
-                sessionStorage.setItem("superAdminDisplayName", superAdminName)
-              }
-            }
-            // For non-SUPERADMIN users, get SUPERADMIN info for footer
-            if (data.superAdmin) {
-              const superAdminLogo = data.superAdmin.logoUrl || null
-              const superAdminName = data.superAdmin.displayName || null
-              setSuperAdminLogoUrl(superAdminLogo)
-              setSuperAdminDisplayName(superAdminName)
-              if (superAdminLogo) {
-                sessionStorage.setItem("superAdminLogoUrl", superAdminLogo)
-              }
-              if (superAdminName) {
-                sessionStorage.setItem("superAdminDisplayName", superAdminName)
+            if (data.account.accountType === "SUPERADMIN") {
+              if (needsSuperAdminInfo) {
+                const superAdminLogo = data.account.logoUrl || null
+                const superAdminName = data.account.displayName || null
+                setSuperAdminLogoUrl(superAdminLogo)
+                setSuperAdminDisplayName(superAdminName)
+                if (superAdminLogo) {
+                  sessionStorage.setItem("superAdminLogoUrl", superAdminLogo)
+                }
+                if (superAdminName) {
+                  sessionStorage.setItem("superAdminDisplayName", superAdminName)
+                }
               }
             }
-          })
-          .catch((error) => {
-            console.error("Failed to fetch user info:", error)
-          })
-      }
+          }
+          
+          // For non-SUPERADMIN users, get SUPERADMIN info for footer
+          if (needsSuperAdminInfo && data.superAdmin) {
+            const superAdminLogo = data.superAdmin.logoUrl || null
+            const superAdminName = data.superAdmin.displayName || null
+            setSuperAdminLogoUrl(superAdminLogo)
+            setSuperAdminDisplayName(superAdminName)
+            if (superAdminLogo) {
+              sessionStorage.setItem("superAdminLogoUrl", superAdminLogo)
+            }
+            if (superAdminName) {
+              sessionStorage.setItem("superAdminDisplayName", superAdminName)
+            }
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to fetch user info:", error)
+        })
     }
   }, [propUserLogoUrl, propSuperAdminLogoUrl, propSuperAdminDisplayName])
 

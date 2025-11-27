@@ -15,6 +15,9 @@ export default function OrgWorkOrdersPage() {
   const orgId = params?.id ? parseInt(params.id as string, 10) : null
   const [accountType, setAccountType] = useState<string>("")
   const [organizationName, setOrganizationName] = useState<string>("")
+  const [userLogoUrl, setUserLogoUrl] = useState<string | null>(null)
+  const [superAdminLogoUrl, setSuperAdminLogoUrl] = useState<string | null>(null)
+  const [superAdminDisplayName, setSuperAdminDisplayName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -35,6 +38,22 @@ export default function OrgWorkOrdersPage() {
       .then((data) => {
         if (data) {
           setAccountType(data.account.accountType)
+          
+          // Set logo URLs from the same API call
+          setUserLogoUrl(data.account.logoUrl || null)
+          
+          // For SUPERADMIN, also set footer info from their own account
+          if (data.account.accountType === "SUPERADMIN") {
+            setSuperAdminLogoUrl(data.account.logoUrl || null)
+            setSuperAdminDisplayName(data.account.displayName || null)
+          }
+          
+          // For non-SUPERADMIN users, get SUPERADMIN info for footer
+          if (data.superAdmin) {
+            setSuperAdminLogoUrl(data.superAdmin.logoUrl || null)
+            setSuperAdminDisplayName(data.superAdmin.displayName || null)
+          }
+          
           // Fetch organization name
           fetch(`/api/orgs/${orgId}`)
             .then((res) => res.json())
@@ -69,7 +88,12 @@ export default function OrgWorkOrdersPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <DashboardSidebar accountType={accountType} />
+      <DashboardSidebar 
+        accountType={accountType}
+        userLogoUrl={userLogoUrl}
+        superAdminLogoUrl={superAdminLogoUrl}
+        superAdminDisplayName={superAdminDisplayName}
+      />
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         <div className="mb-6 md:mb-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
