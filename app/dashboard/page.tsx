@@ -45,6 +45,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [accountType, setAccountType] = useState<string>("")
   const [orgId, setOrgId] = useState<number | null>(null)
+  const [displayName, setDisplayName] = useState<string | null>(null)
   const hasLoadedRef = useRef(false)
 
   const loadDashboard = async (accountType: string, orgId: number | null) => {
@@ -107,9 +108,11 @@ export default function DashboardPage() {
           console.log("✅ [DASHBOARD] Authentication successful:", {
             accountType: data.account.accountType,
             orgId: data.account.orgId,
+            displayName: data.account.displayName,
           })
           setAccountType(data.account.accountType)
           setOrgId(data.account.orgId)
+          setDisplayName(data.account.displayName)
           loadDashboard(data.account.accountType, data.account.orgId)
         }
       })
@@ -159,7 +162,9 @@ export default function DashboardPage() {
               Dashboard
             </h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">
-              Welcome back, <span className="font-semibold text-foreground">{role === "SUPERADMIN" ? "Super Admin" : role === "GOVT" ? "Government Agency" : "Organization"}</span>
+              Welcome back, <span className="font-semibold text-foreground">
+                {displayName || (role === "SUPERADMIN" ? "Super Admin" : role === "GOVT" ? "Government Agency" : "Organization")}
+              </span>
             </p>
           </div>
           <ThemeToggle />
