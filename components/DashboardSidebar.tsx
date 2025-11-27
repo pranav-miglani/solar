@@ -48,7 +48,7 @@ export function DashboardSidebar({ accountType }: DashboardSidebarProps) {
       title: "Vendors",
       href: "/superadmin/vendors",
       icon: Factory,
-      roles: ["SUPERADMIN"],
+      roles: ["SUPERADMIN", "GOVT"],
     },
     {
       title: "Vendor Sync",

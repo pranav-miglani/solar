@@ -620,6 +620,48 @@ export function OrgsTable() {
         )}
       </div>
 
+      {/* GOVT Users Listing (all accounts with account_type = GOVT) */}
+      {accounts.filter((acc) => acc.account_type === "GOVT").length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold mt-4">GOVT Users</h2>
+          <Card className="border-2 shadow-sm">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40">
+                    <TableHead className="font-semibold w-1/2">Email</TableHead>
+                    <TableHead className="font-semibold w-1/4">Type</TableHead>
+                    <TableHead className="font-semibold w-1/4">Org</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accounts
+                    .filter((acc) => acc.account_type === "GOVT")
+                    .map((acc) => (
+                      <TableRow key={acc.id}>
+                        <TableCell className="py-3">
+                          <div className="flex items-center gap-2">
+                            <Mail className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">{acc.email}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <Badge variant="secondary" className="text-xs">
+                            GOVT
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-3 text-sm text-muted-foreground">
+                          Global (no org)
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </div>
+      )}
+
       <Dialog open={accountDialogOpen} onOpenChange={setAccountDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

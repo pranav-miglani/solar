@@ -38,12 +38,18 @@ interface WorkOrder {
   }>
 }
 
-export function WorkOrdersList() {
+interface WorkOrdersListProps {
+  accountType: string
+}
+
+export function WorkOrdersList({ accountType }: WorkOrdersListProps) {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingWorkOrderId, setEditingWorkOrderId] = useState<number | undefined>()
   const [deletingWorkOrderId, setDeletingWorkOrderId] = useState<number | null>(null)
+
+  const isSuperAdmin = accountType === "SUPERADMIN"
 
   useEffect(() => {
     fetchWorkOrders()
@@ -57,11 +63,15 @@ export function WorkOrdersList() {
   }
 
   function handleEdit(workOrderId: number) {
-    setEditingWorkOrderId(workOrderId)
-    setModalOpen(true)
+    // SUPERADMIN can open edit modal; others go to read-only detail page
+    if (isSuperAdmin) {
+      setEditingWorkOrderId(workOrderId)
+      setModalOpen(true)
+    }
   }
 
   function handleCreate() {
+    if (!isSuperAdmin) return
     setEditingWorkOrderId(undefined)
     setModalOpen(true)
   }
@@ -73,6 +83,7 @@ export function WorkOrdersList() {
   }
 
   async function handleDelete(workOrderId: number) {
+    if (!isSuperAdmin) return
     try {
       const response = await fetch(`/api/workorders/${workOrderId}`, {
         method: "DELETE",
@@ -110,20 +121,22 @@ export function WorkOrdersList() {
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-4 p-4 md:p-6 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border border-border shadow-sm">
-        <motion.div 
-          whileHover={{ scale: 1.05 }} 
-          whileTap={{ scale: 0.95 }}
-          className="w-full sm:w-auto"
-        >
-          <Button 
-            onClick={handleCreate}
-            size="lg"
-            className="w-full sm:w-auto transition-all duration-200 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg hover:shadow-xl font-semibold text-base"
+        {isSuperAdmin && (
+          <motion.div 
+            whileHover={{ scale: 1.05 }} 
+            whileTap={{ scale: 0.95 }}
+            className="w-full sm:w-auto"
           >
-            <Plus className="h-5 w-5 mr-2" />
-            Create Work Order
-          </Button>
-        </motion.div>
+            <Button 
+              onClick={handleCreate}
+              size="lg"
+              className="w-full sm:w-auto transition-all duration-200 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg hover:shadow-xl font-semibold text-base"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Create Work Order
+            </Button>
+          </motion.div>
+        )}
       </div>
 
       {/* Desktop Table View */}
@@ -138,7 +151,7 @@ export function WorkOrdersList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {workOrders.length === 0 ? (
+              {workOrders.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={3} className="text-center py-12 text-muted-foreground">
                   No work orders found
@@ -165,15 +178,17 @@ export function WorkOrdersList() {
                       className="flex gap-2 justify-end"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(wo.id)}
-                        className="transition-all duration-200 hover:scale-110 hover:bg-primary/10"
-                      >
-                        <Pencil className="h-4 w-4 mr-1" />
-                        Edit
-                      </Button>
+                      {isSuperAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(wo.id)}
+                          className="transition-all duration-200 hover:scale-110 hover:bg-primary/10"
+                        >
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                      )}
                       <Link href={`/workorders/${wo.id}`}>
                         <Button 
                           variant="ghost" 
@@ -184,36 +199,38 @@ export function WorkOrdersList() {
                           View
                         </Button>
                       </Link>
-                      <AlertDialog open={deletingWorkOrderId === wo.id} onOpenChange={(open: boolean) => !open && setDeletingWorkOrderId(null)}>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDeletingWorkOrderId(wo.id)}
-                            className="transition-all duration-200 hover:scale-110 hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Delete
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete &quot;{wo.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(wo.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      {isSuperAdmin && (
+                        <AlertDialog open={deletingWorkOrderId === wo.id} onOpenChange={(open: boolean) => !open && setDeletingWorkOrderId(null)}>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeletingWorkOrderId(wo.id)}
+                              className="transition-all duration-200 hover:scale-110 hover:bg-destructive/10 hover:text-destructive"
                             >
+                              <Trash2 className="h-4 w-4 mr-1" />
                               Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete &quot;{wo.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(wo.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -240,59 +257,63 @@ export function WorkOrdersList() {
               }}
               onClick={() => handleEdit(wo.id)}
             >
-              <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-start justify-between gap-3 mb-3">
                 <h3 className="font-semibold text-base flex-1">{wo.title}</h3>
-                <div 
-                  className="flex gap-2"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(wo.id)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Link href={`/workorders/${wo.id}`}>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="h-8 w-8 p-0"
+                    <div 
+                      className="flex gap-2"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                  <AlertDialog open={deletingWorkOrderId === wo.id} onOpenChange={(open: boolean) => !open && setDeletingWorkOrderId(null)}>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeletingWorkOrderId(wo.id)}
-                        className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete &quot;{wo.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDelete(wo.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      {isSuperAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(wo.id)}
+                          className="h-8 w-8 p-0"
                         >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Link href={`/workorders/${wo.id}`}>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      {isSuperAdmin && (
+                        <AlertDialog open={deletingWorkOrderId === wo.id} onOpenChange={(open: boolean) => !open && setDeletingWorkOrderId(null)}>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeletingWorkOrderId(wo.id)}
+                              className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete &quot;{wo.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(wo.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
               </div>
               <div className="text-sm text-muted-foreground">
                 Created {new Date(wo.created_at).toLocaleDateString()}
@@ -302,12 +323,14 @@ export function WorkOrdersList() {
         )}
       </div>
 
-      <WorkOrderModal
-        open={modalOpen}
-        onOpenChange={handleModalClose}
-        workOrderId={editingWorkOrderId}
-        organizationName={organizationName}
-      />
+      {isSuperAdmin && (
+        <WorkOrderModal
+          open={modalOpen}
+          onOpenChange={handleModalClose}
+          workOrderId={editingWorkOrderId}
+          organizationName={organizationName}
+        />
+      )}
     </div>
   )
 }

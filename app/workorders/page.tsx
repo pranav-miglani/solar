@@ -60,7 +60,7 @@ export default function WorkOrdersPage() {
             </div>
           </div>
         </div>
-        <WorkOrdersList />
+        <WorkOrdersList accountType={accountType} />
       </div>
     </div>
   )
