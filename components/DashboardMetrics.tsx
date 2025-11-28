@@ -77,7 +77,7 @@ export function DashboardMetrics({ metrics, accountType }: DashboardMetricsProps
     {
       label: "Total Energy Generation",
       value: metrics.totalEnergyMwh
-        ? `${metrics.totalEnergyMwh.toFixed(1)} MWh`
+        ? `${metrics.totalEnergyMwh.toFixed(3)} MWh`
         : "0 MWh",
       icon: TrendingUp,
       gradient: "from-emerald-500 via-green-500 to-teal-500",
@@ -89,16 +89,6 @@ export function DashboardMetrics({ metrics, accountType }: DashboardMetricsProps
   // Additional energy metrics for GOVT users
   const govtEnergyMetrics: Metric[] = [
     {
-      label: "Current Power",
-      value: metrics.currentPowerKw
-        ? `${metrics.currentPowerKw.toFixed(3)} kW`
-        : "0 kW",
-      icon: Activity,
-      gradient: "from-cyan-500 via-blue-500 to-indigo-500",
-      bgGradient: "from-cyan-50/80 to-indigo-50/80 dark:from-cyan-950/50 dark:to-indigo-950/50",
-      borderColor: "border-cyan-200 dark:border-cyan-800",
-    },
-    {
       label: "Installed Capacity",
       value: metrics.installedCapacityKw
         ? `${metrics.installedCapacityKw.toFixed(3)} KWp`
@@ -107,6 +97,16 @@ export function DashboardMetrics({ metrics, accountType }: DashboardMetricsProps
       gradient: "from-green-500 via-emerald-500 to-teal-500",
       bgGradient: "from-green-50/80 to-teal-50/80 dark:from-green-950/50 dark:to-teal-950/50",
       borderColor: "border-green-200 dark:border-green-800",
+    },
+    {
+      label: "Current Power",
+      value: metrics.currentPowerKw
+        ? `${metrics.currentPowerKw.toFixed(3)} kW`
+        : "0 kW",
+      icon: Activity,
+      gradient: "from-cyan-500 via-blue-500 to-indigo-500",
+      bgGradient: "from-cyan-50/80 to-indigo-50/80 dark:from-cyan-950/50 dark:to-indigo-950/50",
+      borderColor: "border-cyan-200 dark:border-cyan-800",
     },
     {
       label: "Daily Energy",
