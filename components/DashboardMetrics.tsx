@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion"
 import { Card } from "@/components/ui/card"
-import { TrendingUp, AlertTriangle, FileText, Zap } from "lucide-react"
+import { TrendingUp, AlertTriangle, FileText, Zap, Activity, Battery, Sun, Calendar, BarChart } from "lucide-react"
 
 interface Metric {
   label: string
@@ -23,6 +23,12 @@ interface DashboardMetricsProps {
     activeAlerts?: number
     totalWorkOrders?: number
     totalEnergyMwh?: number
+    // Additional energy metrics for GOVT users
+    dailyEnergyMwh?: number
+    monthlyEnergyMwh?: number
+    yearlyEnergyMwh?: number
+    currentPowerKw?: number
+    installedCapacityKw?: number
   }
   // Optional account type so we can tweak which cards appear per role (e.g. hide alerts for GOVT)
   accountType?: string
@@ -80,14 +86,69 @@ export function DashboardMetrics({ metrics, accountType }: DashboardMetricsProps
     },
   ]
 
+  // Additional energy metrics for GOVT users
+  const govtEnergyMetrics: Metric[] = [
+    {
+      label: "Current Power",
+      value: metrics.currentPowerKw
+        ? `${metrics.currentPowerKw.toFixed(3)} kW`
+        : "0 kW",
+      icon: Activity,
+      gradient: "from-cyan-500 via-blue-500 to-indigo-500",
+      bgGradient: "from-cyan-50/80 to-indigo-50/80 dark:from-cyan-950/50 dark:to-indigo-950/50",
+      borderColor: "border-cyan-200 dark:border-cyan-800",
+    },
+    {
+      label: "Installed Capacity",
+      value: metrics.installedCapacityKw
+        ? `${metrics.installedCapacityKw.toFixed(3)} KWp`
+        : "0 KWp",
+      icon: Battery,
+      gradient: "from-green-500 via-emerald-500 to-teal-500",
+      bgGradient: "from-green-50/80 to-teal-50/80 dark:from-green-950/50 dark:to-teal-950/50",
+      borderColor: "border-green-200 dark:border-green-800",
+    },
+    {
+      label: "Daily Energy",
+      value: metrics.dailyEnergyMwh
+        ? `${metrics.dailyEnergyMwh.toFixed(3)} MWh`
+        : "0 MWh",
+      icon: Sun,
+      gradient: "from-blue-500 via-cyan-500 to-sky-500",
+      bgGradient: "from-blue-50/80 to-sky-50/80 dark:from-blue-950/50 dark:to-sky-950/50",
+      borderColor: "border-blue-200 dark:border-blue-800",
+    },
+    {
+      label: "Monthly Energy",
+      value: metrics.monthlyEnergyMwh
+        ? `${metrics.monthlyEnergyMwh.toFixed(3)} MWh`
+        : "0 MWh",
+      icon: Calendar,
+      gradient: "from-pink-500 via-rose-500 to-red-500",
+      bgGradient: "from-pink-50/80 to-red-50/80 dark:from-pink-950/50 dark:to-red-950/50",
+      borderColor: "border-pink-200 dark:border-pink-800",
+    },
+    {
+      label: "Yearly Energy",
+      value: metrics.yearlyEnergyMwh
+        ? `${metrics.yearlyEnergyMwh.toFixed(3)} MWh`
+        : "0 MWh",
+      icon: BarChart,
+      gradient: "from-yellow-500 via-amber-500 to-orange-500",
+      bgGradient: "from-yellow-50/80 to-orange-50/80 dark:from-yellow-950/50 dark:to-orange-950/50",
+      borderColor: "border-yellow-200 dark:border-yellow-800",
+    },
+  ]
+
   // GOVT users should not see the Active Alerts card on the dashboard.
+  // For GOVT users, also include the additional energy metrics
   const visibleMetricItems =
     accountType === "GOVT"
-      ? metricItems.filter((m) => m.label !== "Active Alerts")
+      ? [...metricItems.filter((m) => m.label !== "Active Alerts"), ...govtEnergyMetrics]
       : metricItems
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className={`grid grid-cols-1 gap-4 ${accountType === "GOVT" ? "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "md:grid-cols-2 lg:grid-cols-4"}`}>
       {visibleMetricItems.map((metric, index) => {
         const Icon = metric.icon
         return (
