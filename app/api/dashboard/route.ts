@@ -16,6 +16,12 @@ interface DashboardData {
     activeAlerts?: number
     totalWorkOrders?: number
     totalEnergyMwh?: number
+    // Additional energy metrics for GOVT users
+    dailyEnergyMwh?: number
+    monthlyEnergyMwh?: number
+    yearlyEnergyMwh?: number
+    currentPowerKw?: number
+    installedCapacityKw?: number
   }
   widgets: {
     showOrganizations?: boolean
@@ -159,15 +165,22 @@ export async function GET(request: NextRequest) {
       const totalPlants = plantsResult.count || 0
       const unmappedPlants = 0 // GOVT users don't see unmapped plants
 
-      // Calculate total energy generation (sum of total_energy_mwh from plants in work orders only)
+      // Fetch all plant attributes for plants in work orders
       const { data: allPlants } = mappedPlantIds.length > 0
         ? await supabase
             .from("plants")
-            .select("total_energy_mwh")
+            .select("daily_energy_kwh, monthly_energy_mwh, yearly_energy_mwh, total_energy_mwh, current_power_kw, capacity_kw")
             .in("id", mappedPlantIds)
         : { data: [] as any[] }
 
+      // Calculate aggregated metrics
       const totalEnergyMwh = allPlants?.reduce((sum, p) => sum + (p.total_energy_mwh || 0), 0) || 0
+      // Convert daily_energy_kwh to MWh (divide by 1000)
+      const dailyEnergyMwh = allPlants?.reduce((sum, p) => sum + ((p.daily_energy_kwh || 0) / 1000), 0) || 0
+      const monthlyEnergyMwh = allPlants?.reduce((sum, p) => sum + (p.monthly_energy_mwh || 0), 0) || 0
+      const yearlyEnergyMwh = allPlants?.reduce((sum, p) => sum + (p.yearly_energy_mwh || 0), 0) || 0
+      const currentPowerKw = allPlants?.reduce((sum, p) => sum + (p.current_power_kw || 0), 0) || 0
+      const installedCapacityKw = allPlants?.reduce((sum, p) => sum + (p.capacity_kw || 0), 0) || 0
 
       dashboardData.metrics = {
         totalPlants,
@@ -176,6 +189,11 @@ export async function GET(request: NextRequest) {
         activeAlerts: activeAlertsResult.count || 0,
         totalWorkOrders: workOrdersResult.count || 0,
         totalEnergyMwh,
+        dailyEnergyMwh,
+        monthlyEnergyMwh,
+        yearlyEnergyMwh,
+        currentPowerKw,
+        installedCapacityKw,
       }
 
       dashboardData.widgets = {

@@ -8,6 +8,7 @@ import { DashboardMetrics } from "@/components/DashboardMetrics"
 import { TelemetryChart } from "@/components/TelemetryChart"
 import { AlertsFeed } from "@/components/AlertsFeed"
 import { EfficiencySummary } from "@/components/EfficiencySummary"
+import { ProductionOverview } from "@/components/ProductionOverview"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { useUser } from "@/context/UserContext"
 import { Building2, Factory, Plus, FileText } from "lucide-react"
@@ -23,6 +24,13 @@ interface DashboardData {
     activeAlerts?: number
     totalWorkOrders?: number
     totalGeneration24h?: number
+    totalEnergyMwh?: number
+    // Additional energy metrics for GOVT users
+    dailyEnergyMwh?: number
+    monthlyEnergyMwh?: number
+    yearlyEnergyMwh?: number
+    currentPowerKw?: number
+    installedCapacityKw?: number
   }
   widgets: {
     showOrganizations?: boolean
@@ -174,6 +182,24 @@ export default function DashboardPage() {
         <div className="mb-8">
           <DashboardMetrics metrics={metrics} accountType={accountType} />
         </div>
+
+        {/* Production Overview for GOVT users */}
+        {role === "GOVT" && metrics && (
+          <div className="mb-8">
+            <ProductionOverview
+              metrics={{
+                currentPowerKw: metrics.currentPowerKw,
+                installedCapacityKw: metrics.installedCapacityKw,
+                dailyEnergyMwh: metrics.dailyEnergyMwh,
+                monthlyEnergyMwh: metrics.monthlyEnergyMwh,
+                yearlyEnergyMwh: metrics.yearlyEnergyMwh,
+                totalEnergyMwh: metrics.totalEnergyMwh,
+              }}
+              title="Production Overview"
+              hidePerformanceRatio={true}
+            />
+          </div>
+        )}
 
         {/* Action Cards for SUPERADMIN */}
         {role === "SUPERADMIN" && (
