@@ -158,22 +158,23 @@ export function DashboardMetrics({ metrics, accountType }: DashboardMetricsProps
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ delay: index * 0.1, type: "spring", stiffness: 100 }}
             whileHover={{ scale: 1.02, y: -2 }}
+            className="h-full"
           >
-            <Card className={`relative overflow-hidden bg-gradient-to-br ${metric.bgGradient || 'from-background to-muted/50'} border-2 ${metric.borderColor || 'border-border'} hover:shadow-2xl transition-all duration-300 group`}>
+            <Card className={`relative overflow-hidden bg-gradient-to-br ${metric.bgGradient || 'from-background to-muted/50'} border-2 ${metric.borderColor || 'border-border'} hover:shadow-2xl transition-all duration-300 group h-full flex flex-col min-h-[140px]`}>
               {/* Animated gradient overlay on hover */}
               <div className={`absolute inset-0 bg-gradient-to-br ${metric.gradient || 'from-primary to-primary/60'} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
               
-              <div className="relative p-6">
+              <div className="relative p-6 flex-1 flex flex-col justify-between">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  <div className="flex-1 min-w-0 pr-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 line-clamp-2">
                       {metric.label}
                     </p>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                    <p className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent break-words">
                       {metric.value}
                     </p>
                   </div>
-                  <div className={`relative h-12 w-12 rounded-xl bg-gradient-to-br ${metric.gradient || 'from-primary to-primary/60'} p-2.5 shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110`}>
+                  <div className={`relative h-12 w-12 rounded-xl bg-gradient-to-br ${metric.gradient || 'from-primary to-primary/60'} p-2.5 shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 flex-shrink-0`}>
                     {metric.label === "Total Plants" && totalPlants > 0 && accountType !== "GOVT" ? (
                       <>
                         {/* Background icon (unmapped portion - always visible) */}
