@@ -102,9 +102,9 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [selectedPeriod, setSelectedPeriod] = useState<"day" | "month" | "year" | "total">("day")
   const [telemetryLoading, setTelemetryLoading] = useState(false)
-  // For total view: date range
-  const [startYear, setStartYear] = useState<number>(2000)
-  const [endYear, setEndYear] = useState<number>(new Date().getFullYear())
+  // For total view: date range (fixed from 2000 to current year, not user-changeable)
+  const startYear = 2000
+  const endYear = new Date().getFullYear()
   const [telemetryLoaded, setTelemetryLoaded] = useState(false) // Track if user has requested to load graph
 
   useEffect(() => {
@@ -119,7 +119,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
       fetchTelemetry()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plant, selectedDate, selectedPeriod, telemetryLoaded, startYear, endYear])
+  }, [plant, selectedDate, selectedPeriod, telemetryLoaded])
 
   async function fetchPlantData() {
     try {
@@ -218,21 +218,8 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
       } else {
         setSelectedDate(addYears(startOfYear(selectedDate), 1))
       }
-    } else if (selectedPeriod === "total") {
-      // For total view, adjust the year range
-      if (direction === "prev") {
-        // Move both years back by the range size
-        const range = endYear - startYear
-        setStartYear(Math.max(2000, startYear - range - 1))
-        setEndYear(Math.max(2000, endYear - range - 1))
-      } else {
-        // Move both years forward by the range size
-        const currentYear = new Date().getFullYear()
-        const range = endYear - startYear
-        setStartYear(Math.min(currentYear, startYear + range + 1))
-        setEndYear(Math.min(currentYear, endYear + range + 1))
-      }
     }
+    // Total view: date range is fixed, no navigation allowed
     // useEffect will automatically trigger fetchTelemetry() when selectedDate changes
     // No need to call it manually here to avoid double calls
   }
@@ -599,7 +586,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                       </TabsList>
                     </Tabs>
                     
-                    {(selectedPeriod === "day" || selectedPeriod === "month" || selectedPeriod === "year" || selectedPeriod === "total") && (
+                    {(selectedPeriod === "day" || selectedPeriod === "month" || selectedPeriod === "year") && (
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
@@ -616,9 +603,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                               ? format(selectedDate, "yyyy/MM/dd")
                               : selectedPeriod === "month"
                               ? format(selectedDate, "yyyy/MM")
-                              : selectedPeriod === "year"
-                              ? format(selectedDate, "yyyy")
-                              : `${startYear} ~ ${endYear}`}
+                              : format(selectedDate, "yyyy")}
                           </span>
                         </div>
                         <Button
@@ -628,11 +613,20 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                           disabled={telemetryLoading || 
                             (selectedPeriod === "day" && selectedDate && selectedDate >= new Date()) || 
                             (selectedPeriod === "month" && selectedDate && startOfMonth(selectedDate) >= startOfMonth(new Date())) || 
-                            (selectedPeriod === "year" && selectedDate && startOfYear(selectedDate) >= startOfYear(new Date())) || 
-                            (selectedPeriod === "total" && endYear >= new Date().getFullYear())}
+                            (selectedPeriod === "year" && selectedDate && startOfYear(selectedDate) >= startOfYear(new Date()))}
                         >
                           <ChevronRight className="h-4 w-4" />
                         </Button>
+                      </div>
+                    )}
+                    {selectedPeriod === "total" && (
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 px-3 py-1.5 border rounded-md bg-background">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">
+                            {startYear} ~ {endYear}
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -701,7 +695,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-      {alertsLoading ? (
+              {alertsLoading ? (
                 <div className="flex items-center justify-center h-20 text-xs text-muted-foreground">
                   Loading alerts...
                 </div>
@@ -755,7 +749,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                 </div>
               )}
               <div className="mt-3 flex justify-end">
-                <Link href={`/alerts/vendor/${plant.vendors.id}/plant/${plant.id}`}>
+                <Link href={`/alerts/vendor/${plant?.vendors?.id}/plant/${plant?.id}`}>
                   <Button variant="outline" size="sm" className="h-7 px-3 text-xs">
                     View full alert history
                   </Button>
