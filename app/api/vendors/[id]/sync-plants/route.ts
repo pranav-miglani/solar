@@ -181,7 +181,6 @@ export async function POST(
         last_update_time: lastUpdateTime, // lastUpdateTime from vendor
         last_refreshed_at: new Date().toISOString(), // Always set to current time when syncing
         // Additional metadata fields (refreshed on every sync)
-        contact_phone: metadata.contactPhone || null,
         // Normalize network_status by trimming whitespace (handle ' ALL_OFFLINE' with leading space)
         network_status: metadata.networkStatus ? String(metadata.networkStatus).trim() : null,
         vendor_created_date: createdDate || null,

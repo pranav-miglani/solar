@@ -644,7 +644,6 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           // Normalize networkStatus by trimming whitespace (Solarman may return ' ALL_OFFLINE' with leading space)
           networkStatus: station.networkStatus ? String(station.networkStatus).trim() : null,
           type: station.type,
-          contactPhone: station.contactPhone || null,
           locationAddress: locationAddress, // For sync route compatibility (must always be refreshed)
           gridInterconnectionType: station.gridInterconnectionType,
           regionTimezone: station.regionTimezone,
@@ -814,7 +813,6 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           // Normalize networkStatus by trimming whitespace (Solarman may return ' ALL_OFFLINE' with leading space)
           networkStatus: station.networkStatus ? String(station.networkStatus).trim() : null,
           type: station.type,
-          contactPhone: station.contactPhone || null,
           gridInterconnectionType: station.gridInterconnectionType,
           regionTimezone: station.regionTimezone,
           startOperatingTime: startOperatingTime, // Already converted to ISO string

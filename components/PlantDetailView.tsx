@@ -41,7 +41,6 @@ interface Plant {
   total_energy_mwh: number | null
   last_update_time: string | null
   last_refreshed_at: string | null
-  contact_phone: string | null
   network_status: string | null
   vendor_created_date: string | null
   start_operating_time: string | null
@@ -477,16 +476,6 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                         : "N/A"}
                     </p>
                   )}
-                </div>
-              </div>
-            )}
-
-            {plant.contact_phone && (
-              <div className="flex items-center gap-2">
-                <Phone className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Contact Phone</p>
-                  <p className="text-base">{plant.contact_phone}</p>
                 </div>
               </div>
             )}

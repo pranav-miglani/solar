@@ -33,7 +33,6 @@ The `/station/v1.0/list` endpoint returns:
       "locationLng": 76.744538,
       "locationAddress": "Chandigarh Chandigarh Chandigarh ",
       "networkStatus": "NORMAL",
-      "contactPhone": "",
       "lastUpdateTime": 1763279487,
       "createdDate": 1580112893,
       "startOperatingTime": 1580112893,
@@ -76,7 +75,6 @@ The adapter transforms Solarman API response into a normalized `Plant` format:
 | `station.createdDate` | **Unix timestamp (seconds) → ISO string** | `metadata.createdDate` |
 | `station.startOperatingTime` | **Unix timestamp (seconds) → ISO string** | `metadata.startOperatingTime` |
 | `station.networkStatus` | **Trim whitespace** (handle ' ALL_OFFLINE') | `metadata.networkStatus` |
-| `station.contactPhone` | Direct mapping | `metadata.contactPhone` |
 | Other fields | Stored as-is | `metadata.*` |
 
 ### Example Adapter Output:
@@ -95,7 +93,6 @@ The adapter transforms Solarman API response into a normalized `Plant` format:
     currentPowerKw: 2.196,  // 2196 W / 1000
     lastUpdateTime: "2025-11-16T10:30:00.000Z",  // Converted from Unix
     networkStatus: "NORMAL",  // Trimmed
-    contactPhone: "",
     createdDate: "2020-01-28T10:30:00.000Z",
     startOperatingTime: "2020-01-28T10:30:00.000Z",
     // ... other metadata fields
@@ -127,7 +124,6 @@ The sync route maps the Plant object to database columns:
 | `total_energy_mwh` | `metadata.totalEnergyMwh` | Direct | NULL (not in /station/v1.0/list) |
 | `last_update_time` | `metadata.lastUpdateTime` | **Handle both ISO string and Unix timestamp** | TIMESTAMPTZ |
 | `last_refreshed_at` | **Current timestamp** | `NOW()` | When synced to DB |
-| `contact_phone` | `metadata.contactPhone` | Direct | "" (empty string or phone number) |
 | `network_status` | `metadata.networkStatus` | **Trim whitespace** | "NORMAL", "ALL_OFFLINE", "PARTIAL_OFFLINE" |
 | `vendor_created_date` | `metadata.createdDate` | **Handle both ISO string and Unix timestamp** | TIMESTAMPTZ |
 | `start_operating_time` | `metadata.startOperatingTime` | **Handle both ISO string and Unix timestamp** | TIMESTAMPTZ |
@@ -145,7 +141,6 @@ The sync route maps the Plant object to database columns:
 | `station.id` | `vendor_plant_id` | TEXT | Unique per vendor |
 | `station.name` | `name` | TEXT | Plant name |
 | `station.installedCapacity` | `capacity_kw` | NUMERIC(10,2) | Already in kW |
-| `station.contactPhone` | `contact_phone` | TEXT | Can be empty string |
 | `station.networkStatus` | `network_status` | TEXT | Trimmed, normalized |
 
 ### Transformed Mappings:
@@ -253,7 +248,6 @@ Result:
 | `total_energy_mwh` | NULL | Not available |
 | `last_update_time` | `2025-11-16 10:30:00+00` | `station.lastUpdateTime` (Unix → TIMESTAMPTZ) |
 | `last_refreshed_at` | `2025-11-16 17:13:30+00` | `NOW()` (when synced) |
-| `contact_phone` | "" | `station.contactPhone` |
 | `network_status` | "NORMAL" | `station.networkStatus` (trimmed) |
 | `vendor_created_date` | `2020-01-28 10:30:00+00` | `station.createdDate` (Unix → TIMESTAMPTZ) |
 | `start_operating_time` | `2020-01-28 10:30:00+00` | `station.startOperatingTime` (Unix → TIMESTAMPTZ) |
@@ -271,7 +265,7 @@ Result:
 - Location: `location` (JSONB with lat, lng, address)
 - Current power: `current_power_kw` (converted from W)
 - Timestamps: `last_update_time`, `vendor_created_date`, `start_operating_time`
-- Metadata: `contact_phone`, `network_status`
+- Metadata: `network_status`
 - Sync tracking: `last_refreshed_at`
 
 ❌ **NOT Stored in DB:**

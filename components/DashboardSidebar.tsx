@@ -64,6 +64,12 @@ export function DashboardSidebar() {
       roles: ["SUPERADMIN"],
     },
     {
+      title: "Disabled Plants",
+      href: "/superadmin/disabled-plants",
+      icon: AlertTriangle,
+      roles: ["SUPERADMIN"],
+    },
+    {
       title: "Work Orders",
       href: "/workorders",
       icon: FileText,

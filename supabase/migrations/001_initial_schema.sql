@@ -168,7 +168,6 @@ CREATE TABLE plants (
   last_update_time TIMESTAMPTZ, -- Last time production data was updated from vendor (shown as "Last Updated" timestamp)
   last_refreshed_at TIMESTAMPTZ, -- Last time this plant data was refreshed/synced in our database (shown as "Last Refresh" timestamp)
   -- Additional metadata fields (refreshed on every sync)
-  contact_phone TEXT, -- Contact phone number from vendor
   network_status TEXT, -- Network status from vendor (e.g., NORMAL, ALL_OFFLINE, PARTIAL_OFFLINE). May include leading/trailing whitespace which is normalized during sync.
   vendor_created_date TIMESTAMPTZ, -- Original creation date from vendor (Unix timestamp converted to TIMESTAMPTZ)
   start_operating_time TIMESTAMPTZ, -- When plant started operating (Unix timestamp converted to TIMESTAMPTZ)
@@ -185,7 +184,6 @@ COMMENT ON COLUMN plants.yearly_energy_mwh IS 'Yearly energy generation in MWh (
 COMMENT ON COLUMN plants.total_energy_mwh IS 'Total cumulative energy generation in MWh (shown in Production Overview)';
 COMMENT ON COLUMN plants.last_update_time IS 'Last time production data was updated from vendor (shown as "Last Updated" timestamp)';
 COMMENT ON COLUMN plants.last_refreshed_at IS 'Last time this plant data was refreshed/synced in our database (shown as "Last Refresh" timestamp) - set to NOW() on every sync';
-COMMENT ON COLUMN plants.contact_phone IS 'Contact phone number from vendor (refreshed on sync)';
 COMMENT ON COLUMN plants.network_status IS 'Network status from vendor. Valid values: NORMAL, ALL_OFFLINE, PARTIAL_OFFLINE. May include leading/trailing whitespace which is normalized during sync. Unknown values are displayed as N/A in UI.';
 COMMENT ON COLUMN plants.vendor_created_date IS 'Original creation date from vendor (Unix timestamp converted to TIMESTAMPTZ) - refreshed on sync';
 COMMENT ON COLUMN plants.start_operating_time IS 'When plant started operating (Unix timestamp converted to TIMESTAMPTZ) - refreshed on sync';

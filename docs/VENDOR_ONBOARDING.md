@@ -125,7 +125,6 @@ All plants must map to the following database columns:
 
 | Column | Type | Description | Source |
 |--------|------|-------------|--------|
-| `contact_phone` | TEXT | Contact phone number | Vendor API |
 | `network_status` | TEXT | Network status (NORMAL, ALL_OFFLINE, PARTIAL_OFFLINE) | Vendor API |
 | `vendor_created_date` | TIMESTAMPTZ | Original creation date from vendor | Vendor API |
 | `start_operating_time` | TIMESTAMPTZ | When plant started operating | Vendor API |
@@ -383,7 +382,6 @@ SOLARMAN_PRO_API_BASE_URL=https://globalpro.solarmanpv.com
         "locationLng": 76.744538,
         "locationAddress": "Chandigarh",
         "networkStatus": "NORMAL",
-        "contactPhone": "+91-1234567890",
         "lastUpdateTime": 1763279487,
         "createdDate": 1580112893,
         "startOperatingTime": 1580112893
@@ -410,7 +408,6 @@ SOLARMAN_PRO_API_BASE_URL=https://globalpro.solarmanpv.com
 | `station.locationLng` | number | Combined | `location.lng` |
 | `station.locationAddress` | string | Combined | `location.address` |
 | `station.networkStatus` | string | `.trim()` | `network_status` |
-| `station.contactPhone` | string | Direct | `contact_phone` |
 | `station.createdDate` | number (Unix seconds) | `new Date(ts * 1000).toISOString()` | `vendor_created_date` |
 | `station.startOperatingTime` | number (Unix seconds) | `new Date(ts * 1000).toISOString()` | `start_operating_time` |
 
@@ -476,7 +473,6 @@ Use this checklist when implementing a new vendor adapter:
 
 ### Phase 5: Metadata Fields
 
-- [ ] Extract `contact_phone`
 - [ ] Extract `network_status` (normalize and trim)
 - [ ] Extract `vendor_created_date` (convert to ISO 8601)
 - [ ] Extract `start_operating_time` (convert to ISO 8601)

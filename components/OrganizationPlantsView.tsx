@@ -37,7 +37,6 @@ interface Plant {
   yearly_energy_mwh: number | null
   total_energy_mwh: number | null
   last_update_time: string | null
-  contact_phone: string | null
   network_status: string | null
   vendor_created_date: string | null
   start_operating_time: string | null
