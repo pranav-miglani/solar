@@ -273,13 +273,12 @@ export class SolarDmAdapter extends BaseVendorAdapter {
           address: plant.address || null,
         }
       }
-
       // Map network status: 2=offline, 1=online, 3=PARTIAL_OFFLINE
       let networkStatus: string | null = null
       if (plant.communicateStatus === 1) {
-        networkStatus = "ONLINE"
+        networkStatus = "NORMAL"
       } else if (plant.communicateStatus === 2) {
-        networkStatus = "OFFLINE"
+        networkStatus = "ALL_OFFLINE"
       } else if (plant.communicateStatus === 3) {
         networkStatus = "PARTIAL_OFFLINE"
       }

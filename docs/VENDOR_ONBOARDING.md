@@ -227,6 +227,213 @@ interface Plant {
 - Return array of alert objects
 - Map vendor severity levels to: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
 - Include vendor alert ID for deduplication
+- Include alert timestamps (`alert_time`, `end_time`) if available
+- Filter by device type if vendor supports it (e.g., only INVERTER alerts)
+
+**Alert Interface**:
+```typescript
+interface Alert {
+  vendorAlertId?: string    // Vendor's unique alert ID (for deduplication)
+  title: string             // Alert title/name
+  description?: string       // Alert description/message
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  metadata?: Record<string, any>  // Vendor-specific alert data
+}
+```
+
+**Note**: The `normalizeAlert()` method should transform vendor-specific alert data into this format.
+
+---
+
+## Alert Mapping Requirements
+
+### Alert Database Schema
+
+The `alerts` table stores vendor alerts with the following structure:
+
+| Column | Type | Description | Source |
+|--------|------|-------------|--------|
+| `id` | SERIAL | Primary key | System |
+| `plant_id` | INTEGER | Foreign key to plants | System (from vendor_plant_id lookup) |
+| `vendor_id` | INTEGER | Foreign key to vendors | Vendor config |
+| `vendor_alert_id` | TEXT | Vendor's unique alert ID | Vendor API |
+| `vendor_plant_id` | TEXT | Vendor's plant/station ID | Vendor API |
+| `station_id` | BIGINT | Station ID (numeric, if applicable) | Vendor API |
+| `device_type` | TEXT | Device type (e.g., "INVERTER") | Vendor API |
+| `alert_time` | TIMESTAMPTZ | When alert started | Vendor API |
+| `end_time` | TIMESTAMPTZ | When alert ended (nullable) | Vendor API |
+| `grid_down_seconds` | INTEGER | Computed downtime in seconds | Calculated: `max(0, end_time - alert_time)` |
+| `grid_down_benefit_kwh` | NUMERIC(12,3) | Downtime benefit energy | Calculated: `0.5 × hours(9AM-4PM overlap) × capacity_kw` |
+| `title` | TEXT | Alert title | Vendor API |
+| `description` | TEXT | Alert description | Vendor API |
+| `severity` | ENUM | LOW, MEDIUM, HIGH, CRITICAL | Mapped from vendor |
+| `status` | ENUM | ACTIVE, RESOLVED, ACKNOWLEDGED | Mapped from vendor |
+| `metadata` | JSONB | Additional vendor data | Vendor API |
+| `created_at` | TIMESTAMPTZ | Creation timestamp | System |
+| `updated_at` | TIMESTAMPTZ | Last update timestamp | System |
+| `resolved_at` | TIMESTAMPTZ | Resolution timestamp (nullable) | System |
+
+### Alert Sync Implementation
+
+Alerts are synced via a dedicated service (`alertSyncService.ts`) that:
+
+1. **Fetches alerts from vendor API** using the adapter's `getAlerts()` method
+2. **Maps vendor data** to database format
+3. **Calculates derived fields**:
+   - `grid_down_seconds`: Duration between `alert_time` and `end_time`
+   - `grid_down_benefit_kwh`: Energy benefit during grid downtime (9 AM - 4 PM local time)
+4. **Upserts alerts** (insert new, update existing based on `vendor_alert_id`)
+
+### Alert Data Mapping
+
+#### Required Fields
+
+| Database Column | Vendor Field | Conversion Notes |
+|----------------|--------------|------------------|
+| `vendor_alert_id` | `id` or `alertId` | Convert to string, use for deduplication |
+| `vendor_plant_id` | `stationId` or `plantId` | Vendor's plant identifier (as string) |
+| `station_id` | `stationId` | Numeric station ID (if available) |
+| `device_type` | `deviceType` | Filter for specific types (e.g., "INVERTER") |
+| `title` | `alertName` or `alertType` | Alert title/name |
+| `description` | `message` or `description` | Alert description (optional) |
+| `alert_time` | `alertTime` or `timestamp` | Convert to ISO 8601 (Unix seconds → ISO) |
+| `end_time` | `endTime` or `resolvedAt` | Convert to ISO 8601 (nullable) |
+
+#### Severity Mapping
+
+Map vendor severity levels to standardized enum:
+
+```typescript
+// Example: Solarman severity mapping
+const severityMap: Record<number, Alert["severity"]> = {
+  0: "LOW",      // Info
+  1: "MEDIUM",   // Warning
+  2: "HIGH",     // Error
+}
+
+// Upgrade to CRITICAL if safety impact
+if (rawData.influence === 2 || rawData.influence === 3) {
+  severity = "CRITICAL" // Safety impact is critical
+}
+```
+
+**Standard Severity Levels**:
+- `LOW`: Informational alerts, minor issues
+- `MEDIUM`: Warnings, production impact
+- `HIGH`: Errors, significant issues
+- `CRITICAL`: Safety issues, critical failures
+
+#### Status Mapping
+
+Map vendor alert status to standardized enum:
+
+```typescript
+// Example: Map based on end_time presence
+function mapAlertStatus(endTime: number | null | undefined): AlertStatus {
+  if (endTime && endTime > 0) {
+    return "RESOLVED" // Alert has ended
+  }
+  return "ACTIVE" // Alert is still active
+}
+```
+
+**Standard Status Levels**:
+- `ACTIVE`: Alert is currently active
+- `RESOLVED`: Alert has been resolved/ended
+- `ACKNOWLEDGED`: Alert has been acknowledged by user
+
+#### Timestamp Conversion
+
+Convert vendor timestamps to ISO 8601 format:
+
+```typescript
+// Unix timestamp (seconds) → ISO string
+const alertTimeDate = raw.alertTime 
+  ? new Date(raw.alertTime * 1000).toISOString() 
+  : null
+
+// Unix timestamp (milliseconds) → ISO string
+const alertTimeDate = raw.alertTime 
+  ? new Date(raw.alertTime).toISOString() 
+  : null
+```
+
+#### Grid Downtime Calculation
+
+The system automatically calculates:
+- **`grid_down_seconds`**: `max(0, end_time - alert_time)` in seconds
+- **`grid_down_benefit_kwh`**: `0.5 × hours(overlap between 9AM-4PM local time) × installed_capacity_kw`
+
+**Example Calculation**:
+```typescript
+// Alert from 8 AM to 6 PM (10 hours total)
+// Overlap with 9 AM - 4 PM window: 7 hours
+// Plant capacity: 5 kW
+// Benefit: 0.5 × 7 hours × 5 kW = 17.5 kWh
+```
+
+### Alert Sync Configuration
+
+Vendors can configure alert sync behavior:
+
+1. **Lookback Period**: Set `alertsStartDate` in vendor credentials (ISO date string)
+   - Default: 1 year lookback
+   - Example: `"2024-01-01"` in credentials JSON
+
+2. **Device Type Filtering**: Filter alerts by device type (e.g., only INVERTER alerts)
+
+3. **Pagination**: Handle paginated alert responses (if vendor supports it)
+
+### Alert Sync Endpoints
+
+Alerts are synced via:
+- **Manual Sync**: `/api/vendors/[id]/sync-alerts` (POST)
+- **Cron Job**: Automatic sync every 15 minutes (configurable)
+
+### Solarman Alert Example
+
+**Endpoint**: `POST /maintain-s/operating/station/alert/v2/list`
+
+**Request**:
+```json
+{
+  "alertQueryName": "No Mains Voltage",
+  "language": "en",
+  "status": "-1",
+  "timeZone": "Asia/Calcutta",
+  "page": 1,
+  "size": 100
+}
+```
+
+**Response Structure**:
+```json
+{
+  "total": 10,
+  "data": [
+    {
+      "id": "12345",
+      "stationId": 693934,
+      "deviceType": "INVERTER",
+      "alertName": "No Mains Voltage",
+      "alertTime": 1763279487,
+      "endTime": 1763283087,
+      "level": 2,
+      "influence": 2,
+      "timezone": "Asia/Calcutta"
+    }
+  ]
+}
+```
+
+**Mapping**:
+- `id` → `vendor_alert_id`
+- `stationId` → `vendor_plant_id` (as string) and `station_id` (as number)
+- `deviceType` → `device_type` (filter for "INVERTER" only)
+- `alertName` → `title`
+- `alertTime` → `alert_time` (Unix seconds → ISO)
+- `endTime` → `end_time` (Unix seconds → ISO)
+- `level` + `influence` → `severity` (mapped via `mapSolarmanSeverity()`)
 
 ---
 
@@ -411,7 +618,68 @@ SOLARMAN_PRO_API_BASE_URL=https://globalpro.solarmanpv.com
 | `station.createdDate` | number (Unix seconds) | `new Date(ts * 1000).toISOString()` | `vendor_created_date` |
 | `station.startOperatingTime` | number (Unix seconds) | `new Date(ts * 1000).toISOString()` | `start_operating_time` |
 
-### 5. Adapter Implementation
+### 5. Alert Synchronization
+
+**Endpoint**: `POST /maintain-s/operating/station/alert/v2/list`
+
+**Request**:
+```json
+{
+  "alertQueryName": "No Mains Voltage",
+  "language": "en",
+  "status": "-1",
+  "timeZone": "Asia/Calcutta",
+  "page": 1,
+  "size": 100
+}
+```
+
+**Response**:
+```json
+{
+  "total": 10,
+  "data": [
+    {
+      "id": "12345",
+      "stationId": 693934,
+      "deviceType": "INVERTER",
+      "alertName": "No Mains Voltage",
+      "alertTime": 1763279487,
+      "endTime": 1763283087,
+      "level": 2,
+      "influence": 2,
+      "timezone": "Asia/Calcutta"
+    }
+  ]
+}
+```
+
+**Alert Mapping**:
+- `id` → `vendor_alert_id` (as string)
+- `stationId` → `vendor_plant_id` (as string) and `station_id` (as number)
+- `deviceType` → `device_type` (filter for "INVERTER" only)
+- `alertName` → `title`
+- `alertTime` → `alert_time` (Unix seconds → ISO 8601)
+- `endTime` → `end_time` (Unix seconds → ISO 8601)
+- `level` + `influence` → `severity` (mapped via `mapSolarmanSeverity()`)
+
+**Severity Mapping**:
+```typescript
+// level: 0=Info, 1=Warning, 2=Error
+const severityMap = {
+  0: "LOW",
+  1: "MEDIUM",
+  2: "HIGH",
+}
+
+// influence: 0=No impact, 1=Production, 2=Safety, 3=Production+Safety
+// Safety influence (2 or 3) upgrades to CRITICAL
+if (influence === 2 || influence === 3) {
+  severity = "CRITICAL"
+}
+```
+
+### 6. Adapter Implementation
 
 **File**: `lib/vendors/solarmanAdapter.ts`
 
@@ -421,6 +689,7 @@ SOLARMAN_PRO_API_BASE_URL=https://globalpro.solarmanpv.com
 - `getTokenFromDB()` - Retrieves cached token
 - `storeTokenInDB()` - Stores token with expiration
 - `getProApiBaseUrl()` - Gets API base URL from env vars
+- `normalizeAlert()` - Maps Solarman alert format to standard Alert interface
 
 **Registration**: Adapter is registered in `lib/vendors/vendorManager.ts`:
 ```typescript
@@ -486,13 +755,29 @@ Use this checklist when implementing a new vendor adapter:
 - [ ] Test upsert behavior (updating existing plants)
 - [ ] Verify `last_refreshed_at` is set to current timestamp
 
-### Phase 7: Optional Features
+### Phase 7: Alert Synchronization (Optional)
+
+- [ ] Implement `getAlerts()` method in adapter
+- [ ] Implement `normalizeAlert()` method
+- [ ] Map vendor severity levels to standard enum (LOW, MEDIUM, HIGH, CRITICAL)
+- [ ] Map vendor status to standard enum (ACTIVE, RESOLVED, ACKNOWLEDGED)
+- [ ] Extract and convert alert timestamps (alert_time, end_time)
+- [ ] Extract vendor_alert_id for deduplication
+- [ ] Extract vendor_plant_id and station_id
+- [ ] Extract device_type (if applicable)
+- [ ] Filter alerts by device type (e.g., only INVERTER alerts)
+- [ ] Handle pagination (if vendor API supports it)
+- [ ] Test alert sync via `/api/vendors/[id]/sync-alerts`
+- [ ] Verify alerts are stored correctly in database
+- [ ] Verify grid_down_seconds and grid_down_benefit_kwh are calculated
+- [ ] Test alert deduplication (same vendor_alert_id)
+
+### Phase 8: Optional Features
 
 - [ ] Implement `getTelemetry()` (if vendor supports it)
-- [ ] Implement `getAlerts()` (if vendor supports it)
 - [ ] Implement `getRealtime()` (if vendor supports it)
 
-### Phase 8: Testing
+### Phase 9: Testing
 
 - [ ] Test authentication with valid credentials
 - [ ] Test authentication with invalid credentials
@@ -503,7 +788,7 @@ Use this checklist when implementing a new vendor adapter:
 - [ ] Test token expiration and refresh
 - [ ] Test sync via UI (vendor sync page)
 
-### Phase 9: Documentation
+### Phase 10: Documentation
 
 - [ ] Document vendor API endpoints
 - [ ] Document request/response formats
@@ -551,6 +836,11 @@ Verify data quality:
 - Location coordinates are valid (lat: -90 to 90, lng: -180 to 180)
 - Network status values are normalized
 - No duplicate plants (same `vendor_id` + `vendor_plant_id`)
+- Alert severity values are valid (LOW, MEDIUM, HIGH, CRITICAL)
+- Alert status values are valid (ACTIVE, RESOLVED, ACKNOWLEDGED)
+- Alert timestamps are valid ISO 8601 format
+- No duplicate alerts (same `vendor_id` + `vendor_alert_id` + `plant_id`)
+- Grid downtime calculations are correct
 
 ---
 
@@ -595,6 +885,20 @@ Verify data quality:
 
 **Problem**: Not handling missing/null values
 **Solution**: Use nullish coalescing (`??`) and optional chaining (`?.`)
+
+### 6. Alert Mapping
+
+**Problem**: Not mapping vendor severity levels correctly
+**Solution**: Create explicit mapping function (e.g., `mapSolarmanSeverity()`)
+
+**Problem**: Not handling alert deduplication
+**Solution**: Use `vendor_alert_id` + `vendor_id` + `plant_id` as unique key
+
+**Problem**: Not converting alert timestamps correctly
+**Solution**: Always convert vendor timestamps to ISO 8601 format
+
+**Problem**: Not calculating grid downtime benefit
+**Solution**: Implement `calculateGridDownBenefitKwh()` using 9 AM - 4 PM window
 
 ---
 
