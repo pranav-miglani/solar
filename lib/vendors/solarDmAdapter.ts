@@ -866,22 +866,54 @@ export class SolarDmAdapter extends BaseVendorAdapter {
     const operation = context?.operation || "API_CALL"
     const description = context?.description || "SolarDM API request"
     
+    // Build headers object - only include Content-Type if there's a body
+    const headers: Record<string, string> = {
+      "Authorization": `Bearer ${token}`,
+      "Accept": "application/json, text/plain, */*",
+    }
+    
+    // Only add Content-Type for requests with body
+    if (options.body) {
+      headers["Content-Type"] = "application/json"
+    }
+    
+    // Merge any existing headers from options (convert Headers object to plain object if needed)
+    if (options.headers) {
+      if (options.headers instanceof Headers) {
+        options.headers.forEach((value, key) => {
+          headers[key] = value
+        })
+      } else {
+        Object.assign(headers, options.headers)
+      }
+    }
+    
     console.log(`[SolarDM] ${operation}: ${description}`)
     console.log(`[SolarDM] Request URL: ${fullUrl}`)
     console.log(`[SolarDM] Request method: ${options.method || "GET"}`)
-    console.log(`[SolarDM] Bearer Token: ${token}`)
+    console.log(`[SolarDM] Request headers:`, JSON.stringify(headers, null, 2))
     console.log(`[SolarDM] Authorization Header: Bearer ${token}`)
+    
+    if (options.body) {
+      console.log(`[SolarDM] Request body:`, typeof options.body === 'string' ? options.body : JSON.stringify(options.body))
+    }
     
     const response = await pooledFetch(fullUrl, {
       ...options,
-      headers: {
-        ...options.headers,
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json, text/plain, */*",
-      },
+      headers,
     })
     
     console.log(`[SolarDM] Response status: ${response.status} ${response.statusText}`)
+    console.log(`[SolarDM] Response headers:`, JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
+    
+    // Log response body for debugging (but don't consume it)
+    const responseClone = response.clone()
+    try {
+      const responseText = await responseClone.text()
+      console.log(`[SolarDM] Response body (first 500 chars):`, responseText.substring(0, 500))
+    } catch (e) {
+      console.log(`[SolarDM] Could not read response body for logging`)
+    }
     
     return response
   }
@@ -959,6 +991,12 @@ export class SolarDmAdapter extends BaseVendorAdapter {
       
       const fullUrl = `${url}?${params.toString()}`
       console.log(`[SolarDM] Fetching page ${current}/${totalPages} from: ${fullUrl}`)
+      console.log(`[SolarDM] Query parameters:`, {
+        current: current.toString(),
+        size: pageSize.toString(),
+        faultInfo: "There is no mains voltage",
+        encoded: params.toString()
+      })
       
       const response = await this.loggedFetch(
         fullUrl,
