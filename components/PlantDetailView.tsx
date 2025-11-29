@@ -188,10 +188,16 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
     } else {
       setSelectedDate(addDays(selectedDate, 1))
     }
+    // Automatically fetch telemetry when date changes (if graph is already loaded)
+    if (telemetryLoaded) {
+      fetchTelemetry()
+    }
   }
 
   const handleLoadGraph = () => {
     setTelemetryLoaded(true)
+    // Automatically fetch telemetry when user clicks "Load Telemetry Graph"
+    fetchTelemetry()
   }
 
   // Fetch the latest alerts for this plant (limited via API default) so users see
@@ -528,7 +534,16 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                 {/* Period Tabs and Date Selector (for Solarman) */}
                 {plant.vendors.vendor_type === "SOLARMAN" && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <Tabs value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as typeof selectedPeriod)}>
+                    <Tabs 
+                      value={selectedPeriod} 
+                      onValueChange={(v) => {
+                        setSelectedPeriod(v as typeof selectedPeriod)
+                        // Automatically fetch telemetry when period changes (if graph is already loaded)
+                        if (telemetryLoaded) {
+                          fetchTelemetry()
+                        }
+                      }}
+                    >
                       <TabsList>
                         <TabsTrigger value="day">Day</TabsTrigger>
                         <TabsTrigger value="month" disabled>Month</TabsTrigger>
@@ -578,10 +593,24 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                   </Button>
                 </div>
               ) : telemetryLoading ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                    <p className="text-sm text-muted-foreground">Loading telemetry data...</p>
+                <div className="flex flex-col items-center justify-center h-64 space-y-4">
+                  <div className="relative">
+                    {/* Outer spinning ring */}
+                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary border-r-primary"></div>
+                    {/* Inner pulsing dot */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="h-3 w-3 bg-primary rounded-full animate-pulse"></div>
+                    </div>
+                  </div>
+                  <div className="text-center space-y-2">
+                    <p className="text-sm font-medium text-foreground">Fetching telemetry data...</p>
+                    <p className="text-xs text-muted-foreground">This may take a few seconds</p>
+                    {/* Animated dots */}
+                    <div className="flex items-center justify-center gap-1 pt-2">
+                      <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
                   </div>
                 </div>
               ) : telemetry.length > 0 ? (

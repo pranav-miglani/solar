@@ -10,9 +10,29 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Extract plantId from params - handle both string and Promise cases
+    const plantIdParam = params?.id || (params as any)?.id
+    console.log(`[Telemetry API] GET request received`)
+    console.log(`[Telemetry API] Params object:`, JSON.stringify(params))
+    console.log(`[Telemetry API] Plant ID from params: ${plantIdParam}`)
+    console.log(`[Telemetry API] Request URL: ${request.url}`)
+    
+    // Extract plantId from URL if params.id is not available
+    const urlPath = new URL(request.url).pathname
+    const urlMatch = urlPath.match(/\/api\/plants\/(\d+)\/telemetry/)
+    const plantIdFromUrl = urlMatch ? urlMatch[1] : null
+    
+    const finalPlantIdParam = plantIdParam || plantIdFromUrl
+    
+    if (!finalPlantIdParam) {
+      console.error(`[Telemetry API] Missing plant ID parameter. URL: ${request.url}, Params:`, params)
+      return NextResponse.json({ error: "Plant ID is required" }, { status: 400 })
+    }
+
     const session = request.cookies.get("session")?.value
 
     if (!session) {
+      console.error(`[Telemetry API] No session cookie found`)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -20,10 +40,11 @@ export async function GET(
     try {
       sessionData = JSON.parse(Buffer.from(session, "base64").toString())
     } catch {
+      console.error(`[Telemetry API] Invalid session cookie`)
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    const plantId = parseInt(params.id)
+    const plantId = parseInt(finalPlantIdParam)
     const { searchParams } = new URL(request.url)
     
     // Support date-based query (for day view) or hours-based query (for 24h view)
@@ -32,13 +53,18 @@ export async function GET(
     const day = searchParams.get("day")
     const hours = searchParams.get("hours")
 
+    console.log(`[Telemetry API] Request params: plantId=${plantId}, year=${year}, month=${month}, day=${day}`)
+
     if (isNaN(plantId)) {
+      console.error(`[Telemetry API] Invalid plant ID: ${finalPlantIdParam}`)
       return NextResponse.json({ error: "Invalid plant ID" }, { status: 400 })
     }
 
     const supabase = getMainClient()
 
     // Step 1: Fetch plant with vendor information to identify the vendor
+    // Use the internal plant.id to find the plant, then get vendor_plant_id from the database
+    console.log(`[Telemetry API] Querying database for plant ID: ${plantId}`)
     const { data: plant, error: plantError } = await supabase
       .from("plants")
       .select(`
@@ -57,24 +83,52 @@ export async function GET(
       .eq("id", plantId)
       .single()
 
-    if (plantError || !plant) {
+    console.log(`[Telemetry API] Database query result - Plant:`, plant ? `Found (id: ${plant.id}, vendor_plant_id: ${plant.vendor_plant_id})` : "Not found")
+    console.log(`[Telemetry API] Database query error:`, plantError)
+
+    if (plantError) {
+      console.error(`[Telemetry API] Error fetching plant ${plantId}:`, plantError)
+      console.error(`[Telemetry API] Error code: ${plantError.code}, message: ${plantError.message}`)
+      return NextResponse.json(
+        { error: "Plant not found", details: plantError.message, code: plantError.code },
+        { status: 404 }
+      )
+    }
+
+    if (!plant) {
+      console.error(`[Telemetry API] Plant ${plantId} not found in database`)
       return NextResponse.json({ error: "Plant not found" }, { status: 404 })
     }
 
     // Step 2: Extract vendor information (handle array response from Supabase)
     const vendor = Array.isArray(plant.vendors) ? plant.vendors[0] : plant.vendors
 
-    if (!vendor || !vendor.is_active) {
-      return NextResponse.json({ error: "Vendor not found or inactive" }, { status: 404 })
+    if (!vendor) {
+      console.error(`[Telemetry API] Vendor not found for plant ${plantId}`)
+      return NextResponse.json({ error: "Vendor not found for this plant" }, { status: 404 })
+    }
+
+    if (!vendor.is_active) {
+      console.error(`[Telemetry API] Vendor ${vendor.id} is inactive for plant ${plantId}`)
+      return NextResponse.json({ error: "Vendor is inactive" }, { status: 404 })
     }
 
     // Step 3: Validate vendor_plant_id exists (this is the vendor's plant ID, not our internal plant ID)
+    // This is CRITICAL: We use vendor_plant_id (from DB) to call vendor APIs, NOT our internal plant.id
     if (!plant.vendor_plant_id) {
+      console.error(`[Telemetry API] vendor_plant_id is missing for plant ${plantId}`)
+      console.error(`[Telemetry API] Plant data:`, JSON.stringify(plant, null, 2))
       return NextResponse.json(
         { error: "Vendor plant ID not found for this plant" },
         { status: 400 }
       )
     }
+
+    console.log(`[Telemetry API] Processing telemetry request:`)
+    console.log(`[Telemetry API]   - Internal plant.id: ${plantId}`)
+    console.log(`[Telemetry API]   - vendor_plant_id (from DB): ${plant.vendor_plant_id}`)
+    console.log(`[Telemetry API]   - Vendor type: ${vendor.vendor_type}`)
+    console.log(`[Telemetry API]   - Will use vendor_plant_id (${plant.vendor_plant_id}) for vendor API call`)
 
     // Step 4: If we have date parameters, fetch daily telemetry from vendor API
     // Currently only Solarman is fully implemented; other vendors will be added in pipeline
@@ -227,7 +281,15 @@ export async function GET(
       message: "Date parameters (year, month, day) are required for telemetry data",
     })
   } catch (error: any) {
-    console.error("Telemetry error:", error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const plantIdParam = params?.id || (params as any)?.id || "unknown"
+    console.error(`[Telemetry API] Unexpected error for plant ${plantIdParam}:`, error)
+    console.error(`[Telemetry API] Error stack:`, error.stack)
+    return NextResponse.json(
+      { 
+        error: error.message || "Internal server error",
+        details: process.env.NODE_ENV === "development" ? error.stack : undefined
+      },
+      { status: 500 }
+    )
   }
 }
