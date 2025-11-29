@@ -117,10 +117,11 @@ export async function GET(
         // Currently only SolarmanAdapter implements this method
         // Future vendors will be added to the pipeline once Solarman flow is complete
         if (typeof (adapter as any).getDailyTelemetryRecords === "function") {
-          // Make API call to vendor using vendor_plant_id (not our internal plant.id)
-          // For Solarman: systemId = vendor_plant_id (numeric)
+          // CRITICAL: Make API call to vendor using vendor_plant_id (vendor's plant identifier)
+          // NEVER use our internal plant.id when calling vendor APIs
+          // For Solarman: systemId parameter = vendor_plant_id (numeric)
           const dailyData = await (adapter as any).getDailyTelemetryRecords(
-            vendorPlantIdNum, // Vendor's plant ID (e.g., Solarman systemId)
+            vendorPlantIdNum, // vendor_plant_id - vendor's plant identifier (NOT plant.id)
             yearNum,
             monthNum,
             dayNum
@@ -180,9 +181,10 @@ export async function GET(
           const startTime = new Date(yearNum, monthNum - 1, dayNum, 0, 0, 0)
           const endTime = new Date(yearNum, monthNum - 1, dayNum, 23, 59, 59)
 
-          // Use vendor_plant_id (not our internal plant.id) for vendor API call
+          // CRITICAL: Always use vendor_plant_id (vendor's plant identifier) for vendor API calls
+          // NEVER use our internal plant.id when calling vendor APIs
           const telemetryData = await adapter.getTelemetry(
-            vendorPlantId, // Vendor's plant ID
+            vendorPlantId, // vendor_plant_id - vendor's plant identifier (NOT plant.id)
             startTime,
             endTime
           )
