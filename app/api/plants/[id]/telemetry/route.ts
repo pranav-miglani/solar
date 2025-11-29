@@ -130,8 +130,95 @@ export async function GET(
     console.log(`[Telemetry API]   - Vendor type: ${vendor.vendor_type}`)
     console.log(`[Telemetry API]   - Will use vendor_plant_id (${plant.vendor_plant_id}) for vendor API call`)
 
-    // Step 4: If we have date parameters, fetch daily telemetry from vendor API
+    // Step 4: Handle different period views (day, month, year, total)
     // Currently only Solarman is fully implemented; other vendors will be added in pipeline
+    
+    // Month view: year and month (no day)
+    if (year && month && !day) {
+      try {
+        const adapter = VendorManager.getAdapter({
+          id: vendor.id,
+          name: vendor.name,
+          vendorType: vendor.vendor_type,
+          credentials: vendor.credentials,
+          isActive: vendor.is_active,
+        })
+
+        if (typeof (adapter as any).setTokenStorage === "function") {
+          (adapter as any).setTokenStorage(vendor.id, supabase)
+        }
+
+        const vendorPlantId = plant.vendor_plant_id.toString()
+        const vendorPlantIdNum = parseInt(plant.vendor_plant_id)
+        const yearNum = parseInt(year)
+        const monthNum = parseInt(month)
+
+        if (isNaN(yearNum) || isNaN(monthNum)) {
+          return NextResponse.json({ error: "Invalid date parameters" }, { status: 400 })
+        }
+
+        if (isNaN(vendorPlantIdNum)) {
+          return NextResponse.json(
+            { error: "Invalid vendor plant ID format" },
+            { status: 400 }
+          )
+        }
+
+        // Check if adapter supports getMonthlyTelemetryRecords method
+        if (typeof (adapter as any).getMonthlyTelemetryRecords === "function") {
+          const monthlyData = await (adapter as any).getMonthlyTelemetryRecords(
+            vendorPlantIdNum,
+            yearNum,
+            monthNum
+          )
+
+          // Transform monthly records (daily aggregation) to our standard format
+          const telemetry = (monthlyData.records || []).map((record: any) => {
+            // Create timestamp from year, month, day
+            const timestamp = new Date(yearNum, monthNum - 1, record.day).toISOString()
+
+            return {
+              plant_id: plantId,
+              ts: timestamp,
+              power_kw: null, // Monthly view doesn't have power, only daily generation
+              generation_power_kw: null,
+              generation_capacity: null,
+              timezone_offset: null,
+              // For month view, we store daily generation values
+              daily_generation_kwh: record.generationValue || null,
+              day: record.day,
+            }
+          })
+
+          return NextResponse.json({
+            plantId,
+            data: telemetry,
+            statistics: monthlyData.statistics
+              ? {
+                  monthlyGenerationKwh: monthlyData.statistics.generationValue || null,
+                  fullPowerHoursMonth: monthlyData.statistics.fullPowerHoursDay || null,
+                  incomeValue: monthlyData.statistics.incomeValue || null,
+                }
+              : null,
+            period: "month",
+            date: `${year}-${month}`,
+          })
+        } else {
+          return NextResponse.json(
+            { error: "Monthly telemetry not supported for this vendor" },
+            { status: 400 }
+          )
+        }
+      } catch (error: any) {
+        console.error(`Error fetching monthly telemetry from ${vendor.vendor_type}:`, error)
+        return NextResponse.json(
+          { error: `Failed to fetch monthly telemetry: ${error.message}` },
+          { status: 500 }
+        )
+      }
+    }
+    
+    // Day view: year, month, and day
     if (year && month && day) {
       try {
         // Get the appropriate vendor adapter (currently only SolarmanAdapter is fully implemented)

@@ -1038,6 +1038,73 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     return data
   }
 
+  /**
+   * Get monthly telemetry records (daily aggregation for a month)
+   * Returns statistics for the month and daily records
+   */
+  async getMonthlyTelemetryRecords(
+    systemId: number,
+    year: number,
+    month: number
+  ): Promise<{
+    statistics: {
+      systemId: number
+      year: number
+      month: number
+      day: number
+      generationValue: number // Monthly generation in kWh
+      incomeValue: number
+      fullPowerHoursDay: number
+    }
+    records: Array<{
+      systemId: number
+      year: number
+      month: number
+      day: number
+      generationValue: number // Daily generation in kWh
+      incomeValue: number
+      fullPowerHoursDay: number
+      acceptDay: string
+    }>
+  }> {
+    const token = await this.authenticate()
+    
+    // Use PRO API base URL
+    const { url: proApiUrl } = this.getProApiBaseUrl()
+    const url = `${proApiUrl}/maintain-s/history/power/${systemId}/stats/month?year=${year}&month=${month}`
+
+    console.log('📊 [Solarman PRO API] Fetching monthly telemetry records:', {
+      systemId,
+      year,
+      month,
+      url,
+    })
+
+    const response = await this.loggedFetch(
+      url,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "accept": "application/json, text/plain, */*",
+        },
+      },
+      {
+        operation: 'GET_MONTHLY_TELEMETRY_RECORDS',
+        description: `Get monthly telemetry records for system ${systemId} for ${year}-${month}`,
+      }
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ [Solarman PRO API] Failed to fetch monthly telemetry:', response.status, errorText)
+      throw new Error(`Failed to fetch monthly telemetry: ${response.statusText} - ${errorText}`)
+    }
+
+    const data = await response.json()
+    return data
+  }
+
   async getDeviceRealtime(deviceId: number | string): Promise<RealtimeData> {
     const token = await this.authenticate()
     
