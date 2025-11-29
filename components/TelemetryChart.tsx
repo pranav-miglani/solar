@@ -6,6 +6,8 @@ import {
   Line,
   Area,
   AreaChart,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -22,6 +24,8 @@ interface TelemetryData {
   generation_power_kw?: number
   power_kw?: number
   plant_id?: number
+  daily_generation_kwh?: number // For month view: daily generation in kWh
+  day?: number // For month view: day of month
 }
 
 interface TelemetryChartProps {
@@ -30,8 +34,12 @@ interface TelemetryChartProps {
   statistics?: {
     dailyGenerationKwh?: number
     fullPowerHoursDay?: number
+    monthlyGenerationKwh?: number
+    fullPowerHoursMonth?: number
+    incomeValue?: number
   }
   showAreaFill?: boolean
+  period?: "day" | "month" | "year" | "total"
 }
 
 export function TelemetryChart({ 
@@ -39,37 +47,57 @@ export function TelemetryChart({
   title = "Telemetry (24h)",
   statistics,
   showAreaFill = true,
+  period = "day",
 }: TelemetryChartProps) {
-  // Generate X-axis ticks for 24-hour range (every 3 hours)
+  // Generate X-axis ticks for 24-hour range (every 3 hours) - only for day view
   const xAxisTicks = useMemo(() => {
+    if (period !== "day") return []
     const ticks: string[] = []
     for (let i = 0; i <= 24; i += 3) {
       ticks.push(`${i.toString().padStart(2, "0")}:00`)
     }
     return ticks
-  }, [])
+  }, [period])
 
   const chartData = useMemo(() => {
     if (!data || data.length === 0) {
       return []
     }
 
-    // Process data points - use power_kw or generation_power_kw
-    return data
-      .map((point) => {
-        const timestamp = new Date(point.ts)
-        const power = Number(point.power_kw ?? point.generation_power_kw ?? 0)
-        
-        return {
-          time: format(timestamp, "HH:mm"),
-          fullTime: format(timestamp, "yyyy-MM-dd HH:mm:ss"),
-          timestamp: timestamp.getTime(),
-          power: Math.round(power * 100) / 100,
-          hour: timestamp.getHours(),
-        }
-      })
-      .sort((a, b) => a.timestamp - b.timestamp)
-  }, [data])
+    if (period === "month") {
+      // For month view: use daily generation values, sorted by day
+      return data
+        .map((point) => {
+          const day = point.day || 0
+          const generationKwh = point.daily_generation_kwh ?? 0
+          
+          return {
+            day,
+            dayLabel: day.toString(),
+            generation: Math.round(generationKwh * 100) / 100,
+            timestamp: day,
+          }
+        })
+        .filter((point) => point.day > 0) // Filter out invalid days
+        .sort((a, b) => a.day - b.day)
+    } else {
+      // For day view: process data points - use power_kw or generation_power_kw
+      return data
+        .map((point) => {
+          const timestamp = new Date(point.ts)
+          const power = Number(point.power_kw ?? point.generation_power_kw ?? 0)
+          
+          return {
+            time: format(timestamp, "HH:mm"),
+            fullTime: format(timestamp, "yyyy-MM-dd HH:mm:ss"),
+            timestamp: timestamp.getTime(),
+            power: Math.round(power * 100) / 100,
+            hour: timestamp.getHours(),
+          }
+        })
+        .sort((a, b) => a.timestamp - b.timestamp)
+    }
+  }, [data, period])
 
   if (chartData.length === 0) {
     return (
@@ -123,7 +151,7 @@ export function TelemetryChart({
         {/* Statistics */}
         {statistics && (
           <div className="flex gap-6 mb-4 text-sm">
-            {statistics.dailyGenerationKwh !== undefined && 
+            {period === "day" && statistics.dailyGenerationKwh !== undefined && 
              statistics.dailyGenerationKwh !== null && 
              typeof statistics.dailyGenerationKwh === 'number' && (
               <div>
@@ -131,7 +159,7 @@ export function TelemetryChart({
                 <span className="font-semibold">{statistics.dailyGenerationKwh.toFixed(1)} kWh</span>
               </div>
             )}
-            {statistics.fullPowerHoursDay !== undefined && 
+            {period === "day" && statistics.fullPowerHoursDay !== undefined && 
              statistics.fullPowerHoursDay !== null && 
              typeof statistics.fullPowerHoursDay === 'number' && (
               <div>
@@ -139,11 +167,74 @@ export function TelemetryChart({
                 <span className="font-semibold">{statistics.fullPowerHoursDay.toFixed(2)} h</span>
               </div>
             )}
+            {period === "month" && statistics.monthlyGenerationKwh !== undefined && 
+             statistics.monthlyGenerationKwh !== null && 
+             typeof statistics.monthlyGenerationKwh === 'number' && (
+              <div>
+                <span className="text-muted-foreground">Monthly Production: </span>
+                <span className="font-semibold">{statistics.monthlyGenerationKwh.toFixed(1)} kWh</span>
+              </div>
+            )}
+            {period === "month" && statistics.fullPowerHoursMonth !== undefined && 
+             statistics.fullPowerHoursMonth !== null && 
+             typeof statistics.fullPowerHoursMonth === 'number' && (
+              <div>
+                <span className="text-muted-foreground">Peak Hours this Month: </span>
+                <span className="font-semibold">{statistics.fullPowerHoursMonth.toFixed(2)} h</span>
+              </div>
+            )}
           </div>
         )}
 
         <ResponsiveContainer width="100%" height={300}>
-          {showAreaFill ? (
+          {period === "month" ? (
+            // Month view: Bar chart showing daily generation
+            <BarChart data={chartData}>
+              <defs>
+                <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.7} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <XAxis
+                dataKey="dayLabel"
+                tick={{ fill: "currentColor", fontSize: 12 }}
+                className="text-xs"
+                label={{ value: "Day of Month", position: "insideBottom", offset: -5 }}
+              />
+              <YAxis
+                tick={{ fill: "currentColor", fontSize: 12 }}
+                className="text-xs"
+                label={{ value: "kWh", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
+              />
+              <Tooltip 
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const data = payload[0].payload
+                    return (
+                      <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+                        <p className="text-sm font-semibold mb-1">Day {data.day}</p>
+                        <p className="text-sm">
+                          <span className="font-medium text-blue-600 dark:text-blue-400">Generation: </span>
+                          {typeof data.generation === 'number' ? data.generation.toFixed(2) : '0.00'} kWh
+                        </p>
+                      </div>
+                    )
+                  }
+                  return null
+                }}
+              />
+              <Legend />
+              <Bar
+                dataKey="generation"
+                fill="url(#barGradient)"
+                name="Daily Generation"
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          ) : showAreaFill ? (
+            // Day view: Area chart
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
@@ -178,6 +269,7 @@ export function TelemetryChart({
               />
             </AreaChart>
           ) : (
+            // Day view: Line chart (fallback)
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
               <XAxis
@@ -213,17 +305,19 @@ export function TelemetryChart({
           )}
         </ResponsiveContainer>
 
-        {/* Day/Night Indicators */}
-        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Moon className="h-3 w-3" />
-            <span>Night</span>
+        {/* Day/Night Indicators - Only show for day view */}
+        {period === "day" && (
+          <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Moon className="h-3 w-3" />
+              <span>Night</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Sun className="h-3 w-3" />
+              <span>Day</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <Sun className="h-3 w-3" />
-            <span>Day</span>
-          </div>
-        </div>
+        )}
       </div>
     </Card>
   )

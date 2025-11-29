@@ -25,7 +25,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { TelemetryChart } from "@/components/TelemetryChart"
-import { format, addDays, subDays } from "date-fns"
+import { format, addDays, subDays, addMonths, subMonths, startOfMonth } from "date-fns"
 
 // Main plant payload for detail view. Energy values follow our kWh/MWh schema:
 // - daily_energy_kwh is in kWh (per latest migrations)
@@ -144,16 +144,25 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
       setTelemetryLoading(true)
       let response: Response
 
-      // For Solarman vendors, use the new API with date parameters for day view
-      if (plant.vendors.vendor_type === "SOLARMAN" && selectedPeriod === "day") {
+      // For Solarman vendors, use the new API with date parameters
+      if (plant.vendors.vendor_type === "SOLARMAN") {
         const year = selectedDate.getFullYear()
         const month = selectedDate.getMonth() + 1
-        const day = selectedDate.getDate()
         
-        response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}&month=${month}&day=${day}`)
+        if (selectedPeriod === "day") {
+          const day = selectedDate.getDate()
+          response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}&month=${month}&day=${day}`)
+        } else if (selectedPeriod === "month") {
+          // For month view, only send year and month (no day)
+          response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}&month=${month}`)
+        } else {
+          // Year and Total views not yet implemented
+          setTelemetry([])
+          setTelemetryStats(null)
+          return
+        }
       } else {
-        // Fallback: return empty data if not Solarman or date params not provided
-        // Telemetry is now fetched directly from vendor APIs
+        // Fallback: return empty data if not Solarman
         setTelemetry([])
         setTelemetryStats(null)
         return
@@ -183,10 +192,18 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
   }
 
   const handleDateChange = (direction: "prev" | "next") => {
-    if (direction === "prev") {
-      setSelectedDate(subDays(selectedDate, 1))
-    } else {
-      setSelectedDate(addDays(selectedDate, 1))
+    if (selectedPeriod === "day") {
+      if (direction === "prev") {
+        setSelectedDate(subDays(selectedDate, 1))
+      } else {
+        setSelectedDate(addDays(selectedDate, 1))
+      }
+    } else if (selectedPeriod === "month") {
+      if (direction === "prev") {
+        setSelectedDate(subMonths(startOfMonth(selectedDate), 1))
+      } else {
+        setSelectedDate(addMonths(startOfMonth(selectedDate), 1))
+      }
     }
     // useEffect will automatically trigger fetchTelemetry() when selectedDate changes
     // No need to call it manually here to avoid double calls
@@ -546,13 +563,13 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                     >
                       <TabsList>
                         <TabsTrigger value="day">Day</TabsTrigger>
-                        <TabsTrigger value="month" disabled>Month</TabsTrigger>
+                        <TabsTrigger value="month">Month</TabsTrigger>
                         <TabsTrigger value="year" disabled>Year</TabsTrigger>
                         <TabsTrigger value="total" disabled>Total</TabsTrigger>
                       </TabsList>
                     </Tabs>
                     
-                    {selectedPeriod === "day" && (
+                    {(selectedPeriod === "day" || selectedPeriod === "month") && (
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
@@ -565,14 +582,16 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                         <div className="flex items-center gap-2 px-3 py-1.5 border rounded-md bg-background">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm font-medium">
-                            {format(selectedDate, "yyyy/MM/dd")}
+                            {selectedPeriod === "day" 
+                              ? format(selectedDate, "yyyy/MM/dd")
+                              : format(selectedDate, "yyyy/MM")}
                           </span>
                         </div>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleDateChange("next")}
-                          disabled={telemetryLoading || selectedDate >= new Date()}
+                          disabled={telemetryLoading || (selectedPeriod === "day" && selectedDate >= new Date()) || (selectedPeriod === "month" && startOfMonth(selectedDate) >= startOfMonth(new Date()))}
                         >
                           <ChevronRight className="h-4 w-4" />
                         </Button>
@@ -616,9 +635,10 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
               ) : telemetry.length > 0 ? (
                 <TelemetryChart 
                   data={telemetry} 
-                  title={selectedPeriod === "day" ? "Solar Power" : "Generation Power (24h)"}
+                  title={selectedPeriod === "day" ? "Solar Power" : selectedPeriod === "month" ? "Monthly Production" : "Generation Power (24h)"}
                   statistics={telemetryStats || undefined}
                   showAreaFill={plant.vendors.vendor_type === "SOLARMAN"}
+                  period={selectedPeriod}
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
