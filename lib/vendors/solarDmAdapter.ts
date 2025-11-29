@@ -19,16 +19,36 @@ interface SolarDmAuthResponse {
   }
 }
 
-interface SolarDmStation {
-  id: string
-  name: string
-  capacity?: number
-  location?: {
-    lat?: number
-    lng?: number
-    address?: string
+interface SolarDmPlantResponse {
+  code: number
+  message: string
+  data: {
+    total: number
+    list: Array<{
+      id: string
+      plantName: string
+      address: string
+      timeZone: number
+      type: number
+      systemType: number
+      capacity: string // e.g., "5.00"
+      longitude: number
+      latitude: number
+      monetaryUnit: number
+      ownerName: string
+      ownerPhone: string
+      isDeleted: number
+      createBy: string
+      createTime: string // Format: "2025-11-28 10:08:41"
+      updateBy: string
+      updateTime: string
+      communicateStatus: number // 2=offline, 1=online, 3=PARTIAL_OFFLINE
+      alarmStatus: number
+      isSelf: boolean
+      createByType: number
+      [key: string]: any
+    }>
   }
-  [key: string]: any
 }
 
 export class SolarDmAdapter extends BaseVendorAdapter {
@@ -202,16 +222,109 @@ export class SolarDmAdapter extends BaseVendorAdapter {
 
   /**
    * List all plants from SolarDM
-   * TODO: Implement once plant listing endpoint is available
+   * Endpoint: GET /dms/plant/list_all
    */
   async listPlants(): Promise<Plant[]> {
     const token = await this.authenticate()
-    
-    // TODO: Implement plant listing endpoint
-    // For now, return empty array until endpoint is available
-    console.log("[SolarDM] listPlants() called - endpoint not yet implemented")
-    
-    return []
+    const baseUrl = this.getApiBaseUrl()
+    const url = `${baseUrl}/dms/plant/list_all`
+
+    console.log("[SolarDM] Fetching plants from:", url)
+
+    const response = await pooledFetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[SolarDM] Failed to fetch plants:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      })
+      throw new Error(`Failed to fetch plants from SolarDM: ${response.statusText} - ${errorText}`)
+    }
+
+    const data: SolarDmPlantResponse = await response.json()
+
+    if (data.code !== 0 || !data.data?.list) {
+      throw new Error(`SolarDM API error: ${data.message || "Unknown error"}`)
+    }
+
+    const total = data.data.total || 0
+    const plants = data.data.list || []
+    console.log(`[SolarDM] Successfully fetched ${plants.length} plants (total: ${total})`)
+
+    // Map SolarDM plants to Plant format
+    return plants.map((plant) => {
+      // Parse capacity from string (e.g., "5.00" -> 5.0)
+      const capacityKw = parseFloat(plant.capacity) || 0
+
+      // Map location
+      let location: any = undefined
+      if (plant.latitude || plant.longitude || plant.address) {
+        location = {
+          lat: plant.latitude || null,
+          lng: plant.longitude || null,
+          address: plant.address || null,
+        }
+      }
+
+      // Map network status: 2=offline, 1=online, 3=PARTIAL_OFFLINE
+      let networkStatus: string | null = null
+      if (plant.communicateStatus === 1) {
+        networkStatus = "ONLINE"
+      } else if (plant.communicateStatus === 2) {
+        networkStatus = "OFFLINE"
+      } else if (plant.communicateStatus === 3) {
+        networkStatus = "PARTIAL_OFFLINE"
+      }
+
+      // Parse createTime: "2025-11-28 10:08:41" -> ISO string
+      let vendorCreatedDate: string | null = null
+      let startOperatingTime: string | null = null
+      if (plant.createTime) {
+        try {
+          // Parse "YYYY-MM-DD HH:mm:ss" format
+          const date = new Date(plant.createTime.replace(" ", "T"))
+          if (!isNaN(date.getTime())) {
+            const isoString = date.toISOString()
+            vendorCreatedDate = isoString
+            startOperatingTime = isoString // Both use createTime
+          }
+        } catch (error) {
+          console.warn(`[SolarDM] Failed to parse createTime: ${plant.createTime}`, error)
+        }
+      }
+
+      return {
+        id: plant.id, // vendor_plant_id
+        name: plant.plantName || `Plant ${plant.id}`,
+        capacityKw,
+        location,
+        metadata: {
+          // Additional fields for sync service
+          networkStatus,
+          createdDate: vendorCreatedDate, // Sync service expects createdDate
+          startOperatingTime,
+          locationAddress: plant.address || null,
+          // Store raw data for reference
+          raw: {
+            communicateStatus: plant.communicateStatus,
+            alarmStatus: plant.alarmStatus,
+            timeZone: plant.timeZone,
+            type: plant.type,
+            systemType: plant.systemType,
+            createTime: plant.createTime,
+            updateTime: plant.updateTime,
+          },
+        },
+      }
+    })
   }
 
   /**
