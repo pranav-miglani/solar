@@ -25,19 +25,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Call Supabase Edge Function
-    const { data, error } = await supabase.functions.invoke(
-      "solarman-telemetry",
-      {
-        body: { plantId, stationId },
-      }
+    // Note: solarman-telemetry edge function removed (Telemetry DB removed)
+    // Telemetry is now fetched directly from vendor APIs via /api/plants/[id]/telemetry
+    return NextResponse.json(
+      { 
+        error: "This endpoint is deprecated. Use /api/plants/[id]/telemetry instead.",
+        message: "Telemetry DB has been removed. Telemetry is now fetched on-demand from vendor APIs."
+      },
+      { status: 410 } // 410 Gone - resource is no longer available
     )
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

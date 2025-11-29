@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
         showVendors: true,
         showPlants: true,
         showCreateWorkOrder: true,
-        showTelemetryChart: true,
+        showTelemetryChart: false,
         showAlertsFeed: true,
         showWorkOrdersSummary: true,
       }
@@ -197,7 +197,7 @@ export async function GET(request: NextRequest) {
       }
 
       dashboardData.widgets = {
-        showTelemetryChart: true,
+        showTelemetryChart: false,
         showAlertsFeed: true,
         showWorkOrdersSummary: true,
         showOrgBreakdown: true,
@@ -271,7 +271,7 @@ export async function GET(request: NextRequest) {
       }
 
       dashboardData.widgets = {
-        showTelemetryChart: true,
+        showTelemetryChart: false,
         showAlertsFeed: true,
         showWorkOrdersSummary: true,
         showEfficiencySummary: true,

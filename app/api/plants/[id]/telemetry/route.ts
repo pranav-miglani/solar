@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getMainClient } from "@/lib/supabase/pooled"
 import { VendorManager } from "@/lib/vendors/vendorManager"
-import { SolarmanAdapter } from "@/lib/vendors/solarmanAdapter"
 
 // Mark route as dynamic to prevent static generation (uses cookies)
 export const dynamic = 'force-dynamic'
@@ -39,7 +38,7 @@ export async function GET(
 
     const supabase = getMainClient()
 
-    // Fetch plant with vendor information
+    // Step 1: Fetch plant with vendor information to identify the vendor
     const { data: plant, error: plantError } = await supabase
       .from("plants")
       .select(`
@@ -62,16 +61,26 @@ export async function GET(
       return NextResponse.json({ error: "Plant not found" }, { status: 404 })
     }
 
-    // Handle vendors as array (Supabase returns it as array even for single relation)
+    // Step 2: Extract vendor information (handle array response from Supabase)
     const vendor = Array.isArray(plant.vendors) ? plant.vendors[0] : plant.vendors
 
     if (!vendor || !vendor.is_active) {
       return NextResponse.json({ error: "Vendor not found or inactive" }, { status: 404 })
     }
 
-    // If vendor is Solarman and we have date parameters, call Solarman API directly
-    if (vendor.vendor_type === "SOLARMAN" && year && month && day) {
+    // Step 3: Validate vendor_plant_id exists (this is the vendor's plant ID, not our internal plant ID)
+    if (!plant.vendor_plant_id) {
+      return NextResponse.json(
+        { error: "Vendor plant ID not found for this plant" },
+        { status: 400 }
+      )
+    }
+
+    // Step 4: If we have date parameters, fetch daily telemetry from vendor API
+    // Currently only Solarman is fully implemented; other vendors will be added in pipeline
+    if (year && month && day) {
       try {
+        // Get the appropriate vendor adapter (currently only SolarmanAdapter is fully implemented)
         const adapter = VendorManager.getAdapter({
           id: vendor.id,
           name: vendor.name,
@@ -79,16 +88,16 @@ export async function GET(
           apiBaseUrl: vendor.api_base_url,
           credentials: vendor.credentials,
           isActive: vendor.is_active,
-        }) as SolarmanAdapter
+        })
 
-        // Set token storage for the adapter
-        adapter.setTokenStorage(vendor.id, supabase)
-
-        const systemId = parseInt(plant.vendor_plant_id)
-        if (isNaN(systemId)) {
-          return NextResponse.json({ error: "Invalid vendor plant ID" }, { status: 400 })
+        // Set token storage if the adapter supports it (e.g., SolarmanAdapter)
+        if (typeof (adapter as any).setTokenStorage === "function") {
+          (adapter as any).setTokenStorage(vendor.id, supabase)
         }
 
+        // Extract vendor_plant_id (vendor's plant identifier, NOT our internal plant.id)
+        const vendorPlantId = plant.vendor_plant_id.toString()
+        const vendorPlantIdNum = parseInt(plant.vendor_plant_id)
         const yearNum = parseInt(year)
         const monthNum = parseInt(month)
         const dayNum = parseInt(day)
@@ -97,78 +106,123 @@ export async function GET(
           return NextResponse.json({ error: "Invalid date parameters" }, { status: 400 })
         }
 
-        // Fetch daily telemetry records from Solarman
-        const solarmanData = await adapter.getDailyTelemetryRecords(
-          systemId,
-          yearNum,
-          monthNum,
-          dayNum
-        )
+        if (isNaN(vendorPlantIdNum)) {
+          return NextResponse.json(
+            { error: "Invalid vendor plant ID format" },
+            { status: 400 }
+          )
+        }
 
-        // Transform Solarman response to expected format
-        const telemetry = solarmanData.records.map((record) => {
-          // Convert Unix timestamp to ISO string
-          const timestamp = new Date(record.dateTime * 1000).toISOString()
-          
-          // Convert power from W to kW
-          const powerKw = record.generationPower / 1000
+        // Step 5: Check if adapter supports getDailyTelemetryRecords method
+        // Currently only SolarmanAdapter implements this method
+        // Future vendors will be added to the pipeline once Solarman flow is complete
+        if (typeof (adapter as any).getDailyTelemetryRecords === "function") {
+          // Make API call to vendor using vendor_plant_id (not our internal plant.id)
+          // For Solarman: systemId = vendor_plant_id (numeric)
+          const dailyData = await (adapter as any).getDailyTelemetryRecords(
+            vendorPlantIdNum, // Vendor's plant ID (e.g., Solarman systemId)
+            yearNum,
+            monthNum,
+            dayNum
+          )
 
-          return {
+          // Step 6: Transform vendor response to our standard format
+          // Each vendor adapter returns vendor-specific format, we normalize it here
+          const telemetry = (dailyData.records || []).map((record: any) => {
+            // Handle different timestamp formats (Unix seconds or ISO string)
+            let timestamp: string
+            if (typeof record.dateTime === "number") {
+              timestamp = new Date(record.dateTime * 1000).toISOString()
+            } else if (record.ts) {
+              timestamp = record.ts
+            } else {
+              timestamp = new Date().toISOString()
+            }
+
+            // Convert power from W to kW if needed, or use as-is if already in kW
+            const powerKw = record.generationPower
+              ? record.generationPower / 1000 // Convert W to kW
+              : record.power_kw || record.generation_power_kw || 0
+
+            return {
+              plant_id: plantId, // Our internal plant ID (for reference)
+              ts: timestamp,
+              power_kw: powerKw,
+              generation_power_kw: powerKw,
+              generation_capacity: record.generationCapacity || null,
+              timezone_offset: record.timeZoneOffset || null,
+              metadata: {
+                vendorPlantId, // Vendor's plant ID (used in API call)
+                systemId: record.systemId || vendorPlantId,
+                acceptDay: record.acceptDay || null,
+                acceptMonth: record.acceptMonth || null,
+                raw: record, // Original vendor response
+              },
+            }
+          })
+
+          return NextResponse.json({
+            plantId,
+            data: telemetry,
+            statistics: dailyData.statistics
+              ? {
+                  dailyGenerationKwh: dailyData.statistics.generationValue || null,
+                  fullPowerHoursDay: dailyData.statistics.fullPowerHoursDay || null,
+                  incomeValue: dailyData.statistics.incomeValue || null,
+                }
+              : null,
+            period: "day",
+            date: `${year}-${month}-${day}`,
+          })
+        } else {
+          // Fallback to generic getTelemetry method if daily method not available
+          // This is for future vendors that don't implement getDailyTelemetryRecords yet
+          const startTime = new Date(yearNum, monthNum - 1, dayNum, 0, 0, 0)
+          const endTime = new Date(yearNum, monthNum - 1, dayNum, 23, 59, 59)
+
+          // Use vendor_plant_id (not our internal plant.id) for vendor API call
+          const telemetryData = await adapter.getTelemetry(
+            vendorPlantId, // Vendor's plant ID
+            startTime,
+            endTime
+          )
+
+          // Transform to expected format
+          const telemetry = telemetryData.map((data) => ({
             plant_id: plantId,
-            ts: timestamp,
-            power_kw: powerKw,
-            generation_power_kw: powerKw,
-            generation_capacity: record.generationCapacity,
-            timezone_offset: record.timeZoneOffset,
+            ts: data.timestamp instanceof Date ? data.timestamp.toISOString() : new Date(data.timestamp).toISOString(),
+            power_kw: data.generationPowerKw,
+            generation_power_kw: data.generationPowerKw,
             metadata: {
-              systemId: record.systemId,
-              acceptDay: record.acceptDay,
-              acceptMonth: record.acceptMonth,
-              raw: record,
+              vendorPlantId,
+              raw: data.metadata || {},
             },
-          }
-        })
+          }))
 
-        return NextResponse.json({
-          plantId,
-          data: telemetry,
-          statistics: {
-            dailyGenerationKwh: solarmanData.statistics.generationValue,
-            fullPowerHoursDay: solarmanData.statistics.fullPowerHoursDay,
-            incomeValue: solarmanData.statistics.incomeValue,
-          },
-          period: "day",
-          date: `${year}-${month}-${day}`,
-        })
+          return NextResponse.json({
+            plantId,
+            data: telemetry,
+            period: "day",
+            date: `${year}-${month}-${day}`,
+          })
+        }
       } catch (error: any) {
-        console.error("Error fetching Solarman telemetry:", error)
+        console.error(`Error fetching telemetry from ${vendor.vendor_type}:`, error)
         return NextResponse.json(
-          { error: `Failed to fetch telemetry from Solarman: ${error.message}` },
+          { error: `Failed to fetch telemetry: ${error.message}` },
           { status: 500 }
         )
       }
     }
 
-    // Fallback to existing database query for non-Solarman vendors or when date params not provided
-    const hoursNum = hours ? parseInt(hours) : 24
-    const startTime = new Date()
-    startTime.setHours(startTime.getHours() - hoursNum)
-
-    const { data: telemetry, error } = await supabase
-      .from("telemetry")
-      .select("*")
-      .eq("plant_id", params.id)
-      .gte("ts", startTime.toISOString())
-      .order("ts", { ascending: true })
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ 
+    // If date parameters are not provided, return empty data
+    // Telemetry is fetched directly from vendor APIs on demand
+    // Requires: year, month, day query parameters
+    return NextResponse.json({
       plantId,
-      data: telemetry || [],
-      period: `${hoursNum}h`,
+      data: [],
+      period: "24h",
+      message: "Date parameters (year, month, day) are required for telemetry data",
     })
   } catch (error: any) {
     console.error("Telemetry error:", error)

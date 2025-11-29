@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { DashboardSidebar } from "@/components/DashboardSidebar"
 import { DashboardMetrics } from "@/components/DashboardMetrics"
-import { TelemetryChart } from "@/components/TelemetryChart"
+// TelemetryChart removed - telemetry is now fetched on-demand from vendor APIs
 import { AlertsFeed } from "@/components/AlertsFeed"
 import { EfficiencySummary } from "@/components/EfficiencySummary"
 import { ThemeToggle } from "@/components/ThemeToggle"
@@ -62,24 +62,16 @@ export default function DashboardPage() {
   const loadDashboard = async (accountType: string, orgId: number | null) => {
     try {
       console.log("📊 [DASHBOARD] Loading dashboard data for:", { accountType, orgId })
-      const [dashboardRes, telemetryRes, alertsRes] = await Promise.all([
+      const [dashboardRes, alertsRes] = await Promise.all([
         fetch("/api/dashboard"),
-        fetch(
-          accountType === "GOVT"
-            ? "/api/telemetry/global"
-            : accountType === "ORG" && orgId
-            ? `/api/telemetry/org/${orgId}`
-            : "/api/telemetry/global"
-        ),
         fetch("/api/alerts"),
       ])
 
       const dashboard = await dashboardRes.json()
-      const telemetry = await telemetryRes.json()
       const alertsData = await alertsRes.json()
 
       setDashboardData(dashboard)
-      setTelemetryData(telemetry.data || [])
+      setTelemetryData([]) // Telemetry is now fetched on-demand from vendor APIs
       setAlerts(alertsData.alerts || [])
       
       // Fetch organization name for ORG users
@@ -292,19 +284,7 @@ export default function DashboardPage() {
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Telemetry Chart */}
-          {widgets.showTelemetryChart && (
-            <TelemetryChart
-              data={telemetryData}
-              title={
-                role === "GOVT"
-                  ? "Global Telemetry (24h)"
-                  : role === "ORG"
-                  ? "Organization Telemetry (24h)"
-                  : "System Telemetry (24h)"
-              }
-            />
-          )}
+          {/* Telemetry Chart - Removed: Telemetry DB has been removed, telemetry is now fetched on-demand from vendor APIs */}
 
           {/* Alerts Feed */}
           {widgets.showAlertsFeed && (
