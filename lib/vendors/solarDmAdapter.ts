@@ -868,6 +868,8 @@ export class SolarDmAdapter extends BaseVendorAdapter {
     console.log(`[SolarDM] ${operation}: ${description}`)
     console.log(`[SolarDM] Request URL: ${fullUrl}`)
     console.log(`[SolarDM] Request method: ${options.method || "GET"}`)
+    console.log(`[SolarDM] Bearer Token: ${token}`)
+    console.log(`[SolarDM] Authorization Header: Bearer ${token}`)
     
     const response = await pooledFetch(fullUrl, {
       ...options,
