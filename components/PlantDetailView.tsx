@@ -25,7 +25,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { TelemetryChart } from "@/components/TelemetryChart"
-import { format, addDays, subDays, addMonths, subMonths, startOfMonth } from "date-fns"
+import { format, addDays, subDays, addMonths, subMonths, startOfMonth, addYears, subYears, startOfYear } from "date-fns"
 
 // Main plant payload for detail view. Energy values follow our kWh/MWh schema:
 // - daily_energy_kwh is in kWh (per latest migrations)
@@ -102,6 +102,9 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [selectedPeriod, setSelectedPeriod] = useState<"day" | "month" | "year" | "total">("day")
   const [telemetryLoading, setTelemetryLoading] = useState(false)
+  // For total view: date range
+  const [startYear, setStartYear] = useState<number>(2000)
+  const [endYear, setEndYear] = useState<number>(new Date().getFullYear())
   const [telemetryLoaded, setTelemetryLoaded] = useState(false) // Track if user has requested to load graph
 
   useEffect(() => {
@@ -116,7 +119,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
       fetchTelemetry()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plant, selectedDate, selectedPeriod, telemetryLoaded])
+  }, [plant, selectedDate, selectedPeriod, telemetryLoaded, startYear, endYear])
 
   async function fetchPlantData() {
     try {
@@ -145,7 +148,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
       let response: Response
 
       // For Solarman vendors, use the new API with date parameters
-      if (plant.vendors.vendor_type === "SOLARMAN") {
+      if (plant?.vendors?.vendor_type === "SOLARMAN" && selectedDate) {
         const year = selectedDate.getFullYear()
         const month = selectedDate.getMonth() + 1
         
@@ -155,8 +158,13 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
         } else if (selectedPeriod === "month") {
           // For month view, only send year and month (no day)
           response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}&month=${month}`)
+        } else if (selectedPeriod === "year") {
+          // For year view, only send year (no month, no day)
+          response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}`)
+        } else if (selectedPeriod === "total") {
+          // For total view, send period=total and date range
+          response = await fetch(`/api/plants/${plantId}/telemetry?period=total&startYear=${startYear}&endYear=${endYear}`)
         } else {
-          // Year and Total views not yet implemented
           setTelemetry([])
           setTelemetryStats(null)
           return
@@ -203,6 +211,26 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
         setSelectedDate(subMonths(startOfMonth(selectedDate), 1))
       } else {
         setSelectedDate(addMonths(startOfMonth(selectedDate), 1))
+      }
+    } else if (selectedPeriod === "year") {
+      if (direction === "prev") {
+        setSelectedDate(subYears(startOfYear(selectedDate), 1))
+      } else {
+        setSelectedDate(addYears(startOfYear(selectedDate), 1))
+      }
+    } else if (selectedPeriod === "total") {
+      // For total view, adjust the year range
+      if (direction === "prev") {
+        // Move both years back by the range size
+        const range = endYear - startYear
+        setStartYear(Math.max(2000, startYear - range - 1))
+        setEndYear(Math.max(2000, endYear - range - 1))
+      } else {
+        // Move both years forward by the range size
+        const currentYear = new Date().getFullYear()
+        const range = endYear - startYear
+        setStartYear(Math.min(currentYear, startYear + range + 1))
+        setEndYear(Math.min(currentYear, endYear + range + 1))
       }
     }
     // useEffect will automatically trigger fetchTelemetry() when selectedDate changes
@@ -476,7 +504,9 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                    plant.location.lng !== null && plant.location.lng !== undefined && 
                    typeof plant.location.lat === 'number' && typeof plant.location.lng === 'number' && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      {plant.location.lat.toFixed(6)}, {plant.location.lng.toFixed(6)}
+                      {plant.location?.lat !== null && plant.location?.lat !== undefined && plant.location?.lng !== null && plant.location?.lng !== undefined
+                        ? `${plant.location.lat.toFixed(6)}, ${plant.location.lng.toFixed(6)}`
+                        : "N/A"}
                     </p>
                   )}
                 </div>
@@ -551,7 +581,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                 <CardTitle>Telemetry</CardTitle>
                 
                 {/* Period Tabs and Date Selector (for Solarman) */}
-                {plant.vendors.vendor_type === "SOLARMAN" && (
+                {plant?.vendors?.vendor_type === "SOLARMAN" && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <Tabs 
                       value={selectedPeriod} 
@@ -564,12 +594,12 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                       <TabsList>
                         <TabsTrigger value="day">Day</TabsTrigger>
                         <TabsTrigger value="month">Month</TabsTrigger>
-                        <TabsTrigger value="year" disabled>Year</TabsTrigger>
-                        <TabsTrigger value="total" disabled>Total</TabsTrigger>
+                        <TabsTrigger value="year">Year</TabsTrigger>
+                        <TabsTrigger value="total">Total</TabsTrigger>
                       </TabsList>
                     </Tabs>
                     
-                    {(selectedPeriod === "day" || selectedPeriod === "month") && (
+                    {(selectedPeriod === "day" || selectedPeriod === "month" || selectedPeriod === "year" || selectedPeriod === "total") && (
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
@@ -584,14 +614,22 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                           <span className="text-sm font-medium">
                             {selectedPeriod === "day" 
                               ? format(selectedDate, "yyyy/MM/dd")
-                              : format(selectedDate, "yyyy/MM")}
+                              : selectedPeriod === "month"
+                              ? format(selectedDate, "yyyy/MM")
+                              : selectedPeriod === "year"
+                              ? format(selectedDate, "yyyy")
+                              : `${startYear} ~ ${endYear}`}
                           </span>
                         </div>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleDateChange("next")}
-                          disabled={telemetryLoading || (selectedPeriod === "day" && selectedDate >= new Date()) || (selectedPeriod === "month" && startOfMonth(selectedDate) >= startOfMonth(new Date()))}
+                          disabled={telemetryLoading || 
+                            (selectedPeriod === "day" && selectedDate && selectedDate >= new Date()) || 
+                            (selectedPeriod === "month" && selectedDate && startOfMonth(selectedDate) >= startOfMonth(new Date())) || 
+                            (selectedPeriod === "year" && selectedDate && startOfYear(selectedDate) >= startOfYear(new Date())) || 
+                            (selectedPeriod === "total" && endYear >= new Date().getFullYear())}
                         >
                           <ChevronRight className="h-4 w-4" />
                         </Button>
@@ -635,9 +673,9 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
               ) : telemetry.length > 0 ? (
                 <TelemetryChart 
                   data={telemetry} 
-                  title={selectedPeriod === "day" ? "Solar Power" : selectedPeriod === "month" ? "Monthly Production" : "Generation Power (24h)"}
+                  title={selectedPeriod === "day" ? "Solar Power" : selectedPeriod === "month" ? "Monthly Production" : selectedPeriod === "year" ? "Yearly Production" : selectedPeriod === "total" ? "Total Production" : "Generation Power (24h)"}
                   statistics={telemetryStats || undefined}
-                  showAreaFill={plant.vendors.vendor_type === "SOLARMAN"}
+                  showAreaFill={plant?.vendors?.vendor_type === "SOLARMAN"}
                   period={selectedPeriod}
                 />
               ) : (
@@ -706,7 +744,9 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                         )}
                         {typeof alert.grid_down_benefit_kwh === "number" && (
                           <span>
-                            Grid downtime benefit: {alert.grid_down_benefit_kwh.toFixed(2)} kWh
+                            Grid downtime benefit: {alert.grid_down_benefit_kwh !== null && alert.grid_down_benefit_kwh !== undefined && typeof alert.grid_down_benefit_kwh === 'number'
+                              ? alert.grid_down_benefit_kwh.toFixed(2)
+                              : 'N/A'} kWh
                           </span>
                         )}
                       </div>

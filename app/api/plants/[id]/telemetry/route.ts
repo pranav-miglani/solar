@@ -133,6 +133,179 @@ export async function GET(
     // Step 4: Handle different period views (day, month, year, total)
     // Currently only Solarman is fully implemented; other vendors will be added in pipeline
     
+    // Total view: period=total or startYear/endYear params
+    const period = searchParams.get("period")
+    const startYear = searchParams.get("startYear")
+    const endYear = searchParams.get("endYear")
+    
+    if (period === "total" || (startYear && endYear)) {
+      try {
+        const adapter = VendorManager.getAdapter({
+          id: vendor.id,
+          name: vendor.name,
+          vendorType: vendor.vendor_type,
+          credentials: vendor.credentials,
+          isActive: vendor.is_active,
+        })
+
+        if (typeof (adapter as any).setTokenStorage === "function") {
+          (adapter as any).setTokenStorage(vendor.id, supabase)
+        }
+
+        const vendorPlantId = plant.vendor_plant_id.toString()
+        const vendorPlantIdNum = parseInt(plant.vendor_plant_id)
+        const startYearNum = startYear ? parseInt(startYear) : 2000 // Default start year
+        const endYearNum = endYear ? parseInt(endYear) : new Date().getFullYear() // Default to current year
+
+        if (isNaN(startYearNum) || isNaN(endYearNum)) {
+          return NextResponse.json({ error: "Invalid year parameters" }, { status: 400 })
+        }
+
+        if (isNaN(vendorPlantIdNum)) {
+          return NextResponse.json(
+            { error: "Invalid vendor plant ID format" },
+            { status: 400 }
+          )
+        }
+
+        // Check if adapter supports getTotalTelemetryRecords method
+        if (typeof (adapter as any).getTotalTelemetryRecords === "function") {
+          const totalData = await (adapter as any).getTotalTelemetryRecords(
+            vendorPlantIdNum,
+            startYearNum,
+            endYearNum
+          )
+
+          // Transform total records (yearly aggregation) to our standard format
+          const telemetry = (totalData.records || []).map((record: any) => {
+            // Create timestamp from year (first day of year)
+            const timestamp = new Date(record.year, 0, 1).toISOString()
+
+            return {
+              plant_id: plantId,
+              ts: timestamp,
+              power_kw: null, // Total view doesn't have power, only yearly generation
+              generation_power_kw: null,
+              generation_capacity: null,
+              timezone_offset: null,
+              // For total view, we store yearly generation values
+              yearly_generation_kwh: record.generationValue || null,
+              year: record.year,
+            }
+          })
+
+          return NextResponse.json({
+            plantId,
+            data: telemetry,
+            statistics: totalData.statistics
+              ? {
+                  totalGenerationKwh: totalData.statistics.generationValue || null,
+                  fullPowerHoursTotal: totalData.statistics.fullPowerHoursDay || null,
+                  incomeValue: totalData.statistics.incomeValue || null,
+                  operatingTotalDays: totalData.operatingTotalDays || null,
+                }
+              : null,
+            period: "total",
+            dateRange: `${startYearNum} ~ ${endYearNum}`,
+          })
+        } else {
+          return NextResponse.json(
+            { error: "Total telemetry not supported for this vendor" },
+            { status: 400 }
+          )
+        }
+      } catch (error: any) {
+        console.error(`Error fetching total telemetry from ${vendor.vendor_type}:`, error)
+        return NextResponse.json(
+          { error: `Failed to fetch total telemetry: ${error.message}` },
+          { status: 500 }
+        )
+      }
+    }
+    
+    // Year view: only year (no month, no day)
+    if (year && !month && !day) {
+      try {
+        const adapter = VendorManager.getAdapter({
+          id: vendor.id,
+          name: vendor.name,
+          vendorType: vendor.vendor_type,
+          credentials: vendor.credentials,
+          isActive: vendor.is_active,
+        })
+
+        if (typeof (adapter as any).setTokenStorage === "function") {
+          (adapter as any).setTokenStorage(vendor.id, supabase)
+        }
+
+        const vendorPlantId = plant.vendor_plant_id.toString()
+        const vendorPlantIdNum = parseInt(plant.vendor_plant_id)
+        const yearNum = parseInt(year)
+
+        if (isNaN(yearNum)) {
+          return NextResponse.json({ error: "Invalid year parameter" }, { status: 400 })
+        }
+
+        if (isNaN(vendorPlantIdNum)) {
+          return NextResponse.json(
+            { error: "Invalid vendor plant ID format" },
+            { status: 400 }
+          )
+        }
+
+        // Check if adapter supports getYearlyTelemetryRecords method
+        if (typeof (adapter as any).getYearlyTelemetryRecords === "function") {
+          const yearlyData = await (adapter as any).getYearlyTelemetryRecords(
+            vendorPlantIdNum,
+            yearNum
+          )
+
+          // Transform yearly records (monthly aggregation) to our standard format
+          const telemetry = (yearlyData.records || []).map((record: any) => {
+            // Create timestamp from year and month (first day of month)
+            const timestamp = new Date(yearNum, record.month - 1, 1).toISOString()
+
+            return {
+              plant_id: plantId,
+              ts: timestamp,
+              power_kw: null, // Yearly view doesn't have power, only monthly generation
+              generation_power_kw: null,
+              generation_capacity: null,
+              timezone_offset: null,
+              // For year view, we store monthly generation values
+              monthly_generation_kwh: record.generationValue || null,
+              month: record.month,
+            }
+          })
+
+          return NextResponse.json({
+            plantId,
+            data: telemetry,
+            statistics: yearlyData.statistics
+              ? {
+                  yearlyGenerationKwh: yearlyData.statistics.generationValue || null,
+                  fullPowerHoursYear: yearlyData.statistics.fullPowerHoursDay || null,
+                  incomeValue: yearlyData.statistics.incomeValue || null,
+                }
+              : null,
+            period: "year",
+            date: `${year}`,
+          })
+        } else {
+          return NextResponse.json(
+            { error: "Yearly telemetry not supported for this vendor" },
+            { status: 400 }
+          )
+        }
+      } catch (error: any) {
+        console.error(`Error fetching yearly telemetry from ${vendor.vendor_type}:`, error)
+        return NextResponse.json(
+          { error: `Failed to fetch yearly telemetry: ${error.message}` },
+          { status: 500 }
+        )
+      }
+    }
+    
     // Month view: year and month (no day)
     if (year && month && !day) {
       try {

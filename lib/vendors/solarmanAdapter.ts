@@ -1105,6 +1105,147 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     return data
   }
 
+  /**
+   * Get yearly telemetry records (monthly aggregation for a year)
+   * Returns statistics for the year and monthly records
+   */
+  async getYearlyTelemetryRecords(
+    systemId: number,
+    year: number
+  ): Promise<{
+    statistics: {
+      systemId: number
+      year: number
+      month: number
+      day: number
+      generationValue: number // Yearly generation in kWh
+      incomeValue: number
+      fullPowerHoursDay: number
+    }
+    records: Array<{
+      systemId: number
+      year: number
+      month: number
+      day: number
+      generationValue: number // Monthly generation in kWh
+      incomeValue: number
+      fullPowerHoursDay: number
+    }>
+  }> {
+    const token = await this.authenticate()
+    
+    // Use PRO API base URL
+    const { url: proApiUrl } = this.getProApiBaseUrl()
+    const url = `${proApiUrl}/maintain-s/history/power/${systemId}/stats/year?year=${year}`
+
+    console.log('📊 [Solarman PRO API] Fetching yearly telemetry records:', {
+      systemId,
+      year,
+      url,
+    })
+
+    const response = await this.loggedFetch(
+      url,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "accept": "application/json, text/plain, */*",
+        },
+      },
+      {
+        operation: 'GET_YEARLY_TELEMETRY_RECORDS',
+        description: `Get yearly telemetry records for system ${systemId} for year ${year}`,
+      }
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ [Solarman PRO API] Failed to fetch yearly telemetry:', response.status, errorText)
+      throw new Error(`Failed to fetch yearly telemetry: ${response.statusText} - ${errorText}`)
+    }
+
+    const data = await response.json()
+    return data
+  }
+
+  /**
+   * Get total telemetry records (yearly aggregation across all years)
+   * Returns statistics for the total period and yearly records
+   */
+  async getTotalTelemetryRecords(
+    systemId: number,
+    startYear: number,
+    endYear: number
+  ): Promise<{
+    statistics: {
+      systemId: number
+      generationValue: number // Total generation in kWh
+      useValue: number
+      gridValue: number
+      buyValue: number
+      incomeValue: number
+      gridRatio: number
+      generationRatio: number
+      fullPowerHoursDay: number
+      absorbedUseValue: number
+      genForGrid: number
+      selfGenAndUseValue: number
+    }
+    records: Array<{
+      systemId: number
+      year: number
+      month: number
+      day: number
+      generationValue: number // Yearly generation in kWh
+      useValue?: number
+      gridValue?: number
+      buyValue?: number
+      incomeValue: number
+      fullPowerHoursDay?: number
+      gridRatio?: number
+      generationRatio?: number
+    }>
+    operatingTotalDays: number
+  }> {
+    const token = await this.authenticate()
+    
+    // Use PRO API base URL
+    const { url: proApiUrl } = this.getProApiBaseUrl()
+    const url = `${proApiUrl}/maintain-s/history/power/${systemId}/stats/total?startYear=${startYear}&endYear=${endYear}`
+
+    console.log('📊 [Solarman PRO API] Fetching total telemetry records:', {
+      systemId,
+      startYear,
+      endYear,
+      url,
+    })
+
+    const response = await this.loggedFetch(
+      url,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "accept": "application/json, text/plain, */*",
+        },
+      },
+      {
+        operation: 'GET_TOTAL_TELEMETRY_RECORDS',
+        description: `Get total telemetry records for system ${systemId} from ${startYear} to ${endYear}`,
+      }
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ [Solarman PRO API] Failed to fetch total telemetry:', response.status, errorText)
+      throw new Error(`Failed to fetch total telemetry: ${response.statusText} - ${errorText}`)
+    }
+
+    const data = await response.json()
+    return data
+  }
+
   async getDeviceRealtime(deviceId: number | string): Promise<RealtimeData> {
     const token = await this.authenticate()
     
