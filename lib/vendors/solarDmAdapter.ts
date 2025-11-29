@@ -472,6 +472,126 @@ export class SolarDmAdapter extends BaseVendorAdapter {
   }
 
   /**
+   * Get monthly telemetry records (daily aggregation for a specific month)
+   * Endpoint: GET /dms/data_panel/history/stats/month/{plantId}?plantId={plantId}&type=month&time=YYYY-MM
+   * Similar to Solarman's getMonthlyTelemetryRecords()
+   */
+  async getMonthlyTelemetryRecords(
+    plantId: string | number,
+    year: number,
+    month: number
+  ): Promise<{
+    statistics: {
+      systemId: number | string
+      year: number
+      month: number
+      day: number
+      generationValue: number // Monthly generation in kWh
+      fullPowerHoursDay?: number
+    }
+    records: Array<{
+      systemId: number | string
+      year: number
+      month: number
+      day: number
+      generationValue: number // Daily generation in kWh
+      fullPowerHoursDay?: number
+      acceptDay?: string
+    }>
+  }> {
+    const token = await this.authenticate()
+    const baseUrl = this.getApiBaseUrl()
+    
+    // Convert plantId to string (SolarDM uses string IDs)
+    const plantIdStr = plantId.toString()
+    
+    // Format date as YYYY-MM
+    const monthStr = `${year}-${String(month).padStart(2, '0')}`
+    
+    // SolarDM endpoint: /dms/data_panel/history/stats/month/{plantId}?plantId={plantId}&type=month&time=YYYY-MM
+    const url = `${baseUrl}/dms/data_panel/history/stats/month/${plantIdStr}?plantId=${plantIdStr}&type=month&time=${monthStr}`
+
+    console.log("[SolarDM] Fetching monthly telemetry records:", {
+      plantId: plantIdStr,
+      year,
+      month,
+      monthStr,
+      url,
+    })
+
+    const response = await pooledFetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[SolarDM] Failed to fetch monthly telemetry:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      })
+      throw new Error(`Failed to fetch monthly telemetry from SolarDM: ${response.statusText} - ${errorText}`)
+    }
+
+    const data = await response.json()
+
+    if (data.code !== 0 || !data.data?.dataList) {
+      throw new Error(`SolarDM API error: ${data.message || "Unknown error"}`)
+    }
+
+    const dataList = data.data.dataList || []
+    console.log(`[SolarDM] Successfully fetched ${dataList.length} monthly telemetry records`)
+
+    // Transform SolarDM response to match Solarman format
+    const records = dataList.map((item: any) => {
+      // Parse day from time string (e.g., "1", "2", "21" -> 1, 2, 21)
+      const day = parseInt(item.time, 10) || 0
+
+      // generationEnergy is already in kWh - use as is
+      const dailyGenerationKwh = item.generationEnergy || 0
+
+      // Format acceptDay as YYYYMMDD (e.g., "20251121")
+      const acceptDay = day > 0 
+        ? `${year}${String(month).padStart(2, '0')}${String(day).padStart(2, '0')}`
+        : undefined
+
+      return {
+        systemId: plantIdStr,
+        year,
+        month,
+        day,
+        generationValue: dailyGenerationKwh, // Daily generation in kWh
+        fullPowerHoursDay: undefined, // Not provided by SolarDM
+        acceptDay,
+      }
+    })
+
+    // Calculate statistics from records
+    // Monthly generation: sum of all daily generation values
+    const monthlyGenerationKwh = records.reduce((sum: number, record: { generationValue?: number }) => {
+      return sum + (record.generationValue || 0)
+    }, 0)
+
+    const statistics = {
+      systemId: plantIdStr,
+      year,
+      month,
+      day: 0, // Not applicable for monthly stats
+      generationValue: monthlyGenerationKwh, // Monthly generation in kWh
+      fullPowerHoursDay: undefined, // Would need capacity to calculate
+    }
+
+    return {
+      statistics,
+      records,
+    }
+  }
+
+  /**
    * Get realtime data for a plant
    * TODO: Implement once realtime endpoint is available
    */
