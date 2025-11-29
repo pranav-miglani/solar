@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Building2,
   Zap,
@@ -19,10 +20,12 @@ import {
   TrendingUp,
   Clock,
   HelpCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import Link from "next/link"
 import { TelemetryChart } from "@/components/TelemetryChart"
-import { format } from "date-fns"
+import { format, addDays, subDays } from "date-fns"
 
 // Main plant payload for detail view. Energy values follow our kWh/MWh schema:
 // - daily_energy_kwh is in kWh (per latest migrations)
@@ -61,7 +64,14 @@ interface Plant {
 
 interface TelemetryData {
   ts: string
-  generation_power_kw: number
+  generation_power_kw?: number
+  power_kw?: number
+}
+
+interface TelemetryStatistics {
+  dailyGenerationKwh?: number
+  fullPowerHoursDay?: number
+  incomeValue?: number
 }
 
 // Recent alert snapshot used for the sidebar card. Note the combination of
@@ -82,17 +92,31 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
   const router = useRouter()
   const [plant, setPlant] = useState<Plant | null>(null)
   const [telemetry, setTelemetry] = useState<TelemetryData[]>([])
+  const [telemetryStats, setTelemetryStats] = useState<TelemetryStatistics | null>(null)
   const [alerts, setAlerts] = useState<PlantAlert[]>([])
   const [alertsLoading, setAlertsLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Date selection for day view
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  const [selectedPeriod, setSelectedPeriod] = useState<"day" | "month" | "year" | "total">("day")
+  const [telemetryLoading, setTelemetryLoading] = useState(false)
+  const [telemetryLoaded, setTelemetryLoaded] = useState(false) // Track if user has requested to load graph
 
   useEffect(() => {
     fetchPlantData()
-    fetchTelemetry()
     fetchAlerts()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plantId])
+
+  useEffect(() => {
+    // Only fetch telemetry if user has requested to load the graph
+    if (plant && telemetryLoaded) {
+      fetchTelemetry()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plant, selectedDate, selectedPeriod, telemetryLoaded])
 
   async function fetchPlantData() {
     try {
@@ -112,18 +136,59 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
     }
   }
 
-  // Pull the last 24h of normalized telemetry (15-min granularity) for charts.
+  // Fetch telemetry data based on selected period and date
   async function fetchTelemetry() {
+    if (!plant) return
+
     try {
-      const response = await fetch(`/api/telemetry/plant/${plantId}?hours=24`)
+      setTelemetryLoading(true)
+      let response: Response
+
+      // For Solarman vendors, use the new API with date parameters for day view
+      if (plant.vendors.vendor_type === "SOLARMAN" && selectedPeriod === "day") {
+        const year = selectedDate.getFullYear()
+        const month = selectedDate.getMonth() + 1
+        const day = selectedDate.getDate()
+        
+        response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}&month=${month}&day=${day}`)
+      } else {
+        // Fallback to 24h view for other vendors or when period is not "day"
+        response = await fetch(`/api/telemetry/plant/${plantId}?hours=24`)
+      }
       
       if (response.ok) {
         const result = await response.json()
         setTelemetry(result.data || [])
+        
+        // Set statistics if available (from Solarman API)
+        if (result.statistics) {
+          setTelemetryStats(result.statistics)
+        } else {
+          setTelemetryStats(null)
+        }
+      } else {
+        setTelemetry([])
+        setTelemetryStats(null)
       }
     } catch (err) {
       console.error("Failed to fetch telemetry:", err)
+      setTelemetry([])
+      setTelemetryStats(null)
+    } finally {
+      setTelemetryLoading(false)
     }
+  }
+
+  const handleDateChange = (direction: "prev" | "next") => {
+    if (direction === "prev") {
+      setSelectedDate(subDays(selectedDate, 1))
+    } else {
+      setSelectedDate(addDays(selectedDate, 1))
+    }
+  }
+
+  const handleLoadGraph = () => {
+    setTelemetryLoaded(true)
   }
 
   // Fetch the latest alerts for this plant (limited via API default) so users see
@@ -454,16 +519,84 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Telemetry (24h)</CardTitle>
+              <div className="flex flex-col gap-4">
+                <CardTitle>Telemetry</CardTitle>
+                
+                {/* Period Tabs and Date Selector (for Solarman) */}
+                {plant.vendors.vendor_type === "SOLARMAN" && (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <Tabs value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as typeof selectedPeriod)}>
+                      <TabsList>
+                        <TabsTrigger value="day">Day</TabsTrigger>
+                        <TabsTrigger value="month" disabled>Month</TabsTrigger>
+                        <TabsTrigger value="year" disabled>Year</TabsTrigger>
+                        <TabsTrigger value="total" disabled>Total</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                    
+                    {selectedPeriod === "day" && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDateChange("prev")}
+                          disabled={telemetryLoading}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <div className="flex items-center gap-2 px-3 py-1.5 border rounded-md bg-background">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">
+                            {format(selectedDate, "yyyy/MM/dd")}
+                          </span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDateChange("next")}
+                          disabled={telemetryLoading || selectedDate >= new Date()}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              {telemetry.length > 0 ? (
-                <TelemetryChart data={telemetry} title="Generation Power (24h)" />
+              {!telemetryLoaded ? (
+                <div className="flex flex-col items-center justify-center h-64 text-center">
+                  <Activity className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <p className="text-muted-foreground mb-4">Click the button below to load telemetry graph</p>
+                  <Button onClick={handleLoadGraph} className="gap-2">
+                    <Activity className="h-4 w-4" />
+                    Load Telemetry Graph
+                  </Button>
+                </div>
+              ) : telemetryLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                    <p className="text-sm text-muted-foreground">Loading telemetry data...</p>
+                  </div>
+                </div>
+              ) : telemetry.length > 0 ? (
+                <TelemetryChart 
+                  data={telemetry} 
+                  title={selectedPeriod === "day" ? "Solar Power" : "Generation Power (24h)"}
+                  statistics={telemetryStats || undefined}
+                  showAreaFill={plant.vendors.vendor_type === "SOLARMAN"}
+                />
               ) : (
-                <div className="flex items-center justify-center h-64 text-muted-foreground">
+                <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                   <div className="text-center">
                     <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>No telemetry data available</p>
+                    <p className="mb-4">No telemetry data available</p>
+                    <Button variant="outline" onClick={handleLoadGraph} className="gap-2">
+                      <Activity className="h-4 w-4" />
+                      Retry
+                    </Button>
                   </div>
                 </div>
               )}

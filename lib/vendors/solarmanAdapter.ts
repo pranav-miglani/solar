@@ -969,6 +969,80 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     throw new Error("getRealtime requires deviceId. Use getDeviceRealtime(deviceId) instead.")
   }
 
+  /**
+   * Fetch daily telemetry records from Solarman PRO API
+   * Uses the /maintain-s/history/power/{systemId}/record endpoint
+   * @param systemId - Solarman system/station ID (vendor_plant_id)
+   * @param year - Year (e.g., 2025)
+   * @param month - Month (1-12)
+   * @param day - Day (1-31)
+   * @returns Object with statistics and records array
+   */
+  async getDailyTelemetryRecords(
+    systemId: number,
+    year: number,
+    month: number,
+    day: number
+  ): Promise<{
+    statistics: {
+      systemId: number
+      year: number
+      month: number
+      day: number
+      generationValue: number // Daily generation in kWh
+      incomeValue: number
+      fullPowerHoursDay: number
+      acceptDay: string
+    }
+    records: Array<{
+      systemId: number
+      acceptDay: number
+      acceptMonth: number
+      generationPower: number // Power in W (watts)
+      dateTime: number // Unix timestamp
+      generationCapacity: number // Capacity utilization (0-1)
+      timeZoneOffset: number // Timezone offset in seconds
+    }>
+  }> {
+    const token = await this.authenticate()
+    
+    // Use PRO API base URL
+    const { url: proApiUrl } = this.getProApiBaseUrl()
+    const url = `${proApiUrl}/maintain-s/history/power/${systemId}/record?year=${year}&month=${month}&day=${day}`
+
+    console.log('📊 [Solarman PRO API] Fetching daily telemetry records:', {
+      systemId,
+      year,
+      month,
+      day,
+      url,
+    })
+
+    const response = await this.loggedFetch(
+      url,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "accept": "application/json, text/plain, */*",
+        },
+      },
+      {
+        operation: 'GET_DAILY_TELEMETRY_RECORDS',
+        description: `Get daily telemetry records for system ${systemId} on ${year}-${month}-${day}`,
+      }
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ [Solarman PRO API] Failed to fetch daily telemetry:', response.status, errorText)
+      throw new Error(`Failed to fetch daily telemetry: ${response.statusText} - ${errorText}`)
+    }
+
+    const data = await response.json()
+    return data
+  }
+
   async getDeviceRealtime(deviceId: number | string): Promise<RealtimeData> {
     const token = await this.authenticate()
     
