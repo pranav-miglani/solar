@@ -208,13 +208,6 @@ export async function GET(
               generation_power_kw: powerKw,
               generation_capacity: record.generationCapacity || null,
               timezone_offset: record.timeZoneOffset || null,
-              metadata: {
-                vendorPlantId, // Vendor's plant ID (used in API call)
-                systemId: record.systemId || vendorPlantId,
-                acceptDay: record.acceptDay || null,
-                acceptMonth: record.acceptMonth || null,
-                raw: record, // Original vendor response
-              },
             }
           })
 
@@ -251,10 +244,6 @@ export async function GET(
             ts: data.timestamp instanceof Date ? data.timestamp.toISOString() : new Date(data.timestamp).toISOString(),
             power_kw: data.generationPowerKw,
             generation_power_kw: data.generationPowerKw,
-            metadata: {
-              vendorPlantId,
-              raw: data.metadata || {},
-            },
           }))
 
           return NextResponse.json({

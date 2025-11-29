@@ -33,7 +33,7 @@ import { format, addDays, subDays } from "date-fns"
 interface Plant {
   id: number
   name: string
-  capacity_kw: number
+  capacity_kw: number | null
   current_power_kw: number | null
   daily_energy_kwh: number | null
   monthly_energy_mwh: number | null
@@ -329,114 +329,116 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
       {/* Plant Information Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Capacity */}
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                  Installed Capacity
-                </p>
-                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                  {plant.capacity_kw.toFixed(2)} kW
-                </p>
+        {plant.capacity_kw !== null && plant.capacity_kw !== undefined && (
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                    Installed Capacity
+                  </p>
+                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                    {typeof plant.capacity_kw === 'number' ? plant.capacity_kw.toFixed(2) : 'N/A'} kW
+                  </p>
+                </div>
+                <Zap className="h-8 w-8 text-blue-500" />
               </div>
-              <Zap className="h-8 w-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Current Power */}
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600 dark:text-green-400">
-                  Current Power
-                </p>
-                <p className="text-2xl font-bold text-green-900 dark:text-green-100">
-                  {plant.current_power_kw !== null
-                    ? `${plant.current_power_kw.toFixed(2)} kW`
-                    : "N/A"}
-                </p>
+        {plant.current_power_kw !== null && plant.current_power_kw !== undefined && (
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                    Current Power
+                  </p>
+                  <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                    {typeof plant.current_power_kw === 'number' ? `${plant.current_power_kw.toFixed(2)} kW` : "N/A"}
+                  </p>
+                </div>
+                <Activity className="h-8 w-8 text-green-500" />
               </div>
-              <Activity className="h-8 w-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Performance Ratio */}
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-600 dark:text-purple-400">
-                  Performance Ratio
-                </p>
-                <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                  {plant.performance_ratio !== null
-                    ? `${(plant.performance_ratio * 100).toFixed(1)}%`
-                    : "N/A"}
-                </p>
+        {plant.performance_ratio !== null && plant.performance_ratio !== undefined && (
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-purple-600 dark:text-purple-400">
+                    Performance Ratio
+                  </p>
+                  <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                    {typeof plant.performance_ratio === 'number' ? `${(plant.performance_ratio * 100).toFixed(1)}%` : "N/A"}
+                  </p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-purple-500" />
               </div>
-              <TrendingUp className="h-8 w-8 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Energy Production Cards */}
+      {/* Energy Production Cards - Only show cards for data that exists */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Daily Energy</p>
-              <p className="text-xl font-bold">
-                {plant.daily_energy_kwh !== null
-                  ? `${plant.daily_energy_kwh.toFixed(2)} kWh`
-                  : "N/A"}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {plant.daily_energy_kwh !== null && plant.daily_energy_kwh !== undefined && (
+          <Card>
+            <CardContent className="pt-6">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Daily Energy</p>
+                <p className="text-xl font-bold">
+                  {typeof plant.daily_energy_kwh === 'number' ? `${plant.daily_energy_kwh.toFixed(2)} kWh` : "N/A"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        <Card>
-          <CardContent className="pt-6">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Monthly Energy</p>
-              <p className="text-xl font-bold">
-                {plant.monthly_energy_mwh !== null
-                  ? `${plant.monthly_energy_mwh.toFixed(3)} MWh`
-                  : "N/A"}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {plant.monthly_energy_mwh !== null && plant.monthly_energy_mwh !== undefined && (
+          <Card>
+            <CardContent className="pt-6">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Monthly Energy</p>
+                <p className="text-xl font-bold">
+                  {typeof plant.monthly_energy_mwh === 'number' ? `${plant.monthly_energy_mwh.toFixed(3)} MWh` : "N/A"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        <Card>
-          <CardContent className="pt-6">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Yearly Energy</p>
-              <p className="text-xl font-bold">
-                {plant.yearly_energy_mwh !== null
-                  ? `${plant.yearly_energy_mwh.toFixed(3)} MWh`
-                  : "N/A"}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {plant.yearly_energy_mwh !== null && plant.yearly_energy_mwh !== undefined && (
+          <Card>
+            <CardContent className="pt-6">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Yearly Energy</p>
+                <p className="text-xl font-bold">
+                  {typeof plant.yearly_energy_mwh === 'number' ? `${plant.yearly_energy_mwh.toFixed(3)} MWh` : "N/A"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        <Card>
-          <CardContent className="pt-6">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Energy</p>
-              <p className="text-xl font-bold">
-                {plant.total_energy_mwh !== null
-                  ? `${plant.total_energy_mwh.toFixed(3)} MWh`
-                  : "N/A"}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        {plant.total_energy_mwh !== null && plant.total_energy_mwh !== undefined && (
+          <Card>
+            <CardContent className="pt-6">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Energy</p>
+                <p className="text-xl font-bold">
+                  {typeof plant.total_energy_mwh === 'number' ? `${plant.total_energy_mwh.toFixed(3)} MWh` : "N/A"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Plant Details */}
@@ -453,7 +455,9 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-muted-foreground">Location</p>
                   <p className="text-base break-words">{plant.location.address}</p>
-                  {plant.location.lat && plant.location.lng && (
+                  {plant.location.lat !== null && plant.location.lat !== undefined && 
+                   plant.location.lng !== null && plant.location.lng !== undefined && 
+                   typeof plant.location.lat === 'number' && typeof plant.location.lng === 'number' && (
                     <p className="text-xs text-muted-foreground mt-1">
                       {plant.location.lat.toFixed(6)}, {plant.location.lng.toFixed(6)}
                     </p>

@@ -198,7 +198,7 @@ export async function GET(request: NextRequest) {
 
       dashboardData.widgets = {
         showTelemetryChart: false,
-        showAlertsFeed: true,
+        showAlertsFeed: false, // Hide alerts feed for GOVT users on dashboard
         showWorkOrdersSummary: true,
         showOrgBreakdown: true,
         showExportCSV: true,

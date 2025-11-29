@@ -62,13 +62,21 @@ export default function DashboardPage() {
   const loadDashboard = async (accountType: string, orgId: number | null) => {
     try {
       console.log("📊 [DASHBOARD] Loading dashboard data for:", { accountType, orgId })
-      const [dashboardRes, alertsRes] = await Promise.all([
-        fetch("/api/dashboard"),
-        fetch("/api/alerts"),
-      ])
-
-      const dashboard = await dashboardRes.json()
-      const alertsData = await alertsRes.json()
+      
+      // For GOVT users, skip fetching alerts since they won't see the alerts feed
+      const fetchPromises: Promise<Response>[] = [fetch("/api/dashboard")]
+      if (accountType !== "GOVT") {
+        fetchPromises.push(fetch("/api/alerts"))
+      }
+      
+      const responses = await Promise.all(fetchPromises)
+      const dashboard = await responses[0].json()
+      
+      // Only fetch alerts data if we made the request (non-GOVT users)
+      let alertsData = { alerts: [] }
+      if (accountType !== "GOVT" && responses.length > 1) {
+        alertsData = await responses[1].json()
+      }
 
       setDashboardData(dashboard)
       setTelemetryData([]) // Telemetry is now fetched on-demand from vendor APIs
