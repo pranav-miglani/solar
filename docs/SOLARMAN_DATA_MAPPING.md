@@ -125,7 +125,6 @@ The sync route maps the Plant object to database columns:
 | `monthly_energy_mwh` | `metadata.monthlyEnergyMwh` | Direct | NULL (not in /station/v1.0/list) |
 | `yearly_energy_mwh` | `metadata.yearlyEnergyMwh` | Direct | NULL (not in /station/v1.0/list) |
 | `total_energy_mwh` | `metadata.totalEnergyMwh` | Direct | NULL (not in /station/v1.0/list) |
-| `performance_ratio` | `metadata.performanceRatio` | Direct | NULL (not in /station/v1.0/list) |
 | `last_update_time` | `metadata.lastUpdateTime` | **Handle both ISO string and Unix timestamp** | TIMESTAMPTZ |
 | `last_refreshed_at` | **Current timestamp** | `NOW()` | When synced to DB |
 | `contact_phone` | `metadata.contactPhone` | Direct | "" (empty string or phone number) |
@@ -189,7 +188,6 @@ These fields are in the database schema but are **NOT available** from the `/sta
 - `monthly_energy_mwh` - NULL
 - `yearly_energy_mwh` - NULL
 - `total_energy_mwh` - NULL
-- `performance_ratio` - NULL
 
 **Note:** These would need to be fetched from other Solarman endpoints (e.g., `/station/v1.0/base` or device-level endpoints).
 
@@ -253,7 +251,6 @@ Result:
 | `monthly_energy_mwh` | NULL | Not available |
 | `yearly_energy_mwh` | NULL | Not available |
 | `total_energy_mwh` | NULL | Not available |
-| `performance_ratio` | NULL | Not available |
 | `last_update_time` | `2025-11-16 10:30:00+00` | `station.lastUpdateTime` (Unix → TIMESTAMPTZ) |
 | `last_refreshed_at` | `2025-11-16 17:13:30+00` | `NOW()` (when synced) |
 | `contact_phone` | "" | `station.contactPhone` |

@@ -165,7 +165,6 @@ CREATE TABLE plants (
   monthly_energy_mwh NUMERIC(10, 3), -- Monthly Energy in MWh
   yearly_energy_mwh NUMERIC(10, 3), -- Yearly Energy in MWh
   total_energy_mwh NUMERIC(10, 3), -- Total Energy in MWh
-  performance_ratio NUMERIC(5, 4), -- PR (0-1 range, displayed as percentage in circular indicator)
   last_update_time TIMESTAMPTZ, -- Last time production data was updated from vendor (shown as "Last Updated" timestamp)
   last_refreshed_at TIMESTAMPTZ, -- Last time this plant data was refreshed/synced in our database (shown as "Last Refresh" timestamp)
   -- Additional metadata fields (refreshed on every sync)
@@ -184,7 +183,6 @@ COMMENT ON COLUMN plants.daily_energy_kwh IS 'Daily energy generation in kWh (sh
 COMMENT ON COLUMN plants.monthly_energy_mwh IS 'Monthly energy generation in MWh (shown in Production Overview)';
 COMMENT ON COLUMN plants.yearly_energy_mwh IS 'Yearly energy generation in MWh (shown in Production Overview)';
 COMMENT ON COLUMN plants.total_energy_mwh IS 'Total cumulative energy generation in MWh (shown in Production Overview)';
-COMMENT ON COLUMN plants.performance_ratio IS 'Performance Ratio (PR) 0-1 range, displayed as percentage in circular indicator';
 COMMENT ON COLUMN plants.last_update_time IS 'Last time production data was updated from vendor (shown as "Last Updated" timestamp)';
 COMMENT ON COLUMN plants.last_refreshed_at IS 'Last time this plant data was refreshed/synced in our database (shown as "Last Refresh" timestamp) - set to NOW() on every sync';
 COMMENT ON COLUMN plants.contact_phone IS 'Contact phone number from vendor (refreshed on sync)';
