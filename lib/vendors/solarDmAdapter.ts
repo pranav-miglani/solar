@@ -866,10 +866,20 @@ export class SolarDmAdapter extends BaseVendorAdapter {
     const operation = context?.operation || "API_CALL"
     const description = context?.description || "SolarDM API request"
     
-    // Build headers object - only include Content-Type if there's a body
+    // Build headers object - match Postman request format
+    // Extract base domain from API URL (e.g., http://global.solar-dm.com:8010 -> http://global.solar-dm.com)
+    const apiBaseUrl = this.getApiBaseUrl()
+    const urlObj = new URL(apiBaseUrl)
+    const origin = `${urlObj.protocol}//${urlObj.hostname}${urlObj.port ? `:${urlObj.port}` : ""}`
+    
     const headers: Record<string, string> = {
       "Authorization": `Bearer ${token}`,
       "Accept": "application/json, text/plain, */*",
+      "Accept-Language": "en-US",
+      "Connection": "keep-alive",
+      "Origin": origin,
+      "Referer": `${origin}/`,
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
     }
     
     // Only add Content-Type for requests with body
@@ -1036,10 +1046,21 @@ export class SolarDmAdapter extends BaseVendorAdapter {
       }
       
       const records = data.data?.records || []
+      const totalRecords = data.data?.total || 0
+      const apiPages = data.data?.pages ?? 0
       
       if (current === 1) {
-        totalPages = data.data?.pages || 1
-        console.log(`[SolarDM] Total pages from API: ${totalPages}, total records: ${data.data?.total || 0}`)
+        // Handle pagination: if pages is 0 but we have records, calculate pages
+        if (apiPages === 0 && totalRecords > 0) {
+          totalPages = Math.ceil(totalRecords / pageSize)
+          console.log(`[SolarDM] API returned pages=0 but total=${totalRecords}, calculating pages: ${totalPages}`)
+        } else if (apiPages > 0) {
+          totalPages = apiPages
+        } else {
+          totalPages = 1
+        }
+        
+        console.log(`[SolarDM] Total pages: ${totalPages}, total records: ${totalRecords}`)
         
         // Log first few records for debugging
         if (records.length > 0) {
@@ -1049,7 +1070,9 @@ export class SolarDmAdapter extends BaseVendorAdapter {
             happenTime: records[0].happenTime,
             recoverTime: records[0].recoverTime,
             faultInfo: records[0].faultInfo,
+            faultInfoEN: records[0].faultInfoEN,
             faultLevel: records[0].faultLevel,
+            status: records[0].status,
           })
         }
       }
@@ -1065,9 +1088,9 @@ export class SolarDmAdapter extends BaseVendorAdapter {
       // This allows us to see all alerts and log what's being filtered
       allAlerts.push(...records)
       
-      // Check if we've reached the last page
-      if (current >= totalPages) {
-        console.log(`[SolarDM] Reached last page (${totalPages}), stopping pagination`)
+      // Check if we've reached the last page or if we've fetched all records
+      if (current >= totalPages || allAlerts.length >= totalRecords) {
+        console.log(`[SolarDM] Reached last page (${totalPages}) or fetched all records (${allAlerts.length}/${totalRecords}), stopping pagination`)
         break
       }
       
@@ -1109,7 +1132,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
     
     return {
       vendorAlertId: rawData.id?.toString() || "",
-      title: rawData.faultInfoEN || rawData.faultInfo || "Alert",
+      title: rawData.faultInfo || "Alert",
       description: rawData.faultInfo || null,
       severity,
       metadata: rawData,

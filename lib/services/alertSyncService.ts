@@ -867,7 +867,7 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
         plant_id: mapping.plantId,
         vendor_plant_id: mapping.vendorPlantId,
         vendor_alert_id: vendorAlertId,
-        title: raw.faultInfoEN || raw.faultInfo || "Alert",
+        title: raw.faultInfo || "Alert",
         description: raw.faultInfo || null,
         severity,
         status,
