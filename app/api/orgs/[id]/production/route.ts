@@ -57,7 +57,6 @@ export async function GET(
           monthlyEnergyMwh: 0,
           yearlyEnergyMwh: 0,
           totalEnergyMwh: 0,
-          averagePerformanceRatio: 0,
         },
       })
     }
@@ -92,7 +91,6 @@ export async function GET(
           monthlyEnergyMwh: 0,
           yearlyEnergyMwh: 0,
           totalEnergyMwh: 0,
-          averagePerformanceRatio: 0,
         },
       })
     }
@@ -109,12 +107,6 @@ export async function GET(
       monthlyEnergyMwh: plants.reduce((sum: number, p: any) => sum + (p.monthly_energy_mwh || 0), 0),
       yearlyEnergyMwh: plants.reduce((sum: number, p: any) => sum + (p.yearly_energy_mwh || 0), 0),
       totalEnergyMwh: plants.reduce((sum: number, p: any) => sum + (p.total_energy_mwh || 0), 0),
-      averagePerformanceRatio: plants
-        .filter((p: any) => p.performance_ratio !== null && p.performance_ratio !== undefined)
-        .reduce((sum: number, p: any, _: any, arr: any[]) => {
-          if (arr.length === 0) return 0
-          return sum + (p.performance_ratio || 0) / arr.length
-        }, 0),
     }
 
     return NextResponse.json({

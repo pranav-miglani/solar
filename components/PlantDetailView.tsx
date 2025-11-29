@@ -39,7 +39,6 @@ interface Plant {
   monthly_energy_mwh: number | null
   yearly_energy_mwh: number | null
   total_energy_mwh: number | null
-  performance_ratio: number | null
   last_update_time: string | null
   last_refreshed_at: string | null
   contact_phone: string | null
@@ -398,24 +397,6 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
           </Card>
         )}
 
-        {/* Performance Ratio */}
-        {plant.performance_ratio !== null && plant.performance_ratio !== undefined && (
-          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-purple-600 dark:text-purple-400">
-                    Performance Ratio
-                  </p>
-                  <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                    {typeof plant.performance_ratio === 'number' ? `${(plant.performance_ratio * 100).toFixed(1)}%` : "N/A"}
-                  </p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-purple-500" />
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       {/* Energy Production Cards - Only show cards for data that exists */}

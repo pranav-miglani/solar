@@ -50,11 +50,6 @@ export async function GET(
       )
     }
 
-    // Calculate PR percentage
-    const prPercentage = plant.performance_ratio
-      ? (plant.performance_ratio * 100).toFixed(3)
-      : null
-
     // Calculate current power percentage
     const currentPowerPercentage =
       plant.capacity_kw > 0 && plant.current_power_kw
@@ -71,8 +66,6 @@ export async function GET(
         monthlyEnergyMwh: plant.monthly_energy_mwh,
         yearlyEnergyMwh: plant.yearly_energy_mwh,
         totalEnergyMwh: plant.total_energy_mwh,
-        performanceRatio: plant.performance_ratio,
-        prPercentage, // PR as percentage for display
         lastUpdateTime: plant.last_update_time,
         currentPowerPercentage, // Current power as percentage of capacity
       },

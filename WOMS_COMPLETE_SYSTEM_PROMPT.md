@@ -91,7 +91,6 @@ Build a production-ready **Work Order Management System (WOMS)** for managing so
   - `monthly_energy_mwh` (NUMERIC(10, 3))
   - `yearly_energy_mwh` (NUMERIC(10, 3))
   - `total_energy_mwh` (NUMERIC(10, 3)) - Total cumulative energy (from `generationUploadTotalOffset` for Solarman)
-  - `performance_ratio` (NUMERIC(5, 4)) - 0-1 range
 - `last_update_time` (TIMESTAMPTZ) - last vendor update
 - `last_refreshed_at` (TIMESTAMPTZ) - last DB sync
 - `contact_phone` (TEXT)

@@ -598,14 +598,6 @@ export class SolarmanAdapter extends BaseVendorAdapter {
         ? station.generationUploadTotalOffset / 1000 
         : null
       
-      // Performance Ratio: PRO API may have prYesterday, or we can calculate from generationCapacity
-      // PR = (Actual Generation / Expected Generation) where Expected = Capacity * Hours * Efficiency
-      // For now, use prYesterday if available, otherwise null (will be calculated elsewhere if needed)
-      const performanceRatio = station.prYesterday !== null && station.prYesterday !== undefined 
-        ? station.prYesterday 
-        : (station.generationCapacity !== null && station.generationCapacity !== undefined && station.installedCapacity > 0
-          ? station.generationCapacity / station.installedCapacity
-          : null)
       
       // lastUpdateTime is Unix timestamp (seconds), convert to ISO string
       // PRO API returns as float (e.g., 1763468017.000000000)
@@ -638,7 +630,6 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           monthlyEnergyMwh: monthlyEnergyMwh, // From generationMonth (kWh -> MWh)
           yearlyEnergyMwh: yearlyEnergyMwh, // From generationYear (kWh -> MWh)
           totalEnergyMwh: totalEnergyMwh, // From generationUploadTotalOffset (actual energy till date) 
-          performanceRatio: performanceRatio, // From prYesterday or calculated from generationCapacity
           // Additional PRO API fields
           fullPowerHoursDay: station.fullPowerHoursDay || null,
           generationCapacity: station.generationCapacity || null,

@@ -35,7 +35,6 @@ This document describes the complete database schema for WOMS (Work Order Manage
   - `monthly_energy_mwh` - Monthly Energy
   - `yearly_energy_mwh` - Yearly Energy
   - `total_energy_mwh` - Total Energy
-  - `performance_ratio` - PR (0-1, shown as percentage)
   - `last_update_time` - Last sync timestamp
 - **Relationships:**
   - `org_id` → `organizations.id` (required)
