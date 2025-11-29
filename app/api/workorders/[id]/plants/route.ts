@@ -145,14 +145,9 @@ export async function POST(
     }
 
     // Trigger efficiency computation (work orders are static, but we can still compute efficiency)
-    try {
-      await supabase.functions.invoke("compute-efficiency", {
-        body: { workOrderId: parseInt(params.id) },
-      })
-    } catch (efficiencyError) {
-      // Log but don't fail the request
-      console.error("Efficiency computation error:", efficiencyError)
-    }
+    // Note: compute-efficiency edge function removed (Telemetry DB removed)
+    // Efficiency is now calculated differently or not used
+    // If efficiency computation is needed, it should be done via vendor APIs directly
 
     return NextResponse.json({ plants }, { status: 201 })
   } catch (error: any) {

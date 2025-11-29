@@ -152,8 +152,11 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
         
         response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}&month=${month}&day=${day}`)
       } else {
-        // Fallback to 24h view for other vendors or when period is not "day"
-        response = await fetch(`/api/telemetry/plant/${plantId}?hours=24`)
+        // Fallback: return empty data if not Solarman or date params not provided
+        // Telemetry is now fetched directly from vendor APIs
+        setTelemetry([])
+        setTelemetryStats(null)
+        return
       }
       
       if (response.ok) {
