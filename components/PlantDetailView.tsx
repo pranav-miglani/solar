@@ -158,14 +158,8 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
           response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}&month=${month}`)
         } else if (selectedPeriod === "year") {
           // For year view, only send year (no month, no day)
-          // Only Solarman supports year view currently
-          if (plant?.vendors?.vendor_type === "SOLARMAN") {
-            response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}`)
-          } else {
-            setTelemetry([])
-            setTelemetryStats(null)
-            return
-          }
+          // Both Solarman and SolarDM support year view
+          response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}`)
         } else if (selectedPeriod === "total") {
           // For total view, send period=total and date range
           // Only Solarman supports total view currently
@@ -565,7 +559,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                       <TabsList>
                         <TabsTrigger value="day">Day</TabsTrigger>
                         <TabsTrigger value="month">Month</TabsTrigger>
-                        <TabsTrigger value="year" disabled={plant?.vendors?.vendor_type === "SOLARDM"}>Year</TabsTrigger>
+                        <TabsTrigger value="year">Year</TabsTrigger>
                         <TabsTrigger value="total" disabled={plant?.vendors?.vendor_type === "SOLARDM"}>Total</TabsTrigger>
                       </TabsList>
                     </Tabs>

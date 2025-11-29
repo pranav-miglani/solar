@@ -592,6 +592,117 @@ export class SolarDmAdapter extends BaseVendorAdapter {
   }
 
   /**
+   * Get yearly telemetry records (monthly aggregation for a specific year)
+   * Endpoint: GET /dms/data_panel/history/stats/year/{plantId}?plantId={plantId}&type=year&time=YYYY
+   * Similar to Solarman's getYearlyTelemetryRecords()
+   */
+  async getYearlyTelemetryRecords(
+    plantId: string | number,
+    year: number
+  ): Promise<{
+    statistics: {
+      systemId: number | string
+      year: number
+      month: number
+      day: number
+      generationValue: number // Yearly generation in kWh
+      fullPowerHoursDay?: number
+    }
+    records: Array<{
+      systemId: number | string
+      year: number
+      month: number
+      day: number
+      generationValue: number // Monthly generation in kWh
+      fullPowerHoursDay?: number
+    }>
+  }> {
+    const token = await this.authenticate()
+    const baseUrl = this.getApiBaseUrl()
+    
+    // Convert plantId to string (SolarDM uses string IDs)
+    const plantIdStr = plantId.toString()
+    
+    // Format year as YYYY
+    const yearStr = year.toString()
+    
+    // SolarDM endpoint: /dms/data_panel/history/stats/year/{plantId}?plantId={plantId}&type=year&time=YYYY
+    const url = `${baseUrl}/dms/data_panel/history/stats/year/${plantIdStr}?plantId=${plantIdStr}&type=year&time=${yearStr}`
+
+    console.log("[SolarDM] Fetching yearly telemetry records:", {
+      plantId: plantIdStr,
+      year,
+      yearStr,
+      url,
+    })
+
+    const response = await pooledFetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[SolarDM] Failed to fetch yearly telemetry:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      })
+      throw new Error(`Failed to fetch yearly telemetry from SolarDM: ${response.statusText} - ${errorText}`)
+    }
+
+    const data = await response.json()
+
+    if (data.code !== 0 || !data.data?.dataList) {
+      throw new Error(`SolarDM API error: ${data.message || "Unknown error"}`)
+    }
+
+    const dataList = data.data.dataList || []
+    console.log(`[SolarDM] Successfully fetched ${dataList.length} yearly telemetry records`)
+
+    // Transform SolarDM response to match Solarman format
+    const records = dataList.map((item: any) => {
+      // Parse month from time string (e.g., "1", "2", "11" -> 1, 2, 11)
+      const month = parseInt(item.time, 10) || 0
+
+      // generationEnergy is already in kWh (monthly generation) - use as is
+      const monthlyGenerationKwh = item.generationEnergy || 0
+
+      return {
+        systemId: plantIdStr,
+        year,
+        month,
+        day: 0, // Not applicable for monthly records in yearly view
+        generationValue: monthlyGenerationKwh, // Monthly generation in kWh
+        fullPowerHoursDay: undefined, // Not provided by SolarDM
+      }
+    })
+
+    // Calculate statistics from records
+    // Yearly generation: sum of all monthly generation values
+    const yearlyGenerationKwh = records.reduce((sum: number, record: { generationValue?: number }) => {
+      return sum + (record.generationValue || 0)
+    }, 0)
+
+    const statistics = {
+      systemId: plantIdStr,
+      year,
+      month: 0, // Not applicable for yearly stats
+      day: 0, // Not applicable for yearly stats
+      generationValue: yearlyGenerationKwh, // Yearly generation in kWh
+      fullPowerHoursDay: undefined, // Would need capacity to calculate
+    }
+
+    return {
+      statistics,
+      records,
+    }
+  }
+
+  /**
    * Get realtime data for a plant
    * TODO: Implement once realtime endpoint is available
    */

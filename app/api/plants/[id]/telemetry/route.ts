@@ -245,17 +245,11 @@ export async function GET(
           return NextResponse.json({ error: "Invalid year parameter" }, { status: 400 })
         }
 
-        if (isNaN(vendorPlantIdNum)) {
-          return NextResponse.json(
-            { error: "Invalid vendor plant ID format" },
-            { status: 400 }
-          )
-        }
-
         // Check if adapter supports getYearlyTelemetryRecords method
         if (typeof (adapter as any).getYearlyTelemetryRecords === "function") {
+          // For Solarman: use numeric ID, for SolarDM: use string ID
           const yearlyData = await (adapter as any).getYearlyTelemetryRecords(
-            vendorPlantIdNum,
+            vendor.vendor_type === "SOLARDM" ? vendorPlantId : vendorPlantIdNum,
             yearNum
           )
 
