@@ -703,6 +703,141 @@ export class SolarDmAdapter extends BaseVendorAdapter {
   }
 
   /**
+   * Get total telemetry records (yearly aggregation across multiple years)
+   * Endpoint: GET /dms/data_panel/history/stats/total/{plantId}?plantId={plantId}&type=all&time=YYYY+~+YYYY
+   * Similar to Solarman's getTotalTelemetryRecords()
+   */
+  async getTotalTelemetryRecords(
+    plantId: string | number,
+    startYear: number,
+    endYear: number
+  ): Promise<{
+    statistics: {
+      systemId: number | string
+      generationValue: number // Total generation in kWh
+      useValue?: number
+      gridValue?: number
+      buyValue?: number
+      gridRatio?: number
+      generationRatio?: number
+      fullPowerHoursDay?: number
+      absorbedUseValue?: number
+      genForGrid?: number
+      selfGenAndUseValue?: number
+    }
+    records: Array<{
+      systemId: number | string
+      year: number
+      month: number
+      day: number
+      generationValue: number // Yearly generation in kWh
+      useValue?: number
+      gridValue?: number
+      buyValue?: number
+      fullPowerHoursDay?: number
+      gridRatio?: number
+      generationRatio?: number
+    }>
+    operatingTotalDays?: number
+  }> {
+    const token = await this.authenticate()
+    const baseUrl = this.getApiBaseUrl()
+    
+    // Convert plantId to string (SolarDM uses string IDs)
+    const plantIdStr = plantId.toString()
+    
+    // Format time parameter as "YYYY+~+YYYY" (URL encoded space as +)
+    const timeStr = `${startYear}+~+${endYear}`
+    
+    // SolarDM endpoint: /dms/data_panel/history/stats/total/{plantId}?plantId={plantId}&type=all&time=YYYY+~+YYYY
+    const url = `${baseUrl}/dms/data_panel/history/stats/total/${plantIdStr}?plantId=${plantIdStr}&type=all&time=${timeStr}`
+
+    console.log("[SolarDM] Fetching total telemetry records:", {
+      plantId: plantIdStr,
+      startYear,
+      endYear,
+      timeStr,
+      url,
+    })
+
+    const response = await pooledFetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[SolarDM] Failed to fetch total telemetry:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      })
+      throw new Error(`Failed to fetch total telemetry from SolarDM: ${response.statusText} - ${errorText}`)
+    }
+
+    const data = await response.json()
+
+    if (data.code !== 0 || !data.data?.dataList) {
+      throw new Error(`SolarDM API error: ${data.message || "Unknown error"}`)
+    }
+
+    const dataList = data.data.dataList || []
+    console.log(`[SolarDM] Successfully fetched ${dataList.length} total telemetry records`)
+
+    // Transform SolarDM response to match Solarman format
+    const records = dataList.map((item: any) => {
+      // Parse year from time string (e.g., "2025" -> 2025)
+      const year = parseInt(item.time, 10) || 0
+
+      // generationEnergy is already in kWh (yearly generation) - use as is
+      const yearlyGenerationKwh = item.generationEnergy || 0
+
+      return {
+        systemId: plantIdStr,
+        year,
+        month: 0, // Not applicable for yearly records in total view
+        day: 0, // Not applicable for yearly records in total view
+        generationValue: yearlyGenerationKwh, // Yearly generation in kWh
+        useValue: undefined, // Not provided by SolarDM
+        gridValue: undefined, // Not provided by SolarDM
+        buyValue: undefined, // Not provided by SolarDM
+        fullPowerHoursDay: undefined, // Not provided by SolarDM
+        gridRatio: undefined, // Not provided by SolarDM
+        generationRatio: undefined, // Not provided by SolarDM
+      }
+    })
+
+    // Calculate statistics from records
+    // Total generation: sum of all yearly generation values
+    const totalGenerationKwh = records.reduce((sum: number, record: { generationValue?: number }) => {
+      return sum + (record.generationValue || 0)
+    }, 0)
+
+    const statistics = {
+      systemId: plantIdStr,
+      generationValue: totalGenerationKwh, // Total generation in kWh
+      useValue: undefined, // Not provided by SolarDM
+      gridValue: undefined, // Not provided by SolarDM
+      buyValue: undefined, // Not provided by SolarDM
+      gridRatio: undefined, // Not provided by SolarDM
+      generationRatio: undefined, // Not provided by SolarDM
+      fullPowerHoursDay: undefined, // Would need capacity to calculate
+      absorbedUseValue: undefined, // Not provided by SolarDM
+      genForGrid: undefined, // Not provided by SolarDM
+      selfGenAndUseValue: undefined, // Not provided by SolarDM
+    }
+
+    return {
+      statistics,
+      records,
+      operatingTotalDays: undefined, // Not provided by SolarDM
+    }
+  }
+
+  /**
    * Get realtime data for a plant
    * TODO: Implement once realtime endpoint is available
    */
