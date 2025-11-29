@@ -91,12 +91,17 @@ export function TelemetryChart({
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload
+      const powerValue = payload[0].value
+      const powerDisplay = (powerValue !== null && powerValue !== undefined && typeof powerValue === 'number')
+        ? powerValue.toFixed(2)
+        : '0.00'
+      
       return (
         <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
           <p className="text-sm font-semibold mb-1">{data.fullTime}</p>
           <p className="text-sm">
             <span className="font-medium text-blue-600 dark:text-blue-400">Solar Power:</span>{" "}
-            {payload[0].value.toFixed(2)} kW
+            {powerDisplay} kW
           </p>
         </div>
       )
@@ -118,13 +123,17 @@ export function TelemetryChart({
         {/* Statistics */}
         {statistics && (
           <div className="flex gap-6 mb-4 text-sm">
-            {statistics.dailyGenerationKwh !== undefined && (
+            {statistics.dailyGenerationKwh !== undefined && 
+             statistics.dailyGenerationKwh !== null && 
+             typeof statistics.dailyGenerationKwh === 'number' && (
               <div>
                 <span className="text-muted-foreground">Daily Production: </span>
                 <span className="font-semibold">{statistics.dailyGenerationKwh.toFixed(1)} kWh</span>
               </div>
             )}
-            {statistics.fullPowerHoursDay !== undefined && (
+            {statistics.fullPowerHoursDay !== undefined && 
+             statistics.fullPowerHoursDay !== null && 
+             typeof statistics.fullPowerHoursDay === 'number' && (
               <div>
                 <span className="text-muted-foreground">Peak Hours Today: </span>
                 <span className="font-semibold">{statistics.fullPowerHoursDay.toFixed(2)} h</span>
