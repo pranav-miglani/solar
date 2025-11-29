@@ -64,6 +64,7 @@ export async function GET(
 
     // Step 1: Fetch plant with vendor information to identify the vendor
     // Use the internal plant.id to find the plant, then get vendor_plant_id from the database
+    // Note: api_base_url is no longer stored in DB - it's read from environment variables
     console.log(`[Telemetry API] Querying database for plant ID: ${plantId}`)
     const { data: plant, error: plantError } = await supabase
       .from("plants")
@@ -75,7 +76,6 @@ export async function GET(
           id,
           name,
           vendor_type,
-          api_base_url,
           credentials,
           is_active
         )
@@ -135,11 +135,13 @@ export async function GET(
     if (year && month && day) {
       try {
         // Get the appropriate vendor adapter (currently only SolarmanAdapter is fully implemented)
+        // Note: apiBaseUrl is optional - adapter will read from environment variables if not provided
+        // The api_base_url column was removed from vendors table and is now stored in env vars
         const adapter = VendorManager.getAdapter({
           id: vendor.id,
           name: vendor.name,
           vendorType: vendor.vendor_type,
-          apiBaseUrl: vendor.api_base_url,
+          // apiBaseUrl is optional - BaseVendorAdapter.getApiBaseUrl() will read from env vars
           credentials: vendor.credentials,
           isActive: vendor.is_active,
         })

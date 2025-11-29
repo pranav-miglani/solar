@@ -188,16 +188,14 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
     } else {
       setSelectedDate(addDays(selectedDate, 1))
     }
-    // Automatically fetch telemetry when date changes (if graph is already loaded)
-    if (telemetryLoaded) {
-      fetchTelemetry()
-    }
+    // useEffect will automatically trigger fetchTelemetry() when selectedDate changes
+    // No need to call it manually here to avoid double calls
   }
 
   const handleLoadGraph = () => {
+    // Set telemetryLoaded to true - useEffect will automatically trigger fetchTelemetry()
+    // This prevents double API calls
     setTelemetryLoaded(true)
-    // Automatically fetch telemetry when user clicks "Load Telemetry Graph"
-    fetchTelemetry()
   }
 
   // Fetch the latest alerts for this plant (limited via API default) so users see
@@ -538,10 +536,8 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                       value={selectedPeriod} 
                       onValueChange={(v) => {
                         setSelectedPeriod(v as typeof selectedPeriod)
-                        // Automatically fetch telemetry when period changes (if graph is already loaded)
-                        if (telemetryLoaded) {
-                          fetchTelemetry()
-                        }
+                        // useEffect will automatically trigger fetchTelemetry() when selectedPeriod changes
+                        // No need to call it manually here to avoid double calls
                       }}
                     >
                       <TabsList>
