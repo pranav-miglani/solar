@@ -69,7 +69,6 @@ interface TelemetryData {
 interface TelemetryStatistics {
   dailyGenerationKwh?: number
   fullPowerHoursDay?: number
-  incomeValue?: number
 }
 
 // Recent alert snapshot used for the sidebar card. Note the combination of
@@ -145,8 +144,8 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
       setTelemetryLoading(true)
       let response: Response
 
-      // For Solarman vendors, use the new API with date parameters
-      if (plant?.vendors?.vendor_type === "SOLARMAN" && selectedDate) {
+      // For Solarman and SolarDM vendors, use the new API with date parameters
+      if ((plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM") && selectedDate) {
         const year = selectedDate.getFullYear()
         const month = selectedDate.getMonth() + 1
         
@@ -155,20 +154,41 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
           response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}&month=${month}&day=${day}`)
         } else if (selectedPeriod === "month") {
           // For month view, only send year and month (no day)
-          response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}&month=${month}`)
+          // Only Solarman supports month view currently
+          if (plant?.vendors?.vendor_type === "SOLARMAN") {
+            response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}&month=${month}`)
+          } else {
+            setTelemetry([])
+            setTelemetryStats(null)
+            return
+          }
         } else if (selectedPeriod === "year") {
           // For year view, only send year (no month, no day)
-          response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}`)
+          // Only Solarman supports year view currently
+          if (plant?.vendors?.vendor_type === "SOLARMAN") {
+            response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}`)
+          } else {
+            setTelemetry([])
+            setTelemetryStats(null)
+            return
+          }
         } else if (selectedPeriod === "total") {
           // For total view, send period=total and date range
-          response = await fetch(`/api/plants/${plantId}/telemetry?period=total&startYear=${startYear}&endYear=${endYear}`)
+          // Only Solarman supports total view currently
+          if (plant?.vendors?.vendor_type === "SOLARMAN") {
+            response = await fetch(`/api/plants/${plantId}/telemetry?period=total&startYear=${startYear}&endYear=${endYear}`)
+          } else {
+            setTelemetry([])
+            setTelemetryStats(null)
+            return
+          }
         } else {
           setTelemetry([])
           setTelemetryStats(null)
           return
         }
       } else {
-        // Fallback: return empty data if not Solarman
+        // Fallback: return empty data if not Solarman or SolarDM
         setTelemetry([])
         setTelemetryStats(null)
         return
@@ -537,8 +557,8 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
               <div className="flex flex-col gap-4">
                 <CardTitle>Telemetry</CardTitle>
                 
-                {/* Period Tabs and Date Selector (for Solarman) */}
-                {plant?.vendors?.vendor_type === "SOLARMAN" && (
+                {/* Period Tabs and Date Selector (for Solarman and SolarDM) */}
+                {(plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM") && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <Tabs 
                       value={selectedPeriod} 
@@ -550,9 +570,9 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                     >
                       <TabsList>
                         <TabsTrigger value="day">Day</TabsTrigger>
-                        <TabsTrigger value="month">Month</TabsTrigger>
-                        <TabsTrigger value="year">Year</TabsTrigger>
-                        <TabsTrigger value="total">Total</TabsTrigger>
+                        <TabsTrigger value="month" disabled={plant?.vendors?.vendor_type === "SOLARDM"}>Month</TabsTrigger>
+                        <TabsTrigger value="year" disabled={plant?.vendors?.vendor_type === "SOLARDM"}>Year</TabsTrigger>
+                        <TabsTrigger value="total" disabled={plant?.vendors?.vendor_type === "SOLARDM"}>Total</TabsTrigger>
                       </TabsList>
                     </Tabs>
                     
@@ -639,7 +659,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                   data={telemetry} 
                   title={selectedPeriod === "day" ? "Solar Power" : selectedPeriod === "month" ? "Monthly Production" : selectedPeriod === "year" ? "Yearly Production" : selectedPeriod === "total" ? "Total Production" : "Generation Power (24h)"}
                   statistics={telemetryStats || undefined}
-                  showAreaFill={plant?.vendors?.vendor_type === "SOLARMAN"}
+                  showAreaFill={plant?.vendors?.vendor_type === "SOLARMAN" || (plant?.vendors?.vendor_type === "SOLARDM" && selectedPeriod === "day")}
                   period={selectedPeriod}
                 />
               ) : (

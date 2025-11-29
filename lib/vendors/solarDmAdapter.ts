@@ -328,17 +328,147 @@ export class SolarDmAdapter extends BaseVendorAdapter {
   }
 
   /**
-   * Get telemetry data for a plant
-   * TODO: Implement once telemetry endpoint is available
+   * Get telemetry data for a plant (base method - fallback)
+   * This is used when specific period methods (getDailyTelemetryRecords, etc.) are not available
    */
   async getTelemetry(
     plantId: string,
     startTime: Date,
     endTime: Date
   ): Promise<TelemetryData[]> {
-    // TODO: Implement telemetry endpoint
-    // For now, return empty array
+    // This is a fallback method - prefer using getDailyTelemetryRecords, etc. if available
+    console.warn("[SolarDM] getTelemetry() called - not yet implemented. Use specific period methods if available.")
     return []
+  }
+
+  /**
+   * Get daily telemetry records (20-minute intervals for a specific day)
+   * Endpoint: GET /dms/data_panel/history/stats/daily/{plantId}?plantId={plantId}&type=date&time=YYYY-MM-DD
+   * Similar to Solarman's getDailyTelemetryRecords()
+   */
+  async getDailyTelemetryRecords(
+    plantId: string | number,
+    year: number,
+    month: number,
+    day: number
+  ): Promise<{
+    statistics: {
+      systemId: number | string
+      year: number
+      month: number
+      day: number
+      generationValue: number // Daily generation in kWh
+      fullPowerHoursDay?: number
+      acceptDay?: string
+    }
+    records: Array<{
+      systemId: number | string
+      acceptDay?: number
+      acceptMonth?: number
+      generationPower: number // Power in W (will be converted to kW)
+      dateTime: number // Unix timestamp
+      generationCapacity?: number // Capacity utilization (0-1)
+      timeZoneOffset?: number // Timezone offset in seconds
+    }>
+  }> {
+    const token = await this.authenticate()
+    const baseUrl = this.getApiBaseUrl()
+    
+    // Convert plantId to string (SolarDM uses string IDs)
+    const plantIdStr = plantId.toString()
+    
+    // Format date as YYYY-MM-DD
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    
+    // SolarDM endpoint: /dms/data_panel/history/stats/daily/{plantId}?plantId={plantId}&type=date&time=YYYY-MM-DD
+    const url = `${baseUrl}/dms/data_panel/history/stats/daily/${plantIdStr}?plantId=${plantIdStr}&type=date&time=${dateStr}`
+
+    console.log("[SolarDM] Fetching daily telemetry records:", {
+      plantId: plantIdStr,
+      year,
+      month,
+      day,
+      dateStr,
+      url,
+    })
+
+    const response = await pooledFetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[SolarDM] Failed to fetch daily telemetry:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      })
+      throw new Error(`Failed to fetch daily telemetry from SolarDM: ${response.statusText} - ${errorText}`)
+    }
+
+    const data = await response.json()
+
+    if (data.code !== 0 || !data.data?.dataList) {
+      throw new Error(`SolarDM API error: ${data.message || "Unknown error"}`)
+    }
+
+    const dataList = data.data.dataList || []
+    console.log(`[SolarDM] Successfully fetched ${dataList.length} daily telemetry records`)
+
+    // Transform SolarDM response to match Solarman format
+    const records = dataList.map((item: any) => {
+      // Parse time string "YYYY-MM-DD HH:mm:ss" to Unix timestamp (seconds)
+      let dateTime: number
+      try {
+        // Parse the time string and convert to Unix timestamp
+        const date = new Date(item.time.replace(" ", "T"))
+        dateTime = Math.floor(date.getTime() / 1000) // Convert to Unix seconds
+      } catch (error) {
+        console.warn(`[SolarDM] Failed to parse time: ${item.time}`, error)
+        dateTime = Math.floor(Date.now() / 1000) // Fallback to current time
+      }
+
+      // generationPower is already in W (watts) - keep as is for now, will be converted to kW in API route
+      // Note: SolarDM provides 20-minute intervals, not 15-minute like Solarman
+      return {
+        systemId: plantIdStr,
+        generationPower: item.generationPower || 0, // Power in W
+        dateTime, // Unix timestamp in seconds
+        generationCapacity: null, // Not provided by SolarDM
+        timeZoneOffset: null, // Not provided by SolarDM
+      }
+    })
+
+    // Calculate statistics from records
+    // Daily generation: sum of (power * interval_duration) for all intervals
+    // Interval duration: 20 minutes = 1/3 hour
+    const intervalHours = 20 / 60 // 20 minutes in hours
+    let dailyGenerationKwh = 0
+
+    records.forEach((record: any) => {
+      const powerKw = record.generationPower / 1000 // Convert W to kW
+      const energyKwh = powerKw * intervalHours
+      dailyGenerationKwh += energyKwh
+    })
+
+    const statistics = {
+      systemId: plantIdStr,
+      year,
+      month,
+      day,
+      generationValue: dailyGenerationKwh, // Daily generation in kWh
+      fullPowerHoursDay: undefined, // Would need capacity to calculate
+      acceptDay: dateStr, // Format: YYYY-MM-DD
+    }
+
+    return {
+      statistics,
+      records,
+    }
   }
 
   /**

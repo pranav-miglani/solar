@@ -974,7 +974,6 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       month: number
       day: number
       generationValue: number // Daily generation in kWh
-      incomeValue: number
       fullPowerHoursDay: number
       acceptDay: string
     }
@@ -1042,7 +1041,6 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       month: number
       day: number
       generationValue: number // Monthly generation in kWh
-      incomeValue: number
       fullPowerHoursDay: number
     }
     records: Array<{
@@ -1051,7 +1049,6 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       month: number
       day: number
       generationValue: number // Daily generation in kWh
-      incomeValue: number
       fullPowerHoursDay: number
       acceptDay: string
     }>
@@ -1108,7 +1105,6 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       month: number
       day: number
       generationValue: number // Yearly generation in kWh
-      incomeValue: number
       fullPowerHoursDay: number
     }
     records: Array<{
@@ -1117,7 +1113,6 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       month: number
       day: number
       generationValue: number // Monthly generation in kWh
-      incomeValue: number
       fullPowerHoursDay: number
     }>
   }> {
@@ -1173,7 +1168,6 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       useValue: number
       gridValue: number
       buyValue: number
-      incomeValue: number
       gridRatio: number
       generationRatio: number
       fullPowerHoursDay: number
@@ -1190,7 +1184,6 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       useValue?: number
       gridValue?: number
       buyValue?: number
-      incomeValue: number
       fullPowerHoursDay?: number
       gridRatio?: number
       generationRatio?: number

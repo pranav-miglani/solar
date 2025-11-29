@@ -201,7 +201,6 @@ export async function GET(
               ? {
                   totalGenerationKwh: totalData.statistics.generationValue || null,
                   fullPowerHoursTotal: totalData.statistics.fullPowerHoursDay || null,
-                  incomeValue: totalData.statistics.incomeValue || null,
                   operatingTotalDays: totalData.operatingTotalDays || null,
                 }
               : null,
@@ -285,7 +284,6 @@ export async function GET(
               ? {
                   yearlyGenerationKwh: yearlyData.statistics.generationValue || null,
                   fullPowerHoursYear: yearlyData.statistics.fullPowerHoursDay || null,
-                  incomeValue: yearlyData.statistics.incomeValue || null,
                 }
               : null,
             period: "year",
@@ -370,7 +368,6 @@ export async function GET(
               ? {
                   monthlyGenerationKwh: monthlyData.statistics.generationValue || null,
                   fullPowerHoursMonth: monthlyData.statistics.fullPowerHoursDay || null,
-                  incomeValue: monthlyData.statistics.incomeValue || null,
                 }
               : null,
             period: "month",
@@ -422,22 +419,16 @@ export async function GET(
           return NextResponse.json({ error: "Invalid date parameters" }, { status: 400 })
         }
 
-        if (isNaN(vendorPlantIdNum)) {
-          return NextResponse.json(
-            { error: "Invalid vendor plant ID format" },
-            { status: 400 }
-          )
-        }
-
         // Step 5: Check if adapter supports getDailyTelemetryRecords method
-        // Currently only SolarmanAdapter implements this method
-        // Future vendors will be added to the pipeline once Solarman flow is complete
+        // Currently SolarmanAdapter and SolarDmAdapter implement this method
         if (typeof (adapter as any).getDailyTelemetryRecords === "function") {
           // CRITICAL: Make API call to vendor using vendor_plant_id (vendor's plant identifier)
           // NEVER use our internal plant.id when calling vendor APIs
           // For Solarman: systemId parameter = vendor_plant_id (numeric)
+          // For SolarDM: plantId parameter = vendor_plant_id (string, but adapter accepts string | number)
+          // Pass the original vendorPlantId (string) - adapter will handle conversion if needed
           const dailyData = await (adapter as any).getDailyTelemetryRecords(
-            vendorPlantIdNum, // vendor_plant_id - vendor's plant identifier (NOT plant.id)
+            vendor.vendor_type === "SOLARDM" ? vendorPlantId : vendorPlantIdNum, // Use string for SolarDM, number for Solarman
             yearNum,
             monthNum,
             dayNum
@@ -478,7 +469,6 @@ export async function GET(
               ? {
                   dailyGenerationKwh: dailyData.statistics.generationValue || null,
                   fullPowerHoursDay: dailyData.statistics.fullPowerHoursDay || null,
-                  incomeValue: dailyData.statistics.incomeValue || null,
                 }
               : null,
             period: "day",

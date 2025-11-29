@@ -45,7 +45,6 @@ interface TelemetryChartProps {
     totalGenerationKwh?: number
     fullPowerHoursTotal?: number
     operatingTotalDays?: number
-    incomeValue?: number
   }
   showAreaFill?: boolean
   period?: "day" | "month" | "year" | "total"
