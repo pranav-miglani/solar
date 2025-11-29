@@ -7,13 +7,14 @@
 -- - device_type: Redundant, filtering can be done via metadata if needed
 -- - station_id: Redundant, vendor_plant_id already stores this information
 
+-- Remove comments for dropped columns
+COMMENT ON COLUMN alerts.device_type IS NULL;
+COMMENT ON COLUMN alerts.station_id IS NULL;
+
+
 -- Drop device_type column
 ALTER TABLE alerts DROP COLUMN IF EXISTS device_type;
 
 -- Drop station_id column
 ALTER TABLE alerts DROP COLUMN IF EXISTS station_id;
-
--- Remove comments for dropped columns
-COMMENT ON COLUMN alerts.device_type IS NULL;
-COMMENT ON COLUMN alerts.station_id IS NULL;
 
