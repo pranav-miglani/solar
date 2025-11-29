@@ -634,18 +634,6 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
   try {
     logger.info(`🚀 Starting SolarDM alert sync for vendor ${vendor.name} (${vendor.id})`)
 
-    // Resolve org name (for logging only)
-    if (vendor.org_id) {
-      const { data: org } = await supabase
-        .from("organizations")
-        .select("name")
-        .eq("id", vendor.org_id)
-        .single()
-      result.orgName = org?.name
-      if (org?.name) {
-        logger.info(`📋 Organization: ${org.name} (${vendor.org_id})`)
-      }
-    }
 
     const vendorConfig: VendorConfig = {
       id: vendor.id,
@@ -655,7 +643,7 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
       isActive: vendor.is_active,
     }
 
-    logger.info(`🔧 Initializing SolarDM adapter for vendor ${vendor.id}`)
+    logger.info(`🔧 Initializing adapter for vendor ${vendor.id}`)
     const adapter: any = VendorManager.getAdapter(vendorConfig)
 
     // If adapter supports DB-backed token storage, wire it up
@@ -665,7 +653,7 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
     }
 
     // Authenticate (uses DB token if valid)
-    logger.info(`🔐 Authenticating with SolarDM API for vendor ${vendor.id}`)
+    logger.info(`🔐 Authenticating for vendor ${vendor.id}`)
     await adapter.authenticate()
     logger.info(`✅ Authentication successful for vendor ${vendor.id}`)
 

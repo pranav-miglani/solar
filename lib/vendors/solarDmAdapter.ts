@@ -161,6 +161,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
     // Check for cached token first
     const cachedToken = await this.getTokenFromDB()
     if (cachedToken) {
+      console.log("[SolarDM] returing cached token")
       return cachedToken
     }
 
