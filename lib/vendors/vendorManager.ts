@@ -1,5 +1,6 @@
 import { BaseVendorAdapter } from "./baseVendorAdapter"
 import { SolarmanAdapter } from "./solarmanAdapter"
+import { SolarDmAdapter } from "./solarDmAdapter"
 import type { VendorConfig } from "./types"
 
 /**
@@ -55,6 +56,7 @@ export class VendorManager {
 
 // Register built-in adapters
 VendorManager.registerAdapter("SOLARMAN", SolarmanAdapter)
+VendorManager.registerAdapter("SOLARDM", SolarDmAdapter)
 
 // Example: To add a new vendor (e.g., Sungrow), create SungrowAdapter extending BaseVendorAdapter
 // and register it here:

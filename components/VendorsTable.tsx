@@ -107,6 +107,9 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     username: "",
     passwordSha256: "",
     solarmanOrgId: "",
+    // SolarDM fields
+    email: "",
+    passwordRSA: "",
     is_active: true,
   })
 
@@ -186,6 +189,9 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         username: vendor.credentials.username || "",
         passwordSha256: vendor.credentials.passwordSha256 || "",
         solarmanOrgId: vendor.credentials.orgId?.toString() || "",
+        // SolarDM fields
+        email: vendor.credentials.email || "",
+        passwordRSA: vendor.credentials.passwordRSA || "",
         is_active: vendor.is_active,
       })
     } else {
@@ -200,6 +206,9 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         username: "",
         passwordSha256: "",
         solarmanOrgId: "",
+        // SolarDM fields
+        email: "",
+        passwordRSA: "",
         is_active: true,
       })
     }
@@ -215,17 +224,25 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       return
     }
 
-    const credentials: any = {
-      appId: formData.appId,
-      appSecret: formData.appSecret,
-      username: formData.username,
-      passwordSha256: formData.passwordSha256,
-    }
+    // Build credentials based on vendor type
+    const credentials: any = {}
+    
+    if (formData.vendor_type === "SOLARDM") {
+      // SolarDM only requires email and passwordRSA
+      credentials.email = formData.email
+      credentials.passwordRSA = formData.passwordRSA
+    } else {
+      // Solarman and other vendors
+      credentials.appId = formData.appId
+      credentials.appSecret = formData.appSecret
+      credentials.username = formData.username
+      credentials.passwordSha256 = formData.passwordSha256
 
-    if (formData.solarmanOrgId && formData.solarmanOrgId.trim() !== "") {
-      const orgIdNum = parseInt(formData.solarmanOrgId)
-      if (!isNaN(orgIdNum)) {
-        credentials.orgId = orgIdNum
+      if (formData.solarmanOrgId && formData.solarmanOrgId.trim() !== "") {
+        const orgIdNum = parseInt(formData.solarmanOrgId)
+        if (!isNaN(orgIdNum)) {
+          credentials.orgId = orgIdNum
+        }
       }
     }
 
@@ -408,6 +425,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="SOLARMAN">Solarman</SelectItem>
+                    <SelectItem value="SOLARDM">SolarDM</SelectItem>
                     <SelectItem value="SUNGROW">Sungrow</SelectItem>
                     <SelectItem value="OTHER">Other</SelectItem>
                   </SelectContent>
@@ -440,81 +458,125 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                 )}
               </div>
               {/* API Base URL removed from UI - configured via environment variables */}
-              <div>
-                <Label htmlFor="appId">App ID *</Label>
-                <Input
-                  id="appId"
-                  value={formData.appId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, appId: e.target.value })
-                  }
-                  required
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="appSecret">App Secret *</Label>
-                <Input
-                  id="appSecret"
-                  type="password"
-                  value={formData.appSecret}
-                  onChange={(e) =>
-                    setFormData({ ...formData, appSecret: e.target.value })
-                  }
-                  required
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="username">Username *</Label>
-                <Input
-                  id="username"
-                  value={formData.username}
-                  onChange={(e) =>
-                    setFormData({ ...formData, username: e.target.value })
-                  }
-                  required
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="passwordSha256">Password (SHA256) *</Label>
-                <Input
-                  id="passwordSha256"
-                  type="password"
-                  value={formData.passwordSha256}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      passwordSha256: e.target.value,
-                    })
-                  }
-                  required
-                  className="mt-1"
-                />
-              </div>
-              {formData.vendor_type === "SOLARMAN" && (
-                <div>
-                  <Label htmlFor="solarmanOrgId">
-                    Solarman Org ID (Optional)
-                  </Label>
-                  <Input
-                    id="solarmanOrgId"
-                    type="number"
-                    value={formData.solarmanOrgId}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        solarmanOrgId: e.target.value,
-                      })
-                    }
-                    placeholder="For org-scoped login (not your organization ID)"
-                    className="mt-1"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Optional: Solarman internal orgId for org-scoped authentication
-                  </p>
-                </div>
+              
+              {/* SolarDM Fields - Only email and passwordRSA */}
+              {formData.vendor_type === "SOLARDM" ? (
+                <>
+                  <div>
+                    <Label htmlFor="email">Email *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
+                      required
+                      className="mt-1"
+                      placeholder="gigasolarltd@gmail.com"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="passwordRSA">Password (RSA Encrypted) *</Label>
+                    <Input
+                      id="passwordRSA"
+                      type="password"
+                      value={formData.passwordRSA}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          passwordRSA: e.target.value,
+                        })
+                      }
+                      required
+                      className="mt-1"
+                      placeholder="RSA encrypted password"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      RSA encrypted password for SolarDM authentication
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Solarman and other vendor fields */}
+                  <div>
+                    <Label htmlFor="appId">App ID *</Label>
+                    <Input
+                      id="appId"
+                      value={formData.appId}
+                      onChange={(e) =>
+                        setFormData({ ...formData, appId: e.target.value })
+                      }
+                      required
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="appSecret">App Secret *</Label>
+                    <Input
+                      id="appSecret"
+                      type="password"
+                      value={formData.appSecret}
+                      onChange={(e) =>
+                        setFormData({ ...formData, appSecret: e.target.value })
+                      }
+                      required
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="username">Username *</Label>
+                    <Input
+                      id="username"
+                      value={formData.username}
+                      onChange={(e) =>
+                        setFormData({ ...formData, username: e.target.value })
+                      }
+                      required
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="passwordSha256">Password (SHA256) *</Label>
+                    <Input
+                      id="passwordSha256"
+                      type="password"
+                      value={formData.passwordSha256}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          passwordSha256: e.target.value,
+                        })
+                      }
+                      required
+                      className="mt-1"
+                    />
+                  </div>
+                  {formData.vendor_type === "SOLARMAN" && (
+                    <div>
+                      <Label htmlFor="solarmanOrgId">
+                        Solarman Org ID (Optional)
+                      </Label>
+                      <Input
+                        id="solarmanOrgId"
+                        type="number"
+                        value={formData.solarmanOrgId}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            solarmanOrgId: e.target.value,
+                          })
+                        }
+                        placeholder="For org-scoped login (not your organization ID)"
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Optional: Solarman internal orgId for org-scoped authentication
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
               <div className="flex items-center space-x-2">
                 <input
