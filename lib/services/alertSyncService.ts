@@ -294,6 +294,8 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
   }
 
   try {
+    logger.info(`🚀 Starting Solarman alert sync for vendor ${vendor.name} (${vendor.id})`)
+
     // Resolve org name (for logging only)
     if (vendor.org_id) {
       const { data: org } = await supabase
@@ -302,6 +304,9 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
         .eq("id", vendor.org_id)
         .single()
       result.orgName = org?.name
+      if (org?.name) {
+        logger.info(`📋 Organization: ${org.name} (${vendor.org_id})`)
+      }
     }
 
     const vendorConfig: VendorConfig = {
@@ -312,17 +317,22 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
       isActive: vendor.is_active,
     }
 
+    logger.info(`🔧 Initializing Solarman adapter for vendor ${vendor.id}`)
     const adapter: any = VendorManager.getAdapter(vendorConfig)
 
     // If adapter supports DB-backed token storage, wire it up
     if (typeof adapter.setTokenStorage === "function") {
       adapter.setTokenStorage(vendor.id, supabase)
+      logger.info(`💾 Token storage configured for vendor ${vendor.id}`)
     }
 
     // Authenticate (uses DB token if valid)
+    logger.info(`🔐 Authenticating with Solarman API for vendor ${vendor.id}`)
     await adapter.authenticate()
+    logger.info(`✅ Authentication successful for vendor ${vendor.id}`)
 
     // Build plant mapping: Solarman stationId -> internal plant_id
+    logger.info(`🌱 Fetching plants for vendor ${vendor.id}`)
     const { data: plants, error: plantsError } = await supabase
       .from("plants")
       .select("id, vendor_plant_id, capacity_kw")
@@ -331,6 +341,8 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
     if (plantsError) {
       throw new Error(`Failed to fetch plants for vendor ${vendor.id}: ${plantsError.message}`)
     }
+
+    logger.info(`📊 Found ${plants?.length || 0} plants for vendor ${vendor.id}`)
 
     const stationToPlant = new Map<
       number,
@@ -354,6 +366,8 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
       result.success = true
       return result
     }
+
+    logger.info(`🗺️ Built plant mapping: ${stationToPlant.size} plants mapped`)
 
     // Determine lookback window (startDay/endDay) in station timezone
     const startDate = getVendorAlertsStartDate(vendor)
@@ -380,9 +394,12 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
     // We stop when a page returns no data
     let hasMore = true
 
+    logger.info(`📄 Starting pagination: page size ${pageSize}, lookback from ${startDay} to ${endDay}`)
+
     while (hasMore) {
       // Request per vendor sample:
       // POST /maintain-s/operating/station/alert?order.direction=ASC&order.property=alertTime&size=100&page=N
+      logger.info(`📥 Fetching Solarman alerts page ${page}...`)
       const query = new URLSearchParams({
         "order.direction": "ASC",
         "order.property": "alertTime",
@@ -430,9 +447,13 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
 
       if (page === 1) {
         totalFromVendor = typeof data.total === "number" ? data.total : alerts.length
+        logger.info(`📊 Total alerts from vendor API: ${totalFromVendor}`)
       }
 
+      logger.info(`📦 Page ${page}: Received ${alerts.length} alerts`)
+
       if (!alerts.length) {
+        logger.info(`✅ No more alerts on page ${page}, pagination complete`)
         hasMore = false
         break
       }
@@ -440,16 +461,27 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
       result.total += alerts.length
 
       // Process and upsert alerts
+      logger.info(`🔄 Processing ${alerts.length} alerts from page ${page}...`)
+      let skippedCount = 0
+      let processedCount = 0
+
       for (const raw of alerts) {
         // Only INVERTER deviceType as requested
-        if (raw.deviceType !== "INVERTER") continue
+        if (raw.deviceType !== "INVERTER") {
+          skippedCount++
+          continue
+        }
 
         const stationId = Number(raw.stationId)
         const mapping = stationToPlant.get(stationId)
         if (!mapping) {
           // We don't have this station mapped to a plant yet; skip
+          skippedCount++
+          logger.debug(`⏭️ Skipping alert ${raw.id} - station ${stationId} not mapped to a plant`)
           continue
         }
+
+        processedCount++
 
         const alertTimeDate = fromUnixSeconds(raw.alertTime)
         const endTimeDate = fromUnixSeconds(raw.endTime)
