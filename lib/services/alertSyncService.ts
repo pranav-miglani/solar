@@ -86,6 +86,20 @@ function mapSolarmanSeverity(level: number | null | undefined, influence: number
   return severity
 }
 
+/**
+ * Map SolarDM fault level to our severity enum
+ */
+function mapSolarDmSeverity(faultLevel: number | null | undefined): "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" {
+  const severityMap: Record<number, "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"> = {
+    1: "LOW",
+    2: "MEDIUM",
+    3: "HIGH",
+    4: "CRITICAL",
+  }
+  
+  return severityMap[faultLevel ?? 2] || "MEDIUM"
+}
+
 // Cache of Intl.DateTimeFormat instances per timezone to avoid recreating objects in loops
 const TIMEZONE_FORMATTERS = new Map<string, Intl.DateTimeFormat>()
 
@@ -263,7 +277,7 @@ function fromUnixSeconds(value: number | null | undefined): Date | null {
  * This implementation:
  * - Uses page size = 100
  * - Paginates until no data is returned
- * - Filters alerts to deviceType === "INVERTER"
+ * - Filters alerts to deviceType === "INVERTER" (filtered but not stored)
  * - Restricts lookback window to (configured alertsStartDate, max 1 year)
  */
 async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<AlertSyncResult> {
@@ -486,8 +500,6 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
           description: null,
           severity,
           status,
-          station_id: stationId,
-          device_type: raw.deviceType ?? null,
           alert_time: alertTimeDate ? alertTimeDate.toISOString() : null,
           end_time: endTimeDate ? endTimeDate.toISOString() : null,
           grid_down_seconds: gridDownSeconds,
@@ -566,7 +578,250 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
 }
 
 /**
- * Sync alerts for all active vendors (currently only SOLARMAN is implemented).
+ * Sync alerts for a single SolarDM vendor using the inverter fault API.
+ *
+ * This implementation:
+ * - Uses page size = 100
+ * - Paginates until current > pages
+ * - Filters alerts to "There is no mains voltage" (faultInfo)
+ * - Restricts lookback window to (configured alertsStartDate, max 1 year)
+ */
+async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<AlertSyncResult> {
+  const startTime = Date.now()
+  const result: AlertSyncResult = {
+    vendorId: vendor.id,
+    vendorName: vendor.name,
+    orgId: vendor.org_id,
+    success: false,
+    synced: 0,
+    created: 0,
+    updated: 0,
+    total: 0,
+  }
+
+  try {
+    // Resolve org name (for logging only)
+    if (vendor.org_id) {
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("name")
+        .eq("id", vendor.org_id)
+        .single()
+      result.orgName = org?.name
+    }
+
+    const vendorConfig: VendorConfig = {
+      id: vendor.id,
+      name: vendor.name,
+      vendorType: vendor.vendor_type as "SOLARDM" | "SOLARMAN" | "SUNGROW" | "OTHER",
+      credentials: vendor.credentials as Record<string, any>,
+      isActive: vendor.is_active,
+    }
+
+    const adapter: any = VendorManager.getAdapter(vendorConfig)
+
+    // If adapter supports DB-backed token storage, wire it up
+    if (typeof adapter.setTokenStorage === "function") {
+      adapter.setTokenStorage(vendor.id, supabase)
+    }
+
+    // Authenticate (uses DB token if valid)
+    await adapter.authenticate()
+
+    // Build plant mapping: SolarDM plantId -> internal plant_id
+    const { data: plants, error: plantsError } = await supabase
+      .from("plants")
+      .select("id, vendor_plant_id, capacity_kw")
+      .eq("vendor_id", vendor.id)
+
+    if (plantsError) {
+      throw new Error(`Failed to fetch plants for vendor ${vendor.id}: ${plantsError.message}`)
+    }
+
+    const plantIdToPlant = new Map<
+      string,
+      { plantId: number; vendorPlantId: string; capacityKw: number | null }
+    >()
+    ;(plants || []).forEach((p: any) => {
+      const vendorPlantId = p.vendor_plant_id as string
+      if (vendorPlantId) {
+        plantIdToPlant.set(vendorPlantId, {
+          plantId: p.id,
+          vendorPlantId,
+          capacityKw: typeof p.capacity_kw === "number" ? p.capacity_kw : Number(p.capacity_kw) || null,
+        })
+      }
+    })
+
+    if (plantIdToPlant.size === 0) {
+      logger.info(
+        `ℹ️ No plants found for vendor ${vendor.id} when syncing alerts; nothing to do.`
+      )
+      result.success = true
+      return result
+    }
+
+    // Determine lookback window
+    const startDate = getVendorAlertsStartDate(vendor)
+    const endDate = new Date()
+
+    logger.info(
+      `📥 Syncing SolarDM alerts for vendor ${vendor.name} (${vendor.id}) from ${startDate.toISOString()} to ${endDate.toISOString()}`
+    )
+
+    // Fetch all alerts with pagination
+    const allAlerts = await adapter.getAllAlerts(startDate, endDate)
+
+    result.total = allAlerts.length
+
+    // Process and upsert alerts
+    for (const raw of allAlerts) {
+      const vendorPlantId = raw.plantId?.toString()
+      const mapping = vendorPlantId ? plantIdToPlant.get(vendorPlantId) : null
+      
+      if (!mapping) {
+        // We don't have this plant mapped yet; skip
+        continue
+      }
+
+      // Parse timestamps
+      // SolarDM format: "2025-11-29 06:58:21"
+      let alertTimeDate: Date | null = null
+      let endTimeDate: Date | null = null
+
+      if (raw.happenTime) {
+        // Convert "2025-11-29 06:58:21" to ISO format
+        const happenTimeStr = raw.happenTime.replace(" ", "T")
+        alertTimeDate = new Date(happenTimeStr)
+        if (Number.isNaN(alertTimeDate.getTime())) {
+          alertTimeDate = null
+        }
+      }
+
+      if (raw.recoverTime) {
+        const recoverTimeStr = raw.recoverTime.replace(" ", "T")
+        endTimeDate = new Date(recoverTimeStr)
+        if (Number.isNaN(endTimeDate.getTime())) {
+          endTimeDate = null
+        }
+      }
+
+      // Filter by date range
+      if (alertTimeDate) {
+        if (alertTimeDate < startDate || alertTimeDate > endDate) {
+          continue
+        }
+      }
+
+      let gridDownSeconds: number | null = null
+      if (alertTimeDate && endTimeDate) {
+        const diff = Math.floor(
+          (endTimeDate.getTime() - alertTimeDate.getTime()) / 1000
+        )
+        gridDownSeconds = diff > 0 ? diff : 0
+      }
+
+      // Use Asia/Calcutta as default timezone (same as Solarman)
+      const gridDownBenefitKwh = calculateGridDownBenefitKwh(
+        alertTimeDate,
+        endTimeDate,
+        mapping.capacityKw,
+        "Asia/Calcutta"
+      )
+
+      const severity = mapSolarDmSeverity(raw.faultLevel)
+      const status = mapAlertStatus(raw.recoverTime ? 1 : null)
+
+      // Use id from response as vendor_alert_id
+      const vendorAlertId = raw.id?.toString()
+
+      // Check for existing alert (prevent duplicates)
+      const { data: existing, error: existingError } = await supabase
+        .from("alerts")
+        .select("id")
+        .eq("vendor_id", vendor.id)
+        .eq("vendor_alert_id", vendorAlertId)
+        .eq("plant_id", mapping.plantId)
+        .maybeSingle()
+
+      if (existingError) {
+        logger.warn(
+          `⚠️ Error checking existing alert for vendor ${vendor.id}`,
+          existingError
+        )
+      }
+
+      const payload: any = {
+        vendor_id: vendor.id,
+        plant_id: mapping.plantId,
+        vendor_plant_id: mapping.vendorPlantId,
+        vendor_alert_id: vendorAlertId,
+        title: raw.faultInfoEN || raw.faultInfo || "Alert",
+        description: raw.faultInfo || null,
+        severity,
+        status,
+        alert_time: alertTimeDate ? alertTimeDate.toISOString() : null,
+        end_time: endTimeDate ? endTimeDate.toISOString() : null,
+        grid_down_seconds: gridDownSeconds,
+        grid_down_benefit_kwh: gridDownBenefitKwh,
+        metadata: raw,
+      }
+
+      if (existing) {
+        const { error: updateError } = await supabase
+          .from("alerts")
+          .update(payload)
+          .eq("id", existing.id)
+
+        if (updateError) {
+          logger.error(
+            `❌ Failed to update alert ${existing.id} for vendor ${vendor.id}`,
+            updateError
+          )
+        } else {
+          result.updated += 1
+          result.synced += 1
+        }
+      } else {
+        const { error: insertError } = await supabase.from("alerts").insert(payload)
+
+        if (insertError) {
+          logger.error(
+            `❌ Failed to insert alert for vendor ${vendor.id}, plant ${mapping.plantId}`,
+            insertError
+          )
+        } else {
+          result.created += 1
+          result.synced += 1
+        }
+      }
+    }
+
+    // Update vendor's last_alert_synced_at
+    await supabase
+      .from("vendors")
+      .update({ last_alert_synced_at: new Date().toISOString() })
+      .eq("id", vendor.id)
+
+    result.success = true
+
+    const duration = Date.now() - startTime
+    logger.info(
+      `✅ Synced ${result.synced} SolarDM alerts for vendor ${vendor.name} (${vendor.id}): ${result.created} created, ${result.updated} updated (${duration}ms)`
+    )
+  } catch (error: any) {
+    result.error = error.message || String(error)
+    logger.error(
+      `❌ Failed to sync SolarDM alerts for vendor ${vendor.id} (${vendor.name})`,
+      error
+    )
+  }
+
+  return result
+}
+
+/**
+ * Sync alerts for all active vendors (SOLARMAN and SOLARDM are implemented).
  *
  * This is analogous to `syncAllPlants` but focused on alerts.
  */
@@ -612,13 +867,13 @@ export async function syncAllAlerts(): Promise<AlertSyncSummary> {
     }
   }
 
-  // For now, only Solarman is supported; others are skipped but keep structure generic
-  const solarmanVendors = vendors.filter(
-    (v: any) => v.vendor_type === "SOLARMAN"
+  // Filter to SOLARMAN and SOLARDM vendors only
+  const supportedVendors = vendors.filter(
+    (v: any) => v.vendor_type === "SOLARMAN" || v.vendor_type === "SOLARDM"
   )
 
-  if (solarmanVendors.length === 0) {
-    logger.info("No SOLARMAN vendors found for alert sync")
+  if (supportedVendors.length === 0) {
+    logger.info("No SOLARMAN or SOLARDM vendors found for alert sync")
     return {
       totalVendors: vendors.length,
       successful: 0,
@@ -631,10 +886,12 @@ export async function syncAllAlerts(): Promise<AlertSyncSummary> {
     }
   }
 
-  logger.info(`Processing ${solarmanVendors.length} SOLARMAN vendor(s) for alert sync`)
+  const solarmanCount = supportedVendors.filter((v: any) => v.vendor_type === "SOLARMAN").length
+  const solardmCount = supportedVendors.filter((v: any) => v.vendor_type === "SOLARDM").length
+  logger.info(`Processing ${supportedVendors.length} vendor(s) for alert sync (${solarmanCount} SOLARMAN, ${solardmCount} SOLARDM)`)
 
   const results = await Promise.all(
-    solarmanVendors.map((vendor: any) =>
+    supportedVendors.map((vendor: any) =>
       MDC.withContextAsync(
         {
           vendorId: vendor.id,
@@ -642,7 +899,25 @@ export async function syncAllAlerts(): Promise<AlertSyncSummary> {
           orgId: vendor.org_id,
           operation: `sync-alerts-vendor-${vendor.id}`,
         },
-        () => syncSolarmanVendorAlerts(vendor, supabase)
+        () => {
+          if (vendor.vendor_type === "SOLARMAN") {
+            return syncSolarmanVendorAlerts(vendor, supabase)
+          }
+          if (vendor.vendor_type === "SOLARDM") {
+            return syncSolarDmVendorAlerts(vendor, supabase)
+          }
+          return Promise.resolve({
+            vendorId: vendor.id,
+            vendorName: vendor.name,
+            orgId: vendor.org_id,
+            success: false,
+            synced: 0,
+            created: 0,
+            updated: 0,
+            total: 0,
+            error: `Unsupported vendor type: ${vendor.vendor_type}`,
+          })
+        }
       )
     )
   )
@@ -654,7 +929,7 @@ export async function syncAllAlerts(): Promise<AlertSyncSummary> {
   const totalAlertsUpdated = results.reduce((sum, r) => sum + r.updated, 0)
 
   const summary: AlertSyncSummary = {
-    totalVendors: solarmanVendors.length,
+    totalVendors: supportedVendors.length,
     successful,
     failed,
     totalAlertsSynced,
@@ -715,22 +990,26 @@ export async function syncAlertsForVendor(vendorId: number): Promise<AlertSyncRe
     }
   }
 
-  if (vendor.vendor_type !== "SOLARMAN") {
-    return {
-      vendorId: vendor.id,
-      vendorName: vendor.name,
-      orgId: vendor.org_id,
-      orgName: vendor.organizations?.name,
-      success: false,
-      synced: 0,
-      created: 0,
-      updated: 0,
-      total: 0,
-      error: "Alert sync is currently implemented only for SOLARMAN vendors",
-    }
+  if (vendor.vendor_type === "SOLARMAN") {
+    return syncSolarmanVendorAlerts(vendor, supabase)
   }
 
-  return syncSolarmanVendorAlerts(vendor, supabase)
+  if (vendor.vendor_type === "SOLARDM") {
+    return syncSolarDmVendorAlerts(vendor, supabase)
+  }
+
+  return {
+    vendorId: vendor.id,
+    vendorName: vendor.name,
+    orgId: vendor.org_id,
+    orgName: vendor.organizations?.name,
+    success: false,
+    synced: 0,
+    created: 0,
+    updated: 0,
+    total: 0,
+    error: `Alert sync is not implemented for vendor type: ${vendor.vendor_type}`,
+  }
 }
 
 

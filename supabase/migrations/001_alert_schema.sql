@@ -42,8 +42,6 @@ CREATE TABLE IF NOT EXISTS alerts (
   vendor_id INTEGER REFERENCES vendors(id) ON DELETE CASCADE,
   vendor_alert_id TEXT, -- Original alert ID from vendor
   vendor_plant_id TEXT, -- Vendor-specific plant/station identifier (e.g., Solarman stationId as string)
-  station_id BIGINT, -- Station ID from vendor (numeric form, if applicable)
-  device_type TEXT, -- Device type from vendor (e.g., INVERTER). For Solarman we persist only INVERTER alerts.
   alert_time TIMESTAMPTZ, -- When the alert started (vendor timestamp)
   end_time TIMESTAMPTZ, -- When the alert ended / was cleared (if provided by vendor)
   grid_down_seconds INTEGER, -- Computed grid downtime in seconds: max(0, end_time - alert_time)
@@ -63,8 +61,6 @@ ALTER TABLE alerts
   ADD COLUMN IF NOT EXISTS vendor_id INTEGER REFERENCES vendors(id) ON DELETE CASCADE,
   ADD COLUMN IF NOT EXISTS vendor_alert_id TEXT,
   ADD COLUMN IF NOT EXISTS vendor_plant_id TEXT,
-  ADD COLUMN IF NOT EXISTS station_id BIGINT,
-  ADD COLUMN IF NOT EXISTS device_type TEXT,
   ADD COLUMN IF NOT EXISTS alert_time TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS end_time TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS grid_down_seconds INTEGER,
@@ -72,8 +68,6 @@ ALTER TABLE alerts
 
 COMMENT ON COLUMN alerts.vendor_id IS 'Vendor that generated this alert (helps disambiguate vendor_alert_id across vendors).';
 COMMENT ON COLUMN alerts.vendor_plant_id IS 'Vendor-specific plant/station identifier (e.g., Solarman stationId as string).';
-COMMENT ON COLUMN alerts.station_id IS 'Vendor-specific station/plant identifier (numeric form, if applicable).';
-COMMENT ON COLUMN alerts.device_type IS 'Vendor-specific device type (e.g., INVERTER). For Solarman alerts we only persist INVERTER alerts.';
 COMMENT ON COLUMN alerts.alert_time IS 'Timestamp when the alert started (converted from vendor-specific epoch/format).';
 COMMENT ON COLUMN alerts.end_time IS 'Timestamp when the alert ended / was cleared (if provided by vendor).';
 COMMENT ON COLUMN alerts.grid_down_seconds IS 'Computed grid downtime in seconds for this alert: max(0, end_time - alert_time) when both are present.';

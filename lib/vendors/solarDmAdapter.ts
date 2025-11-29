@@ -851,13 +851,152 @@ export class SolarDmAdapter extends BaseVendorAdapter {
   }
 
   /**
+   * Simple logged fetch wrapper for API calls
+   */
+  private async loggedFetch(
+    url: string,
+    options: RequestInit = {},
+    context?: { operation?: string; description?: string }
+  ): Promise<Response> {
+    // Use fetchWithAuth for authenticated requests, or pooledFetch for direct calls
+    const token = await this.authenticate()
+    const fullUrl = url.startsWith("http") ? url : `${this.getApiBaseUrl()}${url}`
+    
+    return pooledFetch(fullUrl, {
+      ...options,
+      headers: {
+        ...options.headers,
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json, text/plain, */*",
+      },
+    })
+  }
+
+  /**
    * Get alerts for a plant
-   * TODO: Implement once alerts endpoint is available
+   * Fetches alerts from SolarDM's inverter fault API
    */
   async getAlerts(plantId: string): Promise<Alert[]> {
-    // TODO: Implement alerts endpoint
-    // Return empty array for now
-    return []
+    const baseUrl = this.getApiBaseUrl()
+    
+    // SolarDM alerts endpoint
+    const url = `${baseUrl}/dms/inverter_fault/page_list/all`
+    
+    // Filter for "There is no mains voltage" alerts (same as Solarman)
+    const params = new URLSearchParams({
+      current: "1",
+      size: "100",
+      faultInfo: "There is no mains voltage"
+    })
+    
+    const response = await this.loggedFetch(
+      `${url}?${params.toString()}`,
+      {
+        method: "GET",
+      },
+      {
+        operation: "GET_ALERTS_SOLARDM",
+        description: `Fetch SolarDM alerts for plant ${plantId}`,
+      }
+    )
+    
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(
+        `SolarDM alerts request failed: ${response.status} ${response.statusText} - ${text}`
+      )
+    }
+    
+    const data = await response.json()
+    
+    if (data.code !== 0) {
+      throw new Error(`SolarDM API error: ${data.message || "Unknown error"}`)
+    }
+    
+    const records = data.data?.records || []
+    
+    // Filter alerts for the specific plant
+    const plantAlerts = records.filter((record: any) => record.plantId === plantId)
+    
+    return plantAlerts.map((record: any) => this.normalizeAlert(record))
+  }
+  
+  /**
+   * Fetch all alerts with pagination
+   * Used by alert sync service to fetch all alerts across all plants
+   */
+  async getAllAlerts(startDate?: Date, endDate?: Date): Promise<any[]> {
+    const baseUrl = this.getApiBaseUrl()
+    
+    const url = `${baseUrl}/dms/inverter_fault/page_list/all`
+    const pageSize = 100
+    let current = 1
+    let totalPages = 1
+    const allAlerts: any[] = []
+    
+    while (current <= totalPages) {
+      const params = new URLSearchParams({
+        current: current.toString(),
+        size: pageSize.toString(),
+        faultInfo: "There is no mains voltage"
+      })
+      
+      const response = await this.loggedFetch(
+        `${url}?${params.toString()}`,
+        {
+          method: "GET",
+        },
+        {
+          operation: "GET_ALL_ALERTS_SOLARDM",
+          description: `Fetch SolarDM alerts page ${current}`,
+        }
+      )
+      
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(
+          `SolarDM alerts request failed (page ${current}): ${response.status} ${response.statusText} - ${text}`
+        )
+      }
+      
+      const data = await response.json()
+      
+      if (data.code !== 0) {
+        throw new Error(`SolarDM API error: ${data.message || "Unknown error"}`)
+      }
+      
+      const records = data.data?.records || []
+      
+      if (current === 1) {
+        totalPages = data.data?.pages || 1
+      }
+      
+      if (records.length === 0) {
+        break
+      }
+      
+      // Filter by date range if provided
+      if (startDate || endDate) {
+        const filtered = records.filter((record: any) => {
+          if (!record.happenTime) return false
+          
+          const happenTime = new Date(record.happenTime.replace(" ", "T"))
+          
+          if (startDate && happenTime < startDate) return false
+          if (endDate && happenTime > endDate) return false
+          
+          return true
+        })
+        
+        allAlerts.push(...filtered)
+      } else {
+        allAlerts.push(...records)
+      }
+      
+      current++
+    }
+    
+    return allAlerts
   }
 
   /**
@@ -875,16 +1014,25 @@ export class SolarDmAdapter extends BaseVendorAdapter {
   }
 
   /**
-   * Normalize alert data
+   * Normalize alert data from SolarDM API response
    */
   protected normalizeAlert(rawData: any): Alert {
-    // TODO: Implement normalization once endpoint is available
-    // Return minimal structure for now
+    // Map SolarDM faultLevel to severity
+    // faultLevel: 1=LOW, 2=MEDIUM, 3=HIGH, 4=CRITICAL (assuming similar to Solarman)
+    const severityMap: Record<number, "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"> = {
+      1: "LOW",
+      2: "MEDIUM",
+      3: "HIGH",
+      4: "CRITICAL",
+    }
+    
+    const severity = severityMap[rawData.faultLevel] || "MEDIUM"
+    
     return {
-      vendorAlertId: rawData.id || rawData.alertId || "",
-      title: rawData.title || rawData.message || "Alert",
-      description: rawData.description || "",
-      severity: (rawData.severity || "MEDIUM") as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
+      vendorAlertId: rawData.id?.toString() || "",
+      title: rawData.faultInfoEN || rawData.faultInfo || "Alert",
+      description: rawData.faultInfo || null,
+      severity,
       metadata: rawData,
     }
   }

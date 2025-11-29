@@ -258,8 +258,6 @@ The `alerts` table stores vendor alerts with the following structure:
 | `vendor_id` | INTEGER | Foreign key to vendors | Vendor config |
 | `vendor_alert_id` | TEXT | Vendor's unique alert ID | Vendor API |
 | `vendor_plant_id` | TEXT | Vendor's plant/station ID | Vendor API |
-| `station_id` | BIGINT | Station ID (numeric, if applicable) | Vendor API |
-| `device_type` | TEXT | Device type (e.g., "INVERTER") | Vendor API |
 | `alert_time` | TIMESTAMPTZ | When alert started | Vendor API |
 | `end_time` | TIMESTAMPTZ | When alert ended (nullable) | Vendor API |
 | `grid_down_seconds` | INTEGER | Computed downtime in seconds | Calculated: `max(0, end_time - alert_time)` |
@@ -292,8 +290,6 @@ Alerts are synced via a dedicated service (`alertSyncService.ts`) that:
 |----------------|--------------|------------------|
 | `vendor_alert_id` | `id` or `alertId` | Convert to string, use for deduplication |
 | `vendor_plant_id` | `stationId` or `plantId` | Vendor's plant identifier (as string) |
-| `station_id` | `stationId` | Numeric station ID (if available) |
-| `device_type` | `deviceType` | Filter for specific types (e.g., "INVERTER") |
 | `title` | `alertName` or `alertType` | Alert title/name |
 | `description` | `message` or `description` | Alert description (optional) |
 | `alert_time` | `alertTime` or `timestamp` | Convert to ISO 8601 (Unix seconds → ISO) |
@@ -428,8 +424,8 @@ Alerts are synced via:
 
 **Mapping**:
 - `id` → `vendor_alert_id`
-- `stationId` → `vendor_plant_id` (as string) and `station_id` (as number)
-- `deviceType` → `device_type` (filter for "INVERTER" only)
+- `stationId` → `vendor_plant_id` (as string)
+- `deviceType` → Filtered (only "INVERTER" alerts are processed, but not stored)
 - `alertName` → `title`
 - `alertTime` → `alert_time` (Unix seconds → ISO)
 - `endTime` → `end_time` (Unix seconds → ISO)
@@ -656,8 +652,8 @@ SOLARMAN_PRO_API_BASE_URL=https://globalpro.solarmanpv.com
 
 **Alert Mapping**:
 - `id` → `vendor_alert_id` (as string)
-- `stationId` → `vendor_plant_id` (as string) and `station_id` (as number)
-- `deviceType` → `device_type` (filter for "INVERTER" only)
+- `stationId` → `vendor_plant_id` (as string)
+- `deviceType` → Filtered (only "INVERTER" alerts are processed, but not stored)
 - `alertName` → `title`
 - `alertTime` → `alert_time` (Unix seconds → ISO 8601)
 - `endTime` → `end_time` (Unix seconds → ISO 8601)
@@ -763,9 +759,8 @@ Use this checklist when implementing a new vendor adapter:
 - [ ] Map vendor status to standard enum (ACTIVE, RESOLVED, ACKNOWLEDGED)
 - [ ] Extract and convert alert timestamps (alert_time, end_time)
 - [ ] Extract vendor_alert_id for deduplication
-- [ ] Extract vendor_plant_id and station_id
-- [ ] Extract device_type (if applicable)
-- [ ] Filter alerts by device type (e.g., only INVERTER alerts)
+- [ ] Extract vendor_plant_id
+- [ ] Filter alerts by device type (e.g., only INVERTER alerts) - filtered but not stored
 - [ ] Handle pagination (if vendor API supports it)
 - [ ] Test alert sync via `/api/vendors/[id]/sync-alerts`
 - [ ] Verify alerts are stored correctly in database

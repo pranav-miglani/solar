@@ -105,8 +105,6 @@ Build a production-ready **Work Order Management System (WOMS)** for managing so
 - `vendor_id` (INTEGER, FK to vendors, NOT NULL)
 - `vendor_alert_id` (TEXT, NOT NULL) - vendor's alert identifier
 - `vendor_plant_id` (TEXT, NOT NULL) - vendor's plant identifier
-- `station_id` (TEXT, nullable) - vendor station ID
-- `device_type` (TEXT) - e.g., "INVERTER"
 - `title` (TEXT)
 - `description` (TEXT, nullable)
 - `severity` (ENUM: LOW, MEDIUM, HIGH, CRITICAL)
@@ -265,7 +263,7 @@ interface TelemetryData {
   - Supports both real-time and historical backfill modes
 - **Alert Sync**:
   - Paginated API calls (size: 100)
-  - Filters by `deviceType === "INVERTER"`
+  - Filters by `deviceType === "INVERTER"` (filtered but not stored)
   - Uses `alertsStartDate` from vendor credentials (default: 1 year lookback)
   - Maps vendor alerts to normalized format
 - Calculates `grid_down_seconds` from alert_time and end_time
