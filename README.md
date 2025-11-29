@@ -363,7 +363,6 @@ Solar power plants with production metrics from vendor APIs.
 | `monthly_energy_mwh` | NUMERIC(10,3) | Monthly energy generation (MWh) |
 | `yearly_energy_mwh` | NUMERIC(10,3) | Yearly energy generation (MWh) |
 | `total_energy_mwh` | NUMERIC(10,3) | Total cumulative energy (MWh) |
-| `performance_ratio` | NUMERIC(5,4) | Performance Ratio (PR) - 0-1 range |
 | `last_update_time` | TIMESTAMPTZ | Last time production data was synced |
 | `created_at` | TIMESTAMPTZ | Creation timestamp |
 | `updated_at` | TIMESTAMPTZ | Last update timestamp |
@@ -1113,8 +1112,6 @@ Get production metrics for a specific plant.
     "monthlyEnergyMwh": 750.0,
     "yearlyEnergyMwh": 9000.0,
     "totalEnergyMwh": 10000.0,
-    "performanceRatio": 0.85,
-    "prPercentage": "85.000",
     "lastUpdateTime": "2024-01-15T10:00:00Z"
   }
 }

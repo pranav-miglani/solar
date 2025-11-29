@@ -85,7 +85,6 @@ export function OrganizationProductionOverview({
     monthlyEnergyMwh: metrics.aggregated?.monthlyEnergyMwh || 0,
     yearlyEnergyMwh: metrics.aggregated?.yearlyEnergyMwh || 0,
     totalEnergyMwh: metrics.aggregated?.totalEnergyMwh || 0,
-    averagePerformanceRatio: metrics.aggregated?.averagePerformanceRatio || 0,
   }
 
   return (
@@ -161,7 +160,6 @@ export function OrganizationProductionOverview({
       <ProductionOverview
         metrics={productionMetrics}
         title="Organization Production Overview"
-        hidePerformanceRatio={accountType === "GOVT"}
       />
     </div>
   )

@@ -189,7 +189,6 @@ async function syncVendorPlants(
         monthly_energy_mwh: metadata.monthlyEnergyMwh || null,
         yearly_energy_mwh: metadata.yearlyEnergyMwh || null,
         total_energy_mwh: metadata.totalEnergyMwh || null,
-        performance_ratio: metadata.performanceRatio || null,
         last_update_time: lastUpdateTime, // lastUpdateTime from vendor
         last_refreshed_at: new Date().toISOString(), // Always set to current time when syncing
         // Additional metadata fields (refreshed on every sync)

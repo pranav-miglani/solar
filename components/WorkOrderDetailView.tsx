@@ -46,7 +46,6 @@ interface Plant {
   monthly_energy_mwh: number | null
   yearly_energy_mwh: number | null
   total_energy_mwh: number | null
-  performance_ratio: number | null
   last_update_time: string | null
   location: {
     lat?: number
@@ -204,9 +203,6 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
     monthlyEnergyMwh: activePlants.reduce((sum, p) => sum + (p.monthly_energy_mwh || 0), 0),
     yearlyEnergyMwh: activePlants.reduce((sum, p) => sum + (p.yearly_energy_mwh || 0), 0),
     totalEnergyMwh: activePlants.reduce((sum, p) => sum + (p.total_energy_mwh || 0), 0),
-    averagePerformanceRatio: activePlants
-      .filter((p) => p.performance_ratio !== null)
-      .reduce((sum, p, _, arr) => sum + (p.performance_ratio || 0) / arr.length, 0),
   }
 
   const lastUpdateTime = activePlants
@@ -339,7 +335,6 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
           metrics={productionData.aggregated}
           lastUpdated={lastUpdateTime ?? undefined}
           title="Work Order Production Overview"
-          hidePerformanceRatio={isGovt}
         />
       )}
 
@@ -422,9 +417,6 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
                           {plant.monthly_energy_mwh !== null && (
                             <div>Monthly: {formatNumber(plant.monthly_energy_mwh, 2, "MWh")}</div>
                           )}
-                          {!isGovt && plant.performance_ratio !== null && (
-                            <div>PR: {formatNumber(plant.performance_ratio * 100, 2, "%")}</div>
-                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -486,9 +478,6 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
                       )}
                       {plant.monthly_energy_mwh !== null && (
                         <div>Monthly: {formatNumber(plant.monthly_energy_mwh, 2, "MWh")}</div>
-                      )}
-                      {!isGovt && plant.performance_ratio !== null && (
-                        <div>PR: {formatNumber(plant.performance_ratio * 100, 2, "%")}</div>
                       )}
                     </div>
                     <Link href={`/plants/${plant.id}`}>
