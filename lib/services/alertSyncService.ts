@@ -632,6 +632,8 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
   }
 
   try {
+    logger.info(`🚀 Starting SolarDM alert sync for vendor ${vendor.name} (${vendor.id})`)
+
     // Resolve org name (for logging only)
     if (vendor.org_id) {
       const { data: org } = await supabase
@@ -640,6 +642,9 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
         .eq("id", vendor.org_id)
         .single()
       result.orgName = org?.name
+      if (org?.name) {
+        logger.info(`📋 Organization: ${org.name} (${vendor.org_id})`)
+      }
     }
 
     const vendorConfig: VendorConfig = {
@@ -650,25 +655,33 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
       isActive: vendor.is_active,
     }
 
+    logger.info(`🔧 Initializing SolarDM adapter for vendor ${vendor.id}`)
     const adapter: any = VendorManager.getAdapter(vendorConfig)
 
     // If adapter supports DB-backed token storage, wire it up
     if (typeof adapter.setTokenStorage === "function") {
       adapter.setTokenStorage(vendor.id, supabase)
+      logger.info(`💾 Token storage configured for vendor ${vendor.id}`)
     }
 
     // Authenticate (uses DB token if valid)
+    logger.info(`🔐 Authenticating with SolarDM API for vendor ${vendor.id}`)
     await adapter.authenticate()
+    logger.info(`✅ Authentication successful for vendor ${vendor.id}`)
 
     // Build plant mapping: SolarDM plantId -> internal plant_id
+    logger.info(`🌱 Fetching plants for vendor ${vendor.id}`)
     const { data: plants, error: plantsError } = await supabase
       .from("plants")
       .select("id, vendor_plant_id, capacity_kw")
       .eq("vendor_id", vendor.id)
 
     if (plantsError) {
+      logger.error(`❌ Failed to fetch plants:`, plantsError)
       throw new Error(`Failed to fetch plants for vendor ${vendor.id}: ${plantsError.message}`)
     }
+
+    logger.info(`📊 Found ${plants?.length || 0} plants for vendor ${vendor.id}`)
 
     const plantIdToPlant = new Map<
       string,
@@ -682,6 +695,7 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
           vendorPlantId,
           capacityKw: typeof p.capacity_kw === "number" ? p.capacity_kw : Number(p.capacity_kw) || null,
         })
+        logger.debug(`🗺️ Mapped plant: vendor_plant_id=${vendorPlantId} -> internal_id=${p.id}`)
       }
     })
 
@@ -693,6 +707,11 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
       return result
     }
 
+    logger.info(`🗺️ Built plant mapping: ${plantIdToPlant.size} plants mapped`)
+    // Log plant IDs for debugging
+    const mappedPlantIds = Array.from(plantIdToPlant.keys())
+    logger.info(`📋 Mapped plant IDs (vendor_plant_id): ${mappedPlantIds.slice(0, 10).join(", ")}${mappedPlantIds.length > 10 ? ` ... (${mappedPlantIds.length} total)` : ""}`)
+
     // Determine lookback window
     const startDate = getVendorAlertsStartDate(vendor)
     const endDate = new Date()
@@ -700,19 +719,73 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
     logger.info(
       `📥 Syncing SolarDM alerts for vendor ${vendor.name} (${vendor.id}) from ${startDate.toISOString()} to ${endDate.toISOString()}`
     )
+    logger.info(`🌱 Plant mapping: ${plantIdToPlant.size} plants available for alert matching`)
 
-    // Fetch all alerts with pagination
-    const allAlerts = await adapter.getAllAlerts(startDate, endDate)
+    // Fetch all alerts with pagination (don't filter by date in adapter - do it here for better logging)
+    logger.info(`📡 Fetching alerts from SolarDM API...`)
+    logger.info(`📅 Date range filter: ${startDate.toISOString()} to ${endDate.toISOString()}`)
+    
+    let allAlerts: any[] = []
+    try {
+      allAlerts = await adapter.getAllAlerts()
+      logger.info(`📦 Received ${allAlerts.length} total alerts from SolarDM API`)
+      
+      if (allAlerts.length === 0) {
+        logger.warn(`⚠️ No alerts returned from SolarDM API. Possible reasons:`)
+        logger.warn(`   1. No alerts exist for "There is no mains voltage" fault`)
+        logger.warn(`   2. API authentication issue`)
+        logger.warn(`   3. API endpoint issue`)
+        logger.warn(`   4. All alerts are outside the date range`)
+      } else {
+        // Log sample alert for debugging
+        logger.info(`📋 Sample alert (first of ${allAlerts.length}):`, {
+          id: allAlerts[0]?.id,
+          plantId: allAlerts[0]?.plantId,
+          plantIdType: typeof allAlerts[0]?.plantId,
+          happenTime: allAlerts[0]?.happenTime,
+          recoverTime: allAlerts[0]?.recoverTime,
+          faultInfo: allAlerts[0]?.faultInfo,
+          faultLevel: allAlerts[0]?.faultLevel,
+        })
+        
+        // Log unique plant IDs from alerts
+        const alertPlantIds = [...new Set(allAlerts.map((a: any) => a.plantId?.toString()).filter(Boolean))]
+        logger.info(`📋 Plant IDs from alerts: ${alertPlantIds.slice(0, 10).join(", ")}${alertPlantIds.length > 10 ? ` ... (${alertPlantIds.length} unique)` : ""}`)
+        
+        // Check overlap
+        const mappedIds = Array.from(plantIdToPlant.keys())
+        const overlap = alertPlantIds.filter(id => mappedIds.includes(id))
+        logger.info(`🔍 Plant ID overlap: ${overlap.length} alerts match mapped plants out of ${alertPlantIds.length} unique plant IDs in alerts`)
+      }
+    } catch (apiError: any) {
+      logger.error(`❌ Error fetching alerts from SolarDM API:`, {
+        error: apiError.message,
+        stack: apiError.stack,
+        vendorId: vendor.id,
+      })
+      throw apiError
+    }
 
     result.total = allAlerts.length
 
+    let skippedNoPlant = 0
+    let skippedDateRange = 0
+    let skippedInvalidDate = 0
+    let processedCount = 0
+
     // Process and upsert alerts
+    logger.info(`🔄 Processing ${allAlerts.length} alerts...`)
     for (const raw of allAlerts) {
       const vendorPlantId = raw.plantId?.toString()
       const mapping = vendorPlantId ? plantIdToPlant.get(vendorPlantId) : null
       
       if (!mapping) {
         // We don't have this plant mapped yet; skip
+        skippedNoPlant++
+        if (skippedNoPlant <= 5) {
+          // Log first few skipped alerts for debugging
+          logger.warn(`⏭️ Skipping alert ${raw.id} - plant ${vendorPlantId} (type: ${typeof raw.plantId}) not found in mapping. Available plant IDs: ${Array.from(plantIdToPlant.keys()).slice(0, 5).join(", ")}`)
+        }
         continue
       }
 
@@ -723,27 +796,45 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
 
       if (raw.happenTime) {
         // Convert "2025-11-29 06:58:21" to ISO format
+        // SolarDM returns dates in format "YYYY-MM-DD HH:mm:ss" (assumed to be local time)
+        // We'll parse it as-is and let JavaScript handle it
         const happenTimeStr = raw.happenTime.replace(" ", "T")
         alertTimeDate = new Date(happenTimeStr)
+        
         if (Number.isNaN(alertTimeDate.getTime())) {
-          alertTimeDate = null
+          skippedInvalidDate++
+          logger.warn(`⚠️ Invalid happenTime format: ${raw.happenTime} for alert ${raw.id}`)
+          continue
         }
+        
+        logger.debug(`📅 Parsed happenTime: ${raw.happenTime} -> ${alertTimeDate.toISOString()}`)
+      } else {
+        skippedInvalidDate++
+        logger.warn(`⚠️ Missing happenTime for alert ${raw.id}`)
+        continue
       }
 
       if (raw.recoverTime) {
         const recoverTimeStr = raw.recoverTime.replace(" ", "T")
         endTimeDate = new Date(recoverTimeStr)
         if (Number.isNaN(endTimeDate.getTime())) {
+          logger.warn(`⚠️ Invalid recoverTime format: ${raw.recoverTime} for alert ${raw.id}`)
           endTimeDate = null
+        } else {
+          logger.debug(`📅 Parsed recoverTime: ${raw.recoverTime} -> ${endTimeDate.toISOString()}`)
         }
       }
 
       // Filter by date range
       if (alertTimeDate) {
         if (alertTimeDate < startDate || alertTimeDate > endDate) {
+          skippedDateRange++
+          logger.debug(`⏭️ Skipping alert ${raw.id} - date ${alertTimeDate.toISOString()} outside range`)
           continue
         }
       }
+
+      processedCount++
 
       let gridDownSeconds: number | null = null
       if (alertTimeDate && endTimeDate) {
@@ -800,6 +891,7 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
       }
 
       if (existing) {
+        logger.debug(`🔄 Updating existing alert ${existing.id} (vendor_alert_id: ${vendorAlertId})`)
         const { error: updateError } = await supabase
           .from("alerts")
           .update(payload)
@@ -813,8 +905,10 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
         } else {
           result.updated += 1
           result.synced += 1
+          logger.debug(`✅ Updated alert ${existing.id}`)
         }
       } else {
+        logger.debug(`➕ Creating new alert (vendor_alert_id: ${vendorAlertId}, plant_id: ${mapping.plantId})`)
         const { error: insertError } = await supabase.from("alerts").insert(payload)
 
         if (insertError) {
@@ -825,9 +919,19 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
         } else {
           result.created += 1
           result.synced += 1
+          logger.debug(`✅ Created new alert`)
         }
       }
     }
+
+    logger.info(`📊 Alert processing summary:`)
+    logger.info(`   - Total from API: ${result.total}`)
+    logger.info(`   - Processed: ${processedCount}`)
+    logger.info(`   - Skipped (no plant mapping): ${skippedNoPlant}`)
+    logger.info(`   - Skipped (date range): ${skippedDateRange}`)
+    logger.info(`   - Skipped (invalid date): ${skippedInvalidDate}`)
+    logger.info(`   - Created: ${result.created}`)
+    logger.info(`   - Updated: ${result.updated}`)
 
     // Update vendor's last_alert_synced_at
     await supabase

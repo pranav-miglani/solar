@@ -862,7 +862,14 @@ export class SolarDmAdapter extends BaseVendorAdapter {
     const token = await this.authenticate()
     const fullUrl = url.startsWith("http") ? url : `${this.getApiBaseUrl()}${url}`
     
-    return pooledFetch(fullUrl, {
+    const operation = context?.operation || "API_CALL"
+    const description = context?.description || "SolarDM API request"
+    
+    console.log(`[SolarDM] ${operation}: ${description}`)
+    console.log(`[SolarDM] Request URL: ${fullUrl}`)
+    console.log(`[SolarDM] Request method: ${options.method || "GET"}`)
+    
+    const response = await pooledFetch(fullUrl, {
       ...options,
       headers: {
         ...options.headers,
@@ -870,6 +877,10 @@ export class SolarDmAdapter extends BaseVendorAdapter {
         Accept: "application/json, text/plain, */*",
       },
     })
+    
+    console.log(`[SolarDM] Response status: ${response.status} ${response.statusText}`)
+    
+    return response
   }
 
   /**
@@ -934,6 +945,8 @@ export class SolarDmAdapter extends BaseVendorAdapter {
     let totalPages = 1
     const allAlerts: any[] = []
     
+    console.log(`[SolarDM] Starting getAllAlerts - startDate: ${startDate?.toISOString()}, endDate: ${endDate?.toISOString()}`)
+    
     while (current <= totalPages) {
       const params = new URLSearchParams({
         current: current.toString(),
@@ -941,8 +954,11 @@ export class SolarDmAdapter extends BaseVendorAdapter {
         faultInfo: "There is no mains voltage"
       })
       
+      const fullUrl = `${url}?${params.toString()}`
+      console.log(`[SolarDM] Fetching page ${current}/${totalPages} from: ${fullUrl}`)
+      
       const response = await this.loggedFetch(
-        `${url}?${params.toString()}`,
+        fullUrl,
         {
           method: "GET",
         },
@@ -954,14 +970,27 @@ export class SolarDmAdapter extends BaseVendorAdapter {
       
       if (!response.ok) {
         const text = await response.text()
+        console.error(`[SolarDM] API request failed (page ${current}):`, {
+          status: response.status,
+          statusText: response.statusText,
+          error: text
+        })
         throw new Error(
           `SolarDM alerts request failed (page ${current}): ${response.status} ${response.statusText} - ${text}`
         )
       }
       
       const data = await response.json()
+      console.log(`[SolarDM] Page ${current} response:`, {
+        code: data.code,
+        message: data.message,
+        total: data.data?.total,
+        pages: data.data?.pages,
+        recordsCount: data.data?.records?.length || 0
+      })
       
       if (data.code !== 0) {
+        console.error(`[SolarDM] API returned error code:`, data)
         throw new Error(`SolarDM API error: ${data.message || "Unknown error"}`)
       }
       
@@ -969,33 +998,42 @@ export class SolarDmAdapter extends BaseVendorAdapter {
       
       if (current === 1) {
         totalPages = data.data?.pages || 1
+        console.log(`[SolarDM] Total pages from API: ${totalPages}, total records: ${data.data?.total || 0}`)
+        
+        // Log first few records for debugging
+        if (records.length > 0) {
+          console.log(`[SolarDM] Sample record from page 1:`, {
+            id: records[0].id,
+            plantId: records[0].plantId,
+            happenTime: records[0].happenTime,
+            recoverTime: records[0].recoverTime,
+            faultInfo: records[0].faultInfo,
+            faultLevel: records[0].faultLevel,
+          })
+        }
       }
       
       if (records.length === 0) {
+        console.log(`[SolarDM] No records on page ${current}, stopping pagination`)
         break
       }
       
-      // Filter by date range if provided
-      if (startDate || endDate) {
-        const filtered = records.filter((record: any) => {
-          if (!record.happenTime) return false
-          
-          const happenTime = new Date(record.happenTime.replace(" ", "T"))
-          
-          if (startDate && happenTime < startDate) return false
-          if (endDate && happenTime > endDate) return false
-          
-          return true
-        })
-        
-        allAlerts.push(...filtered)
-      } else {
-        allAlerts.push(...records)
+      console.log(`[SolarDM] Page ${current}: Received ${records.length} records`)
+      
+      // Don't filter by date here - let the sync service handle it
+      // This allows us to see all alerts and log what's being filtered
+      allAlerts.push(...records)
+      
+      // Check if we've reached the last page
+      if (current >= totalPages) {
+        console.log(`[SolarDM] Reached last page (${totalPages}), stopping pagination`)
+        break
       }
       
       current++
     }
     
+    console.log(`[SolarDM] getAllAlerts complete: ${allAlerts.length} total alerts fetched across ${current - 1} pages`)
     return allAlerts
   }
 
