@@ -110,6 +110,10 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     // SolarDM fields
     email: "",
     passwordRSA: "",
+    // PVBlink fields
+    password: "",
+    // Foxesscloud fields
+    passwordMD5: "",
     is_active: true,
   })
 
@@ -192,6 +196,10 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         // SolarDM fields
         email: vendor.credentials.email || "",
         passwordRSA: vendor.credentials.passwordRSA || "",
+        // PVBlink fields
+        password: vendor.credentials.password || "",
+        // Foxesscloud fields
+        passwordMD5: vendor.credentials.passwordMD5 || "",
         is_active: vendor.is_active,
       })
     } else {
@@ -209,6 +217,10 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         // SolarDM fields
         email: "",
         passwordRSA: "",
+        // PVBlink fields
+        password: "",
+        // Foxesscloud fields
+        passwordMD5: "",
         is_active: true,
       })
     }
@@ -231,6 +243,14 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       // SolarDM only requires email and passwordRSA
       credentials.email = formData.email
       credentials.passwordRSA = formData.passwordRSA
+    } else if (formData.vendor_type === "PVBLINK") {
+      // PVBlink only requires email and password
+      credentials.email = formData.email
+      credentials.password = formData.password
+    } else if (formData.vendor_type === "FOXESSCLOUD") {
+      // Foxesscloud only requires username and passwordMD5
+      credentials.username = formData.username
+      credentials.passwordMD5 = formData.passwordMD5
     } else {
       // Solarman and other vendors
       credentials.appId = formData.appId
@@ -426,6 +446,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                   <SelectContent>
                     <SelectItem value="SOLARMAN">Solarman</SelectItem>
                     <SelectItem value="SOLARDM">SolarDM</SelectItem>
+                    <SelectItem value="PVBLINK">PV Blink</SelectItem>
+                    <SelectItem value="FOXESSCLOUD">PV Hub[Foxesscloud]</SelectItem>
                     <SelectItem value="SUNGROW">Sungrow</SelectItem>
                     <SelectItem value="OTHER">Other</SelectItem>
                   </SelectContent>
@@ -494,6 +516,81 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       RSA encrypted password for SolarDM authentication
+                    </p>
+                  </div>
+                </>
+              ) : formData.vendor_type === "PVBLINK" ? (
+                <>
+                  {/* PVBlink Fields - Only email and password */}
+                  <div>
+                    <Label htmlFor="email">Email *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
+                      required
+                      className="mt-1"
+                      placeholder="vendor@example.com"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="password">Password *</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          password: e.target.value,
+                        })
+                      }
+                      required
+                      className="mt-1"
+                      placeholder="Password"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Password for PVBlink authentication
+                    </p>
+                  </div>
+                </>
+              ) : formData.vendor_type === "FOXESSCLOUD" ? (
+                <>
+                  {/* Foxesscloud Fields - Only username and passwordMD5 */}
+                  <div>
+                    <Label htmlFor="username">Username *</Label>
+                    <Input
+                      id="username"
+                      value={formData.username}
+                      onChange={(e) =>
+                        setFormData({ ...formData, username: e.target.value })
+                      }
+                      required
+                      className="mt-1"
+                      placeholder="Enter username"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="passwordMD5">Password (MD5) *</Label>
+                    <Input
+                      id="passwordMD5"
+                      type="password"
+                      value={formData.passwordMD5}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          passwordMD5: e.target.value,
+                        })
+                      }
+                      required
+                      className="mt-1"
+                      placeholder="MD5 hashed password"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      MD5 hashed password for Foxesscloud authentication
                     </p>
                   </div>
                 </>

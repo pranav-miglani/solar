@@ -13,7 +13,9 @@ This document outlines the requirements and process for onboarding a new vendor 
 7. [Vendor Comparison: Solarman vs SolarDM](#vendor-comparison-solarman-vs-solardm)
 8. [Solarman Example](#solarman-example)
 9. [SolarDM Example](#solardm-example)
-10. [Implementation Checklist](#implementation-checklist)
+10. [PVBlink Example](#pvblink-example)
+11. [Foxesscloud Example](#foxesscloud-example)
+12. [Implementation Checklist](#implementation-checklist)
 11. [Testing Requirements](#testing-requirements)
 12. [Common Pitfalls](#common-pitfalls)
 
@@ -44,7 +46,7 @@ When creating a vendor in the database, the following fields are required:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | TEXT | ✅ Yes | Vendor display name (e.g., "Solarman Production") |
-| `vendor_type` | ENUM | ✅ Yes | One of: `SOLARMAN`, `SOLARDM`, `SUNGROW`, `OTHER` |
+| `vendor_type` | ENUM | ✅ Yes | One of: `SOLARMAN`, `SOLARDM`, `PVBLINK`, `FOXESSCLOUD`, `SUNGROW`, `OTHER` |
 | `credentials` | JSONB | ✅ Yes | Vendor-specific authentication credentials (see below) |
 | `org_id` | INTEGER | Optional | Organization ID (NULL for global/shared vendors) |
 | `is_active` | BOOLEAN | Optional | Active status (default: `true`) |
@@ -72,6 +74,8 @@ API base URLs are stored in environment variables, not in the database:
 - `SOLARMAN_API_BASE_URL` - Base URL for Solarman API
 - `SOLARMAN_PRO_API_BASE_URL` - (Optional) PRO API base URL for Solarman
 - `SOLARDM_API_BASE_URL` - Base URL for SolarDM API
+- `PVBLINK_API_BASE_URL` - Base URL for PVBlink API
+- `FOXESSCLOUD_API_BASE_URL` - Base URL for Foxesscloud API
 - `SUNGROW_API_BASE_URL` - Base URL for Sungrow API
 - `{VENDOR}_API_BASE_URL` - Pattern for other vendors
 
@@ -80,6 +84,8 @@ API base URLs are stored in environment variables, not in the database:
 SOLARMAN_API_BASE_URL=https://globalapi.solarmanpv.com
 SOLARMAN_PRO_API_BASE_URL=https://globalpro.solarmanpv.com
 SOLARDM_API_BASE_URL=http://global.solar-dm.com:8010
+PVBLINK_API_BASE_URL=https://cloud.pvblink.com
+FOXESSCLOUD_API_BASE_URL=https://www.foxesscloud.com
 ```
 
 ### 3. Token Management
@@ -1043,6 +1049,230 @@ const severityMap = {
 case 'SOLARDM':
   return new SolarDmAdapter(config)
 ```
+
+---
+
+## PVBlink Example
+
+This section provides a complete example using PVBlink as a reference implementation.
+
+### 1. Vendor Configuration
+
+**Database Entry**:
+```sql
+INSERT INTO vendors (name, vendor_type, credentials, org_id, is_active)
+VALUES (
+  'PVBlink Production',
+  'PVBLINK',
+  '{"email": "vendor@example.com", "password": "vendor_password"}'::jsonb,
+  1,
+  true
+);
+```
+
+**Environment Variables**:
+```env
+PVBLINK_API_BASE_URL=https://cloud.pvblink.com
+```
+
+### 2. Authentication
+
+**Endpoint**: `POST /api/pvblink/user/login`
+
+**Request**:
+```json
+{
+  "email": "vendor@example.com",
+  "password": "vendor_password",
+  "confirmPassword": null,
+  "resetPasswordToken": null,
+  "rememberMe": false
+}
+```
+
+**Response**:
+```json
+{
+  "data": {
+    "id": "655A622AD99407D29DBA6F43EF9EFD88",
+    "createdOn": "2025-05-02T06:07:47.751+00:00",
+    "updatedOn": "2025-05-02T06:07:47.751+00:00",
+    "activeStatus": "ACTIVE",
+    "firstName": "Sun Astra Energy",
+    "lastName": "solutions Pvt. Ltd.",
+    "email": "sunastrasolar@gmail.com",
+    "dealerId": "E87F7B4A51C7F9ACFF86483BE932BA7F",
+    "mobile": "8558999110",
+    "profilePic": "Screenshot 21753447048535.jpg",
+    "isDealer": true,
+    "accessToken": "yf2apN629pmbHprXV3J_yHTP5jJeK5gr"
+  }
+}
+```
+
+**Implementation**:
+- Token is cached in `vendors.access_token`
+- Token is stored from `data.accessToken` field
+- Default expiration: 11 hours 30 minutes (41400 seconds) - stored in `token_expires_at`
+- Implements retry logic: max 3 attempts on authentication errors
+- Token is validated before each API call (checks expiration)
+
+**Retry Logic**:
+- On authentication error (HTTP error or missing `accessToken`), the adapter retries up to 3 times
+- Uses exponential backoff (1s, 2s, 3s delays)
+- Fails after 3 unsuccessful attempts
+
+**Required Headers**:
+- `Accept: application/json, text/plain, */*`
+- `Accept-Language: en-GB,en-US;q=0.9,en;q=0.8`
+- `Content-Type: application/json`
+- `Origin: https://cloud.pvblink.com`
+- `Referer: https://cloud.pvblink.com/login`
+- `User-Agent: Mozilla/5.0...`
+
+### 3. Plant Listing
+
+**Status**: Not yet implemented - TODO when API endpoint is available
+
+### 4. Alert Synchronization
+
+**Status**: Not yet implemented - TODO when API endpoint is available
+
+### 5. Adapter Implementation
+
+**File**: `lib/vendors/pvBlinkAdapter.ts`
+
+**Key Methods**:
+- `authenticate()` - Handles email/password authentication with retry logic
+- `authenticateWithRetry()` - Internal method for retry logic (max 3 attempts)
+- `getTokenFromDB()` - Retrieves cached token
+- `storeTokenInDB()` - Stores token with expiration (11 hours 30 minutes)
+- `getApiBaseUrl()` - Gets API base URL from env vars
+- `listPlants()`, `getTelemetry()`, `getRealtime()`, `getAlerts()` - TODO: Implement when API endpoints are available
+
+**Registration**: Adapter is registered in `lib/vendors/vendorManager.ts`:
+```typescript
+case 'PVBLINK':
+  return new PvBlinkAdapter(config)
+```
+
+**Important Notes**:
+- Only `email` and `password` are required for credentials
+- Token expiration: 11 hours 30 minutes (41400 seconds)
+- Implements automatic retry on authentication errors (max 3 attempts)
+- Browser-like headers are required for API calls
+
+---
+
+## Foxesscloud Example
+
+This section provides a complete example using Foxesscloud (PV Hub) as a reference implementation.
+
+### 1. Vendor Configuration
+
+**Database Entry**:
+```sql
+INSERT INTO vendors (name, vendor_type, credentials, org_id, is_active)
+VALUES (
+  'Foxesscloud Production',
+  'FOXESSCLOUD',
+  '{"username": "vendor_username", "passwordMD5": "md5_hashed_password"}'::jsonb,
+  1,
+  true
+);
+```
+
+**Environment Variables**:
+```env
+FOXESSCLOUD_API_BASE_URL=https://www.foxesscloud.com
+```
+
+### 2. Authentication
+
+**Endpoint**: `POST /c/v0/user/login`
+
+**Request**:
+```json
+{
+  "user": "vendor_username",
+  "password": "md5_hashed_password"
+}
+```
+
+**Response**:
+```json
+{
+  "errno": 0,
+  "result": {
+    "token": "eyJpZCI6IjE4ODE2MjI1LTdhMDEtNGFlYS1hMTQ3LTJiODU0OTY1MTE3YyIsInNlY3JldCI6ImJkYjY1OGRjZWJlYzNkZmVmZjZlODBhOTI0ODg3Njg2ZDQ1NWZhNzc1N2QxNzg2ZDViMmRkNTIyYmZhZWVmMmYiLCJwYXlsb2FkIjoid0NBTDV4dC8rQThjREYwZUhJQzc0RjREZVgvV3drYlptdHgyaHRNRlNrOTYyanhGa2I2UzFpKzM0dEJTZ0ZaM1VPTytJOU1iS1E0S3B4SG1QM1ZBZTVUdHYrSDkybWhaR1pid3pEbXRHcnJLazhpZ1BVSHY5UUNpbHNEL0VsWEJORmdPc0hxNC9SYWl3ZzVQVHZJdkhwUTFoTjJRVjQ2WExmeTI5V1h0ekRmaXEwRzhaZ2c2TVJPN0hIcUZVaHc0THJOd3RicFVkNG9sdnpmd0hoL2Vnd01YNjcvMHk1bWM0cVBMNVdNMzgvSFJQMzJtRmxVRk9aZTNmc0tFWUhwMSJ9",
+    "access": 1,
+    "user": "MTPLCDG",
+    "weakFlag": false
+  }
+}
+```
+
+**Implementation**:
+- Token is cached in `vendors.access_token`
+- Token is stored from `result.token` field
+- Default expiration: 23 hours 30 minutes (84600 seconds) - stored in `token_expires_at`
+- Implements retry logic: max 3 attempts on authentication errors
+- Token is validated before each API call (checks expiration)
+
+**Retry Logic**:
+- On authentication error (HTTP error, `errno !== 0`, or missing `token`), the adapter retries up to 3 times
+- Uses exponential backoff (1s, 2s, 3s delays)
+- Fails after 3 unsuccessful attempts
+
+**Required Headers**:
+- `Accept: application/json, text/plain, */*`
+- `Accept-Language: en-GB,en-US;q=0.9,en;q=0.8`
+- `Content-Type: application/json;charset=UTF-8`
+- `contenttype: application/json`
+- `lang: en`
+- `Origin: https://www.foxesscloud.com`
+- `Referer: https://www.foxesscloud.com/login`
+- `timezone: Asia/Calcutta`
+- `timestamp: {current_timestamp}` (generated dynamically)
+- `User-Agent: Mozilla/5.0...`
+
+**Error Response**:
+- Success: `errno: 0`
+- Error: `errno: non-zero` (check this field, not just HTTP status)
+
+### 3. Plant Listing
+
+**Status**: Not yet implemented - TODO when API endpoint is available
+
+### 4. Alert Synchronization
+
+**Status**: Not yet implemented - TODO when API endpoint is available
+
+### 5. Adapter Implementation
+
+**File**: `lib/vendors/foxesscloudAdapter.ts`
+
+**Key Methods**:
+- `authenticate()` - Handles username/passwordMD5 authentication with retry logic
+- `authenticateWithRetry()` - Internal method for retry logic (max 3 attempts)
+- `getTokenFromDB()` - Retrieves cached token
+- `storeTokenInDB()` - Stores token with expiration (23 hours 30 minutes)
+- `getApiBaseUrl()` - Gets API base URL from env vars
+- `listPlants()`, `getTelemetry()`, `getRealtime()`, `getAlerts()` - TODO: Implement when API endpoints are available
+
+**Registration**: Adapter is registered in `lib/vendors/vendorManager.ts`:
+```typescript
+case 'FOXESSCLOUD':
+  return new FoxesscloudAdapter(config)
+```
+
+**Important Notes**:
+- Only `username` and `passwordMD5` (MD5 hashed password) are required for credentials
+- Token expiration: 23 hours 30 minutes (84600 seconds)
+- Implements automatic retry on authentication errors (max 3 attempts)
+- Browser-like headers are required for API calls
+- Check `errno` field in response (0 = success, non-zero = error)
+- Timestamp header is generated dynamically for each request
 
 ---
 
