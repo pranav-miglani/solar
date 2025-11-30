@@ -162,7 +162,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
           response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}`)
         } else if (selectedPeriod === "total") {
           // For total view, send period=total and date range
-          // Both Solarman and SolarDM support total view
+          // Solarman, SolarDM, and ShineMonitor support total view
           response = await fetch(`/api/plants/${plantId}/telemetry?period=total&startYear=${startYear}&endYear=${endYear}`)
         } else {
           setTelemetry([])

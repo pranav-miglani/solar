@@ -90,6 +90,17 @@ interface ShineMonitorYearlyTelemetryResponse {
   }
 }
 
+interface ShineMonitorTotalTelemetryResponse {
+  err: number
+  desc: string
+  dat: {
+    peryear: Array<{
+      val: string // Yearly energy value in kWh (e.g., "967.3000")
+      ts: string // Timestamp in format "YYYY-MM-DD HH:mm:ss" (e.g., "2025-01-01 00:00:00")
+    }>
+  }
+}
+
 /**
  * ShineMonitor Vendor Adapter
  * 
@@ -1370,6 +1381,223 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     return {
       statistics,
       records,
+    }
+  }
+
+  /**
+   * Get total telemetry records (yearly aggregation across multiple years)
+   * Endpoint: GET /?sign={sign}&salt={salt}&token={token}&action=queryPlantEnergyTotalPerYear&plantid={vendorPlantId}
+   * Note: ShineMonitor API doesn't support year range filtering, so we filter results client-side
+   * 
+   * @param plantId - Vendor plant ID (vendor_plant_id)
+   * @param startYear - Start year (for filtering, not used in API call)
+   * @param endYear - End year (for filtering, not used in API call)
+   * @returns Telemetry data with records and statistics
+   */
+  async getTotalTelemetryRecords(
+    plantId: string | number,
+    startYear: number,
+    endYear: number
+  ): Promise<{
+    statistics: {
+      systemId: string
+      generationValue: number // Total generation in kWh
+      fullPowerHoursDay?: number
+    }
+    records: Array<{
+      systemId: string
+      year: number
+      month: number
+      day: number
+      generationValue: number // Yearly generation in kWh
+      fullPowerHoursDay?: number
+    }>
+    operatingTotalDays?: number
+  }> {
+    // Get token and secret from DB
+    const cached = await this.getTokenFromDB()
+    if (!cached) {
+      // Authenticate if no cached token
+      await this.authenticate()
+      const refreshed = await this.getTokenFromDB()
+      if (!refreshed) {
+        throw new Error("Failed to get ShineMonitor token")
+      }
+      this.secret = refreshed.secret
+    } else {
+      this.secret = cached.secret
+    }
+
+    const token = cached?.token || (await this.authenticate())
+    const secret = this.secret
+
+    if (!secret) {
+      throw new Error("ShineMonitor secret not available")
+    }
+
+    const vendorPlantId = plantId.toString()
+    const baseUrl = this.getApiBaseUrl()
+
+    // Generate salt for this request
+    const salt = this.generateSalt()
+
+    // Build query parameters WITHOUT sign, salt, token (for sign generation)
+    // Order: action, plantid (no date parameter for total view)
+    const queryParamsForSign = new URLSearchParams()
+    queryParamsForSign.append("action", "queryPlantEnergyTotalPerYear")
+    queryParamsForSign.append("plantid", vendorPlantId)
+
+    // Generate sign using query params without sign, salt, token
+    console.log("[ShineMonitor] Generating sign for total telemetry API call")
+    console.log("[ShineMonitor] Query params for sign generation:", {
+      action: queryParamsForSign.get("action"),
+      plantid: queryParamsForSign.get("plantid"),
+    })
+    const sign = this.generateSignForApi(salt, secret, token, queryParamsForSign)
+
+    // Build final query params with correct order: sign, salt, token first, then other params
+    const finalQueryParams = new URLSearchParams()
+    finalQueryParams.set("sign", sign)
+    finalQueryParams.set("salt", salt)
+    finalQueryParams.set("token", token)
+    finalQueryParams.set("action", queryParamsForSign.get("action") || "")
+    finalQueryParams.set("plantid", queryParamsForSign.get("plantid") || "")
+
+    const url = `${baseUrl}/?${finalQueryParams.toString()}`
+
+    console.log("[ShineMonitor] ========== TOTAL TELEMETRY REQUEST ==========")
+    console.log("[ShineMonitor] Request URL:", url)
+    console.log("[ShineMonitor] Request Method: GET")
+    console.log("[ShineMonitor] Request Headers:", JSON.stringify({
+      Accept: "application/json, text/javascript, */*; q=0.01",
+      "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+      Connection: "keep-alive",
+      Origin: "https://kstar.shinemonitor.com",
+      Referer: "https://kstar.shinemonitor.com/",
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    }, null, 2))
+    console.log("[ShineMonitor] Query Parameters:", {
+      sign: sign, // Complete sign for debugging
+      salt,
+      token: token, // Complete token for debugging
+      action: "queryPlantEnergyTotalPerYear",
+      plantid: vendorPlantId,
+    })
+    console.log("[ShineMonitor] Sign Generation Details:", {
+      salt,
+      secret: secret, // Complete secret for debugging
+      token: token, // Complete token for debugging
+      finalQueryString: `&action=queryPlantEnergyTotalPerYear&plantid=${vendorPlantId}`,
+      generatedSign: sign, // Complete sign for debugging
+    })
+    console.log("[ShineMonitor] Year range filter (client-side):", {
+      startYear,
+      endYear,
+    })
+
+    const response = await pooledFetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+        Connection: "keep-alive",
+        Origin: "https://kstar.shinemonitor.com",
+        Referer: "https://kstar.shinemonitor.com/",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      },
+    })
+
+    console.log("[ShineMonitor] Response Status:", response.status, response.statusText)
+    console.log("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[ShineMonitor] HTTP Error:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      })
+      throw new Error(
+        `Failed to fetch total telemetry from ShineMonitor: ${response.statusText} - ${errorText}`
+      )
+    }
+
+    const responseText = await response.text()
+    console.log("[ShineMonitor] Response Body (raw, first 500 chars):", responseText.substring(0, 500))
+    
+    let data: ShineMonitorTotalTelemetryResponse
+    try {
+      data = JSON.parse(responseText)
+      console.log("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
+    } catch (parseError) {
+      console.error("[ShineMonitor] Failed to parse response JSON:", parseError)
+      console.error("[ShineMonitor] Raw response:", responseText)
+      throw new Error(`ShineMonitor API error: Invalid JSON response`)
+    }
+
+    if (data.err !== 0) {
+      console.error("[ShineMonitor] API Error Response:", {
+        err: data.err,
+        desc: data.desc,
+        fullResponse: JSON.stringify(data, null, 2),
+      })
+      throw new Error(`ShineMonitor API error: ${data.desc || "Unknown error"}`)
+    }
+
+    const peryear = data.dat?.peryear || []
+    console.log(`[ShineMonitor] Successfully fetched ${peryear.length} total telemetry records (before filtering)`)
+
+    // Transform ShineMonitor response to match Solarman format
+    // Filter by year range on client-side (ShineMonitor API doesn't support year filtering)
+    const records = peryear
+      .map((item: any) => {
+        // Parse year from timestamp string "YYYY-MM-DD HH:mm:ss"
+        let year = 0
+        try {
+          const date = new Date(item.ts.replace(" ", "T"))
+          if (!isNaN(date.getTime())) {
+            year = date.getFullYear()
+          }
+        } catch (error) {
+          console.warn(`[ShineMonitor] Failed to parse timestamp: ${item.ts}`, error)
+        }
+
+        // val is already in kWh (yearly energy)
+        const yearlyGenerationKwh = parseFloat(item.val) || 0
+
+        return {
+          systemId: vendorPlantId,
+          year,
+          month: 0, // Not applicable for yearly records in total view
+          day: 0, // Not applicable for yearly records in total view
+          generationValue: yearlyGenerationKwh, // Yearly generation in kWh
+          fullPowerHoursDay: undefined, // Not provided by ShineMonitor
+        }
+      })
+      .filter((record: any) => {
+        // Filter by year range (client-side filtering)
+        return record.year >= startYear && record.year <= endYear
+      })
+
+    console.log(`[ShineMonitor] Filtered to ${records.length} records for year range ${startYear}-${endYear}`)
+    console.log("[ShineMonitor] ========== TOTAL TELEMETRY RESPONSE COMPLETE ==========")
+
+    // Calculate statistics from filtered records
+    // Total generation: sum of all yearly generation values in the filtered range
+    const totalGenerationKwh = records.reduce((sum: number, record: any) => {
+      return sum + (record.generationValue || 0)
+    }, 0)
+
+    const statistics = {
+      systemId: vendorPlantId,
+      generationValue: totalGenerationKwh, // Total generation in kWh
+      fullPowerHoursDay: undefined, // Would need capacity to calculate
+    }
+
+    return {
+      statistics,
+      records,
+      operatingTotalDays: undefined, // Not provided by ShineMonitor
     }
   }
 
