@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import Link from "next/link"
 import { ExternalLink, Building2, Plus, User, Mail, Trash2, FileText } from "lucide-react"
 import {
@@ -49,6 +50,7 @@ interface Account {
   org_id: number | null
   display_name: string | null
   logo_url: string | null
+  is_active: boolean | null
 }
 
 interface OrgsTableProps {
@@ -79,10 +81,16 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
     password: "",
     display_name: "",
   })
+  const [editingEmail, setEditingEmail] = useState<string>("")
+  const [editingPassword, setEditingPassword] = useState<string>("")
   const [editingDisplayName, setEditingDisplayName] = useState<string>("")
   const [editingLogoUrl, setEditingLogoUrl] = useState<string>("")
+  const [editingIsActive, setEditingIsActive] = useState<boolean>(true)
+  const [savingEmail, setSavingEmail] = useState(false)
+  const [savingPassword, setSavingPassword] = useState(false)
   const [savingDisplayName, setSavingDisplayName] = useState(false)
   const [savingLogoUrl, setSavingLogoUrl] = useState(false)
+  const [savingIsActive, setSavingIsActive] = useState(false)
   const [deletingGovtAccountId, setDeletingGovtAccountId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -96,6 +104,7 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
       const updated = accounts.find((acc) => acc.id === selectedGovtAccount.id)
       if (updated) {
         setSelectedGovtAccount(updated)
+        setEditingEmail(updated.email || "")
         setEditingDisplayName(updated.display_name || "")
         setEditingLogoUrl(updated.logo_url || "")
       }
@@ -103,13 +112,16 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts])
 
-  // Initialize editingDisplayName and logo URL when account dialog opens for existing account
+  // Initialize editingEmail, editingPassword, editingDisplayName, logo URL, and is_active when account dialog opens for existing account
   useEffect(() => {
     if (accountDialogOpen && selectedOrg) {
       const orgAcc = accounts.find((acc) => acc.org_id === selectedOrg.id)
       if (orgAcc) {
+        setEditingEmail(orgAcc.email || "")
+        setEditingPassword("") // Don't populate password field for security
         setEditingDisplayName(orgAcc.display_name || "")
         setEditingLogoUrl(orgAcc.logo_url || "")
+        setEditingIsActive(orgAcc.is_active !== false) // Default to true if null/undefined
       }
     }
   }, [accountDialogOpen, selectedOrg, accounts])
@@ -221,6 +233,94 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
     } else {
       const error = await response.json()
       alert(error.error || "Failed to create GOVT user")
+    }
+  }
+
+  // Update email for an account (SUPERADMIN only)
+  async function handleUpdateEmail(accountId: string) {
+    setSavingEmail(true)
+    try {
+      const response = await fetch(`/api/accounts/${accountId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: editingEmail || null,
+        }),
+      })
+
+      if (response.ok) {
+        fetchAccounts()
+        setEditingEmail("")
+      } else {
+        const error = await response.json()
+        alert(error.error || "Failed to update email")
+      }
+    } catch (error) {
+      console.error("Error updating email:", error)
+      alert("Failed to update email")
+    } finally {
+      setSavingEmail(false)
+    }
+  }
+
+  // Update password for an account (SUPERADMIN only)
+  async function handleUpdatePassword(accountId: string) {
+    if (!editingPassword || editingPassword.trim() === "") {
+      alert("Please enter a new password")
+      return
+    }
+
+    setSavingPassword(true)
+    try {
+      const response = await fetch(`/api/accounts/${accountId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: editingPassword,
+        }),
+      })
+
+      if (response.ok) {
+        fetchAccounts()
+        setEditingPassword("")
+        alert("Password updated successfully")
+      } else {
+        const error = await response.json()
+        alert(error.error || "Failed to update password")
+      }
+    } catch (error) {
+      console.error("Error updating password:", error)
+      alert("Failed to update password")
+    } finally {
+      setSavingPassword(false)
+    }
+  }
+
+  // Update is_active for an account (SUPERADMIN only)
+  async function handleUpdateIsActive(accountId: string, isActive: boolean) {
+    setSavingIsActive(true)
+    try {
+      const response = await fetch(`/api/accounts/${accountId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          is_active: isActive,
+        }),
+      })
+
+      if (response.ok) {
+        fetchAccounts()
+        setEditingIsActive(isActive)
+        alert(`Account ${isActive ? "activated" : "deactivated"} successfully`)
+      } else {
+        const error = await response.json()
+        alert(error.error || `Failed to ${isActive ? "activate" : "deactivate"} account`)
+      }
+    } catch (error) {
+      console.error("Error updating account status:", error)
+      alert(`Failed to ${isActive ? "activate" : "deactivate"} account`)
+    } finally {
+      setSavingIsActive(false)
     }
   }
 
@@ -931,11 +1031,33 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                   <div className="space-y-3">
                     <div>
                       <Label className="text-sm font-semibold text-muted-foreground">Email</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Mail className="h-4 w-4 text-primary" />
-                        <div className="text-base font-semibold">
-                          {accounts.find((acc) => acc.org_id === selectedOrg?.id)?.email}
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="email"
+                            value={editingEmail}
+                            onChange={(e) => setEditingEmail(e.target.value)}
+                            placeholder="Enter email address"
+                            className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              const orgAcc = accounts.find((acc) => acc.org_id === selectedOrg?.id)
+                              if (orgAcc) {
+                                handleUpdateEmail(orgAcc.id)
+                              }
+                            }}
+                            disabled={savingEmail}
+                            size="sm"
+                            className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
+                          >
+                            {savingEmail ? "Saving..." : "Save"}
+                          </Button>
                         </div>
+                        <p className="text-xs text-muted-foreground">
+                          Current: {accounts.find((acc) => acc.org_id === selectedOrg?.id)?.email}
+                        </p>
                       </div>
                     </div>
                     <div>
@@ -1022,6 +1144,63 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                             </div>
                           </div>
                         )}
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Password</Label>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="password"
+                            value={editingPassword}
+                            onChange={(e) => setEditingPassword(e.target.value)}
+                            placeholder="Enter new password"
+                            className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              const orgAcc = accounts.find((acc) => acc.org_id === selectedOrg?.id)
+                              if (orgAcc) {
+                                handleUpdatePassword(orgAcc.id)
+                              }
+                            }}
+                            disabled={savingPassword || !editingPassword || editingPassword.trim() === ""}
+                            size="sm"
+                            className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
+                          >
+                            {savingPassword ? "Saving..." : "Save"}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Leave empty to keep current password
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Account Status</Label>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={editingIsActive}
+                            onCheckedChange={(checked) => {
+                              setEditingIsActive(checked)
+                              const orgAcc = accounts.find((acc) => acc.org_id === selectedOrg?.id)
+                              if (orgAcc) {
+                                handleUpdateIsActive(orgAcc.id, checked)
+                              }
+                            }}
+                            disabled={savingIsActive}
+                          />
+                          <span className="text-sm font-medium">
+                            {editingIsActive ? "Active" : "Inactive"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {editingIsActive 
+                            ? "Account can login" 
+                            : "Account cannot login (inactive)"}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -1125,11 +1304,28 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                 <div className="space-y-3">
                   <div>
                     <Label className="text-sm font-semibold text-muted-foreground">Email</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Mail className="h-4 w-4 text-primary" />
-                      <div className="text-base font-semibold">
-                        {selectedGovtAccount.email}
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="email"
+                          value={editingEmail}
+                          onChange={(e) => setEditingEmail(e.target.value)}
+                          placeholder="Enter email address"
+                          className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => handleUpdateEmail(selectedGovtAccount.id)}
+                          disabled={savingEmail}
+                          size="sm"
+                          className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
+                        >
+                          {savingEmail ? "Saving..." : "Save"}
+                        </Button>
                       </div>
+                      <p className="text-xs text-muted-foreground">
+                        Current: {selectedGovtAccount.email}
+                      </p>
                     </div>
                   </div>
                   <div>
@@ -1208,6 +1404,55 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                       )}
                     </div>
                   </div>
+                  <div>
+                    <Label className="text-sm font-semibold text-muted-foreground">Password</Label>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="password"
+                          value={editingPassword}
+                          onChange={(e) => setEditingPassword(e.target.value)}
+                          placeholder="Enter new password"
+                          className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => handleUpdatePassword(selectedGovtAccount.id)}
+                          disabled={savingPassword || !editingPassword || editingPassword.trim() === ""}
+                          size="sm"
+                          className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white transition-all duration-200"
+                        >
+                          {savingPassword ? "Saving..." : "Save"}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Leave empty to keep current password
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-semibold text-muted-foreground">Account Status</Label>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={editingIsActive}
+                          onCheckedChange={(checked) => {
+                            setEditingIsActive(checked)
+                            handleUpdateIsActive(selectedGovtAccount.id, checked)
+                          }}
+                          disabled={savingIsActive}
+                        />
+                        <span className="text-sm font-medium">
+                          {editingIsActive ? "Active" : "Inactive"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {editingIsActive 
+                          ? "Account can login" 
+                          : "Account cannot login (inactive)"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </Card>
               <div className="flex justify-end gap-2 pt-4 border-t">
@@ -1219,6 +1464,7 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                     setSelectedGovtAccount(null)
                     setEditingDisplayName("")
                     setEditingLogoUrl("")
+                    setEditingPassword("")
                   }}
                   className="transition-all duration-200"
                 >

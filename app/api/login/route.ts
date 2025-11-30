@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
       .from("accounts")
       .select("*")
       .eq("email", email)
+      .eq("is_active", true) // Only allow login for active accounts
       .limit(1)
 
     if (accountError) {

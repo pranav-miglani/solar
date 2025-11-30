@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import bcrypt from "bcryptjs"
 import { getMainClient } from "@/lib/supabase/pooled"
 import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
 
@@ -52,23 +53,61 @@ export async function PATCH(
       }
 
       const body = await request.json()
-      const { display_name, logo_url } = body
+      const { email, password, display_name, logo_url, is_active } = body
 
       const supabase = getMainClient()
 
       const updateData: any = {}
+      if (email !== undefined) {
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (email && !emailRegex.test(email)) {
+          logApiResponse(request, 400, Date.now() - startTime)
+          return NextResponse.json(
+            { error: "Invalid email format" },
+            { status: 400 }
+          )
+        }
+        
+        // Check if email is already taken by another account
+        if (email) {
+          const { data: existingAccount } = await supabase
+            .from("accounts")
+            .select("id")
+            .eq("email", email)
+            .neq("id", accountId)
+            .single()
+
+          if (existingAccount) {
+            logApiResponse(request, 409, Date.now() - startTime, { email })
+            return NextResponse.json(
+              { error: "Email already in use by another account" },
+              { status: 409 }
+            )
+          }
+        }
+        
+        updateData.email = email || null
+      }
       if (display_name !== undefined) {
         updateData.display_name = display_name || null
       }
       if (logo_url !== undefined) {
         updateData.logo_url = logo_url || null
       }
+      if (password !== undefined && password !== null && password !== "") {
+        // Hash password before storing
+        updateData.password_hash = await bcrypt.hash(password, 10)
+      }
+      if (is_active !== undefined) {
+        updateData.is_active = is_active !== false // Ensure boolean
+      }
 
       const { data, error } = await supabase
         .from("accounts")
         .update(updateData)
         .eq("id", accountId)
-        .select("id, email, account_type, org_id, created_at, display_name, logo_url")
+        .select("id, email, account_type, org_id, created_at, display_name, logo_url, is_active")
         .single()
 
       if (error) {
