@@ -421,11 +421,16 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       })
       const sign = this.generateSignForApi(salt, secret, token, queryParamsForSign)
 
-      // Build final query params with sign, salt, token added
-      const finalQueryParams = new URLSearchParams(queryParamsForSign)
+      // Build final query params with correct order: sign, salt, token first, then other params
+      // Order is important: sign, salt, token, then action, orderBy, page, pagesize
+      const finalQueryParams = new URLSearchParams()
       finalQueryParams.set("sign", sign)
       finalQueryParams.set("salt", salt)
       finalQueryParams.set("token", token)
+      finalQueryParams.set("action", queryParamsForSign.get("action") || "")
+      finalQueryParams.set("orderBy", queryParamsForSign.get("orderBy") || "")
+      finalQueryParams.set("page", queryParamsForSign.get("page") || "")
+      finalQueryParams.set("pagesize", queryParamsForSign.get("pagesize") || "")
 
       const url = `${baseUrl}/?${finalQueryParams.toString()}`
 
