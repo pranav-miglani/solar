@@ -97,9 +97,11 @@ export default async function AlertsVendorPlantsPage({ params }: PageProps) {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-base md:text-lg">{vendor.name}</span>
-              <Badge variant="outline" className="text-[10px] md:text-xs">
-                {vendor.vendor_type}
-              </Badge>
+              {accountType === "SUPERADMIN" && (
+                <Badge variant="outline" className="text-[10px] md:text-xs">
+                  {vendor.vendor_type}
+                </Badge>
+              )}
             </div>
             {Array.isArray((vendor as any).organizations) &&
               (vendor as any).organizations.length > 0 && (

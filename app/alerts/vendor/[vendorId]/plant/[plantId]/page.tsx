@@ -96,7 +96,8 @@ export default async function PlantAlertsPage({ params, searchParams }: PageProp
               {plant.name} Alerts
             </h1>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
-              Vendor: {vendor.name} ({vendor.vendor_type}) · Vendor plant ID:{" "}
+              Vendor: {vendor.name}
+              {accountType === "SUPERADMIN" && ` (${vendor.vendor_type})`} · Vendor plant ID:{" "}
               {plant.vendor_plant_id}
             </p>
           </div>

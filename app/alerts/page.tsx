@@ -101,7 +101,9 @@ export default async function AlertsVendorsPage() {
                               </span>
                               <span className="truncate">{vendor.name}</span>
                             </CardTitle>
-                            <Badge variant="outline">{vendor.vendor_type}</Badge>
+                            {accountType === "SUPERADMIN" && (
+                              <Badge variant="outline">{vendor.vendor_type}</Badge>
+                            )}
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-2">
