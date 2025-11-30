@@ -1,12 +1,9 @@
 import { BaseVendorAdapter } from "./baseVendorAdapter"
 import { SolarmanAdapter } from "./solarmanAdapter"
 import { SolarDmAdapter } from "./solarDmAdapter"
-<<<<<<< Updated upstream
 import { ShineMonitorAdapter } from "./shineMonitorAdapter"
-=======
 import { PvBlinkAdapter } from "./pvBlinkAdapter"
 import { FoxesscloudAdapter } from "./foxesscloudAdapter"
->>>>>>> Stashed changes
 import type { VendorConfig } from "./types"
 
 /**
@@ -63,12 +60,9 @@ export class VendorManager {
 // Register built-in adapters
 VendorManager.registerAdapter("SOLARMAN", SolarmanAdapter)
 VendorManager.registerAdapter("SOLARDM", SolarDmAdapter)
-<<<<<<< Updated upstream
 VendorManager.registerAdapter("SHINEMONITOR", ShineMonitorAdapter)
-=======
 VendorManager.registerAdapter("PVBLINK", PvBlinkAdapter)
 VendorManager.registerAdapter("FOXESSCLOUD", FoxesscloudAdapter)
->>>>>>> Stashed changes
 
 // Example: To add a new vendor (e.g., Sungrow), create SungrowAdapter extending BaseVendorAdapter
 // and register it here:
