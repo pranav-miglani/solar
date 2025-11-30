@@ -241,9 +241,11 @@ export async function GET(
 
         // Check if adapter supports getYearlyTelemetryRecords method
         if (typeof (adapter as any).getYearlyTelemetryRecords === "function") {
-          // For Solarman: use numeric ID, for SolarDM: use string ID
+          // For Solarman: use numeric ID, for SolarDM/ShineMonitor: use string ID
           const yearlyData = await (adapter as any).getYearlyTelemetryRecords(
-            vendor.vendor_type === "SOLARDM" ? vendorPlantId : vendorPlantIdNum,
+            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" 
+              ? vendorPlantId 
+              : vendorPlantIdNum,
             yearNum
           )
 

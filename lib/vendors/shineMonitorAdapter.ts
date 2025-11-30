@@ -79,6 +79,17 @@ interface ShineMonitorMonthlyTelemetryResponse {
   }
 }
 
+interface ShineMonitorYearlyTelemetryResponse {
+  err: number
+  desc: string
+  dat: {
+    permonth: Array<{
+      val: string // Monthly energy value in kWh (e.g., "0.0000", "248.4000", "284.2000")
+      ts: string // Timestamp in format "YYYY-MM-DD HH:mm:ss" (e.g., "2025-01-01 00:00:00")
+    }>
+  }
+}
+
 /**
  * ShineMonitor Vendor Adapter
  * 
@@ -1140,6 +1151,219 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       month,
       day: 0, // Not applicable for monthly stats
       generationValue: monthlyGenerationKwh, // Monthly generation in kWh
+      fullPowerHoursDay: undefined, // Would need capacity to calculate
+    }
+
+    return {
+      statistics,
+      records,
+    }
+  }
+
+  /**
+   * Get yearly telemetry records (monthly aggregation for a specific year)
+   * Endpoint: GET /?sign={sign}&salt={salt}&token={token}&action=queryPlantEnergyYearPerMonth&plantid={vendorPlantId}&date=YYYY
+   * 
+   * @param plantId - Vendor plant ID (vendor_plant_id)
+   * @param year - Year (e.g., 2025)
+   * @returns Telemetry data with records and statistics
+   */
+  async getYearlyTelemetryRecords(
+    plantId: string | number,
+    year: number
+  ): Promise<{
+    statistics: {
+      systemId: string
+      year: number
+      month: number
+      day: number
+      generationValue: number // Yearly generation in kWh
+      fullPowerHoursDay?: number
+    }
+    records: Array<{
+      systemId: string
+      year: number
+      month: number
+      day: number
+      generationValue: number // Monthly generation in kWh
+      fullPowerHoursDay?: number
+    }>
+  }> {
+    // Get token and secret from DB
+    const cached = await this.getTokenFromDB()
+    if (!cached) {
+      // Authenticate if no cached token
+      await this.authenticate()
+      const refreshed = await this.getTokenFromDB()
+      if (!refreshed) {
+        throw new Error("Failed to get ShineMonitor token")
+      }
+      this.secret = refreshed.secret
+    } else {
+      this.secret = cached.secret
+    }
+
+    const token = cached?.token || (await this.authenticate())
+    const secret = this.secret
+
+    if (!secret) {
+      throw new Error("ShineMonitor secret not available")
+    }
+
+    const vendorPlantId = plantId.toString()
+    const baseUrl = this.getApiBaseUrl()
+
+    // Format date as YYYY
+    const dateStr = year.toString()
+
+    // Generate salt for this request
+    const salt = this.generateSalt()
+
+    // Build query parameters WITHOUT sign, salt, token (for sign generation)
+    // Order: action, plantid, date
+    const queryParamsForSign = new URLSearchParams()
+    queryParamsForSign.append("action", "queryPlantEnergyYearPerMonth")
+    queryParamsForSign.append("plantid", vendorPlantId)
+    queryParamsForSign.append("date", dateStr)
+
+    // Generate sign using query params without sign, salt, token
+    console.log("[ShineMonitor] Generating sign for yearly telemetry API call")
+    console.log("[ShineMonitor] Query params for sign generation:", {
+      action: queryParamsForSign.get("action"),
+      plantid: queryParamsForSign.get("plantid"),
+      date: queryParamsForSign.get("date"),
+    })
+    const sign = this.generateSignForApi(salt, secret, token, queryParamsForSign)
+
+    // Build final query params with correct order: sign, salt, token first, then other params
+    const finalQueryParams = new URLSearchParams()
+    finalQueryParams.set("sign", sign)
+    finalQueryParams.set("salt", salt)
+    finalQueryParams.set("token", token)
+    finalQueryParams.set("action", queryParamsForSign.get("action") || "")
+    finalQueryParams.set("plantid", queryParamsForSign.get("plantid") || "")
+    finalQueryParams.set("date", queryParamsForSign.get("date") || "")
+
+    const url = `${baseUrl}/?${finalQueryParams.toString()}`
+
+    console.log("[ShineMonitor] ========== YEARLY TELEMETRY REQUEST ==========")
+    console.log("[ShineMonitor] Request URL:", url)
+    console.log("[ShineMonitor] Request Method: GET")
+    console.log("[ShineMonitor] Request Headers:", JSON.stringify({
+      Accept: "application/json, text/javascript, */*; q=0.01",
+      "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+      Connection: "keep-alive",
+      Origin: "https://kstar.shinemonitor.com",
+      Referer: "https://kstar.shinemonitor.com/",
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+    }, null, 2))
+    console.log("[ShineMonitor] Query Parameters:", {
+      sign: sign, // Complete sign for debugging
+      salt,
+      token: token, // Complete token for debugging
+      action: "queryPlantEnergyYearPerMonth",
+      plantid: vendorPlantId,
+      date: dateStr,
+    })
+    console.log("[ShineMonitor] Sign Generation Details:", {
+      salt,
+      secret: secret, // Complete secret for debugging
+      token: token, // Complete token for debugging
+      finalQueryString: `&action=queryPlantEnergyYearPerMonth&plantid=${vendorPlantId}&date=${dateStr}`,
+      generatedSign: sign, // Complete sign for debugging
+    })
+
+    const response = await pooledFetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+        Connection: "keep-alive",
+        Origin: "https://kstar.shinemonitor.com",
+        Referer: "https://kstar.shinemonitor.com/",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      },
+    })
+
+    console.log("[ShineMonitor] Response Status:", response.status, response.statusText)
+    console.log("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[ShineMonitor] HTTP Error:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      })
+      throw new Error(
+        `Failed to fetch yearly telemetry from ShineMonitor: ${response.statusText} - ${errorText}`
+      )
+    }
+
+    const responseText = await response.text()
+    console.log("[ShineMonitor] Response Body (raw, first 500 chars):", responseText.substring(0, 500))
+    
+    let data: ShineMonitorYearlyTelemetryResponse
+    try {
+      data = JSON.parse(responseText)
+      console.log("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
+    } catch (parseError) {
+      console.error("[ShineMonitor] Failed to parse response JSON:", parseError)
+      console.error("[ShineMonitor] Raw response:", responseText)
+      throw new Error(`ShineMonitor API error: Invalid JSON response`)
+    }
+
+    if (data.err !== 0) {
+      console.error("[ShineMonitor] API Error Response:", {
+        err: data.err,
+        desc: data.desc,
+        fullResponse: JSON.stringify(data, null, 2),
+      })
+      throw new Error(`ShineMonitor API error: ${data.desc || "Unknown error"}`)
+    }
+
+    const permonth = data.dat?.permonth || []
+    console.log(`[ShineMonitor] Successfully fetched ${permonth.length} yearly telemetry records`)
+    console.log("[ShineMonitor] ========== YEARLY TELEMETRY RESPONSE COMPLETE ==========")
+
+    // Transform ShineMonitor response to match Solarman format
+    const records = permonth.map((item: any) => {
+      // Parse month from timestamp string "YYYY-MM-DD HH:mm:ss"
+      let month = 0
+      try {
+        const date = new Date(item.ts.replace(" ", "T"))
+        if (!isNaN(date.getTime())) {
+          month = date.getMonth() + 1 // getMonth() returns 0-11, we need 1-12
+        }
+      } catch (error) {
+        console.warn(`[ShineMonitor] Failed to parse timestamp: ${item.ts}`, error)
+      }
+
+      // val is already in kWh (monthly energy)
+      const monthlyGenerationKwh = parseFloat(item.val) || 0
+
+      return {
+        systemId: vendorPlantId,
+        year,
+        month,
+        day: 0, // Not applicable for monthly records in yearly view
+        generationValue: monthlyGenerationKwh, // Monthly generation in kWh
+        fullPowerHoursDay: undefined, // Not provided by ShineMonitor
+      }
+    })
+
+    // Calculate statistics from records
+    // Yearly generation: sum of all monthly generation values
+    const yearlyGenerationKwh = records.reduce((sum: number, record: any) => {
+      return sum + (record.generationValue || 0)
+    }, 0)
+
+    const statistics = {
+      systemId: vendorPlantId,
+      year,
+      month: 0, // Not applicable for yearly stats
+      day: 0, // Not applicable for yearly stats
+      generationValue: yearlyGenerationKwh, // Yearly generation in kWh
       fullPowerHoursDay: undefined, // Would need capacity to calculate
     }
 
