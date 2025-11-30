@@ -25,6 +25,30 @@ interface PvBlinkAuthResponse {
   }
 }
 
+interface PvBlinkPlant {
+  id: string
+  updatedOn: string
+  name: string
+  capacity: number
+  totalProduction: number
+  powerNormalization: number
+  dailyProduction: number
+  peakHoursToday: number
+  alert: string
+  isMapped: boolean
+  dealerName: string
+  noOfDevice: number
+  collapse: boolean
+  isOnline: boolean
+  loggerVersionNo: string
+  loggerId: string
+  inverterId: string
+}
+
+interface PvBlinkPlantResponse {
+  data: PvBlinkPlant[]
+}
+
 export class PvBlinkAdapter extends BaseVendorAdapter {
   private vendorId?: number
   private supabaseClient?: any
@@ -249,11 +273,94 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
 
   /**
    * List all plants from PVBlink
-   * TODO: Implement once API endpoint is available
+   * Endpoint: GET /api/pvblink/plant/s/all?pageNo={pageNo}
+   * Pagination: Iterates until empty data array is received
    */
   async listPlants(): Promise<Plant[]> {
-    // TODO: Implement plant listing when API endpoint is available
-    throw new Error("PVBlink plant listing not yet implemented")
+    const token = await this.authenticate()
+    const baseUrl = this.getApiBaseUrl()
+    const url = `${baseUrl}/api/pvblink/plant/s/all`
+    
+    const allPlants: Plant[] = []
+    let pageNo = 0
+    let hasMore = true
+
+    console.log("[PVBlink] Fetching plants from:", url)
+
+    while (hasMore) {
+      const pageUrl = `${url}?pageNo=${pageNo}`
+      console.log(`[PVBlink] Fetching page ${pageNo}...`)
+
+      const response = await pooledFetch(pageUrl, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json, text/plain, */*",
+          "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+          "Authorization": token,
+          "Content-Type": "application/json",
+          "Origin": baseUrl,
+          "Referer": `${baseUrl}/app/plant`,
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+        },
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`[PVBlink] Failed to fetch plants (page ${pageNo}):`, {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+        })
+        throw new Error(`Failed to fetch plants from PVBlink (page ${pageNo}): ${response.statusText} - ${errorText}`)
+      }
+
+      const data: PvBlinkPlantResponse = await response.json()
+
+      // Check if we have plants in this page
+      if (!data.data || data.data.length === 0) {
+        console.log(`[PVBlink] No more plants found on page ${pageNo}, stopping pagination`)
+        hasMore = false
+        break
+      }
+
+      console.log(`[PVBlink] Page ${pageNo}: Received ${data.data.length} plants`)
+
+      // Map PVBlink plants to Plant format
+      const mappedPlants = data.data.map((plant) => {
+        // Map network status: isOnline (true = ONLINE, false = ALL_OFFLINE)
+        const networkStatus = plant.isOnline ? "ONLINE" : "ALL_OFFLINE"
+
+        return {
+          id: plant.id, // vendor_plant_id
+          name: plant.name,
+          capacityKw: plant.capacity || 0,
+          location: undefined, // Not provided in API response
+          metadata: {
+            updatedOn: plant.updatedOn,
+            totalProduction: plant.totalProduction,
+            powerNormalization: plant.powerNormalization,
+            dailyProduction: plant.dailyProduction,
+            peakHoursToday: plant.peakHoursToday,
+            alert: plant.alert,
+            isMapped: plant.isMapped,
+            dealerName: plant.dealerName,
+            noOfDevice: plant.noOfDevice,
+            collapse: plant.collapse,
+            isOnline: plant.isOnline,
+            loggerVersionNo: plant.loggerVersionNo,
+            loggerId: plant.loggerId,
+            inverterId: plant.inverterId,
+            networkStatus, // Normalized network status
+          },
+        }
+      })
+
+      allPlants.push(...mappedPlants)
+      pageNo++
+    }
+
+    console.log(`[PVBlink] Successfully fetched ${allPlants.length} total plants across ${pageNo} pages`)
+    return allPlants
   }
 
   /**
