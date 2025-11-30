@@ -22,6 +22,39 @@ interface ShineMonitorAuthResponse {
   }
 }
 
+interface ShineMonitorPlantResponse {
+  err: number
+  desc: string
+  dat: {
+    total: number
+    page: number
+    pagesize: number
+    plant: Array<{
+      pid: number
+      uid: number
+      usr: string
+      name: string
+      type: number
+      status: number // 0=ONLINE/NORMAL, 1=ALL_OFFLINE, others=PARTIAL_OFFLINE
+      address: {
+        lon: string
+        lat: string
+        address?: string
+        timezone: number
+      }
+      nominalPower: string // e.g., "3.0000"
+      install: string // Format: "2025-08-27 11:39:45"
+      gts: string // Format: "2025-08-27 11:39:45"
+      outputPower: string // e.g., "0.7574"
+      energy: string // e.g., "2.5000" (daily energy in kWh)
+      energyMonth: string // e.g., "131.6000" (monthly energy - check if kWh or MWh)
+      energyYear: string // e.g., "2034.7000" (yearly energy - check if kWh or MWh)
+      energyTotal: string // e.g., "2034.7000" (total energy - check if kWh or MWh)
+      energyDatDate: string // Format: "2025-11-30 15:09:10"
+    }>
+  }
+}
+
 /**
  * ShineMonitor Vendor Adapter
  * 
@@ -85,6 +118,46 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     const actionString = `&action=auth&usr=${userName}&company-key=${companyKey}`
     const signInput = salt + passHash + actionString
     return this.sha1(signInput)
+  }
+
+  /**
+   * Generate sign for API calls (non-auth)
+   * Process:
+   * 1. Remove sign, salt, token from query string
+   * 2. Get remaining query string from &action onwards
+   * 3. sign = SHA1(salt + secret + token + finalQueryString)
+   * 
+   * Example:
+   * - Query: sign=X&salt=Y&token=Z&action=webQueryPlants&orderBy=ascPlantId&page=0&pagesize=100
+   * - After removing sign, salt, token: action=webQueryPlants&orderBy=ascPlantId&page=0&pagesize=100
+   * - finalQueryString: &action=webQueryPlants&orderBy=ascPlantId&page=0&pagesize=100
+   */
+  private generateSignForApi(
+    salt: string,
+    secret: string,
+    token: string,
+    queryParams: URLSearchParams
+  ): string {
+    // Build query string excluding sign, salt, token
+    const parts: string[] = []
+    queryParams.forEach((value, key) => {
+      if (key !== "sign" && key !== "salt" && key !== "token") {
+        parts.push(`${key}=${value}`)
+      }
+    })
+
+    // Join with & and ensure it starts with &
+    let finalQueryString = parts.join("&")
+    if (finalQueryString && !finalQueryString.startsWith("&")) {
+      finalQueryString = "&" + finalQueryString
+    }
+
+    // Generate sign: SHA1(salt + secret + token + finalQueryString)
+    const signInput = salt + secret + token + finalQueryString
+    console.log(`[ShineMonitor] Sign generation input: salt=${salt}, secret=${secret.substring(0, 10)}..., token=${token.substring(0, 10)}..., finalQueryString=${finalQueryString}`)
+    const generatedSign = this.sha1(signInput)
+    console.log(`[ShineMonitor] Generated sign: ${generatedSign}`)
+    return generatedSign
   }
 
   /**
@@ -242,12 +315,237 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
 
   /**
    * List all plants from ShineMonitor
-   * TODO: Implement once API endpoint is known
+   * Endpoint: GET /?sign={sign}&salt={salt}&token={token}&action=webQueryPlants&orderBy=ascPlantId&page=0&pagesize=100
    */
   async listPlants(): Promise<Plant[]> {
-    // TODO: Implement plant listing
-    // This will need to be implemented once the plant listing endpoint is documented
-    throw new Error("ShineMonitor plant listing not yet implemented")
+    // Get token and secret from DB
+    const cached = await this.getTokenFromDB()
+    if (!cached) {
+      // Authenticate if no cached token
+      await this.authenticate()
+      const refreshed = await this.getTokenFromDB()
+      if (!refreshed) {
+        throw new Error("Failed to get ShineMonitor token")
+      }
+      this.secret = refreshed.secret
+    } else {
+      this.secret = cached.secret
+    }
+
+    const token = cached?.token || (await this.authenticate())
+    const secret = this.secret
+
+    if (!secret) {
+      throw new Error("ShineMonitor secret not available")
+    }
+
+    const baseUrl = this.getApiBaseUrl()
+    const pageSize = 100
+    let currentPage = 0
+    let totalPages = 1
+    const allPlants: Plant[] = []
+
+    console.log("[ShineMonitor] Fetching plants from:", baseUrl)
+
+    while (currentPage <= totalPages) {
+      // Generate salt for this request
+      const salt = this.generateSalt()
+
+      // Build query parameters WITHOUT sign, salt, token (for sign generation)
+      // Order: action, orderBy, page, pagesize (as per API specification)
+      const queryParamsForSign = new URLSearchParams()
+      queryParamsForSign.append("action", "webQueryPlants")
+      queryParamsForSign.append("orderBy", "ascPlantId")
+      queryParamsForSign.append("page", currentPage.toString())
+      queryParamsForSign.append("pagesize", pageSize.toString())
+
+      // Generate sign using query params without sign, salt, token
+      const sign = this.generateSignForApi(salt, secret, token, queryParamsForSign)
+
+      // Build final query params with sign, salt, token added
+      const finalQueryParams = new URLSearchParams(queryParamsForSign)
+      finalQueryParams.set("sign", sign)
+      finalQueryParams.set("salt", salt)
+      finalQueryParams.set("token", token)
+
+      const url = `${baseUrl}/?${finalQueryParams.toString()}`
+
+      console.log(
+        `[ShineMonitor] Fetching page ${currentPage} from:`,
+        url.replace(/sign=[^&]+/, "sign=***").replace(/token=[^&]+/, "token=***")
+      )
+
+      const response = await pooledFetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json, text/javascript, */*; q=0.01",
+          "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+          Connection: "keep-alive",
+          Origin: "https://kstar.shinemonitor.com",
+          Referer: "https://kstar.shinemonitor.com/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+        },
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`[ShineMonitor] Failed to fetch plants (page ${currentPage}):`, {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+        })
+        throw new Error(
+          `Failed to fetch plants from ShineMonitor: ${response.statusText} - ${errorText}`
+        )
+      }
+
+      const data: ShineMonitorPlantResponse = await response.json()
+
+      if (data.err !== 0) {
+        throw new Error(`ShineMonitor API error: ${data.desc || "Unknown error"}`)
+      }
+
+      const plants = data.dat?.plant || []
+      const total = data.dat?.total || 0
+
+      if (currentPage === 0) {
+        // Calculate total pages from first response
+        totalPages = Math.ceil(total / pageSize) - 1 // -1 because page is 0-indexed
+        console.log(
+          `[ShineMonitor] Total plants: ${total}, pages: ${totalPages + 1} (page size: ${pageSize})`
+        )
+      }
+
+      console.log(`[ShineMonitor] Page ${currentPage}: Received ${plants.length} plants`)
+
+      // Map ShineMonitor plants to Plant format
+      const mappedPlants = plants.map((plant) => {
+        // Parse capacity from string (e.g., "3.0000" -> 3.0)
+        const capacityKw = parseFloat(plant.nominalPower) || 0
+
+        // Map location
+        let location: any = undefined
+        if (plant.address) {
+          location = {
+            lat: plant.address.lat ? parseFloat(plant.address.lat) : null,
+            lng: plant.address.lon ? parseFloat(plant.address.lon) : null,
+            address: plant.address.address || plant.usr || null,
+          }
+        }
+
+        // Map network status: 0=ONLINE/NORMAL, 1=ALL_OFFLINE, others=PARTIAL_OFFLINE
+        let networkStatus: string | null = null
+        if (plant.status === 0) {
+          networkStatus = "NORMAL"
+        } else if (plant.status === 1) {
+          networkStatus = "ALL_OFFLINE"
+        } else {
+          networkStatus = "PARTIAL_OFFLINE"
+        }
+
+        // Parse install date: "2025-08-27 11:39:45" -> ISO string
+        let vendorCreatedDate: string | null = null
+        if (plant.install) {
+          try {
+            const date = new Date(plant.install.replace(" ", "T"))
+            if (!isNaN(date.getTime())) {
+              vendorCreatedDate = date.toISOString()
+            }
+          } catch (error) {
+            console.warn(`[ShineMonitor] Failed to parse install date: ${plant.install}`, error)
+          }
+        }
+
+        // Parse gts (start operating time): "2025-08-27 11:39:45" -> ISO string
+        let startOperatingTime: string | null = null
+        if (plant.gts) {
+          try {
+            const date = new Date(plant.gts.replace(" ", "T"))
+            if (!isNaN(date.getTime())) {
+              startOperatingTime = date.toISOString()
+            }
+          } catch (error) {
+            console.warn(`[ShineMonitor] Failed to parse gts: ${plant.gts}`, error)
+          }
+        }
+
+        // Parse production metrics
+        // outputPower is in kW (already correct unit)
+        const currentPowerKw = parseFloat(plant.outputPower) || 0
+        
+        // energy is daily energy in kWh (already correct unit)
+        const dailyEnergyKwh = parseFloat(plant.energy) || 0
+        
+        // energyMonth, energyYear, energyTotal are in kWh, need to convert to MWh
+        const monthlyEnergyMwh = (parseFloat(plant.energyMonth) || 0) / 1000
+        const yearlyEnergyMwh = (parseFloat(plant.energyYear) || 0) / 1000
+        const totalEnergyMwh = (parseFloat(plant.energyTotal) || 0) / 1000
+
+        // Parse last update time from energyDatDate
+        let lastUpdateTime: string | null = null
+        if (plant.energyDatDate) {
+          try {
+            const date = new Date(plant.energyDatDate.replace(" ", "T"))
+            if (!isNaN(date.getTime())) {
+              lastUpdateTime = date.toISOString()
+            }
+          } catch (error) {
+            console.warn(`[ShineMonitor] Failed to parse energyDatDate: ${plant.energyDatDate}`, error)
+          }
+        }
+
+        return {
+          id: plant.pid.toString(), // vendor_plant_id
+          name: plant.name || `Plant ${plant.pid}`,
+          capacityKw,
+          location,
+          metadata: {
+            // Production metrics
+            currentPowerKw,
+            dailyEnergyKwh,
+            monthlyEnergyMwh,
+            yearlyEnergyMwh,
+            totalEnergyMwh,
+            lastUpdateTime,
+            // Additional fields for sync service
+            networkStatus,
+            createdDate: vendorCreatedDate, // Sync service expects createdDate
+            startOperatingTime,
+            locationAddress: plant.address?.address || plant.usr || null,
+            // Store raw data for reference
+            raw: {
+              pid: plant.pid,
+              uid: plant.uid,
+              usr: plant.usr,
+              type: plant.type,
+              status: plant.status,
+              address: plant.address,
+              nominalPower: plant.nominalPower,
+              install: plant.install,
+              gts: plant.gts,
+              outputPower: plant.outputPower,
+              energy: plant.energy,
+              energyMonth: plant.energyMonth,
+              energyYear: plant.energyYear,
+              energyTotal: plant.energyTotal,
+              energyDatDate: plant.energyDatDate,
+            },
+          },
+        }
+      })
+
+      allPlants.push(...mappedPlants)
+
+      // Check if we've fetched all pages
+      if (currentPage >= totalPages || plants.length === 0) {
+        break
+      }
+
+      currentPage++
+    }
+
+    console.log(`[ShineMonitor] Successfully fetched ${allPlants.length} plants`)
+    return allPlants
   }
 
   /**
