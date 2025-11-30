@@ -154,9 +154,22 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
 
     // Generate sign: SHA1(salt + secret + token + finalQueryString)
     const signInput = salt + secret + token + finalQueryString
-    console.log(`[ShineMonitor] Sign generation input: salt=${salt}, secret=${secret.substring(0, 10)}..., token=${token.substring(0, 10)}..., finalQueryString=${finalQueryString}`)
+    console.log(`[ShineMonitor] Sign generation input:`, {
+      salt,
+      secret: secret, // Complete secret for debugging
+      token: token, // Complete token for debugging
+      finalQueryString,
+      signInputLength: signInput.length,
+    })
+    console.log(`[ShineMonitor] Sign input (full, for debugging):`, {
+      salt,
+      secret,
+      token,
+      finalQueryString,
+      concatenated: signInput,
+    })
     const generatedSign = this.sha1(signInput)
-    console.log(`[ShineMonitor] Generated sign: ${generatedSign}`)
+    console.log(`[ShineMonitor] Generated sign (complete): ${generatedSign}`)
     return generatedSign
   }
 
@@ -275,7 +288,22 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     const baseUrl = this.getApiBaseUrl()
     const url = `${baseUrl}/?sign=${sign}&salt=${salt}&action=auth&usr=${userName}&company-key=${companyKey}`
 
-    console.log("[ShineMonitor] Authenticating with:", url.replace(/sign=[^&]+/, "sign=***"))
+    console.log("[ShineMonitor] ========== AUTHENTICATION REQUEST ==========")
+    console.log("[ShineMonitor] Request URL:", url)
+    console.log("[ShineMonitor] Request Method: GET")
+    console.log("[ShineMonitor] Request Headers:", JSON.stringify({
+      Accept: "application/json",
+      Origin: "https://kstar.shinemonitor.com",
+      Referer: "https://kstar.shinemonitor.com/",
+    }, null, 2))
+    console.log("[ShineMonitor] Sign Generation Details:", {
+      salt,
+      passHash: passHash, // Complete passHash for debugging
+      userName,
+      companyKey,
+      sign,
+      actionString: `&action=auth&usr=${userName}&company-key=${companyKey}`,
+    })
 
     const response = await pooledFetch(url, {
       method: "GET",
@@ -285,6 +313,9 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
         Referer: "https://kstar.shinemonitor.com/",
       },
     })
+
+    console.log("[ShineMonitor] Response Status:", response.status, response.statusText)
+    console.log("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -298,9 +329,26 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       )
     }
 
-    const data: ShineMonitorAuthResponse = await response.json()
+    const responseText = await response.text()
+    console.log("[ShineMonitor] Response Body (raw):", responseText)
+    
+    let data: ShineMonitorAuthResponse
+    try {
+      data = JSON.parse(responseText)
+      console.log("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
+    } catch (parseError) {
+      console.error("[ShineMonitor] Failed to parse response JSON:", parseError)
+      console.error("[ShineMonitor] Raw response:", responseText)
+      throw new Error(`ShineMonitor authentication failed: Invalid JSON response`)
+    }
 
     if (data.err !== 0 || !data.dat?.token) {
+      console.error("[ShineMonitor] Authentication error response:", {
+        err: data.err,
+        desc: data.desc,
+        hasToken: !!data.dat?.token,
+        hasSecret: !!data.dat?.secret,
+      })
       throw new Error(
         `ShineMonitor authentication failed: ${data.desc || "Unknown error"}`
       )
@@ -310,6 +358,10 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     await this.storeTokenInDB(data.dat.token, data.dat.secret, data.dat.expire)
 
     console.log("[ShineMonitor] Authentication successful")
+    console.log("[ShineMonitor] Token (complete):", data.dat.token)
+    console.log("[ShineMonitor] Secret (complete):", data.dat.secret)
+    console.log("[ShineMonitor] Expires in:", data.dat.expire, "seconds")
+    console.log("[ShineMonitor] ========== AUTHENTICATION COMPLETE ==========")
     return data.dat.token
   }
 
@@ -360,6 +412,13 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       queryParamsForSign.append("pagesize", pageSize.toString())
 
       // Generate sign using query params without sign, salt, token
+      console.log("[ShineMonitor] Generating sign for API call (page " + currentPage + ")")
+      console.log("[ShineMonitor] Query params for sign generation:", {
+        action: queryParamsForSign.get("action"),
+        orderBy: queryParamsForSign.get("orderBy"),
+        page: queryParamsForSign.get("page"),
+        pagesize: queryParamsForSign.get("pagesize"),
+      })
       const sign = this.generateSignForApi(salt, secret, token, queryParamsForSign)
 
       // Build final query params with sign, salt, token added
@@ -370,10 +429,33 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
 
       const url = `${baseUrl}/?${finalQueryParams.toString()}`
 
-      console.log(
-        `[ShineMonitor] Fetching page ${currentPage} from:`,
-        url.replace(/sign=[^&]+/, "sign=***").replace(/token=[^&]+/, "token=***")
-      )
+      console.log("[ShineMonitor] ========== PLANT LIST REQUEST (Page " + currentPage + ") ==========")
+      console.log("[ShineMonitor] Request URL:", url)
+      console.log("[ShineMonitor] Request Method: GET")
+      console.log("[ShineMonitor] Request Headers:", JSON.stringify({
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+        Connection: "keep-alive",
+        Origin: "https://kstar.shinemonitor.com",
+        Referer: "https://kstar.shinemonitor.com/",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      }, null, 2))
+      console.log("[ShineMonitor] Query Parameters:", {
+        action: "webQueryPlants",
+        orderBy: "ascPlantId",
+        page: currentPage.toString(),
+        pagesize: pageSize.toString(),
+        salt,
+        token: token, // Complete token for debugging
+        sign: sign, // Complete sign for debugging
+      })
+      console.log("[ShineMonitor] Sign Generation Details:", {
+        salt,
+        secret: secret, // Complete secret for debugging
+        token: token, // Complete token for debugging
+        finalQueryString: `&action=webQueryPlants&orderBy=ascPlantId&page=${currentPage}&pagesize=${pageSize}`,
+        generatedSign: sign, // Complete sign for debugging
+      })
 
       const response = await pooledFetch(url, {
         method: "GET",
@@ -387,9 +469,12 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
         },
       })
 
+      console.log("[ShineMonitor] Response Status:", response.status, response.statusText)
+      console.log("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
+
       if (!response.ok) {
         const errorText = await response.text()
-        console.error(`[ShineMonitor] Failed to fetch plants (page ${currentPage}):`, {
+        console.error(`[ShineMonitor] HTTP Error (page ${currentPage}):`, {
           status: response.status,
           statusText: response.statusText,
           error: errorText,
@@ -399,9 +484,25 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
         )
       }
 
-      const data: ShineMonitorPlantResponse = await response.json()
+      const responseText = await response.text()
+      console.log("[ShineMonitor] Response Body (raw, first 500 chars):", responseText.substring(0, 500))
+      
+      let data: ShineMonitorPlantResponse
+      try {
+        data = JSON.parse(responseText)
+        console.log("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
+      } catch (parseError) {
+        console.error("[ShineMonitor] Failed to parse response JSON:", parseError)
+        console.error("[ShineMonitor] Raw response:", responseText)
+        throw new Error(`ShineMonitor API error: Invalid JSON response`)
+      }
 
       if (data.err !== 0) {
+        console.error("[ShineMonitor] API Error Response:", {
+          err: data.err,
+          desc: data.desc,
+          fullResponse: JSON.stringify(data, null, 2),
+        })
         throw new Error(`ShineMonitor API error: ${data.desc || "Unknown error"}`)
       }
 
@@ -417,6 +518,16 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       }
 
       console.log(`[ShineMonitor] Page ${currentPage}: Received ${plants.length} plants`)
+      if (plants.length > 0) {
+        console.log("[ShineMonitor] Sample plant (first):", JSON.stringify({
+          pid: plants[0].pid,
+          name: plants[0].name,
+          nominalPower: plants[0].nominalPower,
+          status: plants[0].status,
+          address: plants[0].address,
+        }, null, 2))
+      }
+      console.log("[ShineMonitor] ========== PLANT LIST RESPONSE (Page " + currentPage + ") COMPLETE ==========")
 
       // Map ShineMonitor plants to Plant format
       const mappedPlants = plants.map((plant) => {
@@ -544,7 +655,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       currentPage++
     }
 
-    console.log(`[ShineMonitor] Successfully fetched ${allPlants.length} plants`)
+    console.log(`[ShineMonitor] ========== PLANT LIST COMPLETE ==========`)
+    console.log(`[ShineMonitor] Successfully fetched ${allPlants.length} plants across ${currentPage + 1} pages`)
     return allPlants
   }
 
