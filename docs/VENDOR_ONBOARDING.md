@@ -40,7 +40,7 @@ When creating a vendor in the database, the following fields are required:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | TEXT | ✅ Yes | Vendor display name (e.g., "Solarman Production") |
-| `vendor_type` | ENUM | ✅ Yes | One of: `SOLARMAN`, `SUNGROW`, `OTHER` |
+| `vendor_type` | ENUM | ✅ Yes | One of: `SOLARMAN`, `SOLARDM`, `SHINEMONITOR`, `SUNGROW`, `OTHER` |
 | `credentials` | JSONB | ✅ Yes | Vendor-specific authentication credentials (see below) |
 | `org_id` | INTEGER | Optional | Organization ID (NULL for global/shared vendors) |
 | `is_active` | BOOLEAN | Optional | Active status (default: `true`) |
@@ -67,6 +67,8 @@ API base URLs are stored in environment variables, not in the database:
 
 - `SOLARMAN_API_BASE_URL` - Base URL for Solarman API
 - `SOLARMAN_PRO_API_BASE_URL` - (Optional) PRO API base URL for Solarman
+- `SOLARDM_API_BASE_URL` - Base URL for SolarDM API
+- `SHINEMONITOR_API_BASE_URL` - Base URL for ShineMonitor API
 - `SUNGROW_API_BASE_URL` - Base URL for Sungrow API
 - `{VENDOR}_API_BASE_URL` - Pattern for other vendors
 
@@ -74,6 +76,8 @@ API base URLs are stored in environment variables, not in the database:
 ```env
 SOLARMAN_API_BASE_URL=https://globalapi.solarmanpv.com
 SOLARMAN_PRO_API_BASE_URL=https://globalpro.solarmanpv.com
+SOLARDM_API_BASE_URL=http://global.solar-dm.com:8010
+SHINEMONITOR_API_BASE_URL=https://web.shinemonitor.com/public
 ```
 
 ### 3. Token Management
@@ -502,6 +506,169 @@ networkStatus: station.networkStatus ? String(station.networkStatus).trim() : nu
 
 ---
 
+## Vendor Comparison: Solarman vs SolarDM
+
+This section compares the two currently supported vendors to help understand implementation differences and similarities.
+
+### Authentication Comparison
+
+| Aspect | Solarman | SolarDM |
+|--------|----------|---------|
+| **Endpoint** | `POST /account/v1.0/token` | `POST /ums/business/email_login` |
+| **Method** | Query parameter (`?appId=...`) + JSON body | JSON body only |
+| **Required Credentials** | `appId`, `appSecret`, `username`, `passwordSha256`, `solarmanOrgId` (optional) | `email`, `passwordRSA` |
+| **Token Response** | `access_token`, `expires_in`, `refresh_token` | `token`, `refreshToken`, `expiresIn` |
+| **Token Storage** | `access_token`, `token_expires_at` | `access_token`, `token_expires_at` |
+| **Token Type** | Bearer token | Bearer token |
+| **Base URL** | `https://globalapi.solarmanpv.com` or `https://globalpro.solarmanpv.com` | `http://global.solar-dm.com:8010` |
+
+**Key Differences**:
+- Solarman requires SHA-256 hashed password, SolarDM requires RSA-encrypted password
+- Solarman supports org-level authentication (optional `orgId`), SolarDM does not
+- Solarman uses query parameters for appId, SolarDM uses only JSON body
+
+### Plant Listing Comparison
+
+| Aspect | Solarman | SolarDM |
+|--------|----------|---------|
+| **Endpoint** | `POST /maintain-s/operating/station/v2/search` (PRO API) | `GET /dms/plant/list_all` |
+| **Method** | POST with JSON body | GET (no body) |
+| **Pagination** | Built into response (`total`, `data[]`) | Returns all plants in single response |
+| **Plant ID Type** | Number (converted to string) | String |
+| **Response Structure** | Nested `station` object | Flat `data[]` array |
+
+**Data Mapping Differences**:
+
+| Field | Solarman Source | SolarDM Source |
+|-------|----------------|----------------|
+| `vendor_plant_id` | `station.id` (number → string) | `id` (string) |
+| `name` | `station.name` | `plantName` |
+| `capacity_kw` | `station.installedCapacity` | `capacity` |
+| `current_power_kw` | `station.generationPower` (W → kW) | `currentPower` (W → kW) |
+| `daily_energy_kwh` | `station.generationValue` (kWh) | `dailyEnergy` (kWh) |
+| `monthly_energy_mwh` | `station.generationMonth` (kWh → MWh) | `monthlyEnergy` (kWh → MWh) |
+| `yearly_energy_mwh` | `station.generationYear` (kWh → MWh) | `yearlyEnergy` (kWh → MWh) |
+| `total_energy_mwh` | `station.generationUploadTotalOffset` (kWh → MWh) | `totalEnergy` (kWh → MWh) |
+| `location.lat` | `station.locationLat` | `latitude` |
+| `location.lng` | `station.locationLng` | `longitude` |
+| `location.address` | `station.locationAddress` | `address` |
+| `network_status` | `station.networkStatus` (trimmed) | `communicateStatus` (1=online, 2=offline, 3=PARTIAL_OFFLINE) |
+| `vendor_created_date` | `station.createdDate` (Unix seconds) | `createTime` (Unix timestamp) |
+| `start_operating_time` | `station.startOperatingTime` (Unix seconds) | `createTime` (Unix timestamp) |
+
+**Key Differences**:
+- Solarman uses PRO API for richer data, SolarDM uses standard API
+- Solarman plant IDs are numbers, SolarDM uses strings
+- Solarman network status is string-based, SolarDM uses numeric codes
+- Solarman has separate `createdDate` and `startOperatingTime`, SolarDM uses same `createTime` for both
+
+### Alert Synchronization Comparison
+
+| Aspect | Solarman | SolarDM |
+|--------|----------|---------|
+| **Endpoint** | `POST /maintain-s/operating/station/alert/v2/list` | `GET /dms/inverter_fault/page_list/all` |
+| **Method** | POST with JSON body | GET with query parameters |
+| **Pagination** | `page`, `size` in request body | `current`, `size` in query params |
+| **Filtering** | `alertQueryName: "No Mains Voltage"` in body | `faultInfo: "There is no mains voltage"` in query |
+| **Device Filter** | `deviceType: "INVERTER"` (filtered but not stored) | No device type filter (all alerts) |
+| **Response Structure** | `{ total, data[] }` | `{ code, message, data: { records[], total, pages } }` |
+
+**Alert Data Mapping**:
+
+| Database Field | Solarman Source | SolarDM Source |
+|----------------|-----------------|----------------|
+| `vendor_alert_id` | `id` (string) | `id` (string) |
+| `vendor_plant_id` | `stationId` (number → string) | `plantId` (string) |
+| `title` | `alertName` | `faultInfo` |
+| `description` | `alertName` (same as title) | `faultInfo` (same as title) |
+| `alert_time` | `alertTime` (Unix seconds → ISO) | `happenTime` ("YYYY-MM-DD HH:mm:ss" → ISO) |
+| `end_time` | `endTime` (Unix seconds → ISO) | `recoverTime` ("YYYY-MM-DD HH:mm:ss" → ISO) |
+| `severity` | `level` + `influence` (mapped) | `faultLevel` (1=LOW, 2=MEDIUM, 3=HIGH, 4=CRITICAL) |
+| `status` | Based on `endTime` presence | Based on `recoverTime` presence |
+
+**Severity Mapping**:
+
+**Solarman**:
+```typescript
+// level: 0=Info, 1=Warning, 2=Error
+const severityMap = { 0: "LOW", 1: "MEDIUM", 2: "HIGH" }
+// influence: 2=Safety, 3=Production+Safety → CRITICAL
+if (influence === 2 || influence === 3) severity = "CRITICAL"
+```
+
+**SolarDM**:
+```typescript
+// faultLevel: 1=LOW, 2=MEDIUM, 3=HIGH, 4=CRITICAL
+const severityMap = { 1: "LOW", 2: "MEDIUM", 3: "HIGH", 4: "CRITICAL" }
+```
+
+**Key Differences**:
+- Solarman uses POST with body, SolarDM uses GET with query params
+- Solarman timestamps are Unix seconds, SolarDM uses "YYYY-MM-DD HH:mm:ss" format
+- Solarman severity combines `level` + `influence`, SolarDM uses single `faultLevel`
+- Solarman filters by device type, SolarDM does not
+- Both use same alert title for both `title` and `description` fields
+
+### Telemetry Comparison
+
+| Aspect | Solarman | SolarDM |
+|--------|----------|---------|
+| **Daily Endpoint** | `GET /maintain-s/history/power/{systemId}/record?year={year}&month={month}&day={day}` | `GET /dms/data_panel/history/stats/daily/{plantId}?type=date&time=YYYY-MM-DD` |
+| **Monthly Endpoint** | `GET /maintain-s/history/power/{systemId}/stats/month?year={year}&month={month}` | `GET /dms/data_panel/history/stats/month/{plantId}?type=month&time=YYYY-MM` |
+| **Yearly Endpoint** | `GET /maintain-s/history/power/{systemId}/stats/year?year={year}` | `GET /dms/data_panel/history/stats/year/{plantId}?type=year&time=YYYY` |
+| **Total Endpoint** | `GET /maintain-s/history/power/{systemId}/stats/total?startYear={start}&endYear={end}` | `GET /dms/data_panel/history/stats/total/{plantId}?type=all&time=YYYY+~+YYYY` |
+| **Data Format** | 5-minute intervals with power (W) | 20-minute intervals with power (W) |
+| **Energy Calculation** | Sum of power over intervals | Sum of `generationEnergy` (kWh) from `dataList` |
+| **Statistics** | Includes `fullPowerHours` | Does not include `fullPowerHours` |
+
+**Key Differences**:
+- Solarman uses numeric `systemId` in path, SolarDM uses string `plantId`
+- Solarman provides `fullPowerHours` statistics, SolarDM does not
+- Solarman uses 5-minute intervals, SolarDM uses 20-minute intervals
+- Solarman calculates energy from power, SolarDM provides pre-calculated energy values
+
+### API Request Headers Comparison
+
+| Header | Solarman | SolarDM |
+|--------|----------|---------|
+| **Authorization** | `Bearer {token}` | `Bearer {token}` |
+| **Accept** | `application/json, text/plain, */*` | `application/json, text/plain, */*` |
+| **Content-Type** | `application/json` (POST only) | `application/json` (POST only) |
+| **Additional Headers** | None required | `Accept-Language: en-US`, `Connection: keep-alive`, `Origin`, `Referer`, `User-Agent` |
+
+**Key Differences**:
+- SolarDM requires browser-like headers (Origin, Referer, User-Agent) for some endpoints
+- Solarman works with minimal headers
+- Both use Bearer token authentication
+
+### Error Handling Comparison
+
+| Aspect | Solarman | SolarDM |
+|--------|----------|---------|
+| **Success Code** | HTTP 200 with `success: true` | HTTP 200 with `code: 0` |
+| **Error Response** | `{ success: false, msg: "error message" }` | `{ code: non-zero, message: "error message" }` |
+| **Token Expiration** | Returns 401 Unauthorized | Returns 401 Unauthorized |
+| **Pagination Errors** | Returns empty `data[]` array | Returns `code: 0` with empty `records[]` |
+
+### Implementation Notes
+
+**Common Patterns**:
+- Both vendors use Bearer token authentication
+- Both store tokens in database with expiration
+- Both support pagination for alerts
+- Both filter alerts to "No Mains Voltage" / "There is no mains voltage"
+- Both calculate grid downtime benefit using 9 AM - 4 PM window
+
+**Vendor-Specific Considerations**:
+- **Solarman**: Prefer PRO API for richer plant data
+- **Solarman**: Handle both user-level and org-level authentication
+- **SolarDM**: Always include browser-like headers for API calls
+- **SolarDM**: Handle `pages: 0` in pagination responses (calculate from `total`)
+- **SolarDM**: Parse date strings in "YYYY-MM-DD HH:mm:ss" format
+- **SolarDM**: Map numeric network status codes to string values
+
+---
+
 ## Solarman Example
 
 This section provides a complete example using Solarman as a reference implementation.
@@ -692,6 +859,285 @@ if (influence === 2 || influence === 3) {
 case 'SOLARMAN':
   return new SolarmanAdapter(config)
 ```
+
+---
+
+## SolarDM Example
+
+This section provides a complete example using SolarDM as a reference implementation.
+
+### 1. Vendor Configuration
+
+**Database Entry**:
+```sql
+INSERT INTO vendors (name, vendor_type, credentials, org_id, is_active)
+VALUES (
+  'SolarDM Production',
+  'SOLARDM',
+  '{"email": "vendor@example.com", "passwordRSA": "encrypted_password"}'::jsonb,
+  1,
+  true
+);
+```
+
+**Environment Variables**:
+```env
+SOLARDM_API_BASE_URL=http://global.solar-dm.com:8010
+```
+
+### 2. Authentication
+
+**Endpoint**: `POST /ums/business/email_login`
+
+**Request**:
+```json
+{
+  "email": "vendor@example.com",
+  "password": "encrypted_password"
+}
+```
+
+**Response**:
+```json
+{
+  "code": 0,
+  "message": "Success",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "refresh_token_string",
+    "expiresIn": 3600
+  }
+}
+```
+
+**Implementation**:
+- Token is cached in `vendors.access_token`
+- Expiration stored in `vendors.token_expires_at`
+- Token is validated before each API call
+
+### 3. Plant Listing
+
+**Endpoint**: `GET /dms/plant/list_all`
+
+**Request**: No body, authenticated GET request
+
+**Response Structure**:
+```json
+{
+  "code": 0,
+  "message": "Success",
+  "data": [
+    {
+      "id": "1931246821487521793",
+      "plantName": "34963900110105",
+      "capacity": 5.0,
+      "latitude": 30.740103,
+      "longitude": 76.744538,
+      "address": "Chandigarh",
+      "communicateStatus": 1,
+      "createTime": 1580112893000,
+      "currentPower": 2196.0,
+      "dailyEnergy": 12.5,
+      "monthlyEnergy": 350.0,
+      "yearlyEnergy": 4200.0,
+      "totalEnergy": 50000.0
+    }
+  ]
+}
+```
+
+### 4. Data Mapping
+
+| SolarDM Field | Type | Conversion | Database Column |
+|---------------|------|------------|-----------------|
+| `id` | string | Direct | `vendor_plant_id` |
+| `plantName` | string | Direct | `name` |
+| `capacity` | number (kW) | Direct | `capacity_kw` |
+| `currentPower` | number (W) | `/ 1000` | `current_power_kw` |
+| `dailyEnergy` | number (kWh) | Direct | `daily_energy_kwh` |
+| `monthlyEnergy` | number (kWh) | `/ 1000` | `monthly_energy_mwh` |
+| `yearlyEnergy` | number (kWh) | `/ 1000` | `yearly_energy_mwh` |
+| `totalEnergy` | number (kWh) | `/ 1000` | `total_energy_mwh` |
+| `latitude` | number | Combined | `location.lat` |
+| `longitude` | number | Combined | `location.lng` |
+| `address` | string | Combined | `location.address` |
+| `communicateStatus` | number | `1=online, 2=offline, 3=PARTIAL_OFFLINE` | `network_status` |
+| `createTime` | number (Unix ms) | `new Date(ts).toISOString()` | `vendor_created_date` |
+| `createTime` | number (Unix ms) | `new Date(ts).toISOString()` | `start_operating_time` |
+
+### 5. Alert Synchronization
+
+**Endpoint**: `GET /dms/inverter_fault/page_list/all?current=1&size=100&faultInfo=There%20is%20no%20mains%20voltage`
+
+**Request**: Query parameters only (no body)
+
+**Response**:
+```json
+{
+  "code": 0,
+  "message": "Success",
+  "data": {
+    "records": [
+      {
+        "id": "1994579265913106434",
+        "faultInfo": "There is no mains voltage",
+        "faultInfoEN": "There is no mains voltage",
+        "faultLevel": 1,
+        "plantId": "1931246821487521793",
+        "happenTime": "2025-11-29 06:58:21",
+        "recoverTime": null
+      }
+    ],
+    "total": 1,
+    "pages": 0
+  }
+}
+```
+
+**Alert Mapping**:
+- `id` → `vendor_alert_id` (as string)
+- `plantId` → `vendor_plant_id` (as string)
+- `faultInfo` → `title` and `description` (same value)
+- `happenTime` → `alert_time` ("YYYY-MM-DD HH:mm:ss" → ISO 8601)
+- `recoverTime` → `end_time` ("YYYY-MM-DD HH:mm:ss" → ISO 8601, nullable)
+- `faultLevel` → `severity` (1=LOW, 2=MEDIUM, 3=HIGH, 4=CRITICAL)
+
+**Severity Mapping**:
+```typescript
+const severityMap = {
+  1: "LOW",
+  2: "MEDIUM",
+  3: "HIGH",
+  4: "CRITICAL"
+}
+```
+
+**Important Notes**:
+- Handle `pages: 0` in response by calculating from `total` records
+- Parse date strings in "YYYY-MM-DD HH:mm:ss" format
+- Include browser-like headers (Origin, Referer, User-Agent) for API calls
+
+### 6. Adapter Implementation
+
+**File**: `lib/vendors/solarDmAdapter.ts`
+
+**Key Methods**:
+- `authenticate()` - Handles email/password authentication
+- `listPlants()` - Fetches plants from `/dms/plant/list_all`
+- `getTokenFromDB()` - Retrieves cached token
+- `storeTokenInDB()` - Stores token with expiration
+- `getApiBaseUrl()` - Gets API base URL from env vars
+- `normalizeAlert()` - Maps SolarDM alert format to standard Alert interface
+- `getAllAlerts()` - Fetches all alerts with pagination
+- `getDailyTelemetryRecords()`, `getMonthlyTelemetryRecords()`, etc. - Telemetry methods
+
+**Registration**: Adapter is registered in `lib/vendors/vendorManager.ts`:
+```typescript
+case 'SOLARDM':
+  return new SolarDmAdapter(config)
+```
+
+---
+
+## ShineMonitor Example
+
+This section provides a complete example using ShineMonitor as a reference implementation.
+
+### 1. Vendor Configuration
+
+**Database Entry**:
+```sql
+INSERT INTO vendors (name, vendor_type, credentials, org_id, is_active)
+VALUES (
+  'ShineMonitor Production',
+  'SHINEMONITOR',
+  '{"user_name": "KRPC", "pass_hash": "6c8f8c16df43ccf76d2b05da9b2f8d360eddf5d4", "company_key": "bnrl_frRFjEz8Mkn"}'::jsonb,
+  1,
+  true
+);
+```
+
+**Environment Variables**:
+```env
+SHINEMONITOR_API_BASE_URL=https://web.shinemonitor.com/public
+```
+
+### 2. Authentication
+
+**Endpoint**: `GET /?sign={sign}&salt={salt}&action=auth&usr={user_name}&company-key={company_key}`
+
+**Authentication Process**:
+1. Generate `salt` = current timestamp in milliseconds: `new Date().getTime()`
+2. Generate `sign` = SHA1(salt + pass_hash + action_string)
+   - `action_string` = `&action=auth&usr={user_name}&company-key={company_key}`
+3. Make GET request with sign and salt as query parameters
+
+**Example Calculation**:
+- `user_name` = "KRPC"
+- `pass_hash` = "6c8f8c16df43ccf76d2b05da9b2f8d360eddf5d4"
+- `company_key` = "bnrl_frRFjEz8Mkn"
+- `salt` = 1764487501695
+- `action_string` = "&action=auth&usr=KRPC&company-key=bnrl_frRFjEz8Mkn"
+- `sign` = SHA1("1764487501695" + "6c8f8c16df43ccf76d2b05da9b2f8d360eddf5d4" + "&action=auth&usr=KRPC&company-key=bnrl_frRFjEz8Mkn")
+- `sign` = "7ebb5a792ff29c80fecc37f75e2b551f746e1efb"
+
+**Request**:
+```
+GET /?sign=7ebb5a792ff29c80fecc37f75e2b551f746e1efb&salt=1764487501695&action=auth&usr=KRPC&company-key=bnrl_frRFjEz8Mkn
+Headers:
+  Accept: application/json
+  Origin: https://kstar.shinemonitor.com
+  Referer: https://kstar.shinemonitor.com/
+```
+
+**Response**:
+```json
+{
+  "err": 0,
+  "desc": "ERR_NONE",
+  "dat": {
+    "secret": "961cfabc5413955995218cae0fe5c195a783086a",
+    "expire": 432000,
+    "token": "fda947c492cd1af56d93bf3806b5c2ca79de3356812d84af608d52abd67443ea",
+    "role": 2,
+    "usr": "KRPC",
+    "uid": 5077101
+  }
+}
+```
+
+**Implementation**:
+- Token is cached in `vendors.access_token`
+- Secret is stored in `vendors.token_metadata.secret`
+- Expiration stored in `vendors.token_expires_at` (expire is in seconds)
+- Token is validated before each API call
+
+**Key Points**:
+- Salt must be generated fresh for each authentication request
+- Sign is calculated using SHA1 hash of (salt + pass_hash + action_string)
+- Both `token` and `secret` are required for future API calls
+- `expire` is in seconds (432000 = 5 days)
+- Success is indicated by `err: 0` and `desc: "ERR_NONE"`
+
+### 3. Adapter Implementation
+
+**File**: `lib/vendors/shineMonitorAdapter.ts`
+
+**Key Methods**:
+- `authenticate()` - Handles sign/salt authentication flow
+- `generateSalt()` - Generates current timestamp as salt
+- `generateSign()` - Calculates SHA1 sign for authentication
+- `getTokenFromDB()` - Retrieves cached token and secret
+- `storeTokenInDB()` - Stores token, secret, and expiration
+- `getApiBaseUrl()` - Gets API base URL from env vars
+
+**Registration**: Adapter is registered in `lib/vendors/vendorManager.ts`:
+```typescript
+case 'SHINEMONITOR':
+  return new ShineMonitorAdapter(config)
+```
+
+**Note**: Plant listing, telemetry, and alerts endpoints are not yet implemented and will need to be added once the API documentation is available.
 
 ---
 

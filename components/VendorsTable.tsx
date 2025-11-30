@@ -110,6 +110,10 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     // SolarDM fields
     email: "",
     passwordRSA: "",
+    // ShineMonitor fields
+    user_name: "",
+    pass_hash: "",
+    company_key: "",
     is_active: true,
   })
 
@@ -192,6 +196,10 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         // SolarDM fields
         email: vendor.credentials.email || "",
         passwordRSA: vendor.credentials.passwordRSA || "",
+        // ShineMonitor fields
+        user_name: vendor.credentials.user_name || "",
+        pass_hash: vendor.credentials.pass_hash || "",
+        company_key: vendor.credentials.company_key || "",
         is_active: vendor.is_active,
       })
     } else {
@@ -209,6 +217,10 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         // SolarDM fields
         email: "",
         passwordRSA: "",
+        // ShineMonitor fields
+        user_name: "",
+        pass_hash: "",
+        company_key: "",
         is_active: true,
       })
     }
@@ -231,6 +243,11 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       // SolarDM only requires email and passwordRSA
       credentials.email = formData.email
       credentials.passwordRSA = formData.passwordRSA
+    } else if (formData.vendor_type === "SHINEMONITOR") {
+      // ShineMonitor only requires user_name, pass_hash, and company_key
+      credentials.user_name = formData.user_name
+      credentials.pass_hash = formData.pass_hash
+      credentials.company_key = formData.company_key
     } else {
       // Solarman and other vendors
       credentials.appId = formData.appId
@@ -426,6 +443,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                   <SelectContent>
                     <SelectItem value="SOLARMAN">Solarman</SelectItem>
                     <SelectItem value="SOLARDM">SolarDM</SelectItem>
+                    <SelectItem value="SHINEMONITOR">ShineMonitor</SelectItem>
                     <SelectItem value="SUNGROW">Sungrow</SelectItem>
                     <SelectItem value="OTHER">Other</SelectItem>
                   </SelectContent>
@@ -495,6 +513,56 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                     <p className="text-xs text-muted-foreground mt-1">
                       RSA encrypted password for SolarDM authentication
                     </p>
+                  </div>
+                </>
+              ) : formData.vendor_type === "SHINEMONITOR" ? (
+                <>
+                  {/* ShineMonitor Fields - Only user_name, pass_hash, and company_key */}
+                  <div>
+                    <Label htmlFor="user_name">User Name *</Label>
+                    <Input
+                      id="user_name"
+                      value={formData.user_name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, user_name: e.target.value })
+                      }
+                      required
+                      className="mt-1"
+                      placeholder="KRPC"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="pass_hash">Password (SHA1 Hash) *</Label>
+                    <Input
+                      id="pass_hash"
+                      type="password"
+                      value={formData.pass_hash}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          pass_hash: e.target.value,
+                        })
+                      }
+                      required
+                      className="mt-1"
+                      placeholder="SHA1 hashed password"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      SHA1 hashed password for ShineMonitor authentication
+                    </p>
+                  </div>
+                  <div>
+                    <Label htmlFor="company_key">Company Key *</Label>
+                    <Input
+                      id="company_key"
+                      value={formData.company_key}
+                      onChange={(e) =>
+                        setFormData({ ...formData, company_key: e.target.value })
+                      }
+                      required
+                      className="mt-1"
+                      placeholder="bnrl_frRFjEz8Mkn"
+                    />
                   </div>
                 </>
               ) : (
