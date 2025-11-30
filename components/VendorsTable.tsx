@@ -110,10 +110,17 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     // SolarDM fields
     email: "",
     passwordRSA: "",
+<<<<<<< Updated upstream
     // ShineMonitor fields
     user_name: "",
     pass_hash: "",
     company_key: "",
+=======
+    // PVBlink fields
+    password: "",
+    // Foxesscloud fields
+    passwordMD5: "",
+>>>>>>> Stashed changes
     is_active: true,
   })
 
@@ -196,10 +203,17 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         // SolarDM fields
         email: vendor.credentials.email || "",
         passwordRSA: vendor.credentials.passwordRSA || "",
+<<<<<<< Updated upstream
         // ShineMonitor fields
         user_name: vendor.credentials.user_name || "",
         pass_hash: vendor.credentials.pass_hash || "",
         company_key: vendor.credentials.company_key || "",
+=======
+        // PVBlink fields
+        password: vendor.credentials.password || "",
+        // Foxesscloud fields
+        passwordMD5: vendor.credentials.passwordMD5 || "",
+>>>>>>> Stashed changes
         is_active: vendor.is_active,
       })
     } else {
@@ -217,10 +231,17 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         // SolarDM fields
         email: "",
         passwordRSA: "",
+<<<<<<< Updated upstream
         // ShineMonitor fields
         user_name: "",
         pass_hash: "",
         company_key: "",
+=======
+        // PVBlink fields
+        password: "",
+        // Foxesscloud fields
+        passwordMD5: "",
+>>>>>>> Stashed changes
         is_active: true,
       })
     }
@@ -243,11 +264,22 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       // SolarDM only requires email and passwordRSA
       credentials.email = formData.email
       credentials.passwordRSA = formData.passwordRSA
+<<<<<<< Updated upstream
     } else if (formData.vendor_type === "SHINEMONITOR") {
       // ShineMonitor only requires user_name, pass_hash, and company_key
       credentials.user_name = formData.user_name
       credentials.pass_hash = formData.pass_hash
       credentials.company_key = formData.company_key
+=======
+    } else if (formData.vendor_type === "PVBLINK") {
+      // PVBlink only requires email and password
+      credentials.email = formData.email
+      credentials.password = formData.password
+    } else if (formData.vendor_type === "FOXESSCLOUD") {
+      // Foxesscloud only requires username and passwordMD5
+      credentials.username = formData.username
+      credentials.passwordMD5 = formData.passwordMD5
+>>>>>>> Stashed changes
     } else {
       // Solarman and other vendors
       credentials.appId = formData.appId
@@ -443,7 +475,12 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                   <SelectContent>
                     <SelectItem value="SOLARMAN">Solarman</SelectItem>
                     <SelectItem value="SOLARDM">SolarDM</SelectItem>
+<<<<<<< Updated upstream
                     <SelectItem value="SHINEMONITOR">ShineMonitor</SelectItem>
+=======
+                    <SelectItem value="PVBLINK">PV Blink</SelectItem>
+                    <SelectItem value="FOXESSCLOUD">PV Hub[Foxesscloud]</SelectItem>
+>>>>>>> Stashed changes
                     <SelectItem value="SUNGROW">Sungrow</SelectItem>
                     <SelectItem value="OTHER">Other</SelectItem>
                   </SelectContent>
@@ -515,6 +552,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                     </p>
                   </div>
                 </>
+<<<<<<< Updated upstream
               ) : formData.vendor_type === "SHINEMONITOR" ? (
                 <>
                   {/* ShineMonitor Fields - Only user_name, pass_hash, and company_key */}
@@ -541,10 +579,40 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                         setFormData({
                           ...formData,
                           pass_hash: e.target.value,
+=======
+              ) : formData.vendor_type === "PVBLINK" ? (
+                <>
+                  {/* PVBlink Fields - Only email and password */}
+                  <div>
+                    <Label htmlFor="email">Email *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
+                      required
+                      className="mt-1"
+                      placeholder="vendor@example.com"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="password">Password *</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          password: e.target.value,
+>>>>>>> Stashed changes
                         })
                       }
                       required
                       className="mt-1"
+<<<<<<< Updated upstream
                       placeholder="SHA1 hashed password"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
@@ -564,6 +632,51 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                       placeholder="bnrl_frRFjEz8Mkn"
                     />
                   </div>
+=======
+                      placeholder="Password"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Password for PVBlink authentication
+                    </p>
+                  </div>
+                </>
+              ) : formData.vendor_type === "FOXESSCLOUD" ? (
+                <>
+                  {/* Foxesscloud Fields - Only username and passwordMD5 */}
+                  <div>
+                    <Label htmlFor="username">Username *</Label>
+                    <Input
+                      id="username"
+                      value={formData.username}
+                      onChange={(e) =>
+                        setFormData({ ...formData, username: e.target.value })
+                      }
+                      required
+                      className="mt-1"
+                      placeholder="Enter username"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="passwordMD5">Password (MD5) *</Label>
+                    <Input
+                      id="passwordMD5"
+                      type="password"
+                      value={formData.passwordMD5}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          passwordMD5: e.target.value,
+                        })
+                      }
+                      required
+                      className="mt-1"
+                      placeholder="MD5 hashed password"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      MD5 hashed password for Foxesscloud authentication
+                    </p>
+                  </div>
+>>>>>>> Stashed changes
                 </>
               ) : (
                 <>
