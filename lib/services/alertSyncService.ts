@@ -312,7 +312,7 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
     const vendorConfig: VendorConfig = {
       id: vendor.id,
       name: vendor.name,
-      vendorType: vendor.vendor_type as "SOLARMAN" | "SUNGROW" | "OTHER",
+      vendorType: vendor.vendor_type as "SOLARMAN" | "SOLARDM" | "SHINEMONITOR" | "PVBLINK" | "FOXESSCLOUD" | "OTHER",
       credentials: vendor.credentials as Record<string, any>,
       isActive: vendor.is_active,
     }
@@ -638,7 +638,7 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
     const vendorConfig: VendorConfig = {
       id: vendor.id,
       name: vendor.name,
-      vendorType: vendor.vendor_type as "SOLARDM" | "SOLARMAN" | "SUNGROW" | "OTHER",
+      vendorType: vendor.vendor_type as "SOLARDM" | "SOLARMAN" | "SHINEMONITOR" | "PVBLINK" | "FOXESSCLOUD" | "OTHER",
       credentials: vendor.credentials as Record<string, any>,
       isActive: vendor.is_active,
     }

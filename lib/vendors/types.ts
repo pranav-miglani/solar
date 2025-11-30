@@ -5,11 +5,7 @@ export interface VendorCredentials {
 export interface VendorConfig {
   id: number
   name: string
-<<<<<<< Updated upstream
-  vendorType: 'SOLARMAN' | 'SOLARDM' | 'SHINEMONITOR' | 'SUNGROW' | 'OTHER'
-=======
-  vendorType: 'SOLARMAN' | 'SOLARDM' | 'SUNGROW' | 'PVBLINK' | 'FOXESSCLOUD' | 'OTHER'
->>>>>>> Stashed changes
+  vendorType: 'SOLARMAN' | 'SOLARDM' | 'SHINEMONITOR' | 'PVBLINK' | 'FOXESSCLOUD' | 'OTHER'
   apiBaseUrl?: string // Optional - can be read from environment variables instead
   credentials: VendorCredentials
   isActive: boolean

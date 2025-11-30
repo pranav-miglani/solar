@@ -83,7 +83,7 @@ export async function POST(
                     const vendorConfig: VendorConfig = {
                       id: vendor.id,
                       name: vendor.name,
-                      vendorType: vendor.vendor_type as "SOLARMAN" | "SUNGROW" | "OTHER",
+                      vendorType: vendor.vendor_type as "SOLARMAN" | "SOLARDM" | "SHINEMONITOR" | "PVBLINK" | "FOXESSCLOUD" | "OTHER",
                       // apiBaseUrl removed - now read from environment variables (e.g., SOLARMAN_API_BASE_URL)
                       credentials: vendor.credentials as Record<string, any>,
                       isActive: vendor.is_active,

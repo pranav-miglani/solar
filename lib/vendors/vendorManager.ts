@@ -64,7 +64,7 @@ VendorManager.registerAdapter("SHINEMONITOR", ShineMonitorAdapter)
 VendorManager.registerAdapter("PVBLINK", PvBlinkAdapter)
 VendorManager.registerAdapter("FOXESSCLOUD", FoxesscloudAdapter)
 
-// Example: To add a new vendor (e.g., Sungrow), create SungrowAdapter extending BaseVendorAdapter
+// Example: To add a new vendor, create a new adapter extending BaseVendorAdapter
 // and register it here:
-// VendorManager.registerAdapter("SUNGROW", SungrowAdapter)
+// VendorManager.registerAdapter("VENDOR_TYPE", VendorAdapter)
 
