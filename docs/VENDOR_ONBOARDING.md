@@ -8,10 +8,14 @@ This document outlines the requirements and process for onboarding a new vendor 
 2. [Vendor Configuration Requirements](#vendor-configuration-requirements)
 3. [Database Schema](#database-schema)
 4. [Required API Endpoints](#required-api-endpoints)
-5. [Data Mapping Requirements](#data-mapping-requirements)
-6. [Solarman Example](#solarman-example)
-7. [Implementation Checklist](#implementation-checklist)
-8. [Testing Requirements](#testing-requirements)
+5. [Alert Mapping Requirements](#alert-mapping-requirements)
+6. [Data Mapping Requirements](#data-mapping-requirements)
+7. [Vendor Comparison: Solarman vs SolarDM](#vendor-comparison-solarman-vs-solardm)
+8. [Solarman Example](#solarman-example)
+9. [SolarDM Example](#solardm-example)
+10. [Implementation Checklist](#implementation-checklist)
+11. [Testing Requirements](#testing-requirements)
+12. [Common Pitfalls](#common-pitfalls)
 
 ---
 
@@ -40,7 +44,7 @@ When creating a vendor in the database, the following fields are required:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | TEXT | ✅ Yes | Vendor display name (e.g., "Solarman Production") |
-| `vendor_type` | ENUM | ✅ Yes | One of: `SOLARMAN`, `SOLARDM`, `SHINEMONITOR`, `SUNGROW`, `OTHER` |
+| `vendor_type` | ENUM | ✅ Yes | One of: `SOLARMAN`, `SOLARDM`, `SUNGROW`, `OTHER` |
 | `credentials` | JSONB | ✅ Yes | Vendor-specific authentication credentials (see below) |
 | `org_id` | INTEGER | Optional | Organization ID (NULL for global/shared vendors) |
 | `is_active` | BOOLEAN | Optional | Active status (default: `true`) |
@@ -68,7 +72,6 @@ API base URLs are stored in environment variables, not in the database:
 - `SOLARMAN_API_BASE_URL` - Base URL for Solarman API
 - `SOLARMAN_PRO_API_BASE_URL` - (Optional) PRO API base URL for Solarman
 - `SOLARDM_API_BASE_URL` - Base URL for SolarDM API
-- `SHINEMONITOR_API_BASE_URL` - Base URL for ShineMonitor API
 - `SUNGROW_API_BASE_URL` - Base URL for Sungrow API
 - `{VENDOR}_API_BASE_URL` - Pattern for other vendors
 
@@ -77,7 +80,6 @@ API base URLs are stored in environment variables, not in the database:
 SOLARMAN_API_BASE_URL=https://globalapi.solarmanpv.com
 SOLARMAN_PRO_API_BASE_URL=https://globalpro.solarmanpv.com
 SOLARDM_API_BASE_URL=http://global.solar-dm.com:8010
-SHINEMONITOR_API_BASE_URL=https://web.shinemonitor.com/public
 ```
 
 ### 3. Token Management
@@ -681,11 +683,13 @@ INSERT INTO vendors (name, vendor_type, credentials, org_id, is_active)
 VALUES (
   'Solarman Production',
   'SOLARMAN',
-  '{"username": "vendor_username", "password": "vendor_password"}'::jsonb,
+  '{"appId": "vendor_app_id", "appSecret": "vendor_app_secret", "username": "vendor_username", "passwordSha256": "sha256_hashed_password", "solarmanOrgId": 12345}'::jsonb,
   1,
   true
 );
 ```
+
+**Note**: `solarmanOrgId` is optional. If provided, authentication is scoped to that Solarman organization.
 
 **Environment Variables**:
 ```env
@@ -695,16 +699,19 @@ SOLARMAN_PRO_API_BASE_URL=https://globalpro.solarmanpv.com
 
 ### 2. Authentication
 
-**Endpoint**: `POST /oauth/token`
+**Endpoint**: `POST /account/v1.0/token?appId={appId}`
 
 **Request**:
 ```json
 {
+  "appSecret": "vendor_app_secret",
   "username": "vendor_username",
-  "password": "vendor_password",
-  "grant_type": "password"
+  "password": "sha256_hashed_password",
+  "orgId": 12345
 }
 ```
+
+**Note**: `orgId` is optional. If provided, authentication is scoped to that organization.
 
 **Response**:
 ```json
@@ -1039,108 +1046,6 @@ case 'SOLARDM':
 
 ---
 
-## ShineMonitor Example
-
-This section provides a complete example using ShineMonitor as a reference implementation.
-
-### 1. Vendor Configuration
-
-**Database Entry**:
-```sql
-INSERT INTO vendors (name, vendor_type, credentials, org_id, is_active)
-VALUES (
-  'ShineMonitor Production',
-  'SHINEMONITOR',
-  '{"user_name": "KRPC", "pass_hash": "6c8f8c16df43ccf76d2b05da9b2f8d360eddf5d4", "company_key": "bnrl_frRFjEz8Mkn"}'::jsonb,
-  1,
-  true
-);
-```
-
-**Environment Variables**:
-```env
-SHINEMONITOR_API_BASE_URL=https://web.shinemonitor.com/public
-```
-
-### 2. Authentication
-
-**Endpoint**: `GET /?sign={sign}&salt={salt}&action=auth&usr={user_name}&company-key={company_key}`
-
-**Authentication Process**:
-1. Generate `salt` = current timestamp in milliseconds: `new Date().getTime()`
-2. Generate `sign` = SHA1(salt + pass_hash + action_string)
-   - `action_string` = `&action=auth&usr={user_name}&company-key={company_key}`
-3. Make GET request with sign and salt as query parameters
-
-**Example Calculation**:
-- `user_name` = "KRPC"
-- `pass_hash` = "6c8f8c16df43ccf76d2b05da9b2f8d360eddf5d4"
-- `company_key` = "bnrl_frRFjEz8Mkn"
-- `salt` = 1764487501695
-- `action_string` = "&action=auth&usr=KRPC&company-key=bnrl_frRFjEz8Mkn"
-- `sign` = SHA1("1764487501695" + "6c8f8c16df43ccf76d2b05da9b2f8d360eddf5d4" + "&action=auth&usr=KRPC&company-key=bnrl_frRFjEz8Mkn")
-- `sign` = "7ebb5a792ff29c80fecc37f75e2b551f746e1efb"
-
-**Request**:
-```
-GET /?sign=7ebb5a792ff29c80fecc37f75e2b551f746e1efb&salt=1764487501695&action=auth&usr=KRPC&company-key=bnrl_frRFjEz8Mkn
-Headers:
-  Accept: application/json
-  Origin: https://kstar.shinemonitor.com
-  Referer: https://kstar.shinemonitor.com/
-```
-
-**Response**:
-```json
-{
-  "err": 0,
-  "desc": "ERR_NONE",
-  "dat": {
-    "secret": "961cfabc5413955995218cae0fe5c195a783086a",
-    "expire": 432000,
-    "token": "fda947c492cd1af56d93bf3806b5c2ca79de3356812d84af608d52abd67443ea",
-    "role": 2,
-    "usr": "KRPC",
-    "uid": 5077101
-  }
-}
-```
-
-**Implementation**:
-- Token is cached in `vendors.access_token`
-- Secret is stored in `vendors.token_metadata.secret`
-- Expiration stored in `vendors.token_expires_at` (expire is in seconds)
-- Token is validated before each API call
-
-**Key Points**:
-- Salt must be generated fresh for each authentication request
-- Sign is calculated using SHA1 hash of (salt + pass_hash + action_string)
-- Both `token` and `secret` are required for future API calls
-- `expire` is in seconds (432000 = 5 days)
-- Success is indicated by `err: 0` and `desc: "ERR_NONE"`
-
-### 3. Adapter Implementation
-
-**File**: `lib/vendors/shineMonitorAdapter.ts`
-
-**Key Methods**:
-- `authenticate()` - Handles sign/salt authentication flow
-- `generateSalt()` - Generates current timestamp as salt
-- `generateSign()` - Calculates SHA1 sign for authentication
-- `getTokenFromDB()` - Retrieves cached token and secret
-- `storeTokenInDB()` - Stores token, secret, and expiration
-- `getApiBaseUrl()` - Gets API base URL from env vars
-
-**Registration**: Adapter is registered in `lib/vendors/vendorManager.ts`:
-```typescript
-case 'SHINEMONITOR':
-  return new ShineMonitorAdapter(config)
-```
-
-**Note**: Plant listing, telemetry, and alerts endpoints are not yet implemented and will need to be added once the API documentation is available.
-
----
-
 ## Implementation Checklist
 
 Use this checklist when implementing a new vendor adapter:
@@ -1373,6 +1278,6 @@ abstract class BaseVendorAdapter {
 
 ---
 
-**Last Updated**: 2025-01-XX
-**Version**: 1.0
+**Last Updated**: 2025-11-29
+**Version**: 2.0
 

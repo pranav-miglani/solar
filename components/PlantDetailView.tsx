@@ -144,8 +144,8 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
       setTelemetryLoading(true)
       let response: Response
 
-      // For Solarman, SolarDM, and ShineMonitor vendors, use the new API with date parameters
-      if ((plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM" || plant?.vendors?.vendor_type === "SHINEMONITOR") && selectedDate) {
+      // For Solarman and SolarDM vendors, use the new API with date parameters
+      if ((plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM") && selectedDate) {
         const year = selectedDate.getFullYear()
         const month = selectedDate.getMonth() + 1
         
@@ -158,11 +158,11 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
           response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}&month=${month}`)
         } else if (selectedPeriod === "year") {
           // For year view, only send year (no month, no day)
-          // Solarman, SolarDM, and ShineMonitor support year view
+          // Both Solarman and SolarDM support year view
           response = await fetch(`/api/plants/${plantId}/telemetry?year=${year}`)
         } else if (selectedPeriod === "total") {
           // For total view, send period=total and date range
-          // Solarman, SolarDM, and ShineMonitor support total view
+          // Both Solarman and SolarDM support total view
           response = await fetch(`/api/plants/${plantId}/telemetry?period=total&startYear=${startYear}&endYear=${endYear}`)
         } else {
           setTelemetry([])
@@ -170,7 +170,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
           return
         }
       } else {
-        // Fallback: return empty data if not Solarman, SolarDM, or ShineMonitor
+        // Fallback: return empty data if not Solarman or SolarDM
         setTelemetry([])
         setTelemetryStats(null)
         return
@@ -540,7 +540,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                 <CardTitle>Telemetry</CardTitle>
                 
                 {/* Period Tabs and Date Selector (for Solarman and SolarDM) */}
-                {(plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM" || plant?.vendors?.vendor_type === "SHINEMONITOR") && (
+                {(plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM") && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <Tabs 
                       value={selectedPeriod} 
@@ -641,7 +641,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                   data={telemetry} 
                   title={selectedPeriod === "day" ? "Solar Power" : selectedPeriod === "month" ? "Monthly Production" : selectedPeriod === "year" ? "Yearly Production" : selectedPeriod === "total" ? "Total Production" : "Generation Power (24h)"}
                   statistics={telemetryStats || undefined}
-                  showAreaFill={plant?.vendors?.vendor_type === "SOLARMAN" || (plant?.vendors?.vendor_type === "SOLARDM" && selectedPeriod === "day") || (plant?.vendors?.vendor_type === "SHINEMONITOR" && selectedPeriod === "day")}
+                  showAreaFill={plant?.vendors?.vendor_type === "SOLARMAN" || (plant?.vendors?.vendor_type === "SOLARDM" && selectedPeriod === "day")}
                   period={selectedPeriod}
                 />
               ) : (

@@ -163,11 +163,9 @@ export async function GET(
 
         // Check if adapter supports getTotalTelemetryRecords method
         if (typeof (adapter as any).getTotalTelemetryRecords === "function") {
-          // For Solarman: use numeric ID, for SolarDM/ShineMonitor: use string ID
+          // For Solarman: use numeric ID, for SolarDM: use string ID
           const totalData = await (adapter as any).getTotalTelemetryRecords(
-            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" 
-              ? vendorPlantId 
-              : vendorPlantIdNum,
+            vendor.vendor_type === "SOLARDM" ? vendorPlantId : vendorPlantIdNum,
             startYearNum,
             endYearNum
           )
@@ -243,11 +241,9 @@ export async function GET(
 
         // Check if adapter supports getYearlyTelemetryRecords method
         if (typeof (adapter as any).getYearlyTelemetryRecords === "function") {
-          // For Solarman: use numeric ID, for SolarDM/ShineMonitor: use string ID
+          // For Solarman: use numeric ID, for SolarDM: use string ID
           const yearlyData = await (adapter as any).getYearlyTelemetryRecords(
-            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" 
-              ? vendorPlantId 
-              : vendorPlantIdNum,
+            vendor.vendor_type === "SOLARDM" ? vendorPlantId : vendorPlantIdNum,
             yearNum
           )
 
@@ -322,11 +318,9 @@ export async function GET(
 
         // Check if adapter supports getMonthlyTelemetryRecords method
         if (typeof (adapter as any).getMonthlyTelemetryRecords === "function") {
-          // For Solarman: use numeric ID, for SolarDM/ShineMonitor: use string ID
+          // For Solarman: use numeric ID, for SolarDM: use string ID
           const monthlyData = await (adapter as any).getMonthlyTelemetryRecords(
-            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" 
-              ? vendorPlantId 
-              : vendorPlantIdNum,
+            vendor.vendor_type === "SOLARDM" ? vendorPlantId : vendorPlantIdNum,
             yearNum,
             monthNum
           )
@@ -408,18 +402,15 @@ export async function GET(
         }
 
         // Step 5: Check if adapter supports getDailyTelemetryRecords method
-        // Currently SolarmanAdapter, SolarDmAdapter, and ShineMonitorAdapter implement this method
+        // Currently SolarmanAdapter and SolarDmAdapter implement this method
         if (typeof (adapter as any).getDailyTelemetryRecords === "function") {
           // CRITICAL: Make API call to vendor using vendor_plant_id (vendor's plant identifier)
           // NEVER use our internal plant.id when calling vendor APIs
           // For Solarman: systemId parameter = vendor_plant_id (numeric)
           // For SolarDM: plantId parameter = vendor_plant_id (string, but adapter accepts string | number)
-          // For ShineMonitor: plantid parameter = vendor_plant_id (string)
           // Pass the original vendorPlantId (string) - adapter will handle conversion if needed
           const dailyData = await (adapter as any).getDailyTelemetryRecords(
-            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" 
-              ? vendorPlantId 
-              : vendorPlantIdNum, // Use string for SolarDM/ShineMonitor, number for Solarman
+            vendor.vendor_type === "SOLARDM" ? vendorPlantId : vendorPlantIdNum, // Use string for SolarDM, number for Solarman
             yearNum,
             monthNum,
             dayNum
