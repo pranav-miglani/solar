@@ -163,9 +163,9 @@ export async function GET(
 
         // Check if adapter supports getTotalTelemetryRecords method
         if (typeof (adapter as any).getTotalTelemetryRecords === "function") {
-          // For Solarman: use numeric ID, for SolarDM/ShineMonitor: use string ID
+          // For Solarman: use numeric ID, for SolarDM/ShineMonitor/PVBlink: use string ID
           const totalData = await (adapter as any).getTotalTelemetryRecords(
-            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" 
+            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" || vendor.vendor_type === "PVBLINK"
               ? vendorPlantId 
               : vendorPlantIdNum,
             startYearNum,
@@ -174,8 +174,24 @@ export async function GET(
 
           // Transform total records (yearly aggregation) to our standard format
           const telemetry = (totalData.records || []).map((record: any) => {
-            // Create timestamp from year (first day of year)
-            const timestamp = new Date(record.year, 0, 1).toISOString()
+            // Create timestamp from year
+            // PVBlink provides year in record.year, others may use dateTime
+            let year = record.year
+            let timestamp: string
+            
+            if (year) {
+              // PVBlink/Solarman: use record.year
+              timestamp = new Date(year, 0, 1).toISOString()
+            } else if (record.dateTime) {
+              // Extract year from timestamp if year not provided
+              const date = new Date(record.dateTime > 1e12 ? record.dateTime : record.dateTime * 1000)
+              year = date.getFullYear()
+              timestamp = date.toISOString()
+            } else {
+              // Fallback
+              timestamp = new Date(startYearNum, 0, 1).toISOString()
+              year = startYearNum
+            }
 
             return {
               plant_id: plantId,
@@ -186,7 +202,7 @@ export async function GET(
               timezone_offset: null,
               // For total view, we store yearly generation values
               yearly_generation_kwh: record.generationValue || null,
-              year: record.year,
+              year: year,
             }
           })
 
@@ -196,7 +212,7 @@ export async function GET(
             statistics: totalData.statistics
               ? {
                   totalGenerationKwh: totalData.statistics.generationValue || null,
-                  fullPowerHoursTotal: totalData.statistics.fullPowerHoursDay || null,
+                  fullPowerHoursTotal: totalData.statistics.fullPowerHoursDay || totalData.statistics.peakHours || null,
                   operatingTotalDays: totalData.operatingTotalDays || null,
                 }
               : null,
@@ -243,9 +259,9 @@ export async function GET(
 
         // Check if adapter supports getYearlyTelemetryRecords method
         if (typeof (adapter as any).getYearlyTelemetryRecords === "function") {
-          // For Solarman: use numeric ID, for SolarDM/ShineMonitor: use string ID
+          // For Solarman: use numeric ID, for SolarDM/ShineMonitor/PVBlink: use string ID
           const yearlyData = await (adapter as any).getYearlyTelemetryRecords(
-            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" 
+            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" || vendor.vendor_type === "PVBLINK"
               ? vendorPlantId 
               : vendorPlantIdNum,
             yearNum
@@ -253,8 +269,24 @@ export async function GET(
 
           // Transform yearly records (monthly aggregation) to our standard format
           const telemetry = (yearlyData.records || []).map((record: any) => {
-            // Create timestamp from year and month (first day of month)
-            const timestamp = new Date(yearNum, record.month - 1, 1).toISOString()
+            // Create timestamp from year and month
+            // PVBlink provides month in record.month, others may use dateTime
+            let month = record.month
+            let timestamp: string
+            
+            if (month) {
+              // PVBlink/Solarman: use record.month
+              timestamp = new Date(yearNum, month - 1, 1).toISOString()
+            } else if (record.dateTime) {
+              // Extract month from timestamp if month not provided
+              const date = new Date(record.dateTime > 1e12 ? record.dateTime : record.dateTime * 1000)
+              month = date.getMonth() + 1
+              timestamp = date.toISOString()
+            } else {
+              // Fallback
+              timestamp = new Date(yearNum, 0, 1).toISOString()
+              month = 1
+            }
 
             return {
               plant_id: plantId,
@@ -265,7 +297,7 @@ export async function GET(
               timezone_offset: null,
               // For year view, we store monthly generation values
               monthly_generation_kwh: record.generationValue || null,
-              month: record.month,
+              month: month,
             }
           })
 
@@ -275,7 +307,7 @@ export async function GET(
             statistics: yearlyData.statistics
               ? {
                   yearlyGenerationKwh: yearlyData.statistics.generationValue || null,
-                  fullPowerHoursYear: yearlyData.statistics.fullPowerHoursDay || null,
+                  fullPowerHoursYear: yearlyData.statistics.fullPowerHoursDay || yearlyData.statistics.peakHours || null,
                 }
               : null,
             period: "year",
@@ -322,9 +354,9 @@ export async function GET(
 
         // Check if adapter supports getMonthlyTelemetryRecords method
         if (typeof (adapter as any).getMonthlyTelemetryRecords === "function") {
-          // For Solarman: use numeric ID, for SolarDM/ShineMonitor: use string ID
+          // For Solarman: use numeric ID, for SolarDM/ShineMonitor/PVBlink: use string ID
           const monthlyData = await (adapter as any).getMonthlyTelemetryRecords(
-            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" 
+            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" || vendor.vendor_type === "PVBLINK"
               ? vendorPlantId 
               : vendorPlantIdNum,
             yearNum,
@@ -334,7 +366,23 @@ export async function GET(
           // Transform monthly records (daily aggregation) to our standard format
           const telemetry = (monthlyData.records || []).map((record: any) => {
             // Create timestamp from year, month, day
-            const timestamp = new Date(yearNum, monthNum - 1, record.day).toISOString()
+            // PVBlink provides day in record.day, others may use dateTime
+            let day = record.day
+            let timestamp: string
+            
+            if (day) {
+              // PVBlink/Solarman: use record.day
+              timestamp = new Date(yearNum, monthNum - 1, day).toISOString()
+            } else if (record.dateTime) {
+              // Extract day from timestamp if day not provided
+              const date = new Date(record.dateTime > 1e12 ? record.dateTime : record.dateTime * 1000)
+              day = date.getDate()
+              timestamp = date.toISOString()
+            } else {
+              // Fallback
+              timestamp = new Date(yearNum, monthNum - 1, 1).toISOString()
+              day = 1
+            }
 
             return {
               plant_id: plantId,
@@ -345,7 +393,7 @@ export async function GET(
               timezone_offset: null,
               // For month view, we store daily generation values
               daily_generation_kwh: record.generationValue || null,
-              day: record.day,
+              day: day,
             }
           })
 
@@ -355,7 +403,7 @@ export async function GET(
             statistics: monthlyData.statistics
               ? {
                   monthlyGenerationKwh: monthlyData.statistics.generationValue || null,
-                  fullPowerHoursMonth: monthlyData.statistics.fullPowerHoursDay || null,
+                  fullPowerHoursMonth: monthlyData.statistics.fullPowerHoursDay || monthlyData.statistics.peakHours || null,
                 }
               : null,
             period: "month",
@@ -408,18 +456,19 @@ export async function GET(
         }
 
         // Step 5: Check if adapter supports getDailyTelemetryRecords method
-        // Currently SolarmanAdapter, SolarDmAdapter, and ShineMonitorAdapter implement this method
+        // Currently SolarmanAdapter, SolarDmAdapter, ShineMonitorAdapter, and PvBlinkAdapter implement this method
         if (typeof (adapter as any).getDailyTelemetryRecords === "function") {
           // CRITICAL: Make API call to vendor using vendor_plant_id (vendor's plant identifier)
           // NEVER use our internal plant.id when calling vendor APIs
           // For Solarman: systemId parameter = vendor_plant_id (numeric)
           // For SolarDM: plantId parameter = vendor_plant_id (string, but adapter accepts string | number)
           // For ShineMonitor: plantid parameter = vendor_plant_id (string)
+          // For PVBlink: vendorPlantId parameter = vendor_plant_id (string)
           // Pass the original vendorPlantId (string) - adapter will handle conversion if needed
           const dailyData = await (adapter as any).getDailyTelemetryRecords(
-            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" 
+            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" || vendor.vendor_type === "PVBLINK"
               ? vendorPlantId 
-              : vendorPlantIdNum, // Use string for SolarDM/ShineMonitor, number for Solarman
+              : vendorPlantIdNum, // Use string for SolarDM/ShineMonitor/PVBlink, number for Solarman
             yearNum,
             monthNum,
             dayNum
@@ -428,10 +477,22 @@ export async function GET(
           // Step 6: Transform vendor response to our standard format
           // Each vendor adapter returns vendor-specific format, we normalize it here
           const telemetry = (dailyData.records || []).map((record: any) => {
-            // Handle different timestamp formats (Unix seconds or ISO string)
+            // Handle different timestamp formats:
+            // - Solarman: Unix seconds (dateTime * 1000)
+            // - PVBlink: Unix milliseconds (dateTime already in ms)
+            // - SolarDM/ShineMonitor: ISO string (ts)
             let timestamp: string
             if (typeof record.dateTime === "number") {
-              timestamp = new Date(record.dateTime * 1000).toISOString()
+              // Check if it's milliseconds (PVBlink) or seconds (Solarman)
+              // PVBlink timestamps are typically > 1e12 (milliseconds since epoch)
+              // Solarman timestamps are typically < 1e10 (seconds since epoch)
+              if (record.dateTime > 1e12) {
+                // PVBlink: already in milliseconds
+                timestamp = new Date(record.dateTime).toISOString()
+              } else {
+                // Solarman: convert seconds to milliseconds
+                timestamp = new Date(record.dateTime * 1000).toISOString()
+              }
             } else if (record.ts) {
               timestamp = record.ts
             } else {
@@ -439,8 +500,11 @@ export async function GET(
             }
 
             // Convert power from W to kW if needed, or use as-is if already in kW
+            // PVBlink provides power in kW, Solarman provides in W
             const powerKw = record.generationPower
-              ? record.generationPower / 1000 // Convert W to kW
+              ? (vendor.vendor_type === "PVBLINK" 
+                  ? record.generationPower // PVBlink: already in kW
+                  : record.generationPower / 1000) // Solarman: convert W to kW
               : record.power_kw || record.generation_power_kw || 0
 
             return {
@@ -459,7 +523,7 @@ export async function GET(
             statistics: dailyData.statistics
               ? {
                   dailyGenerationKwh: dailyData.statistics.generationValue || null,
-                  fullPowerHoursDay: dailyData.statistics.fullPowerHoursDay || null,
+                  fullPowerHoursDay: dailyData.statistics.fullPowerHoursDay || dailyData.statistics.peakHours || null,
                 }
               : null,
             period: "day",

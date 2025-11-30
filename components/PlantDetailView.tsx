@@ -144,8 +144,8 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
       setTelemetryLoading(true)
       let response: Response
 
-      // For Solarman, SolarDM, and ShineMonitor vendors, use the new API with date parameters
-      if ((plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM" || plant?.vendors?.vendor_type === "SHINEMONITOR") && selectedDate) {
+      // For Solarman, SolarDM, ShineMonitor, and PVBlink vendors, use the new API with date parameters
+      if ((plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM" || plant?.vendors?.vendor_type === "SHINEMONITOR" || plant?.vendors?.vendor_type === "PVBLINK") && selectedDate) {
         const year = selectedDate.getFullYear()
         const month = selectedDate.getMonth() + 1
         
@@ -539,8 +539,8 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
               <div className="flex flex-col gap-4">
                 <CardTitle>Telemetry</CardTitle>
                 
-                {/* Period Tabs and Date Selector (for Solarman and SolarDM) */}
-                {(plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM" || plant?.vendors?.vendor_type === "SHINEMONITOR") && (
+                {/* Period Tabs and Date Selector (for Solarman, SolarDM, ShineMonitor, and PVBlink) */}
+                {(plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM" || plant?.vendors?.vendor_type === "SHINEMONITOR" || plant?.vendors?.vendor_type === "PVBLINK") && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <Tabs 
                       value={selectedPeriod} 
@@ -641,7 +641,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                   data={telemetry} 
                   title={selectedPeriod === "day" ? "Solar Power" : selectedPeriod === "month" ? "Monthly Production" : selectedPeriod === "year" ? "Yearly Production" : selectedPeriod === "total" ? "Total Production" : "Generation Power (24h)"}
                   statistics={telemetryStats || undefined}
-                  showAreaFill={plant?.vendors?.vendor_type === "SOLARMAN" || (plant?.vendors?.vendor_type === "SOLARDM" && selectedPeriod === "day") || (plant?.vendors?.vendor_type === "SHINEMONITOR" && selectedPeriod === "day")}
+                  showAreaFill={plant?.vendors?.vendor_type === "SOLARMAN" || (plant?.vendors?.vendor_type === "SOLARDM" && selectedPeriod === "day") || (plant?.vendors?.vendor_type === "SHINEMONITOR" && selectedPeriod === "day") || (plant?.vendors?.vendor_type === "PVBLINK" && selectedPeriod === "day")}
                   period={selectedPeriod}
                 />
               ) : (

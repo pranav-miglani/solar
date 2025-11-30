@@ -49,6 +49,50 @@ interface PvBlinkPlantResponse {
   data: PvBlinkPlant[]
 }
 
+interface PvBlinkDailyTelemetryResponse {
+  data: {
+    peakHours: number
+    production: number // Total daily production (kWh)
+    productionData: Array<{
+      production: number // Power in kW at this time point
+      createdOn: number // Timestamp in milliseconds
+    }>
+  }
+}
+
+interface PvBlinkMonthlyTelemetryResponse {
+  data: {
+    peakHours: number
+    production: number // Total monthly production (kWh)
+    productionData: Array<{
+      production: number // Daily production in kWh
+      createdOn: number // Timestamp in milliseconds (start of day)
+    }>
+  }
+}
+
+interface PvBlinkYearlyTelemetryResponse {
+  data: {
+    peakHours: number
+    production: number // Total yearly production (kWh)
+    productionData: Array<{
+      production: number // Monthly production in kWh
+      createdOn: number // Timestamp in milliseconds (start of month)
+    }>
+  }
+}
+
+interface PvBlinkTotalTelemetryResponse {
+  data: {
+    peakHours: number
+    production: number // Total production (kWh) for the year
+    productionData: Array<{
+      production: number // Yearly production in kWh
+      createdOn: number // Timestamp in milliseconds (start of year)
+    }>
+  }
+}
+
 export class PvBlinkAdapter extends BaseVendorAdapter {
   private vendorId?: number
   private supabaseClient?: any
@@ -364,16 +408,410 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
   }
 
   /**
+   * Get daily telemetry records for a specific plant
+   * Endpoint: GET /api/pvblink/plant/s/production/detail/{vendorPlantId}/day?year={year}&month={month}&day={day}
+   * Returns power data at 5-minute intervals for the specified day
+   */
+  async getDailyTelemetryRecords(
+    vendorPlantId: string,
+    year: number,
+    month: number,
+    day: number
+  ): Promise<{
+    statistics: {
+      vendorPlantId: string
+      year: number
+      month: number
+      day: number
+      generationValue: number // Daily generation in kWh
+      peakHours: number
+    }
+    records: Array<{
+      vendorPlantId: string
+      generationPower: number // Power in kW
+      dateTime: number // Unix timestamp in milliseconds
+      timeZoneOffset?: number
+    }>
+  }> {
+    const token = await this.authenticate()
+    const baseUrl = this.getApiBaseUrl()
+    const url = `${baseUrl}/api/pvblink/plant/s/production/detail/${vendorPlantId}/day?year=${year}&month=${month}&day=${day}`
+
+    console.log("[PVBlink] Fetching daily telemetry records:", {
+      vendorPlantId,
+      year,
+      month,
+      day,
+      url,
+    })
+
+    const response = await pooledFetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+        "Authorization": token,
+        "Content-Type": "application/json",
+        "Origin": baseUrl,
+        "Referer": `${baseUrl}/app/plant/station/dashboard?plant=${vendorPlantId}`,
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      },
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[PVBlink] Failed to fetch daily telemetry:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      })
+      throw new Error(`Failed to fetch daily telemetry: ${response.statusText} - ${errorText}`)
+    }
+
+    const data: PvBlinkDailyTelemetryResponse = await response.json()
+
+    // Map PVBlink response to standard format
+    const records = (data.data.productionData || []).map((point) => ({
+      vendorPlantId,
+      generationPower: point.production || 0, // Power in kW
+      dateTime: point.createdOn, // Timestamp in milliseconds
+    }))
+
+    return {
+      statistics: {
+        vendorPlantId,
+        year,
+        month,
+        day,
+        generationValue: data.data.production || 0, // Daily generation in kWh
+        peakHours: data.data.peakHours || 0,
+      },
+      records,
+    }
+  }
+
+  /**
+   * Get monthly telemetry records for a specific plant
+   * Endpoint: GET /api/pvblink/plant/s/production/detail/{vendorPlantId}/daily?year={year}&month={month}
+   * Returns daily production data for the specified month
+   */
+  async getMonthlyTelemetryRecords(
+    vendorPlantId: string,
+    year: number,
+    month: number
+  ): Promise<{
+    statistics: {
+      vendorPlantId: string
+      year: number
+      month: number
+      generationValue: number // Monthly generation in kWh
+      peakHours: number
+    }
+    records: Array<{
+      vendorPlantId: string
+      day: number // Day of month (1-31)
+      generationValue: number // Daily generation in kWh
+      dateTime: number // Unix timestamp in milliseconds (start of day)
+    }>
+  }> {
+    const token = await this.authenticate()
+    const baseUrl = this.getApiBaseUrl()
+    const url = `${baseUrl}/api/pvblink/plant/s/production/detail/${vendorPlantId}/daily?year=${year}&month=${month}`
+
+    console.log("[PVBlink] Fetching monthly telemetry records:", {
+      vendorPlantId,
+      year,
+      month,
+      url,
+    })
+
+    const response = await pooledFetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+        "Authorization": token,
+        "Content-Type": "application/json",
+        "Origin": baseUrl,
+        "Referer": `${baseUrl}/app/plant/station/dashboard?plant=${vendorPlantId}`,
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      },
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[PVBlink] Failed to fetch monthly telemetry:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      })
+      throw new Error(`Failed to fetch monthly telemetry: ${response.statusText} - ${errorText}`)
+    }
+
+    const data: PvBlinkMonthlyTelemetryResponse = await response.json()
+
+    // Map PVBlink response to standard format
+    // Extract day from timestamp for each record
+    const records = (data.data.productionData || []).map((point) => {
+      const date = new Date(point.createdOn)
+      return {
+        vendorPlantId,
+        day: date.getDate(), // Day of month (1-31)
+        generationValue: point.production || 0, // Daily generation in kWh
+        dateTime: point.createdOn, // Timestamp in milliseconds
+      }
+    })
+
+    return {
+      statistics: {
+        vendorPlantId,
+        year,
+        month,
+        generationValue: data.data.production || 0, // Monthly generation in kWh
+        peakHours: data.data.peakHours || 0,
+      },
+      records,
+    }
+  }
+
+  /**
+   * Get yearly telemetry records for a specific plant
+   * Endpoint: GET /api/pvblink/plant/s/production/detail/{vendorPlantId}/monthly?year={year}
+   * Returns monthly production data for the specified year
+   */
+  async getYearlyTelemetryRecords(
+    vendorPlantId: string,
+    year: number
+  ): Promise<{
+    statistics: {
+      vendorPlantId: string
+      year: number
+      generationValue: number // Yearly generation in kWh
+      peakHours: number
+    }
+    records: Array<{
+      vendorPlantId: string
+      month: number // Month (1-12)
+      generationValue: number // Monthly generation in kWh
+      dateTime: number // Unix timestamp in milliseconds (start of month)
+    }>
+  }> {
+    const token = await this.authenticate()
+    const baseUrl = this.getApiBaseUrl()
+    const url = `${baseUrl}/api/pvblink/plant/s/production/detail/${vendorPlantId}/monthly?year=${year}`
+
+    console.log("[PVBlink] Fetching yearly telemetry records:", {
+      vendorPlantId,
+      year,
+      url,
+    })
+
+    const response = await pooledFetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+        "Authorization": token,
+        "Content-Type": "application/json",
+        "Origin": baseUrl,
+        "Referer": `${baseUrl}/app/plant/station/dashboard?plant=${vendorPlantId}`,
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+      },
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[PVBlink] Failed to fetch yearly telemetry:`, {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      })
+      throw new Error(`Failed to fetch yearly telemetry: ${response.statusText} - ${errorText}`)
+    }
+
+    const data: PvBlinkYearlyTelemetryResponse = await response.json()
+
+    // Map PVBlink response to standard format
+    // Extract month from timestamp for each record
+    const records = (data.data.productionData || []).map((point) => {
+      const date = new Date(point.createdOn)
+      return {
+        vendorPlantId,
+        month: date.getMonth() + 1, // Month (1-12)
+        generationValue: point.production || 0, // Monthly generation in kWh
+        dateTime: point.createdOn, // Timestamp in milliseconds
+      }
+    })
+
+    return {
+      statistics: {
+        vendorPlantId,
+        year,
+        generationValue: data.data.production || 0, // Yearly generation in kWh
+        peakHours: data.data.peakHours || 0,
+      },
+      records,
+    }
+  }
+
+  /**
+   * Get total telemetry records (yearly aggregation across all years)
+   * Endpoint: GET /api/pvblink/plant/s/production/detail/{vendorPlantId}/yearly?year={year}
+   * Since PVBlink API only supports single year queries, we fetch each year individually and aggregate
+   * Returns statistics for the total period and yearly records
+   */
+  async getTotalTelemetryRecords(
+    vendorPlantId: string,
+    startYear: number,
+    endYear: number
+  ): Promise<{
+    statistics: {
+      vendorPlantId: string
+      generationValue: number // Total generation in kWh across all years
+      peakHours: number
+    }
+    records: Array<{
+      vendorPlantId: string
+      year: number
+      generationValue: number // Yearly generation in kWh
+      dateTime: number // Unix timestamp in milliseconds (start of year)
+    }>
+    operatingTotalDays?: number
+  }> {
+    const token = await this.authenticate()
+    const baseUrl = this.getApiBaseUrl()
+    
+    console.log("[PVBlink] Fetching total telemetry records:", {
+      vendorPlantId,
+      startYear,
+      endYear,
+    })
+
+    const allRecords: Array<{
+      vendorPlantId: string
+      year: number
+      generationValue: number
+      dateTime: number
+    }> = []
+    
+    let totalProduction = 0
+    let totalPeakHours = 0
+
+    // Fetch data for each year from startYear to endYear
+    // Note: PVBlink API /yearly endpoint may return all years up to the specified year,
+    // but we'll fetch each year individually to ensure we get complete data
+    for (let year = startYear; year <= endYear; year++) {
+      try {
+        const url = `${baseUrl}/api/pvblink/plant/s/production/detail/${vendorPlantId}/yearly?year=${year}`
+        
+        console.log(`[PVBlink] Fetching year ${year}...`)
+
+        const response = await pooledFetch(url, {
+          method: "GET",
+          headers: {
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+            "Authorization": token,
+            "Content-Type": "application/json",
+            "Origin": baseUrl,
+            "Referer": `${baseUrl}/app/plant/station/dashboard?plant=${vendorPlantId}`,
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+          },
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.warn(`[PVBlink] Failed to fetch year ${year}:`, {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText,
+          })
+          // Continue with other years even if one fails
+          continue
+        }
+
+        const data: PvBlinkTotalTelemetryResponse = await response.json()
+
+        // The API may return multiple years in productionData, or just the requested year
+        // Process all entries in productionData
+        const yearlyRecords = (data.data.productionData || []).map((point) => {
+          const date = new Date(point.createdOn)
+          const recordYear = date.getFullYear() || year
+          
+          // Only include records within our requested range
+          if (recordYear >= startYear && recordYear <= endYear) {
+            return {
+              vendorPlantId,
+              year: recordYear,
+              generationValue: point.production || 0, // Yearly generation in kWh
+              dateTime: point.createdOn, // Timestamp in milliseconds
+            }
+          }
+          return null
+        }).filter((record): record is NonNullable<typeof record> => record !== null)
+
+        // Aggregate statistics from this year's data
+        // If productionData has entries, sum them; otherwise use data.production
+        if (yearlyRecords.length > 0) {
+          const yearTotal = yearlyRecords.reduce((sum, r) => sum + r.generationValue, 0)
+          totalProduction += yearTotal
+        } else {
+          // Fallback: use data.production if no records
+          totalProduction += data.data.production || 0
+        }
+        totalPeakHours += data.data.peakHours || 0
+
+        allRecords.push(...yearlyRecords)
+      } catch (error: any) {
+        console.warn(`[PVBlink] Error fetching year ${year}:`, error.message)
+        // Continue with other years even if one fails
+        continue
+      }
+    }
+
+    // Remove duplicate years (in case API returns overlapping data)
+    const uniqueRecords = new Map<number, typeof allRecords[0]>()
+    for (const record of allRecords) {
+      const existing = uniqueRecords.get(record.year)
+      if (!existing || record.generationValue > existing.generationValue) {
+        uniqueRecords.set(record.year, record)
+      }
+    }
+    const finalRecords = Array.from(uniqueRecords.values()).sort((a, b) => a.year - b.year)
+
+    // If no records found, create a placeholder for the year range
+    if (finalRecords.length === 0 && totalProduction > 0) {
+      // Create a single record representing the total
+      finalRecords.push({
+        vendorPlantId,
+        year: startYear,
+        generationValue: totalProduction,
+        dateTime: new Date(startYear, 0, 1).getTime(),
+      })
+    }
+
+    return {
+      statistics: {
+        vendorPlantId,
+        generationValue: totalProduction, // Total generation across all years
+        peakHours: totalPeakHours,
+      },
+      records: finalRecords, // Sorted and deduplicated records
+    }
+  }
+
+  /**
    * Get telemetry data for a specific plant
-   * TODO: Implement once API endpoint is available
+   * This is a fallback method - prefer using getDailyTelemetryRecords for day view
    */
   async getTelemetry(
     plantId: string,
     startTime: Date,
     endTime: Date
   ): Promise<TelemetryData[]> {
-    // TODO: Implement telemetry when API endpoint is available
-    throw new Error("PVBlink telemetry not yet implemented")
+    // This is a fallback method - prefer using getDailyTelemetryRecords for day view
+    console.warn("[PVBlink] getTelemetry() called - not yet implemented. Use getDailyTelemetryRecords for day view.")
+    return []
   }
 
   /**
