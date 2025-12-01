@@ -122,7 +122,17 @@ export async function POST(request: NextRequest) {
       requirePermission(accountType as any, "vendors", "create")
 
       const body = await request.json()
-      const { name, vendor_type, credentials, is_active, org_id } = body
+      const {
+        name,
+        vendor_type,
+        credentials,
+        is_active,
+        org_id,
+        plant_sync_mode,
+        per_plant_sync_interval_minutes,
+        plant_list_sync_morning_ist,
+        plant_list_sync_evening_ist,
+      } = body
 
       if (!name || !vendor_type || !credentials) {
         logApiResponse(request, 400, Date.now() - startTime)
@@ -152,6 +162,10 @@ export async function POST(request: NextRequest) {
           credentials,
           is_active: is_active ?? true,
           org_id,
+          plant_sync_mode: plant_sync_mode || null,
+          per_plant_sync_interval_minutes: per_plant_sync_interval_minutes ?? 15,
+          plant_list_sync_morning_ist: plant_list_sync_morning_ist || null,
+          plant_list_sync_evening_ist: plant_list_sync_evening_ist || null,
         })
         .select()
         .single()
@@ -177,3 +191,10 @@ export async function POST(request: NextRequest) {
     }
   })
 }
+
+/**
+ * PATCH /api/vendors/[id]
+ * Vendor update route lives in app/api/vendors/[id]/route.ts. This file only
+ * handles collection-level POST/GET. Plant sync configuration fields are
+ * passed through there as well.
+ */

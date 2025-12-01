@@ -58,6 +58,10 @@ interface Vendor {
   credentials: Record<string, any>
   is_active: boolean
   org_id?: number
+  plant_sync_mode?: 'LIST_PLANTS' | 'PER_PLANT'
+  per_plant_sync_interval_minutes?: number
+  plant_list_sync_morning_ist?: string | null
+  plant_list_sync_evening_ist?: string | null
   organizations?: {
     id: number
     name: string
@@ -119,6 +123,11 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     // Foxesscloud fields
     passwordMD5: "",
     is_active: true,
+    // Plant sync configuration
+    plant_sync_mode: "LIST_PLANTS" as 'LIST_PLANTS' | 'PER_PLANT',
+    per_plant_sync_interval_minutes: 15,
+    plant_list_sync_morning_ist: "06:00",
+    plant_list_sync_evening_ist: "23:00",
   })
 
   useEffect(() => {
@@ -209,6 +218,18 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         // Foxesscloud fields
         passwordMD5: vendor.credentials.passwordMD5 || "",
         is_active: vendor.is_active,
+        // Plant sync configuration
+        plant_sync_mode:
+          (vendor.plant_sync_mode as 'LIST_PLANTS' | 'PER_PLANT') ||
+          (vendor.vendor_type === "SOLARMAN" || vendor.vendor_type === "SHINEMONITOR"
+            ? "LIST_PLANTS"
+            : "PER_PLANT"),
+        per_plant_sync_interval_minutes:
+          vendor.per_plant_sync_interval_minutes ?? 15,
+        plant_list_sync_morning_ist:
+          vendor.plant_list_sync_morning_ist || "06:00",
+        plant_list_sync_evening_ist:
+          vendor.plant_list_sync_evening_ist || "23:00",
       })
     } else {
       setEditingVendor(null)
@@ -234,6 +255,11 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         // Foxesscloud fields
         passwordMD5: "",
         is_active: true,
+         // Plant sync configuration (defaults for new vendor)
+        plant_sync_mode: "LIST_PLANTS",
+        per_plant_sync_interval_minutes: 15,
+        plant_list_sync_morning_ist: "06:00",
+        plant_list_sync_evening_ist: "23:00",
       })
     }
     setDialogOpen(true)
@@ -298,6 +324,10 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         org_id: parseInt(formData.org_id),
         credentials,
         is_active: formData.is_active,
+        plant_sync_mode: formData.plant_sync_mode,
+        per_plant_sync_interval_minutes: formData.per_plant_sync_interval_minutes,
+        plant_list_sync_morning_ist: formData.plant_list_sync_morning_ist,
+        plant_list_sync_evening_ist: formData.plant_list_sync_evening_ist,
       }),
     })
 
@@ -430,7 +460,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                 </Button>
               </motion.div>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
                   {editingVendor ? "Edit Vendor" : "Add Vendor"}
@@ -742,6 +772,130 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                   )}
                 </>
               )}
+
+              {/* Plant Sync Strategy */}
+              <div className="mt-4 space-y-3 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm font-semibold">
+                      Plant Sync Strategy
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Controls how the 15‑minute (or configured) cron syncs plants for this vendor.
+                      Solarman / ShineMonitor typically sync via <span className="font-semibold">plant list</span>.
+                      SolarDM / PV Blink typically sync via <span className="font-semibold">individual plants</span>.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-muted-foreground">
+                      Mode
+                    </Label>
+                    <div className="flex flex-col gap-2 text-xs">
+                      <Button
+                        type="button"
+                        variant={formData.plant_sync_mode === "LIST_PLANTS" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            plant_sync_mode: "LIST_PLANTS",
+                          }))
+                        }
+                        className="justify-start"
+                      >
+                        Sync via plant list (listPlants)
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={formData.plant_sync_mode === "PER_PLANT" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            plant_sync_mode: "PER_PLANT",
+                          }))
+                        }
+                        className="justify-start"
+                      >
+                        Sync via individual plants
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-muted-foreground">
+                      Vendor Sync Timing (defaults, override allowed)
+                    </Label>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-28 text-muted-foreground">
+                          Per‑plant interval
+                        </span>
+                        <Input
+                          type="number"
+                          min={5}
+                          max={1440}
+                          value={formData.per_plant_sync_interval_minutes}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              per_plant_sync_interval_minutes: Number(e.target.value) || 15,
+                            }))
+                          }
+                          className="h-8 w-24"
+                        />
+                        <span className="text-muted-foreground">minutes</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-28 text-muted-foreground">
+                          Morning listPlants
+                        </span>
+                        <Input
+                          type="time"
+                          value={formData.plant_list_sync_morning_ist}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              plant_list_sync_morning_ist: e.target.value,
+                            }))
+                          }
+                          className="h-8 w-28"
+                        />
+                        <span className="text-muted-foreground text-[11px]">
+                          Default 06:00 IST
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-28 text-muted-foreground">
+                          Evening listPlants
+                        </span>
+                        <Input
+                          type="time"
+                          value={formData.plant_list_sync_evening_ist}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              plant_list_sync_evening_ist: e.target.value,
+                            }))
+                          }
+                          className="h-8 w-28"
+                        />
+                        <span className="text-muted-foreground text-[11px]">
+                          Default 23:00 IST
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Super Admin can override these defaults per vendor. During sync, the backend
+                  checks whether this vendor should be synced via <span className="font-semibold">plant list</span>
+                  or <span className="font-semibold">individual plants</span>. For individual‑plant vendors,
+                  the plant list is refreshed around the configured morning and evening times.
+                </p>
+              </div>
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"

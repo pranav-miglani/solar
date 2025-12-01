@@ -71,7 +71,16 @@ export async function PUT(
     requirePermission(accountType as any, "vendors", "update")
 
     const body = await request.json()
-    const { name, credentials, is_active, org_id } = body
+    const {
+      name,
+      credentials,
+      is_active,
+      org_id,
+      plant_sync_mode,
+      per_plant_sync_interval_minutes,
+      plant_list_sync_morning_ist,
+      plant_list_sync_evening_ist,
+    } = body
 
     // Use service role client to bypass RLS
     const supabase = getMainClient()
@@ -85,6 +94,19 @@ export async function PUT(
 
     if (org_id !== undefined) {
       updateData.org_id = org_id
+    }
+
+    if (plant_sync_mode !== undefined) {
+      updateData.plant_sync_mode = plant_sync_mode
+    }
+    if (per_plant_sync_interval_minutes !== undefined) {
+      updateData.per_plant_sync_interval_minutes = per_plant_sync_interval_minutes
+    }
+    if (plant_list_sync_morning_ist !== undefined) {
+      updateData.plant_list_sync_morning_ist = plant_list_sync_morning_ist
+    }
+    if (plant_list_sync_evening_ist !== undefined) {
+      updateData.plant_list_sync_evening_ist = plant_list_sync_evening_ist
     }
 
     const { data: vendor, error } = await supabase

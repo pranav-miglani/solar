@@ -62,6 +62,29 @@ async function validateAndRefreshToken(
 }
 
 /**
+ * Resolve plant sync mode for a vendor. Defaults are based on vendor_type:
+ * - SOLARMAN, SHINEMONITOR -> LIST_PLANTS
+ * - SOLARDM, PVBLINK       -> PER_PLANT
+ * - FOXESSCLOUD, OTHER     -> LIST_PLANTS
+ */
+function getPlantSyncMode(vendor: any): 'LIST_PLANTS' | 'PER_PLANT' {
+  if (vendor.plant_sync_mode === 'LIST_PLANTS' || vendor.plant_sync_mode === 'PER_PLANT') {
+    return vendor.plant_sync_mode
+  }
+
+  switch (vendor.vendor_type) {
+    case 'SOLARMAN':
+    case 'SHINEMONITOR':
+      return 'LIST_PLANTS'
+    case 'SOLARDM':
+    case 'PVBLINK':
+      return 'PER_PLANT'
+    default:
+      return 'LIST_PLANTS'
+  }
+}
+
+/**
  * Sync plants for a single vendor
  */
 async function syncVendorPlants(
@@ -81,6 +104,11 @@ async function syncVendorPlants(
   }
 
   try {
+    const plantSyncMode = getPlantSyncMode(vendor)
+    logger.info(
+      `[Sync] Vendor ${vendor.id} (${vendor.name}) using plant_sync_mode=${plantSyncMode}`
+    )
+
     // Get organization name
     if (vendor.org_id) {
       const { data: org } = await supabase
@@ -100,9 +128,25 @@ async function syncVendorPlants(
               // apiBaseUrl removed - now read from environment variables (e.g., SOLARMAN_API_BASE_URL)
               credentials: vendor.credentials as Record<string, any>,
               isActive: vendor.is_active,
+              plantSyncMode,
+              perPlantSyncIntervalMinutes: vendor.per_plant_sync_interval_minutes ?? 15,
+              plantListSyncMorningIst: vendor.plant_list_sync_morning_ist || undefined,
+              plantListSyncEveningIst: vendor.plant_list_sync_evening_ist || undefined,
             }
 
     const adapter = VendorManager.getAdapter(vendorConfig)
+
+    // For now, the 15‑minute cron only runs full listPlants() sync for LIST_PLANTS mode.
+    // Vendors configured for PER_PLANT mode will be handled by a separate per‑plant
+    // metrics cron (which can still call listPlants() at configured morning/evening times).
+    if (plantSyncMode === "PER_PLANT") {
+      logger.info(
+        `[Sync] Skipping listPlants() sync for vendor ${vendor.name} (${vendor.id}) because plant_sync_mode=PER_PLANT. ` +
+          `Topology and metrics will be refreshed by the per‑plant cron and twice‑daily listPlants() job.`
+      )
+      result.success = true
+      return result
+    }
 
     // Set token storage for adapters that support it
     if (typeof (adapter as any).setTokenStorage === "function") {
@@ -116,7 +160,7 @@ async function syncVendorPlants(
       return result
     }
 
-    // Fetch plants from vendor (context automatically propagated)
+    // Fetch plants from vendor (context automatically propagated) for LIST_PLANTS mode
     logger.info(`Fetching plants for vendor ${vendor.name} (ID: ${vendor.id})`)
     const vendorPlants = await adapter.listPlants()
 
