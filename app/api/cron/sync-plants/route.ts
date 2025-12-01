@@ -42,9 +42,9 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Check if we're in the restricted time window (7 PM IST to 6 AM IST)
-        const syncWindowStart = process.env.SYNC_WINDOW_START || "19:00" // 7 PM IST default
-        const syncWindowEnd = process.env.SYNC_WINDOW_END || "06:00" // 6 AM IST default
+        // Check if we're in the restricted time window (8 PM IST to 5 AM IST)
+        const syncWindowStart = process.env.SYNC_WINDOW_START || "20:00" // 8 PM IST default
+        const syncWindowEnd = process.env.SYNC_WINDOW_END || "05:00" // 5 AM IST default
         
         // Get current time in Asia/Kolkata timezone using Intl API
         const now = new Date()
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
         const endTimeMinutes = endHour * 60 + endMin
         
         // Check if current time is in the restricted window
-        // Handle case where window spans midnight (e.g., 19:00 to 06:00)
+        // Handle case where window spans midnight (e.g., 20:00 to 05:00)
         let inRestrictedWindow = false
         if (startTimeMinutes > endTimeMinutes) {
           // Window spans midnight
