@@ -1460,8 +1460,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                   )}
                 </div>
 
-                {/* Right column: vendor-level plant sync strategy */}
-                <div className="space-y-3 rounded-md border bg-muted/40 px-3 py-3">
+                {/* Right column: vendor-level telemetry sync strategy */}
+                <div className="space-y-3 rounded-md border bg-muted/40 px-4 py-3">
                   <div className="space-y-1">
                     <Label className="text-sm font-semibold">
                       Telemetry Sync Strategy
@@ -1473,7 +1473,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                       runs only at the configured morning and evening times.
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     <div className="space-y-2">
                       <Label className="text-[11px] font-semibold text-muted-foreground">
                         Mode
@@ -1489,7 +1489,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                               plant_sync_mode: "LIST_PLANTS",
                             }))
                           }
-                          className="justify-start"
+                          className="justify-start whitespace-normal text-left"
                         >
                           Sync via plant list (listPlants)
                         </Button>
@@ -1503,7 +1503,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                               plant_sync_mode: "PER_PLANT",
                             }))
                           }
-                          className="justify-start"
+                          className="justify-start whitespace-normal text-left"
                         >
                           Sync via individual plants
                         </Button>
@@ -1513,8 +1513,11 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                     {syncSettings.plant_sync_mode === "PER_PLANT" ? (
                       <div className="space-y-2">
                         <Label className="text-[11px] font-semibold text-muted-foreground">
-                          Vendor Sync Timing (PER_PLANT vendors only)
+                          Vendor Sync Timing
                         </Label>
+                        <p className="text-[11px] text-muted-foreground">
+                          Only applied when mode is <span className="font-semibold">Sync via individual plants</span>.
+                        </p>
                         <div className="space-y-2 text-xs">
                           <div className="flex items-center gap-2">
                             <span className="w-32 text-muted-foreground">
