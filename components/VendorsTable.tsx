@@ -100,7 +100,22 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
   } | null>(null)
   const [syncSettingsDialogOpen, setSyncSettingsDialogOpen] = useState(false)
   const [selectedOrgForSync, setSelectedOrgForSync] = useState<{ id: number, name: string } | null>(null)
-  const [syncSettings, setSyncSettings] = useState<{ enabled: boolean, interval: number }>({ enabled: true, interval: 15 })
+  const [selectedVendorForSyncId, setSelectedVendorForSyncId] = useState<number | null>(null)
+  const [syncSettings, setSyncSettings] = useState<{
+    enabled: boolean
+    interval: number
+    plant_sync_mode: 'LIST_PLANTS' | 'PER_PLANT'
+    per_plant_sync_interval_minutes: number
+    plant_list_sync_morning_ist: string
+    plant_list_sync_evening_ist: string
+  }>({
+    enabled: true,
+    interval: 15,
+    plant_sync_mode: 'LIST_PLANTS',
+    per_plant_sync_interval_minutes: 15,
+    plant_list_sync_morning_ist: "06:00",
+    plant_list_sync_evening_ist: "23:00",
+  })
   const [formData, setFormData] = useState({
     name: "",
     vendor_type: "SOLARMAN",
@@ -152,13 +167,33 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
   function openSyncSettingsDialog(orgId: number, orgName: string) {
     // Find the org's current sync settings from vendors
     const vendor = vendors.find((v) => v.organizations?.id === orgId)
+
     if (vendor?.organizations) {
+      const inferredMode: 'LIST_PLANTS' | 'PER_PLANT' =
+        (vendor.plant_sync_mode as 'LIST_PLANTS' | 'PER_PLANT' | undefined) ??
+        (vendor.vendor_type === "SOLARMAN" || vendor.vendor_type === "SHINEMONITOR"
+          ? "LIST_PLANTS"
+          : "PER_PLANT")
+
       setSyncSettings({
         enabled: vendor.organizations.auto_sync_enabled ?? true,
         interval: vendor.organizations.sync_interval_minutes ?? 15,
+        plant_sync_mode: inferredMode,
+        per_plant_sync_interval_minutes: vendor.per_plant_sync_interval_minutes ?? 15,
+        plant_list_sync_morning_ist: vendor.plant_list_sync_morning_ist || "06:00",
+        plant_list_sync_evening_ist: vendor.plant_list_sync_evening_ist || "23:00",
       })
+      setSelectedVendorForSyncId(vendor.id)
     } else {
-      setSyncSettings({ enabled: true, interval: 15 })
+      setSyncSettings({
+        enabled: true,
+        interval: 15,
+        plant_sync_mode: "LIST_PLANTS",
+        per_plant_sync_interval_minutes: 15,
+        plant_list_sync_morning_ist: "06:00",
+        plant_list_sync_evening_ist: "23:00",
+      })
+      setSelectedVendorForSyncId(null)
     }
     setSelectedOrgForSync({ id: orgId, name: orgName })
     setSyncSettingsDialogOpen(true)
@@ -169,7 +204,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     if (!selectedOrgForSync) return
     
     try {
-      const response = await fetch(`/api/orgs/${selectedOrgForSync.id}`, {
+      // First, update organization-level auto-sync settings.
+      const orgResponse = await fetch(`/api/orgs/${selectedOrgForSync.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -178,15 +214,46 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         }),
       })
 
-      if (response.ok) {
-        setSyncSettingsDialogOpen(false)
-        setSelectedOrgForSync(null)
-        // Refresh vendors to get updated org data
-        fetchVendors()
-      } else {
-        const error = await response.json()
-        alert(error.error || "Failed to update sync settings")
+      if (!orgResponse.ok) {
+        const error = await orgResponse.json()
+        alert(error.error || "Failed to update organization sync settings")
+        return
       }
+
+      // Next, if we have a vendor associated with this org, persist the plant sync strategy
+      // settings onto that vendor record so all sync controls live behind this dialog.
+      if (selectedVendorForSyncId != null) {
+        const vendor = vendors.find((v) => v.id === selectedVendorForSyncId)
+
+        if (vendor) {
+          const vendorResponse = await fetch(`/api/vendors/${vendor.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: vendor.name,
+              credentials: vendor.credentials,
+              is_active: vendor.is_active,
+              org_id: vendor.org_id,
+              plant_sync_mode: syncSettings.plant_sync_mode,
+              per_plant_sync_interval_minutes: syncSettings.per_plant_sync_interval_minutes,
+              plant_list_sync_morning_ist: syncSettings.plant_list_sync_morning_ist,
+              plant_list_sync_evening_ist: syncSettings.plant_list_sync_evening_ist,
+            }),
+          })
+
+          if (!vendorResponse.ok) {
+            const error = await vendorResponse.json()
+            alert(error.error || "Failed to update vendor plant sync settings")
+            return
+          }
+        }
+      }
+
+      setSyncSettingsDialogOpen(false)
+      setSelectedOrgForSync(null)
+      setSelectedVendorForSyncId(null)
+      // Refresh vendors to get updated org + vendor data
+      fetchVendors()
     } catch (error: any) {
       alert(`Error updating sync settings: ${error.message}`)
     }
@@ -1380,6 +1447,129 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                     </p>
                   </div>
                 )}
+
+                {/* Plant Sync Strategy – mirrored here so all sync-related controls live in this dialog */}
+                <div className="mt-2 space-y-3 border-t pt-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <Label className="text-sm font-semibold">
+                        Plant Sync Strategy
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Controls how the 15‑minute (or configured) cron syncs plants for this vendor.
+                        Solarman / ShineMonitor typically sync via <span className="font-semibold">plant list</span>.
+                        SolarDM / PV Blink typically sync via <span className="font-semibold">individual plants</span>.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground">
+                        Mode
+                      </Label>
+                      <div className="flex flex-col gap-2 text-xs">
+                        <Button
+                          type="button"
+                          variant={syncSettings.plant_sync_mode === "LIST_PLANTS" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() =>
+                            setSyncSettings((prev) => ({
+                              ...prev,
+                              plant_sync_mode: "LIST_PLANTS",
+                            }))
+                          }
+                          className="justify-start"
+                        >
+                          Sync via plant list (listPlants)
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={syncSettings.plant_sync_mode === "PER_PLANT" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() =>
+                            setSyncSettings((prev) => ({
+                              ...prev,
+                              plant_sync_mode: "PER_PLANT",
+                            }))
+                          }
+                          className="justify-start"
+                        >
+                          Sync via individual plants
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground">
+                        Vendor Sync Timing (defaults, override allowed)
+                      </Label>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-28 text-muted-foreground">
+                            Per‑plant interval
+                          </span>
+                          <Input
+                            type="number"
+                            min={5}
+                            max={1440}
+                            value={syncSettings.per_plant_sync_interval_minutes}
+                            onChange={(e) =>
+                              setSyncSettings((prev) => ({
+                                ...prev,
+                                per_plant_sync_interval_minutes: Number(e.target.value) || 15,
+                              }))
+                            }
+                            className="h-8 w-24"
+                          />
+                          <span className="text-muted-foreground">minutes</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-28 text-muted-foreground">
+                            Morning listPlants
+                          </span>
+                          <Input
+                            type="time"
+                            value={syncSettings.plant_list_sync_morning_ist}
+                            onChange={(e) =>
+                              setSyncSettings((prev) => ({
+                                ...prev,
+                                plant_list_sync_morning_ist: e.target.value,
+                              }))
+                            }
+                            className="h-8 w-28"
+                          />
+                          <span className="text-muted-foreground text-[11px]">
+                            Default 06:00 IST
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-28 text-muted-foreground">
+                            Evening listPlants
+                          </span>
+                          <Input
+                            type="time"
+                            value={syncSettings.plant_list_sync_evening_ist}
+                            onChange={(e) =>
+                              setSyncSettings((prev) => ({
+                                ...prev,
+                                plant_list_sync_evening_ist: e.target.value,
+                              }))
+                            }
+                            className="h-8 w-28"
+                          />
+                          <span className="text-muted-foreground text-[11px]">
+                            Default 23:00 IST
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    During sync, the backend checks whether this vendor should be synced via <span className="font-semibold">plant list</span>
+                    or <span className="font-semibold">individual plants</span>. For individual‑plant vendors,
+                    the plant list is refreshed around the configured morning and evening times.
+                  </p>
+                </div>
               </div>
               <div className="flex justify-end gap-2 pt-4">
                 <Button
