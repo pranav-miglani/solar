@@ -1413,21 +1413,21 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                 <span className="font-semibold text-base">{selectedOrgForSync.name}</span>
               </div>
               <div className="grid gap-6 md:grid-cols-2">
-                {/* Left column: org-level auto-sync */}
+                {/* Left column: org-level auto-sync + mode selection */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-4">
-                  <Label htmlFor="sync-enabled" className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Enable Auto-Sync
-                  </Label>
-                  <Switch
-                    id="sync-enabled"
-                    checked={syncSettings.enabled}
-                    onCheckedChange={(checked) => {
-                      setSyncSettings((prev) => ({ ...prev, enabled: checked }))
-                    }}
-                  />
-                </div>
+                    <Label htmlFor="sync-enabled" className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Enable Auto-Sync
+                    </Label>
+                    <Switch
+                      id="sync-enabled"
+                      checked={syncSettings.enabled}
+                      onCheckedChange={(checked) => {
+                        setSyncSettings((prev) => ({ ...prev, enabled: checked }))
+                      }}
+                    />
+                  </div>
                   {syncSettings.enabled && (
                     <div className="space-y-2">
                       <Label htmlFor="sync-interval" className="text-xs font-semibold text-muted-foreground">
@@ -1458,6 +1458,42 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                       </p>
                     </div>
                   )}
+
+                  <div className="space-y-2 pt-2">
+                    <Label className="text-[11px] font-semibold text-muted-foreground">
+                      Mode
+                    </Label>
+                    <div className="flex flex-col gap-2 text-xs">
+                      <Button
+                        type="button"
+                        variant={syncSettings.plant_sync_mode === "LIST_PLANTS" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() =>
+                          setSyncSettings((prev) => ({
+                            ...prev,
+                            plant_sync_mode: "LIST_PLANTS",
+                          }))
+                        }
+                        className="justify-start whitespace-normal text-left"
+                      >
+                        Sync via plant list (listPlants)
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={syncSettings.plant_sync_mode === "PER_PLANT" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() =>
+                          setSyncSettings((prev) => ({
+                            ...prev,
+                            plant_sync_mode: "PER_PLANT",
+                          }))
+                        }
+                        className="justify-start whitespace-normal text-left"
+                      >
+                        Sync via individual plants
+                      </Button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Right column: vendor-level telemetry sync strategy */}
@@ -1473,131 +1509,90 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                       runs only at the configured morning and evening times.
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    {/* Left column left intentionally minimal so controls and notes sit visually on the right */}
-                    <div className="hidden lg:block" />
-                    <div className="space-y-3 text-xs">
+
+                  {syncSettings.plant_sync_mode === "PER_PLANT" ? (
+                    <div className="space-y-2 text-xs">
+                      <Label className="text-[11px] font-semibold text-muted-foreground">
+                        Vendor Sync Timing
+                      </Label>
+                      <p className="text-[11px] text-muted-foreground">
+                        Only applied when mode is <span className="font-semibold">Sync via individual plants</span>.
+                      </p>
                       <div className="space-y-2">
-                        <Label className="text-[11px] font-semibold text-muted-foreground">
-                          Mode
-                        </Label>
-                        <div className="flex flex-col gap-2">
-                          <Button
-                            type="button"
-                            variant={syncSettings.plant_sync_mode === "LIST_PLANTS" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() =>
+                        <div className="flex items-center gap-2">
+                          <span className="w-32 text-muted-foreground">
+                            Per‑plant interval
+                          </span>
+                          <Input
+                            type="number"
+                            min={5}
+                            max={1440}
+                            value={syncSettings.per_plant_sync_interval_minutes}
+                            onChange={(e) =>
                               setSyncSettings((prev) => ({
                                 ...prev,
-                                plant_sync_mode: "LIST_PLANTS",
+                                per_plant_sync_interval_minutes: Number(e.target.value) || syncSettings.interval,
                               }))
                             }
-                            className="justify-start whitespace-normal text-left"
-                          >
-                            Sync via plant list (listPlants)
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={syncSettings.plant_sync_mode === "PER_PLANT" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() =>
+                            className="h-8 w-20"
+                          />
+                          <span className="text-muted-foreground">min</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-32 text-muted-foreground">
+                            Morning listPlants
+                          </span>
+                          <Input
+                            type="time"
+                            value={syncSettings.plant_list_sync_morning_ist}
+                            onChange={(e) =>
                               setSyncSettings((prev) => ({
                                 ...prev,
-                                plant_sync_mode: "PER_PLANT",
+                                plant_list_sync_morning_ist: e.target.value,
                               }))
                             }
-                            className="justify-start whitespace-normal text-left"
-                          >
-                            Sync via individual plants
-                          </Button>
+                            className="h-8 w-28"
+                          />
+                          <span className="text-muted-foreground text-[11px]">
+                            Default 06:00 IST
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-32 text-muted-foreground">
+                            Evening listPlants
+                          </span>
+                          <Input
+                            type="time"
+                            value={syncSettings.plant_list_sync_evening_ist}
+                            onChange={(e) =>
+                              setSyncSettings((prev) => ({
+                                ...prev,
+                                plant_list_sync_evening_ist: e.target.value,
+                              }))
+                            }
+                            className="h-8 w-28"
+                          />
+                          <span className="text-muted-foreground text-[11px]">
+                            Default 23:00 IST
+                          </span>
                         </div>
                       </div>
-
-                      {syncSettings.plant_sync_mode === "PER_PLANT" ? (
-                        <div className="space-y-2">
-                          <Label className="text-[11px] font-semibold text-muted-foreground">
-                            Vendor Sync Timing
-                          </Label>
-                          <p className="text-[11px] text-muted-foreground">
-                            Only applied when mode is <span className="font-semibold">Sync via individual plants</span>.
-                          </p>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <span className="w-32 text-muted-foreground">
-                                Per‑plant interval
-                              </span>
-                              <Input
-                                type="number"
-                                min={5}
-                                max={1440}
-                                value={syncSettings.per_plant_sync_interval_minutes}
-                                onChange={(e) =>
-                                  setSyncSettings((prev) => ({
-                                    ...prev,
-                                    per_plant_sync_interval_minutes: Number(e.target.value) || syncSettings.interval,
-                                  }))
-                                }
-                                className="h-8 w-20"
-                              />
-                              <span className="text-muted-foreground">min</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="w-32 text-muted-foreground">
-                                Morning listPlants
-                              </span>
-                              <Input
-                                type="time"
-                                value={syncSettings.plant_list_sync_morning_ist}
-                                onChange={(e) =>
-                                  setSyncSettings((prev) => ({
-                                    ...prev,
-                                    plant_list_sync_morning_ist: e.target.value,
-                                  }))
-                                }
-                                className="h-8 w-28"
-                              />
-                              <span className="text-muted-foreground text-[11px]">
-                                Default 06:00 IST
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="w-32 text-muted-foreground">
-                                Evening listPlants
-                              </span>
-                              <Input
-                                type="time"
-                                value={syncSettings.plant_list_sync_evening_ist}
-                                onChange={(e) =>
-                                  setSyncSettings((prev) => ({
-                                    ...prev,
-                                    plant_list_sync_evening_ist: e.target.value,
-                                  }))
-                                }
-                                className="h-8 w-28"
-                              />
-                              <span className="text-muted-foreground text-[11px]">
-                                Default 23:00 IST
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-1 text-[11px] text-muted-foreground">
-                          <p>
-                            For <span className="font-semibold">plant list</span> mode, the vendor
-                            uses the organization&#39;s auto-sync interval above; no additional
-                            vendor timing is required.
-                          </p>
-                        </div>
-                      )}
-
-                      <p className="text-[11px] text-muted-foreground">
-                        During sync, the backend checks whether this vendor should be synced via <span className="font-semibold">plant list</span>
-                        or <span className="font-semibold">individual plants</span>. For individual‑plant vendors,
-                        the plant list is refreshed around the configured morning and evening times.
+                    </div>
+                  ) : (
+                    <div className="space-y-1 text-[11px] text-muted-foreground">
+                      <p>
+                        For <span className="font-semibold">plant list</span> mode, the vendor
+                        uses the organization&#39;s auto-sync interval on the left; no additional
+                        vendor timing is required.
                       </p>
                     </div>
-                  </div>
+                  )}
+
+                  <p className="text-[11px] text-muted-foreground">
+                    During sync, the backend checks whether this vendor should be synced via <span className="font-semibold">plant list</span>
+                    or <span className="font-semibold">individual plants</span>. For individual‑plant vendors,
+                    the plant list is refreshed around the configured morning and evening times.
+                  </p>
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-4">
