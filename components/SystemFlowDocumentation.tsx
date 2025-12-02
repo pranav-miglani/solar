@@ -37,9 +37,16 @@ interface VendorCapability {
   type: string
   auth: boolean
   listPlants: boolean
+  listPlant: boolean // Per-plant fetching support
   telemetry: boolean
   alerts: boolean
   defaultMode: "LIST_PLANTS" | "PER_PLANT"
+  authApi: string
+  listPlantsApi: string
+  listPlantApi: string
+  telemetryApi: string
+  alertsApi: string
+  mappingStatus: "Complete" | "Partial" | "Pending"
   notes: string
 }
 
@@ -49,50 +56,85 @@ const vendorCapabilities: VendorCapability[] = [
     type: "SOLARMAN",
     auth: true,
     listPlants: true,
+    listPlant: true,
     telemetry: true,
     alerts: true,
     defaultMode: "LIST_PLANTS",
-    notes: "Reference standard - full implementation with PRO API support"
+    authApi: "POST /account/v1.0/token",
+    listPlantsApi: "POST /maintain-s/operating/station/v2/search (PRO API)",
+    listPlantApi: "POST /maintain-s/operating/station/v2/search (filtered by stationId)",
+    telemetryApi: "GET /maintain-s/history/power/{systemId}/record",
+    alertsApi: "POST /maintain-s/operating/station/alert",
+    mappingStatus: "Complete",
+    notes: "Reference standard - full implementation with PRO API support. All components mapped correctly."
   },
   {
     name: "SolarDM",
     type: "SOLARDM",
     auth: true,
     listPlants: true,
+    listPlant: true,
     telemetry: true,
     alerts: true,
     defaultMode: "PER_PLANT",
-    notes: "At/near parity with Solarman - full implementation"
+    authApi: "POST /ums/business/email_login",
+    listPlantsApi: "GET /dms/plant/list_all",
+    listPlantApi: "GET /dms/plant/list_all (filtered client-side)",
+    telemetryApi: "GET /dms/data_panel/history/stats/daily/{plantId}",
+    alertsApi: "GET /dms/inverter_fault/page_list/all (paginated)",
+    mappingStatus: "Complete",
+    notes: "At/near parity with Solarman - full implementation. All components mapped correctly."
   },
   {
     name: "PV Blink",
     type: "PVBLINK",
     auth: true,
     listPlants: true,
+    listPlant: true,
     telemetry: true,
     alerts: false,
     defaultMode: "PER_PLANT",
-    notes: "Plants and telemetry implemented (daily/monthly/yearly/total), alerts pending"
+    authApi: "POST /api/pvblink/user/login",
+    listPlantsApi: "GET /api/pvblink/plant/s/all (paginated)",
+    listPlantApi: "GET /api/pvblink/plant/s/all (filtered client-side)",
+    telemetryApi: "GET /api/pvblink/plant/s/production/detail/{plantId}/day",
+    alertsApi: "Not implemented",
+    mappingStatus: "Partial",
+    notes: "Plants and telemetry implemented (daily/monthly/yearly/total), alerts pending. Components mapped correctly."
   },
   {
     name: "ShineMonitor",
     type: "SHINEMONITOR",
     auth: true,
     listPlants: true,
+    listPlant: true,
     telemetry: true,
     alerts: false,
     defaultMode: "LIST_PLANTS",
-    notes: "Plants and telemetry implemented (daily/monthly/yearly/total), realtime and alerts pending"
+    authApi: "GET /?action=auth (SHA1 sign/salt)",
+    listPlantsApi: "GET /?action=webQueryPlants (paginated)",
+    listPlantApi: "GET /?action=webQueryPlants (filtered client-side)",
+    telemetryApi: "GET /?action=queryPlantActiveOuputPowerOneDay, queryPlantEnergyMonthPerDay, queryPlantEnergyYearPerMonth, queryPlantEnergyTotalPerYear",
+    alertsApi: "Not implemented",
+    mappingStatus: "Partial",
+    notes: "Plants and telemetry implemented (daily/monthly/yearly/total), realtime and alerts pending. Components mapped correctly."
   },
   {
     name: "Foxesscloud",
     type: "FOXESSCLOUD",
     auth: true,
     listPlants: false,
+    listPlant: false,
     telemetry: false,
     alerts: false,
     defaultMode: "LIST_PLANTS",
-    notes: "Auth only - plants, telemetry, alerts TODO"
+    authApi: "POST /c/v0/user/login",
+    listPlantsApi: "Not implemented",
+    listPlantApi: "Not implemented",
+    telemetryApi: "Not implemented",
+    alertsApi: "Not implemented",
+    mappingStatus: "Pending",
+    notes: "Auth only - plants, telemetry, alerts TODO. Components not yet mapped."
   },
 ]
 
@@ -1314,9 +1356,12 @@ Unique Constraints:
                         <th className="text-left p-3 font-semibold">Vendor</th>
                         <th className="text-center p-3 font-semibold">Auth</th>
                         <th className="text-center p-3 font-semibold">listPlants</th>
+                        <th className="text-center p-3 font-semibold">listPlant</th>
                         <th className="text-center p-3 font-semibold">Telemetry</th>
                         <th className="text-center p-3 font-semibold">Alerts</th>
                         <th className="text-center p-3 font-semibold">Default Mode</th>
+                        <th className="text-center p-3 font-semibold">Mapping</th>
+                        <th className="text-left p-3 font-semibold">APIs Invoked</th>
                         <th className="text-left p-3 font-semibold">Notes</th>
                       </tr>
                     </thead>
@@ -1329,28 +1374,35 @@ Unique Constraints:
                           </td>
                           <td className="p-3 text-center">
                             {vendor.auth ? (
-                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" title={vendor.authApi} />
                             ) : (
                               <XCircle className="h-5 w-5 text-red-500 mx-auto" />
                             )}
                           </td>
                           <td className="p-3 text-center">
                             {vendor.listPlants ? (
-                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" title={vendor.listPlantsApi} />
+                            ) : (
+                              <XCircle className="h-5 w-5 text-red-500 mx-auto" />
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            {vendor.listPlant ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" title={vendor.listPlantApi} />
                             ) : (
                               <XCircle className="h-5 w-5 text-red-500 mx-auto" />
                             )}
                           </td>
                           <td className="p-3 text-center">
                             {vendor.telemetry ? (
-                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" title={vendor.telemetryApi} />
                             ) : (
                               <XCircle className="h-5 w-5 text-red-500 mx-auto" />
                             )}
                           </td>
                           <td className="p-3 text-center">
                             {vendor.alerts ? (
-                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" title={vendor.alertsApi} />
                             ) : (
                               <XCircle className="h-5 w-5 text-red-500 mx-auto" />
                             )}
@@ -1359,6 +1411,26 @@ Unique Constraints:
                             <Badge variant={vendor.defaultMode === "LIST_PLANTS" ? "default" : "secondary"}>
                               {vendor.defaultMode}
                             </Badge>
+                          </td>
+                          <td className="p-3 text-center">
+                            <Badge 
+                              variant={
+                                vendor.mappingStatus === "Complete" ? "default" : 
+                                vendor.mappingStatus === "Partial" ? "secondary" : 
+                                "destructive"
+                              }
+                            >
+                              {vendor.mappingStatus}
+                            </Badge>
+                          </td>
+                          <td className="p-3 text-xs text-muted-foreground max-w-xs">
+                            <div className="space-y-1">
+                              {vendor.auth && <div>✓ {vendor.authApi}</div>}
+                              {vendor.listPlants && <div>✓ {vendor.listPlantsApi}</div>}
+                              {vendor.listPlant && <div>✓ {vendor.listPlantApi}</div>}
+                              {vendor.telemetry && <div>✓ {vendor.telemetryApi}</div>}
+                              {vendor.alerts && <div>✓ {vendor.alertsApi}</div>}
+                            </div>
                           </td>
                           <td className="p-3 text-sm text-muted-foreground">{vendor.notes}</td>
                         </tr>
@@ -1601,6 +1673,11 @@ Unique Constraints:
 │   │   ├── orgs/                # Organization management
 │   │   ├── plants/               # Plant endpoints
 │   │   ├── vendors/             # Vendor management & sync
+│   │   │   ├── export/          # Excel export endpoint
+│   │   │   └── import/          # Excel import endpoint
+│   │   ├── accounts/            # Account management
+│   │   │   ├── export/          # Excel export endpoint
+│   │   │   └── import/          # Excel import endpoint
 │   │   └── workorders/          # Work order endpoints
 │   │       ├── export/          # Excel export endpoint
 │   │       └── import/          # Excel import endpoint
@@ -1665,6 +1742,7 @@ Unique Constraints:
                         <li>Unit conversions (W→kW, kWh→MWh) during normalization</li>
                         <li>Timestamp conversions (Unix seconds → ISO strings)</li>
                         <li>Fetches newly added plants from vendors</li>
+                        <li>Optionally enriches plants with live telemetry if not in listPlants() (via <code className="bg-background px-1 rounded">listPlant()</code>)</li>
                       </ul>
                     </div>
                     <div className="bg-muted/50 p-4 rounded-lg">
@@ -1716,6 +1794,7 @@ Unique Constraints:
                         <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
                           <li><code className="bg-background px-1 rounded">authenticate()</code> - Returns access token</li>
                           <li><code className="bg-background px-1 rounded">listPlants()</code> - Returns all plants from vendor</li>
+                          <li><code className="bg-background px-1 rounded">listPlant(vendorPlantId)</code> - Returns single plant by vendor plant ID (for PER_PLANT mode)</li>
                           <li><code className="bg-background px-1 rounded">getTelemetry()</code> - Time-series telemetry data</li>
                           <li><code className="bg-background px-1 rounded">getAlerts()</code> - Alert data (if supported)</li>
                           <li><code className="bg-background px-1 rounded">normalizeTelemetry()</code> - Vendor → standard format</li>
@@ -1747,8 +1826,22 @@ Unique Constraints:
                       <li>Use <code className="bg-background px-1 rounded">requirePermission(accountType, resource, action)</code> for authorization</li>
                       <li>Use <code className="bg-background px-1 rounded">getMainClient()</code> (service role key) to bypass RLS</li>
                       <li>Perform database operations</li>
-                      <li>Return JSON response</li>
+                      <li>Return JSON response (or Excel file for export endpoints)</li>
                     </ol>
+                    <div className="mt-3">
+                      <h4 className="font-medium text-sm mb-1">Excel Import/Export Routes</h4>
+                      <p className="text-xs text-muted-foreground">
+                        Excel operations use <code className="bg-background px-1 rounded">exceljs</code> library:
+                      </p>
+                      <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc mt-1">
+                        <li><strong>Export:</strong> <code className="bg-background px-1 rounded">GET /api/{`{resource}`}/export</code> - Generates Excel file, returns as blob with Content-Type header</li>
+                        <li><strong>Import:</strong> <code className="bg-background px-1 rounded">POST /api/{`{resource}`}/import</code> - Accepts multipart/form-data with file, parses Excel, validates, creates records</li>
+                        <li><strong>Resources:</strong> workorders, vendors, accounts</li>
+                        <li><strong>Access:</strong> SUPERADMIN and DEVELOPER only</li>
+                        <li><strong>Behavior:</strong> Import only creates new records - never updates existing ones</li>
+                        <li><strong>Validation:</strong> Comprehensive validation with detailed error messages for failed rows</li>
+                      </ul>
+                    </div>
                     <div className="mt-3">
                       <h4 className="font-medium text-sm mb-1">MDC Context Integration</h4>
                       <p className="text-xs text-muted-foreground">
@@ -3174,8 +3267,115 @@ User-Agent: Mozilla/5.0...`}
 
         {/* Backlog Tab - Production Improvements */}
         <TabsContent value="backlog" className="space-y-6">
+          {/* Excel Import/Export Features */}
           <Card className="overflow-hidden">
-            <SectionHeader id="work-order-excel" title="Work Order Excel Import/Export" icon={FileText} />
+            <SectionHeader id="excel-features" title="Excel Import/Export Features" icon={FileText} />
+            {expandedSections.has("excel-features") && (
+              <div className="p-6 pt-0 space-y-6 border-t">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Overview</h3>
+                  <p className="text-sm text-muted-foreground">
+                    SUPERADMIN and DEVELOPER accounts can export and import data via Excel files for bulk operations and disaster recovery.
+                    All Excel operations use <code className="bg-background px-1 rounded">exceljs</code> library for file generation and parsing.
+                  </p>
+
+                  {/* Work Orders Excel */}
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    <h4 className="font-semibold">Work Orders Excel Import/Export</h4>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Endpoints:</strong>
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li><code className="bg-background px-1 rounded">GET /api/workorders/export</code> - Export work orders to Excel</li>
+                      <li><code className="bg-background px-1 rounded">POST /api/workorders/import</code> - Import work orders from Excel</li>
+                    </ul>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Export Columns:</strong> Work Order ID, Title, Description, Location, Organization ID/Name, Vendor Plant ID, Plant Name, Vendor ID/Name/Type, Capacity (kW), Created At, Updated At
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Import Requirements:</strong> Title, Organization ID, Vendor Plant ID, Vendor Type (mandatory). Plant Name is optional (not used for matching).
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>UI Location:</strong> Work Orders page - Export Excel and Import Excel buttons (SUPERADMIN/DEVELOPER only)
+                    </p>
+                  </div>
+
+                  {/* Vendors Excel */}
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    <h4 className="font-semibold">Vendors Excel Import/Export</h4>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Endpoints:</strong>
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li><code className="bg-background px-1 rounded">GET /api/vendors/export</code> - Export vendors to Excel</li>
+                      <li><code className="bg-background px-1 rounded">POST /api/vendors/import</code> - Import vendors from Excel</li>
+                    </ul>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Export Columns:</strong> Vendor ID, Name, Vendor Type, Organization ID/Name, Is Active, Credentials (JSON), Plant Sync Mode, Per Plant Sync Interval, Plant List Sync Morning/Evening (IST), Telemetry Sync Mode, Telemetry Sync Interval
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Import Requirements:</strong> Name, Vendor Type, Organization ID, Credentials (JSON) (mandatory). Other fields are optional with defaults.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Validation:</strong> Organization must exist, vendor name + org_id combination must be unique, credentials must be valid JSON
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>UI Location:</strong> Vendors page - Export Excel and Import Excel buttons (SUPERADMIN/DEVELOPER only)
+                    </p>
+                    <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                      <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                        <strong>⚠️ Important:</strong> Import only creates new vendors - does not update existing ones. Credentials must be valid JSON format.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Accounts Excel */}
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    <h4 className="font-semibold">Accounts Excel Import/Export</h4>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Endpoints:</strong>
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li><code className="bg-background px-1 rounded">GET /api/accounts/export</code> - Export accounts to Excel (filtered by orgId if provided)</li>
+                      <li><code className="bg-background px-1 rounded">POST /api/accounts/import</code> - Import accounts from Excel</li>
+                    </ul>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Export Columns:</strong> Account ID, Email, Password (empty - not exported for security), Account Type, Organization ID/Name, Display Name, Logo URL, Is Active, Created At
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Import Requirements:</strong> Email, Password, Account Type (mandatory). For ORG accounts, Organization ID is required. For SUPERADMIN/GOVT, Organization ID must be empty.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Validation:</strong> Email must be unique, organization must exist for ORG accounts, each organization can only have one ORG account, DEVELOPER accounts cannot be created via import
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>UI Location:</strong> Organizations page - Export Accounts Excel and Import Accounts Excel buttons (SUPERADMIN/DEVELOPER only)
+                    </p>
+                    <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                      <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                        <strong>⚠️ Important:</strong> Import only creates new accounts - does not update existing ones. Passwords are hashed using bcrypt before storage. DEVELOPER accounts cannot be created via import (must use script).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
+                    <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Common Features Across All Excel Operations</h4>
+                    <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 ml-4 list-disc">
+                      <li><strong>No Updates:</strong> All import operations only create new records - existing records are never updated</li>
+                      <li><strong>Validation:</strong> Comprehensive validation with detailed error messages for failed rows</li>
+                      <li><strong>Results:</strong> Import responses include total processed, successful creations, errors, and detailed error messages (first 100 rows)</li>
+                      <li><strong>File Format:</strong> Supports .xlsx and .xls formats</li>
+                      <li><strong>Security:</strong> Only SUPERADMIN and DEVELOPER accounts can access export/import features</li>
+                      <li><strong>Filtering:</strong> Export endpoints support optional <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">orgId</code> query parameter for organization-specific exports</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          <Card className="overflow-hidden">
+            <SectionHeader id="work-order-excel" title="Work Order Excel Import/Export (Detailed)" icon={FileText} />
             {expandedSections.has("work-order-excel") && (
               <div className="p-6 pt-0 space-y-6 border-t">
                 <div className="space-y-4">
