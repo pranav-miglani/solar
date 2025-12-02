@@ -72,9 +72,16 @@ export function middleware(request: NextRequest) {
   // Role-based route protection
   const pathname = request.nextUrl.pathname
 
-  // Superadmin-only routes
+  // Superadmin-only routes (SUPERADMIN and DEVELOPER can access)
   if (pathname.startsWith("/superadmin")) {
-    if (accountType !== "SUPERADMIN") {
+    if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER") {
+      return NextResponse.redirect(new URL("/dashboard", request.url))
+    }
+  }
+
+  // System Flow docs - only DEVELOPER can access (SUPERADMIN cannot)
+  if (pathname.startsWith("/superadmin/system-flow")) {
+    if (accountType !== "DEVELOPER") {
       return NextResponse.redirect(new URL("/dashboard", request.url))
     }
   }

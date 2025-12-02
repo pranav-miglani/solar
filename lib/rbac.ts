@@ -1,4 +1,4 @@
-export type AccountType = "SUPERADMIN" | "ORG" | "GOVT"
+export type AccountType = "SUPERADMIN" | "ORG" | "GOVT" | "DEVELOPER"
 
 export interface Permission {
   resource: string
@@ -7,7 +7,7 @@ export interface Permission {
 
 const ROLE_PERMISSIONS: Record<AccountType, Permission[]> = {
   SUPERADMIN: [
-    // Full access to everything
+    // Full access to everything (except docs)
     { resource: "accounts", action: "read" },
     { resource: "organizations", action: "create" },
     { resource: "organizations", action: "read" },
@@ -29,6 +29,31 @@ const ROLE_PERMISSIONS: Record<AccountType, Permission[]> = {
     { resource: "alerts", action: "update" },
     { resource: "telemetry", action: "read" },
     { resource: "efficiency", action: "read" },
+  ],
+  DEVELOPER: [
+    // Same as SUPERADMIN + doc access
+    { resource: "accounts", action: "read" },
+    { resource: "organizations", action: "create" },
+    { resource: "organizations", action: "read" },
+    { resource: "organizations", action: "update" },
+    { resource: "organizations", action: "delete" },
+    { resource: "vendors", action: "create" },
+    { resource: "vendors", action: "read" },
+    { resource: "vendors", action: "update" },
+    { resource: "vendors", action: "delete" },
+    { resource: "plants", action: "create" },
+    { resource: "plants", action: "read" },
+    { resource: "plants", action: "update" },
+    { resource: "plants", action: "delete" },
+    { resource: "work_orders", action: "create" },
+    { resource: "work_orders", action: "read" },
+    { resource: "work_orders", action: "update" },
+    { resource: "work_orders", action: "delete" },
+    { resource: "alerts", action: "read" },
+    { resource: "alerts", action: "update" },
+    { resource: "telemetry", action: "read" },
+    { resource: "efficiency", action: "read" },
+    { resource: "docs", action: "read" },
   ],
   GOVT: [
     // Read-only global access

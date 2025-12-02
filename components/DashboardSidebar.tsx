@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   RefreshCw,
+  BookOpen,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -68,6 +69,12 @@ export function DashboardSidebar() {
       href: "/superadmin/disabled-plants",
       icon: AlertTriangle,
       roles: ["SUPERADMIN"],
+    },
+    {
+      title: "System Flow",
+      href: "/superadmin/system-flow",
+      icon: BookOpen,
+      roles: ["DEVELOPER"],
     },
     {
       title: "Work Orders",
