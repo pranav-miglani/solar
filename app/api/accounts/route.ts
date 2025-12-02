@@ -110,12 +110,21 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Validate account_type
+      // Validate account_type - DEVELOPER accounts cannot be created via UI
       if (!["SUPERADMIN", "ORG", "GOVT"].includes(account_type)) {
         logApiResponse(request, 400, Date.now() - startTime)
         return NextResponse.json(
-          { error: "Invalid account_type. Must be SUPERADMIN, ORG, or GOVT" },
+          { error: "Invalid account_type. Must be SUPERADMIN, ORG, or GOVT. DEVELOPER accounts must be created via script." },
           { status: 400 }
+        )
+      }
+      
+      // Explicitly reject DEVELOPER account creation from UI
+      if (account_type === "DEVELOPER") {
+        logApiResponse(request, 403, Date.now() - startTime)
+        return NextResponse.json(
+          { error: "DEVELOPER accounts cannot be created via UI. Use the create-developer-account script instead." },
+          { status: 403 }
         )
       }
 
@@ -128,11 +137,11 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Validate org_id is null for SUPERADMIN and GOVT
-      if ((account_type === "SUPERADMIN" || account_type === "GOVT") && org_id) {
+      // Validate org_id is null for SUPERADMIN, GOVT, and DEVELOPER
+      if ((account_type === "SUPERADMIN" || account_type === "GOVT" || account_type === "DEVELOPER") && org_id) {
         logApiResponse(request, 400, Date.now() - startTime)
         return NextResponse.json(
-          { error: "org_id must be null for SUPERADMIN and GOVT accounts" },
+          { error: "org_id must be null for SUPERADMIN, GOVT, and DEVELOPER accounts" },
           { status: 400 }
         )
       }

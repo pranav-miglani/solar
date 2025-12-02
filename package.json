@@ -12,6 +12,7 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
+    "create:developer": "tsx scripts/create-developer-account.ts",
     "test:login": "bash scripts/test-login.sh",
     "verify:setup": "bash scripts/verify-setup.sh",
     "debug": "NODE_OPTIONS='--inspect-brk' node server.js"

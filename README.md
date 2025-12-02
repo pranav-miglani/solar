@@ -1752,6 +1752,8 @@ After creating users via the Supabase console (see [Setup & Installation](#setup
 > **⚠️ Security Note**: **Always change default passwords in production!**
 > 
 > **📝 User Management**: To create, update, or delete user accounts, use the Supabase SQL console. See [SETUP_GUIDE.md](./SETUP_GUIDE.md) for detailed instructions.
+>
+> **🔧 DEVELOPER Accounts**: DEVELOPER accounts have all SUPERADMIN privileges plus documentation access. They **cannot** be created via the UI. Use the script: `npm run create:developer <email> <password>`. See [docs/CREATE_DEVELOPER_ACCOUNT.md](./docs/CREATE_DEVELOPER_ACCOUNT.md) for details.
 
 ## Additional Resources
 
