@@ -321,8 +321,79 @@ async function syncVendorLiveTelemetry(
                 success: false,
                 error: "Plant not found",
                 data: null,
+              }
+            }
+
+            // Extract live telemetry fields from plant data
+            const metadata = plantData.metadata || {}
+            const currentPowerKw = metadata.currentPowerKw ?? null
+            const dailyEnergyKwh = metadata.dailyEnergyKwh ?? null
+            const monthlyEnergyMwh = metadata.monthlyEnergyMwh ?? null
+            const yearlyEnergyMwh = metadata.yearlyEnergyMwh ?? null
+            const totalEnergyMwh = metadata.totalEnergyMwh ?? null
+            const networkStatus = metadata.networkStatus
+              ? String(metadata.networkStatus).trim()
+              : null
+            const lastUpdateTime = metadata.lastUpdateTime
+              ? typeof metadata.lastUpdateTime === "string"
+                ? metadata.lastUpdateTime
+                : typeof metadata.lastUpdateTime === "number"
+                ? new Date(metadata.lastUpdateTime * 1000).toISOString()
+                : null
+              : null
+
+            return {
+              plantId: plant.id,
+              vendorPlantId: plant.vendor_plant_id,
+              success: true,
+              data: {
+                current_power_kw: currentPowerKw,
+                daily_energy_kwh: dailyEnergyKwh,
+                monthly_energy_mwh: monthlyEnergyMwh,
+                yearly_energy_mwh: yearlyEnergyMwh,
+                total_energy_mwh: totalEnergyMwh,
+                network_status: networkStatus,
+                last_update_time: lastUpdateTime,
+                last_refreshed_at: new Date().toISOString(),
+              },
+            }
+          } catch (plantError: any) {
+            logger.error(
+              `[LiveTelemetry] Error fetching telemetry for plant ${plant.vendor_plant_id}:`,
+              plantError.message
+            )
+            return {
+              plantId: plant.id,
+              vendorPlantId: plant.vendor_plant_id,
+              success: false,
+              error: plantError.message,
+              data: null,
+            }
+          }
+        })
+
+        // Wait for all plants in batch to be fetched
+        const batchResults = await Promise.all(batchPromises)
+
+        // Collect results and accumulate updates
+        for (const res of batchResults) {
+          plantResults.push({
+            plantId: res.plantId,
+            vendorPlantId: res.vendorPlantId,
+            success: res.success,
+            error: res.error,
+          })
+
+          // Add to update batch if we have data
+          if (res.success && res.data) {
+            allUpdates.push({
+              id: res.plantId,
+              vendorPlantId: res.vendorPlantId,
+              data: res.data,
+            })
+          }
+        }
       }
-    }
     }
 
     // Update all plants in batches (reduce number of database transactions)

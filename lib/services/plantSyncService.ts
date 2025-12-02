@@ -162,7 +162,7 @@ async function syncVendorPlants(
 
     // Fetch plants from vendor (context automatically propagated) for LIST_PLANTS mode
     logger.info(`Fetching plants for vendor ${vendor.name} (ID: ${vendor.id})`)
-    const vendorPlants = await adapter.listPlants()
+    let vendorPlants = await adapter.listPlants()
 
     if (!vendorPlants || vendorPlants.length === 0) {
       result.success = true
