@@ -138,6 +138,109 @@ const vendorCapabilities: VendorCapability[] = [
   },
 ]
 
+// Mermaid component for System Architecture
+const SystemArchitectureMermaidDiagram = () => {
+  const mermaidRef = useRef<HTMLDivElement>(null)
+  const [svg, setSvg] = useState<string>("")
+
+  useEffect(() => {
+    if (svg) return
+
+    const diagramDefinition = `graph TB
+    subgraph Frontend["🌐 Frontend Layer"]
+        UI["Next.js Frontend<br/>React Components<br/>TypeScript"]
+        Pages["Pages & Components<br/>Dashboard, Plants,<br/>Work Orders, Alerts"]
+    end
+
+    subgraph API["⚙️ API Layer"]
+        Routes["API Routes<br/>Next.js API Endpoints"]
+        Services["Sync Services<br/>plantSyncService<br/>liveTelemetrySyncService<br/>alertSyncService"]
+        Adapters["Vendor Adapters<br/>BaseVendorAdapter<br/>Solarman, SolarDM, etc."]
+    end
+
+    subgraph Database["💾 Database Layer"]
+        MainDB["Main Database<br/>Supabase PostgreSQL"]
+        Tables["Core Tables<br/>accounts, organizations<br/>vendors, plants<br/>work_orders, alerts"]
+        LiveData["Live Telemetry<br/>Stored in plants table<br/>current_power_kw, daily_energy_kwh<br/>monthly_energy_mwh, etc."]
+    end
+
+    subgraph External["🌍 External Services"]
+        VendorAPIs["Vendor APIs<br/>Solarman API<br/>SolarDM API<br/>ShineMonitor API<br/>PVBlink API<br/>Foxesscloud API"]
+    end
+
+    subgraph Cron["⏰ Cron Jobs"]
+        PlantCron["Plant Sync Cron<br/>Every 15 min<br/>Checks morning/evening times"]
+        TelemetryCron["Live Telemetry Cron<br/>Every 15 min<br/>Filters by interval"]
+        AlertCron["Alert Sync Cron<br/>Scheduled sync"]
+    end
+
+    UI --> Pages
+    Pages -->|HTTP Requests| Routes
+    Routes --> Services
+    Services --> Adapters
+    Adapters -->|API Calls| VendorAPIs
+    Services -->|Read/Write| MainDB
+    Routes -->|Query/Update| MainDB
+    MainDB --> Tables
+    MainDB --> LiveData
+    
+    PlantCron -->|Triggers| Routes
+    TelemetryCron -->|Triggers| Routes
+    AlertCron -->|Triggers| Routes
+    
+    VendorAPIs -->|Returns Data| Adapters
+    Adapters -->|Processes| Services
+    Services -->|Stores| MainDB
+
+    style Frontend fill:#3b82f6,stroke:#2563eb,stroke-width:2px,color:#fff
+    style API fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+    style Database fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff
+    style External fill:#ef4444,stroke:#dc2626,stroke-width:2px,color:#fff
+    style Cron fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff`
+
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      themeVariables: {
+        primaryColor: '#1e293b',
+        primaryTextColor: '#f1f5f9',
+        primaryBorderColor: '#475569',
+        lineColor: '#64748b',
+        secondaryColor: '#334155',
+        tertiaryColor: '#0f172a',
+      },
+      flowchart: {
+        useMaxWidth: true,
+        htmlLabels: true,
+        curve: 'basis',
+      },
+    })
+
+    const id = `system-architecture-${Date.now()}`
+    
+    mermaid.render(id, diagramDefinition).then((result) => {
+      setSvg(result.svg)
+    }).catch((error) => {
+      console.error('Error rendering System Architecture Mermaid diagram:', error)
+    })
+  }, [svg])
+
+  if (svg) {
+    return (
+      <div 
+        className="flex justify-center items-center min-h-[600px] overflow-x-auto w-full" 
+        dangerouslySetInnerHTML={{ __html: svg }} 
+      />
+    )
+  }
+
+  return (
+    <div ref={mermaidRef} className="flex justify-center items-center min-h-[600px] overflow-x-auto w-full">
+      <div className="text-muted-foreground">Loading diagram...</div>
+    </div>
+  )
+}
+
 // Mermaid component for Plant Sync Flow
 const PlantSyncMermaidDiagram = () => {
   const mermaidRef = useRef<HTMLDivElement>(null)
@@ -409,41 +512,7 @@ export function SystemFlowDocumentation() {
                 {/* Architecture Diagram */}
                 <div className="bg-muted/50 p-6 rounded-lg">
                   <h3 className="font-semibold text-lg mb-4">System Architecture Flow</h3>
-                  <svg viewBox="0 0 800 600" className="w-full h-auto">
-                    {/* Frontend */}
-                    <rect x="50" y="50" width="200" height="100" rx="8" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" strokeWidth="2"/>
-                    <text x="150" y="95" textAnchor="middle" className="text-sm font-semibold fill-foreground">Next.js Frontend</text>
-                    <text x="150" y="115" textAnchor="middle" className="text-xs fill-muted-foreground">React Components</text>
-                    
-                    {/* API Routes */}
-                    <rect x="300" y="50" width="200" height="100" rx="8" fill="#8b5cf6" opacity="0.2" stroke="#8b5cf6" strokeWidth="2"/>
-                    <text x="400" y="95" textAnchor="middle" className="text-sm font-semibold fill-foreground">API Routes</text>
-                    <text x="400" y="115" textAnchor="middle" className="text-xs fill-muted-foreground">Next.js API</text>
-                    
-                    {/* Main DB */}
-                    <rect x="50" y="250" width="200" height="100" rx="8" fill="#10b981" opacity="0.2" stroke="#10b981" strokeWidth="2"/>
-                    <text x="150" y="285" textAnchor="middle" className="text-sm font-semibold fill-foreground">Main Database</text>
-                    <text x="150" y="305" textAnchor="middle" className="text-xs fill-muted-foreground">Supabase PostgreSQL</text>
-                    
-                    {/* Vendor APIs */}
-                    <rect x="300" y="250" width="200" height="100" rx="8" fill="#ef4444" opacity="0.2" stroke="#ef4444" strokeWidth="2"/>
-                    <text x="400" y="285" textAnchor="middle" className="text-sm font-semibold fill-foreground">Vendor APIs</text>
-                    <text x="400" y="305" textAnchor="middle" className="text-xs fill-muted-foreground">Solarman, SolarDM, etc.</text>
-                    
-                    {/* Arrows */}
-                    <path d="M 250 100 L 300 100" stroke="#3b82f6" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 500 100 L 400 250" stroke="#8b5cf6" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 500 100 L 300 250" stroke="#8b5cf6" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 250 300 L 300 300" stroke="#10b981" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 500 300 L 400 300" stroke="#ef4444" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    
-                    {/* Arrow marker */}
-                    <defs>
-                      <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-                        <polygon points="0 0, 10 3, 0 6" fill="#currentColor"/>
-                      </marker>
-                    </defs>
-                  </svg>
+                  <SystemArchitectureMermaidDiagram />
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
