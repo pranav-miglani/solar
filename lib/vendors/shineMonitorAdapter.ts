@@ -412,6 +412,28 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
   }
 
   /**
+   * Get a single plant by vendor plant ID
+   * Uses the same endpoint as listPlants but filters by plant ID
+   * Note: ShineMonitor API doesn't support filtering by plant ID in the query,
+   * so we fetch all and filter client-side (or use a small page size)
+   */
+  async listPlant(vendorPlantId: string): Promise<Plant | null> {
+    // ShineMonitor API doesn't support filtering by plant ID
+    // We'll fetch all plants and filter (inefficient but works)
+    // Alternatively, we could use a very small page size and stop after finding the plant
+    const allPlants = await this.listPlants()
+    const plant = allPlants.find((p) => p.id === vendorPlantId)
+    
+    if (!plant) {
+      return null
+    }
+
+    // ShineMonitor listPlants() already provides live telemetry in metadata
+    // (currentPowerKw, dailyEnergyKwh, monthlyEnergyMwh, etc.)
+    return plant
+  }
+
+  /**
    * List all plants from ShineMonitor
    * Endpoint: GET /?sign={sign}&salt={salt}&token={token}&action=webQueryPlants&orderBy=ascPlantId&page=0&pagesize=100
    */

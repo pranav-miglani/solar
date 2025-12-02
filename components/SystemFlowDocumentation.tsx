@@ -72,17 +72,17 @@ const vendorCapabilities: VendorCapability[] = [
     telemetry: true,
     alerts: false,
     defaultMode: "PER_PLANT",
-    notes: "Plants and telemetry implemented, alerts pending"
+    notes: "Plants and telemetry implemented (daily/monthly/yearly/total), alerts pending"
   },
   {
     name: "ShineMonitor",
     type: "SHINEMONITOR",
     auth: true,
-    listPlants: false,
-    telemetry: false,
+    listPlants: true,
+    telemetry: true,
     alerts: false,
     defaultMode: "LIST_PLANTS",
-    notes: "Auth only - plants, telemetry, alerts TODO"
+    notes: "Plants and telemetry implemented (daily/monthly/yearly/total), realtime and alerts pending"
   },
   {
     name: "Foxesscloud",
@@ -105,29 +105,32 @@ const PlantSyncMermaidDiagram = () => {
     if (svg) return
 
     const diagramDefinition = `flowchart TD
-    A["Cron Trigger<br/>Every 15 min"] --> D{"Check Restricted<br/>Window<br/>8 PM - 5 AM IST"}
+    A["Cron Trigger<br/>Every 15 min<br/>(checks timing)"] --> D{"Check Restricted<br/>Window<br/>8 PM - 5 AM IST"}
     B["Manual Sync<br/>UI Button"] --> D
+    C["Twice Daily<br/>Morning/Evening<br/>Configurable"] --> D
     D -->|"Not in window"| E["syncAllPlants()<br/>plantSyncService.ts"]
     D -->|"In window"| F["Skip Sync"]
-    E --> G["Filter Organizations<br/>auto_sync_enabled = true<br/>Check sync_interval_minutes"]
-    G --> H["For Each Vendor<br/>Get plant_sync_mode<br/>Create adapter"]
-    H --> I{"plant_sync_mode?"}
-    I -->|"LIST_PLANTS"| J["LIST_PLANTS Mode<br/>Authenticate<br/>Call listPlants()<br/>Upsert to DB<br/>Batch size: 100"]
-    I -->|"PER_PLANT"| K["PER_PLANT Mode<br/>Skip listPlants()<br/>Intended for<br/>per-plant cron"]
-    J --> L["Results<br/>Success/Failure counts<br/>Plants synced/created/updated"]
-    K --> L
+    E --> G["Filter Organizations<br/>auto_sync_enabled = true"]
+    G --> H["For Each Vendor<br/>Check shouldRunPlantSync()<br/>Morning/Evening times"]
+    H --> I{"Time matches<br/>morning/evening?"}
+    I -->|"Yes"| J["Authenticate<br/>Call listPlants()<br/>Upsert to DB<br/>Batch size: 100"]
+    I -->|"No"| K["Skip Sync<br/>(not sync time)"]
+    J --> L["Results<br/>Success/Failure counts<br/>Plants synced/created/updated<br/>Fetches newly added plants"]
+    K --> M["Wait for next<br/>sync window"]
 
     style A fill:#3b82f6,stroke:#2563eb,stroke-width:2px,color:#fff
     style B fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+    style C fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff
     style D fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff
     style E fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff
     style F fill:#ef4444,stroke:#dc2626,stroke-width:2px,color:#fff
-    style G fill:#ef4444,stroke:#dc2626,stroke-width:2px,color:#fff
-    style H fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+    style G fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+    style H fill:#6366f1,stroke:#4f46e5,stroke-width:2px,color:#fff
     style I fill:#6366f1,stroke:#4f46e5,stroke-width:2px,color:#fff
     style J fill:#3b82f6,stroke:#2563eb,stroke-width:2px,color:#fff
-    style K fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
-    style L fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff`
+    style K fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff
+    style L fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff
+    style M fill:#94a3b8,stroke:#64748b,stroke-width:2px,color:#fff`
 
     mermaid.initialize({
       startOnLoad: false,
@@ -451,15 +454,17 @@ export function SystemFlowDocumentation() {
                       <div>
                         <h4 className="font-medium mb-2">Sync Services</h4>
                         <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                          <li><code className="bg-background px-1 rounded">plantSyncService.ts</code> - Plant synchronization</li>
+                          <li><code className="bg-background px-1 rounded">plantSyncService.ts</code> - Plant synchronization (twice daily: morning/evening)</li>
                           <li><code className="bg-background px-1 rounded">alertSyncService.ts</code> - Alert synchronization</li>
-                          <li><code className="bg-background px-1 rounded">telemetrySyncService.ts</code> - Telemetry synchronization</li>
+                          <li><code className="bg-background px-1 rounded">liveTelemetrySyncService.ts</code> - Live telemetry sync (15/30/45 min intervals, LIST_PLANTS or PER_PLANT mode)</li>
+                          <li><code className="bg-background px-1 rounded">telemetrySyncService.ts</code> - Historical telemetry (graphs) synchronization</li>
                         </ul>
                       </div>
                       <div>
                         <h4 className="font-medium mb-2">Cron Jobs</h4>
                         <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                          <li><code className="bg-background px-1 rounded">plantSyncCron.js</code> - 15-minute plant sync</li>
+                          <li><code className="bg-background px-1 rounded">plantSyncCron.js</code> - Runs every 15 min, checks morning/evening times (twice daily sync)</li>
+                          <li><code className="bg-background px-1 rounded">liveTelemetrySyncCron.js</code> - Runs every 15 min, filters vendors by telemetry_sync_interval</li>
                           <li><code className="bg-background px-1 rounded">alertSyncCron.js</code> - Alert sync scheduler</li>
                           <li>Morning cron (00:15 AM) - Historical aggregate updates</li>
                         </ul>
@@ -513,7 +518,15 @@ export function SystemFlowDocumentation() {
                       </div>
                       <div>
                         <code className="bg-background px-2 py-1 rounded text-sm font-mono">plant_list_sync_evening_ist</code>
-                        <p className="text-sm text-muted-foreground mt-1">TIME (default: 23:00) - Evening listPlants time for PER_PLANT vendors</p>
+                        <p className="text-sm text-muted-foreground mt-1">TIME (default: 23:00) - Evening plant sync time (IST)</p>
+                      </div>
+                      <div>
+                        <code className="bg-background px-2 py-1 rounded text-sm font-mono">telemetry_sync_mode</code>
+                        <p className="text-sm text-muted-foreground mt-1">Enum: LIST_PLANTS | PER_PLANT - How live telemetry is fetched (all plants in one call vs per-plant)</p>
+                      </div>
+                      <div>
+                        <code className="bg-background px-2 py-1 rounded text-sm font-mono">telemetry_sync_interval</code>
+                        <p className="text-sm text-muted-foreground mt-1">Integer (15, 30, or 45) - Live telemetry sync interval in minutes. Sync runs at fixed clock times based on this interval.</p>
                       </div>
                     </div>
                   </div>
@@ -521,10 +534,90 @@ export function SystemFlowDocumentation() {
                 <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-900">
                   <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">Restricted Sync Window</h4>
                   <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    Currently configured via environment variables <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">SYNC_WINDOW_START</code> (default: 20:00 IST) 
-                    and <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">SYNC_WINDOW_END</code> (default: 05:00 IST). 
-                    Per-vendor restricted window configuration is planned but not yet implemented.
+                    <strong>8:00 PM - 5:00 AM IST:</strong> All sync operations (plant sync and telemetry sync) are automatically skipped during this time window.
+                    This prevents unnecessary API calls during off-peak hours. Currently configured via environment variables 
+                    <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">SYNC_WINDOW_START</code> (default: 20:00 IST) 
+                    and <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">SYNC_WINDOW_END</code> (default: 05:00 IST).
                   </p>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Telemetry Architecture */}
+          <Card className="overflow-hidden">
+            <SectionHeader id="telemetry-architecture" title="Telemetry Architecture: Graphs vs Live Telemetry" icon={Layers} />
+            {expandedSections.has("telemetry-architecture") && (
+              <div className="p-6 pt-0 space-y-6 border-t">
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 p-6 rounded-lg border border-blue-200 dark:border-blue-900">
+                  <h3 className="font-semibold text-lg mb-4">Two Types of Telemetry Data</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    The system separates telemetry into two distinct categories with different update strategies:
+                  </p>
+                  
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="bg-white dark:bg-background p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Graphs (Historical Telemetry)
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        <strong>Purpose:</strong> Time-series data for visualization and analysis
+                      </p>
+                      <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
+                        <li><strong>Storage:</strong> Separate telemetry database (<code className="bg-background px-1 rounded">telemetry_15m</code> table)</li>
+                        <li><strong>Update:</strong> Fetched on-demand when user requests graph data</li>
+                        <li><strong>API:</strong> <code className="bg-background px-1 rounded">GET /api/plants/[id]/telemetry</code></li>
+                        <li><strong>Resolution:</strong> 15-minute intervals (configurable)</li>
+                        <li><strong>Retention:</strong> 24-hour rolling window</li>
+                        <li><strong>Data:</strong> Power generation over time (kW values at each timestamp)</li>
+                      </ul>
+                    </div>
+                    
+                    <div className="bg-white dark:bg-background p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-3 flex items-center gap-2">
+                        <Zap className="h-5 w-5" />
+                        Live Telemetry (Real-Time Metrics)
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        <strong>Purpose:</strong> Current production metrics displayed in dashboards
+                      </p>
+                      <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
+                        <li><strong>Storage:</strong> Main database (<code className="bg-background px-1 rounded">plants</code> table)</li>
+                        <li><strong>Update:</strong> Automatic via cron job at configurable intervals (15, 30, or 45 minutes per vendor)</li>
+                        <li><strong>Service:</strong> <code className="bg-background px-1 rounded">liveTelemetrySyncService.ts</code></li>
+                        <li><strong>Cron:</strong> <code className="bg-background px-1 rounded">liveTelemetrySyncCron.js</code> (runs every 15 min, filters vendors by interval)</li>
+                        <li><strong>Sync Modes:</strong>
+                          <ul className="ml-4 mt-1 list-disc">
+                            <li><code className="bg-background px-1 rounded">LIST_PLANTS</code> - Fetches all plants telemetry in single API call (efficient)</li>
+                            <li><code className="bg-background px-1 rounded">PER_PLANT</code> - Fetches each plant telemetry individually (costly but necessary for some vendors)</li>
+                          </ul>
+                        </li>
+                        <li><strong>Fields Updated:</strong>
+                          <ul className="ml-4 mt-1 list-disc">
+                            <li><code className="bg-background px-1 rounded">current_power_kw</code></li>
+                            <li><code className="bg-background px-1 rounded">daily_energy_kwh</code></li>
+                            <li><code className="bg-background px-1 rounded">monthly_energy_mwh</code></li>
+                            <li><code className="bg-background px-1 rounded">yearly_energy_mwh</code></li>
+                            <li><code className="bg-background px-1 rounded">total_energy_mwh</code></li>
+                            <li><code className="bg-background px-1 rounded">network_status</code></li>
+                          </ul>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                    <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">How Live Telemetry is Fetched</h4>
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
+                      The system uses two sync modes based on vendor configuration (<code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">telemetry_sync_mode</code>):
+                    </p>
+                    <ol className="text-sm text-yellow-800 dark:text-yellow-200 space-y-2 ml-4 list-decimal">
+                      <li><strong>LIST_PLANTS Mode (Efficient):</strong> Calls <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">adapter.listPlants()</code> once to get all plants telemetry in a single API call. Maps vendor response to database fields and updates in batches of 100.</li>
+                      <li><strong>PER_PLANT Mode (Costly):</strong> Calls <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">adapter.listPlant(vendorPlantId)</code> for each plant individually. Fetches in batches of 50 plants (parallel), then updates database in batches of 100 (reduces transactions).</li>
+                      <li><strong>Interval-Based Sync:</strong> Cron runs every 15 minutes, but only syncs vendors whose <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">telemetry_sync_interval</code> matches the current time (e.g., 15 min syncs at :00, :15, :30, :45)</li>
+                    </ol>
+                  </div>
                 </div>
               </div>
             )}
@@ -545,26 +638,48 @@ export function SystemFlowDocumentation() {
                       <strong>Default for:</strong> Solarman, ShineMonitor, Foxesscloud
                     </p>
                     <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2 ml-4 list-disc">
-                      <li>At each eligible cron tick (based on org sync interval), calls <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">adapter.listPlants()</code></li>
+                      <li>Plant sync runs <strong>twice daily</strong> (morning and evening) to fetch newly added plants</li>
+                      <li>At sync time, calls <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">adapter.listPlants()</code></li>
                       <li>Upserts plants into <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">plants</code> table with topology and metrics</li>
                       <li>Production metrics (daily/monthly/yearly/total) come from plant list API</li>
-                      <li>No extra vendor-level timing required - uses org sync cadence</li>
+                      <li>Manual/force sync always available on request</li>
                     </ul>
                   </div>
                   <div className="bg-purple-50 dark:bg-purple-950/20 p-6 rounded-lg border border-purple-200 dark:border-purple-900">
                     <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-3 flex items-center gap-2">
                       <PlayCircle className="h-5 w-5" />
-                      PER_PLANT Mode
+                      Live Telemetry Sync Modes
                     </h4>
                     <p className="text-sm text-purple-800 dark:text-purple-200 mb-3">
-                      <strong>Default for:</strong> SolarDM, PVBlink
+                      <strong>Configurable per vendor:</strong> Set via <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">telemetry_sync_mode</code> in vendor settings
                     </p>
-                    <ul className="text-sm text-purple-800 dark:text-purple-200 space-y-2 ml-4 list-disc">
-                      <li>Preferred source of metrics is per-plant telemetry APIs, not listPlants()</li>
-                      <li>At main cron interval, list-based sync is skipped</li>
-                      <li>Twice-daily listPlants() refresh at configured morning/evening times (not yet wired)</li>
-                      <li>Per-plant telemetry cron uses <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">per_plant_sync_interval_minutes</code></li>
-                    </ul>
+                    <div className="space-y-3">
+                      <div>
+                        <h5 className="font-medium text-sm mb-1">LIST_PLANTS Mode (Efficient)</h5>
+                        <ul className="text-sm text-purple-800 dark:text-purple-200 space-y-1 ml-4 list-disc">
+                          <li>Single API call gets all plants telemetry</li>
+                          <li>Uses <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">adapter.listPlants()</code></li>
+                          <li>Recommended for vendors that provide live telemetry in listPlants()</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h5 className="font-medium text-sm mb-1">PER_PLANT Mode (Costly)</h5>
+                        <ul className="text-sm text-purple-800 dark:text-purple-200 space-y-1 ml-4 list-disc">
+                          <li>Each plant requires individual API call</li>
+                          <li>Uses <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">adapter.listPlant(vendorPlantId)</code> for each plant</li>
+                          <li>Fetches in batches of 50 (parallel), updates in batches of 100</li>
+                          <li>Necessary for vendors that don&apos;t provide live telemetry in listPlants()</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h5 className="font-medium text-sm mb-1">Sync Interval</h5>
+                        <ul className="text-sm text-purple-800 dark:text-purple-200 space-y-1 ml-4 list-disc">
+                          <li>Configurable per vendor: 15, 30, or 45 minutes</li>
+                          <li>Sync runs at fixed clock times (e.g., 15 min: :00, :15, :30, :45)</li>
+                          <li>Stored in <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">telemetry_sync_interval</code> field</li>
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -761,7 +876,17 @@ export function SystemFlowDocumentation() {
                         <tr className="border-b">
                           <td className="p-2"><code>plant_list_sync_evening_ist</code></td>
                           <td className="p-2">TIME</td>
-                          <td className="p-2">Evening listPlants sync time (default: 23:00)</td>
+                          <td className="p-2">Evening plant sync time (default: 23:00 IST)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>telemetry_sync_mode</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">LIST_PLANTS or PER_PLANT - How live telemetry is fetched (default: LIST_PLANTS)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>telemetry_sync_interval</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">Live telemetry sync interval in minutes: 15, 30, or 45 (default: 15)</td>
                         </tr>
                         <tr className="border-b">
                           <td className="p-2"><code>last_synced_at</code></td>
@@ -919,10 +1044,23 @@ export function SystemFlowDocumentation() {
                           <td className="p-2">INTEGER</td>
                           <td className="p-2">FK to organizations (required for CASCADE delete)</td>
                         </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>created_at</code></td>
+                          <td className="p-2">TIMESTAMPTZ</td>
+                          <td className="p-2">Creation timestamp</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>updated_at</code></td>
+                          <td className="p-2">TIMESTAMPTZ</td>
+                          <td className="p-2">Last update timestamp</td>
+                        </tr>
                       </tbody>
                     </table>
                     <div className="mt-2 text-xs text-muted-foreground">
                       <strong>Note:</strong> No status field - work orders are static per requirements
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Excel Import/Export:</strong> SUPERADMIN and DEVELOPER can export work orders to Excel and import them back for bulk operations and disaster recovery.
                     </div>
                   </div>
 
@@ -1303,11 +1441,12 @@ Unique Constraints:
                         <strong>syncAllPlants()</strong> in <code className="bg-background px-1 rounded">plantSyncService.ts</code>
                         <ul className="ml-4 mt-1 list-disc">
                           <li>Fetches all active vendors with organization settings</li>
-                          <li>Groups vendors by organization</li>
-                          <li>Filters by <code className="bg-background px-1 rounded">shouldSyncOrg()</code>:
+                          <li>Filters by <code className="bg-background px-1 rounded">auto_sync_enabled = true</code></li>
+                          <li>For each vendor, checks <code className="bg-background px-1 rounded">shouldRunPlantSync()</code>:
                             <ul className="ml-4 mt-1 list-disc">
-                              <li>Checks <code className="bg-background px-1 rounded">auto_sync_enabled = true</code></li>
-                              <li>Verifies current minute matches <code className="bg-background px-1 rounded">sync_interval_minutes</code> boundary</li>
+                              <li>Checks if current time is within 15 minutes of morning or evening sync time</li>
+                              <li>Uses <code className="bg-background px-1 rounded">plant_list_sync_morning_ist</code> and <code className="bg-background px-1 rounded">plant_list_sync_evening_ist</code></li>
+                              <li>Plant sync runs <strong>twice daily</strong> to fetch newly added plants</li>
                             </ul>
                           </li>
                         </ul>
@@ -1315,19 +1454,14 @@ Unique Constraints:
                       <li>
                         <strong>For each eligible vendor:</strong> <code className="bg-background px-1 rounded">syncVendorPlants()</code>
                         <ul className="ml-4 mt-1 list-disc">
-                          <li>Resolves <code className="bg-background px-1 rounded">plant_sync_mode</code> (defaults based on vendor_type)</li>
-                          <li>If <code className="bg-background px-1 rounded">PER_PLANT</code>: Skip listPlants sync (returns early)</li>
-                          <li>If <code className="bg-background px-1 rounded">LIST_PLANTS</code>:
-                            <ul className="ml-4 mt-1 list-disc">
-                              <li>Creates vendor adapter via <code className="bg-background px-1 rounded">VendorManager.getAdapter()</code></li>
-                              <li>Sets token storage for adapter</li>
-                              <li>Validates/refreshes token via <code className="bg-background px-1 rounded">validateAndRefreshToken()</code></li>
-                              <li>Calls <code className="bg-background px-1 rounded">adapter.listPlants()</code></li>
-                              <li>Normalizes plant data (unit conversions, timestamps)</li>
-                              <li>Upserts plants in batches of 100 to <code className="bg-background px-1 rounded">plants</code> table</li>
-                              <li>Updates production metrics (daily/monthly/yearly/total energy)</li>
-                            </ul>
-                          </li>
+                          <li>Creates vendor adapter via <code className="bg-background px-1 rounded">VendorManager.getAdapter()</code></li>
+                          <li>Sets token storage for adapter</li>
+                          <li>Validates/refreshes token via <code className="bg-background px-1 rounded">validateAndRefreshToken()</code></li>
+                          <li>Calls <code className="bg-background px-1 rounded">adapter.listPlants()</code></li>
+                          <li>Normalizes plant data (unit conversions, timestamps)</li>
+                          <li>Upserts plants in batches of 100 to <code className="bg-background px-1 rounded">plants</code> table</li>
+                          <li>Updates production metrics (daily/monthly/yearly/total energy)</li>
+                          <li>If live telemetry not in listPlants(), optionally uses <code className="bg-background px-1 rounded">listPlant()</code> per plant (configurable via <code className="bg-background px-1 rounded">ENABLE_PER_PLANT_LIVE_TELEMETRY</code>)</li>
                         </ul>
                       </li>
                       <li>
@@ -1335,6 +1469,111 @@ Unique Constraints:
                       </li>
                     </ol>
                   </div>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Live Telemetry Sync Flow */}
+          <Card className="overflow-hidden">
+            <FlowSectionHeader flowId="flow-live-telemetry-sync" flowTitle="Live Telemetry Sync Flow" icon={Zap} />
+            {expandedSections.has("flow-live-telemetry-sync") && (
+              <div className="p-6 pt-0 space-y-6 border-t">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Entry Points</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        1. Auto Cron
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Runs every 15 minutes via <code className="bg-background px-1 rounded">lib/cron/liveTelemetrySyncCron.js</code>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Calls <code className="bg-background px-1 rounded">GET /api/cron/sync-live-telemetry</code>
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Database className="h-4 w-4" />
+                        2. External Cron
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        GitHub Actions, cron-job.org, etc.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Calls <code className="bg-background px-1 rounded">GET /api/cron/sync-live-telemetry</code> with <code className="bg-background px-1 rounded">CRON_SECRET</code>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Complete Flow</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    <ol className="text-sm text-muted-foreground space-y-3 ml-4 list-decimal">
+                      <li>
+                        <strong>Entry Point:</strong> Cron trigger (every 15 minutes)
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Cron checks restricted window (8 PM - 5 AM IST by default)</li>
+                          <li>If in window, sync is skipped</li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong>syncAllLiveTelemetry()</strong> in <code className="bg-background px-1 rounded">liveTelemetrySyncService.ts</code>
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Fetches all active vendors</li>
+                          <li>For each vendor, checks <code className="bg-background px-1 rounded">shouldSyncVendorTelemetry()</code>:
+                            <ul className="ml-4 mt-1 list-disc">
+                              <li>Checks if current minute matches <code className="bg-background px-1 rounded">telemetry_sync_interval</code> boundary</li>
+                              <li>For 15 min: syncs at :00, :15, :30, :45</li>
+                              <li>For 30 min: syncs at :00, :30</li>
+                              <li>For 45 min: syncs at :00, :45</li>
+                            </ul>
+                          </li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong>For each eligible vendor:</strong> <code className="bg-background px-1 rounded">syncVendorLiveTelemetry()</code>
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Gets <code className="bg-background px-1 rounded">telemetry_sync_mode</code> (LIST_PLANTS or PER_PLANT)</li>
+                          <li>Creates vendor adapter and validates token</li>
+                          <li><strong>If LIST_PLANTS mode:</strong>
+                            <ul className="ml-4 mt-1 list-disc">
+                              <li>Calls <code className="bg-background px-1 rounded">adapter.listPlants()</code> once</li>
+                              <li>Maps all plants telemetry from response</li>
+                              <li>Updates database in batches of 100</li>
+                            </ul>
+                          </li>
+                          <li><strong>If PER_PLANT mode:</strong>
+                            <ul className="ml-4 mt-1 list-disc">
+                              <li>Fetches all active plants for vendor</li>
+                              <li>Processes in batches of 50 (parallel API calls)</li>
+                              <li>For each plant, calls <code className="bg-background px-1 rounded">adapter.listPlant(vendorPlantId)</code></li>
+                              <li>Collects updates and performs batch database update (100 plants per transaction)</li>
+                            </ul>
+                          </li>
+                          <li>Updates fields: <code className="bg-background px-1 rounded">current_power_kw</code>, <code className="bg-background px-1 rounded">daily_energy_kwh</code>, <code className="bg-background px-1 rounded">monthly_energy_mwh</code>, <code className="bg-background px-1 rounded">yearly_energy_mwh</code>, <code className="bg-background px-1 rounded">total_energy_mwh</code>, <code className="bg-background px-1 rounded">network_status</code></li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong>Results:</strong> Summary with success/failure counts, plants synced/failed
+                      </li>
+                    </ol>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                  <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">⚠️ Important Notes</h4>
+                  <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1 ml-4 list-disc">
+                    <li>Live telemetry sync is <strong>separate from plant sync</strong> - runs at different intervals</li>
+                    <li>Plant sync runs twice daily to fetch newly added plants</li>
+                    <li>Live telemetry sync runs at configurable intervals (15/30/45 min) to update real-time metrics</li>
+                    <li>LIST_PLANTS mode is more efficient (single API call) but requires vendor support</li>
+                    <li>PER_PLANT mode is costly (one call per plant) but works for all vendors</li>
+                    <li>All syncs respect the restricted time window (8 PM - 5 AM IST)</li>
+                  </ul>
                 </div>
               </div>
             )}
@@ -1363,6 +1602,8 @@ Unique Constraints:
 │   │   ├── plants/               # Plant endpoints
 │   │   ├── vendors/             # Vendor management & sync
 │   │   └── workorders/          # Work order endpoints
+│   │       ├── export/          # Excel export endpoint
+│   │       └── import/          # Excel import endpoint
 │   ├── auth/                     # Auth pages
 │   ├── dashboard/                # Dashboard page
 │   ├── superadmin/               # Super admin pages
@@ -1372,16 +1613,20 @@ Unique Constraints:
 │   └── *.tsx                    # Feature components
 ├── lib/                          # Core libraries
 │   ├── services/                # Business logic services
-│   │   ├── plantSyncService.ts  # Plant sync orchestration
-│   │   └── alertSyncService.ts  # Alert sync orchestration
+│   │   ├── plantSyncService.ts  # Plant sync orchestration (twice daily)
+│   │   ├── alertSyncService.ts  # Alert sync orchestration
+│   │   └── liveTelemetrySyncService.ts  # Live telemetry sync (15/30/45 min intervals)
 │   ├── vendors/                 # Vendor adapter system
-│   │   ├── baseVendorAdapter.ts # Abstract base class
+│   │   ├── baseVendorAdapter.ts # Abstract base class (includes listPlant method)
 │   │   ├── solarmanAdapter.ts   # Solarman implementation
 │   │   ├── solarDmAdapter.ts   # SolarDM implementation
 │   │   ├── pvBlinkAdapter.ts    # PVBlink implementation
+│   │   ├── shineMonitorAdapter.ts  # ShineMonitor implementation
+│   │   ├── foxesscloudAdapter.ts   # Foxesscloud implementation
 │   │   └── vendorManager.ts     # Factory pattern
 │   ├── cron/                    # Cron job definitions
-│   │   ├── plantSyncCron.js    # Plant sync scheduler
+│   │   ├── plantSyncCron.js    # Plant sync scheduler (checks morning/evening times)
+│   │   ├── liveTelemetrySyncCron.js  # Live telemetry sync scheduler
 │   │   └── alertSyncCron.js     # Alert sync scheduler
 │   ├── supabase/                # Database clients
 │   │   ├── pooled.ts            # Connection pooling
@@ -1410,16 +1655,28 @@ Unique Constraints:
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="bg-muted/50 p-4 rounded-lg">
                       <h4 className="font-medium mb-2">lib/services/plantSyncService.ts</h4>
-                      <p className="text-xs text-muted-foreground mb-2">Main plant synchronization service</p>
+                      <p className="text-xs text-muted-foreground mb-2">Main plant synchronization service (twice daily)</p>
                       <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                         <li><code className="bg-background px-1 rounded">syncAllPlants()</code> - Main entry point, orchestrates all vendor syncs</li>
-                        <li><code className="bg-background px-1 rounded">syncVendorPlants()</code> - Per-vendor sync logic with mode handling</li>
-                        <li><code className="bg-background px-1 rounded">getPlantSyncMode()</code> - Resolves LIST_PLANTS vs PER_PLANT mode</li>
-                        <li><code className="bg-background px-1 rounded">shouldSyncOrg()</code> - Checks org eligibility (auto_sync_enabled, interval)</li>
+                        <li><code className="bg-background px-1 rounded">syncVendorPlants()</code> - Per-vendor sync logic</li>
+                        <li><code className="bg-background px-1 rounded">shouldRunPlantSync()</code> - Checks if current time matches morning/evening sync times</li>
                         <li><code className="bg-background px-1 rounded">validateAndRefreshToken()</code> - Token validation and refresh</li>
                         <li>Batch upserts (100 plants per batch) for performance</li>
                         <li>Unit conversions (W→kW, kWh→MWh) during normalization</li>
                         <li>Timestamp conversions (Unix seconds → ISO strings)</li>
+                        <li>Fetches newly added plants from vendors</li>
+                      </ul>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">lib/services/liveTelemetrySyncService.ts</h4>
+                      <p className="text-xs text-muted-foreground mb-2">Live telemetry synchronization service</p>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><code className="bg-background px-1 rounded">syncAllLiveTelemetry()</code> - Main entry point, orchestrates all vendor telemetry syncs</li>
+                        <li><code className="bg-background px-1 rounded">syncVendorLiveTelemetry()</code> - Per-vendor telemetry sync with mode handling</li>
+                        <li><code className="bg-background px-1 rounded">shouldSyncVendorTelemetry()</code> - Checks if vendor should be synced based on telemetry_sync_interval</li>
+                        <li>Supports two modes: LIST_PLANTS (single API call) or PER_PLANT (individual calls)</li>
+                        <li>Batch fetching (50 plants parallel) and batch updates (100 plants per transaction)</li>
+                        <li>Updates: current_power_kw, daily_energy_kwh, monthly_energy_mwh, yearly_energy_mwh, total_energy_mwh, network_status</li>
                       </ul>
                     </div>
                     <div className="bg-muted/50 p-4 rounded-lg">
@@ -1563,7 +1820,20 @@ Unique Constraints:
                         <li>Schedule: Every 15 minutes (<code className="bg-background px-1 rounded">*/15 * * * *</code>)</li>
                         <li>Calls: <code className="bg-background px-1 rounded">GET /api/cron/sync-plants</code></li>
                         <li>Checks restricted window (8 PM - 5 AM IST by default)</li>
-                        <li>Skips sync if in restricted window</li>
+                        <li>Service checks morning/evening times - plant sync runs <strong>twice daily</strong></li>
+                        <li>Skips sync if in restricted window or not at sync time</li>
+                        <li>Uses <code className="bg-background px-1 rounded">CRON_SECRET</code> for security (if configured)</li>
+                        <li>Runs in-process (server.js starts it)</li>
+                      </ul>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">liveTelemetrySyncCron.js</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Schedule: Every 15 minutes (<code className="bg-background px-1 rounded">*/15 * * * *</code>)</li>
+                        <li>Calls: <code className="bg-background px-1 rounded">GET /api/cron/sync-live-telemetry</code></li>
+                        <li>Checks restricted window (8 PM - 5 AM IST by default)</li>
+                        <li>Service filters vendors by <code className="bg-background px-1 rounded">telemetry_sync_interval</code> (15/30/45 min)</li>
+                        <li>Only syncs vendors whose interval matches current time</li>
                         <li>Uses <code className="bg-background px-1 rounded">CRON_SECRET</code> for security (if configured)</li>
                         <li>Runs in-process (server.js starts it)</li>
                       </ul>
@@ -1774,6 +2044,18 @@ Unique Constraints:
                           <td className="p-2">Enable in-process alert sync cron (true/false)</td>
                           <td className="p-2">⚠️ Optional</td>
                           <td className="p-2">true</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_LIVE_TELEMETRY_SYNC_CRON</code></td>
+                          <td className="p-2">Enable in-process live telemetry sync cron (true/false)</td>
+                          <td className="p-2">⚠️ Optional</td>
+                          <td className="p-2">true</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_PER_PLANT_LIVE_TELEMETRY</code></td>
+                          <td className="p-2">Enable per-plant live telemetry fetching during plant sync if not in listPlants() (true/false)</td>
+                          <td className="p-2">⚠️ Optional</td>
+                          <td className="p-2">false</td>
                         </tr>
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">NODE_ENV</code></td>
@@ -2056,70 +2338,76 @@ All vendor adapters must extend BaseVendorAdapter and implement:
   ]
 }`}
                         />
+                        <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                          <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Attribute Mapping</h5>
+                          <p className="text-xs text-blue-800 dark:text-blue-200 mb-2">
+                            The following table shows how Solarman PRO API fields are mapped to database columns:
+                          </p>
+                        </div>
                         <div><strong>Database Mapping:</strong></div>
                         <table className="w-full text-xs border-collapse">
                           <thead>
-                            <tr className="border-b">
-                              <th className="text-left p-2">API Field</th>
-                              <th className="text-left p-2">DB Column</th>
-                              <th className="text-left p-2">Transformation</th>
+                            <tr className="border-b bg-muted">
+                              <th className="text-left p-2 font-semibold">API Field</th>
+                              <th className="text-left p-2 font-semibold">DB Column</th>
+                              <th className="text-left p-2 font-semibold">Transformation</th>
                             </tr>
                           </thead>
                           <tbody>
                             <tr className="border-b">
-                              <td className="p-2"><code>station.id</code></td>
-                              <td className="p-2"><code>vendor_plant_id</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">station.id</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">vendor_plant_id</code></td>
                               <td className="p-2">Convert to string</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>station.name</code></td>
-                              <td className="p-2"><code>name</code></td>
-                              <td className="p-2">Direct</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">station.name</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">name</code></td>
+                              <td className="p-2">Direct mapping</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>station.installedCapacity</code></td>
-                              <td className="p-2"><code>capacity_kw</code></td>
-                              <td className="p-2">Already in kW</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">station.installedCapacity</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">capacity_kw</code></td>
+                              <td className="p-2">Already in kW - direct mapping</td>
+                            </tr>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">station.generationPower</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">current_power_kw</code></td>
+                              <td className="p-2"><strong>W → kW</strong> (divide by 1000) - Live telemetry field</td>
+                            </tr>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">station.generationValue</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">daily_energy_kwh</code></td>
+                              <td className="p-2">Direct (already kWh) - <strong>Live telemetry field</strong></td>
+                            </tr>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">station.generationMonth</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">monthly_energy_mwh</code></td>
+                              <td className="p-2"><strong>kWh → MWh</strong> (divide by 1000) - Live telemetry field</td>
+                            </tr>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">station.generationYear</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">yearly_energy_mwh</code></td>
+                              <td className="p-2"><strong>kWh → MWh</strong> (divide by 1000) - Live telemetry field</td>
+                            </tr>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">station.generationUploadTotalOffset</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">total_energy_mwh</code></td>
+                              <td className="p-2"><strong>kWh → MWh</strong> (divide by 1000) - Live telemetry field</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>station.generationPower</code></td>
-                              <td className="p-2"><code>current_power_kw</code></td>
-                              <td className="p-2">W → kW (divide by 1000)</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">station.lastUpdateTime</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">last_update_time</code></td>
+                              <td className="p-2"><strong>Unix seconds → ISO string</strong> (Date conversion)</td>
                             </tr>
-                            <tr className="border-b">
-                              <td className="p-2"><code>station.generationValue</code></td>
-                              <td className="p-2"><code>daily_energy_kwh</code></td>
-                              <td className="p-2">Direct (already kWh)</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="p-2"><code>station.generationMonth</code></td>
-                              <td className="p-2"><code>monthly_energy_mwh</code></td>
-                              <td className="p-2">kWh → MWh (divide by 1000)</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="p-2"><code>station.generationYear</code></td>
-                              <td className="p-2"><code>yearly_energy_mwh</code></td>
-                              <td className="p-2">kWh → MWh (divide by 1000)</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="p-2"><code>station.generationUploadTotalOffset</code></td>
-                              <td className="p-2"><code>total_energy_mwh</code></td>
-                              <td className="p-2">kWh → MWh (divide by 1000)</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="p-2"><code>station.lastUpdateTime</code></td>
-                              <td className="p-2"><code>last_update_time</code></td>
-                              <td className="p-2">Unix seconds → ISO string</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="p-2"><code>station.networkStatus</code></td>
-                              <td className="p-2"><code>network_status</code></td>
-                              <td className="p-2">Trim whitespace</td>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">station.networkStatus</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">network_status</code></td>
+                              <td className="p-2">Trim whitespace - <strong>Live telemetry field</strong></td>
                             </tr>
                             <tr>
-                              <td className="p-2"><code>station.locationLat/Lng/Address</code></td>
-                              <td className="p-2"><code>location</code> (JSONB)</td>
-                              <td className="p-2">{"{lat, lng, address}"}</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">station.locationLat/Lng/Address</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">location</code> (JSONB)</td>
+                              <td className="p-2">Combine into JSONB: <code className="bg-muted px-1 rounded">{"{lat, lng, address}"}</code></td>
                             </tr>
                           </tbody>
                         </table>
@@ -2191,45 +2479,51 @@ All vendor adapters must extend BaseVendorAdapter and implement:
   ]
 }`}
                         />
+                        <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                          <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Alert Attribute Mapping</h5>
+                          <p className="text-xs text-blue-800 dark:text-blue-200 mb-2">
+                            The following table shows how Solarman alert fields are mapped to database columns:
+                          </p>
+                        </div>
                         <div><strong>Database Mapping:</strong></div>
                         <table className="w-full text-xs border-collapse">
                           <thead>
-                            <tr className="border-b">
-                              <th className="text-left p-2">API Field</th>
-                              <th className="text-left p-2">DB Column</th>
-                              <th className="text-left p-2">Transformation</th>
+                            <tr className="border-b bg-muted">
+                              <th className="text-left p-2 font-semibold">API Field</th>
+                              <th className="text-left p-2 font-semibold">DB Column</th>
+                              <th className="text-left p-2 font-semibold">Transformation</th>
                             </tr>
                           </thead>
                           <tbody>
                             <tr className="border-b">
-                              <td className="p-2"><code>id</code></td>
-                              <td className="p-2"><code>vendor_alert_id</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">id</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">vendor_alert_id</code></td>
                               <td className="p-2">Convert to string</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>stationId</code></td>
-                              <td className="p-2"><code>vendor_plant_id</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">stationId</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">vendor_plant_id</code></td>
                               <td className="p-2">Convert to string</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>alertName</code></td>
-                              <td className="p-2"><code>title</code></td>
-                              <td className="p-2">Direct</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">alertName</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">title</code></td>
+                              <td className="p-2">Direct mapping</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>level + influence</code></td>
-                              <td className="p-2"><code>severity</code></td>
-                              <td className="p-2">Map: 0→LOW, 1→MEDIUM, 2→HIGH, Safety→CRITICAL</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">level + influence</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">severity</code></td>
+                              <td className="p-2"><strong>Severity mapping:</strong> 0→LOW, 1→MEDIUM, 2→HIGH, Safety→CRITICAL</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>endTime</code></td>
-                              <td className="p-2"><code>status</code></td>
-                              <td className="p-2">null→ACTIVE, value→RESOLVED</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">endTime</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">status</code></td>
+                              <td className="p-2"><strong>Status mapping:</strong> null→ACTIVE, value→RESOLVED</td>
                             </tr>
                             <tr>
-                              <td className="p-2"><code>endTime - alertTime</code></td>
-                              <td className="p-2"><code>grid_down_seconds</code></td>
-                              <td className="p-2">Calculate difference in seconds</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">endTime - alertTime</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">grid_down_seconds</code></td>
+                              <td className="p-2"><strong>Calculation:</strong> Difference in seconds (max with 0)</td>
                             </tr>
                           </tbody>
                         </table>
@@ -2303,40 +2597,46 @@ All vendor adapters must extend BaseVendorAdapter and implement:
   }
 }`}
                         />
+                        <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                          <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Attribute Mapping</h5>
+                          <p className="text-xs text-blue-800 dark:text-blue-200 mb-2">
+                            The following table shows how SolarDM API fields are mapped to database columns:
+                          </p>
+                        </div>
                         <div><strong>Database Mapping:</strong></div>
                         <table className="w-full text-xs border-collapse">
                           <thead>
-                            <tr className="border-b">
-                              <th className="text-left p-2">API Field</th>
-                              <th className="text-left p-2">DB Column</th>
-                              <th className="text-left p-2">Transformation</th>
+                            <tr className="border-b bg-muted">
+                              <th className="text-left p-2 font-semibold">API Field</th>
+                              <th className="text-left p-2 font-semibold">DB Column</th>
+                              <th className="text-left p-2 font-semibold">Transformation</th>
                             </tr>
                           </thead>
                           <tbody>
                             <tr className="border-b">
-                              <td className="p-2"><code>id</code></td>
-                              <td className="p-2"><code>vendor_plant_id</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">id</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">vendor_plant_id</code></td>
                               <td className="p-2">Direct (string)</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>plantName</code></td>
-                              <td className="p-2"><code>name</code></td>
-                              <td className="p-2">Direct</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">plantName</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">name</code></td>
+                              <td className="p-2">Direct mapping</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>capacity</code></td>
-                              <td className="p-2"><code>capacity_kw</code></td>
-                              <td className="p-2">ParseFloat (string → number)</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">capacity</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">capacity_kw</code></td>
+                              <td className="p-2"><strong>ParseFloat</strong> (string → number, already in kW)</td>
                             </tr>
-                            <tr className="border-b">
-                              <td className="p-2"><code>communicateStatus</code></td>
-                              <td className="p-2"><code>network_status</code></td>
-                              <td className="p-2">1→NORMAL, 2→ALL_OFFLINE, 3→PARTIAL_OFFLINE</td>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">communicateStatus</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">network_status</code></td>
+                              <td className="p-2"><strong>Status mapping:</strong> 1→NORMAL, 2→ALL_OFFLINE, 3→PARTIAL_OFFLINE - <strong>Live telemetry field</strong></td>
                             </tr>
                             <tr>
-                              <td className="p-2"><code>createTime</code></td>
-                              <td className="p-2"><code>vendor_created_date</code></td>
-                              <td className="p-2">&quot;YYYY-MM-DD HH:mm:ss&quot; → ISO string</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">createTime</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">vendor_created_date</code></td>
+                              <td className="p-2"><strong>Date conversion:</strong> &quot;YYYY-MM-DD HH:mm:ss&quot; → ISO string</td>
                             </tr>
                           </tbody>
                         </table>
@@ -2427,35 +2727,41 @@ All vendor adapters must extend BaseVendorAdapter and implement:
   ]
 }`}
                         />
+                        <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                          <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Attribute Mapping</h5>
+                          <p className="text-xs text-blue-800 dark:text-blue-200 mb-2">
+                            The following table shows how PVBlink API fields are mapped to database columns:
+                          </p>
+                        </div>
                         <div><strong>Database Mapping:</strong></div>
                         <table className="w-full text-xs border-collapse">
                           <thead>
-                            <tr className="border-b">
-                              <th className="text-left p-2">API Field</th>
-                              <th className="text-left p-2">DB Column</th>
-                              <th className="text-left p-2">Transformation</th>
+                            <tr className="border-b bg-muted">
+                              <th className="text-left p-2 font-semibold">API Field</th>
+                              <th className="text-left p-2 font-semibold">DB Column</th>
+                              <th className="text-left p-2 font-semibold">Transformation</th>
                             </tr>
                           </thead>
                           <tbody>
                             <tr className="border-b">
-                              <td className="p-2"><code>id</code></td>
-                              <td className="p-2"><code>vendor_plant_id</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">id</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">vendor_plant_id</code></td>
                               <td className="p-2">Direct (string)</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>name</code></td>
-                              <td className="p-2"><code>name</code></td>
-                              <td className="p-2">Direct</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">name</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">name</code></td>
+                              <td className="p-2">Direct mapping</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>capacity</code></td>
-                              <td className="p-2"><code>capacity_kw</code></td>
-                              <td className="p-2">Direct (already kW)</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">capacity</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">capacity_kw</code></td>
+                              <td className="p-2">Direct (already in kW)</td>
                             </tr>
-                            <tr>
-                              <td className="p-2"><code>isOnline</code></td>
-                              <td className="p-2"><code>network_status</code></td>
-                              <td className="p-2">true→ONLINE, false→ALL_OFFLINE</td>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">isOnline</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">network_status</code></td>
+                              <td className="p-2"><strong>Boolean mapping:</strong> true→ONLINE, false→ALL_OFFLINE - <strong>Live telemetry field</strong></td>
                             </tr>
                           </tbody>
                         </table>
@@ -2586,80 +2892,86 @@ Example: &action=webQueryPlants&orderBy=ascPlantId&page=0&pagesize=100`}
   }
 }`}
                         />
+                        <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                          <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Attribute Mapping</h5>
+                          <p className="text-xs text-blue-800 dark:text-blue-200 mb-2">
+                            The following table shows how ShineMonitor API fields are mapped to database columns:
+                          </p>
+                        </div>
                         <div><strong>Database Mapping:</strong></div>
                         <table className="w-full text-xs border-collapse">
                           <thead>
-                            <tr className="border-b">
-                              <th className="text-left p-2">API Field</th>
-                              <th className="text-left p-2">DB Column</th>
-                              <th className="text-left p-2">Transformation</th>
+                            <tr className="border-b bg-muted">
+                              <th className="text-left p-2 font-semibold">API Field</th>
+                              <th className="text-left p-2 font-semibold">DB Column</th>
+                              <th className="text-left p-2 font-semibold">Transformation</th>
                             </tr>
                           </thead>
                           <tbody>
                             <tr className="border-b">
-                              <td className="p-2"><code>pid</code></td>
-                              <td className="p-2"><code>vendor_plant_id</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">pid</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">vendor_plant_id</code></td>
                               <td className="p-2">Convert to string</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>name</code></td>
-                              <td className="p-2"><code>name</code></td>
-                              <td className="p-2">Direct</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">name</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">name</code></td>
+                              <td className="p-2">Direct mapping</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>nominalPower</code></td>
-                              <td className="p-2"><code>capacity_kw</code></td>
-                              <td className="p-2">ParseFloat (string → number, already in kW)</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">nominalPower</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">capacity_kw</code></td>
+                              <td className="p-2"><strong>ParseFloat</strong> (string → number, already in kW)</td>
+                            </tr>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">outputPower</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">current_power_kw</code></td>
+                              <td className="p-2"><strong>ParseFloat</strong> (already in kW) - <strong>Live telemetry field</strong></td>
+                            </tr>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">energy</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">daily_energy_kwh</code></td>
+                              <td className="p-2"><strong>ParseFloat</strong> (already in kWh) - <strong>Live telemetry field</strong></td>
+                            </tr>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">energyMonth</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">monthly_energy_mwh</code></td>
+                              <td className="p-2"><strong>ParseFloat → divide by 1000</strong> (kWh → MWh) - <strong>Live telemetry field</strong></td>
+                            </tr>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">energyYear</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">yearly_energy_mwh</code></td>
+                              <td className="p-2"><strong>ParseFloat → divide by 1000</strong> (kWh → MWh) - <strong>Live telemetry field</strong></td>
+                            </tr>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">energyTotal</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">total_energy_mwh</code></td>
+                              <td className="p-2"><strong>ParseFloat → divide by 1000</strong> (kWh → MWh) - <strong>Live telemetry field</strong></td>
+                            </tr>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">status</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">network_status</code></td>
+                              <td className="p-2"><strong>Status mapping:</strong> 0→NORMAL, 1→ALL_OFFLINE, others→PARTIAL_OFFLINE - <strong>Live telemetry field</strong></td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>outputPower</code></td>
-                              <td className="p-2"><code>current_power_kw</code></td>
-                              <td className="p-2">ParseFloat (already in kW)</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">install</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">vendor_created_date</code></td>
+                              <td className="p-2"><strong>Date conversion:</strong> &quot;YYYY-MM-DD HH:mm:ss&quot; → ISO string</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>energy</code></td>
-                              <td className="p-2"><code>daily_energy_kwh</code></td>
-                              <td className="p-2">ParseFloat (already in kWh)</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">gts</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">start_operating_time</code></td>
+                              <td className="p-2"><strong>Date conversion:</strong> &quot;YYYY-MM-DD HH:mm:ss&quot; → ISO string</td>
                             </tr>
                             <tr className="border-b">
-                              <td className="p-2"><code>energyMonth</code></td>
-                              <td className="p-2"><code>monthly_energy_mwh</code></td>
-                              <td className="p-2">ParseFloat → divide by 1000 (kWh → MWh)</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="p-2"><code>energyYear</code></td>
-                              <td className="p-2"><code>yearly_energy_mwh</code></td>
-                              <td className="p-2">ParseFloat → divide by 1000 (kWh → MWh)</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="p-2"><code>energyTotal</code></td>
-                              <td className="p-2"><code>total_energy_mwh</code></td>
-                              <td className="p-2">ParseFloat → divide by 1000 (kWh → MWh)</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="p-2"><code>status</code></td>
-                              <td className="p-2"><code>network_status</code></td>
-                              <td className="p-2">0→NORMAL, 1→ALL_OFFLINE, others→PARTIAL_OFFLINE</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="p-2"><code>install</code></td>
-                              <td className="p-2"><code>vendor_created_date</code></td>
-                              <td className="p-2">&quot;YYYY-MM-DD HH:mm:ss&quot; → ISO string</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="p-2"><code>gts</code></td>
-                              <td className="p-2"><code>start_operating_time</code></td>
-                              <td className="p-2">&quot;YYYY-MM-DD HH:mm:ss&quot; → ISO string</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="p-2"><code>energyDatDate</code></td>
-                              <td className="p-2"><code>last_update_time</code></td>
-                              <td className="p-2">&quot;YYYY-MM-DD HH:mm:ss&quot; → ISO string</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">energyDatDate</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">last_update_time</code></td>
+                              <td className="p-2"><strong>Date conversion:</strong> &quot;YYYY-MM-DD HH:mm:ss&quot; → ISO string</td>
                             </tr>
                             <tr>
-                              <td className="p-2"><code>address.lat/lon/address</code></td>
-                              <td className="p-2"><code>location</code> (JSONB)</td>
-                              <td className="p-2">{"{lat, lng, address}"}</td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">address.lat/lon/address</code></td>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">location</code> (JSONB)</td>
+                              <td className="p-2">Combine into JSONB: <code className="bg-muted px-1 rounded">{"{lat, lng, address}"}</code></td>
                             </tr>
                           </tbody>
                         </table>
@@ -2862,6 +3174,128 @@ User-Agent: Mozilla/5.0...`}
 
         {/* Backlog Tab - Production Improvements */}
         <TabsContent value="backlog" className="space-y-6">
+          <Card className="overflow-hidden">
+            <SectionHeader id="work-order-excel" title="Work Order Excel Import/Export" icon={FileText} />
+            {expandedSections.has("work-order-excel") && (
+              <div className="p-6 pt-0 space-y-6 border-t">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Excel Export</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Access:</strong> SUPERADMIN and DEVELOPER accounts can export work orders to Excel format.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Endpoint:</strong> <code className="bg-background px-1 rounded">GET /api/workorders/export</code>
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Query Parameters:</strong>
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li><code className="bg-background px-1 rounded">orgId</code> (optional) - Filter by organization ID</li>
+                    </ul>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Exported Columns:</strong>
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>Work Order ID, Title, Description, Location</li>
+                      <li>Organization ID, Organization Name</li>
+                      <li>Plant ID, Plant Name, Vendor Plant ID</li>
+                      <li>Vendor ID, Vendor Name, Vendor Type</li>
+                      <li>Capacity (kW), Created At, Updated At</li>
+                    </ul>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Format:</strong> One row per plant mapping. Work orders with multiple plants will have multiple rows.
+                    </p>
+                  </div>
+
+                  <h3 className="font-semibold text-lg">Excel Import</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Access:</strong> SUPERADMIN and DEVELOPER accounts can import work orders from Excel files.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Endpoint:</strong> <code className="bg-background px-1 rounded">POST /api/workorders/import</code>
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Request:</strong> Multipart form data with <code className="bg-background px-1 rounded">file</code> field containing Excel file (.xlsx or .xls)
+                    </p>
+                    <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900">
+                      <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Required Columns:</h4>
+                      <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+                        <li><strong>Title</strong> - Work order title (required)</li>
+                        <li><strong>Organization ID</strong> - Organization ID (required, must exist)</li>
+                        <li><strong>Vendor Plant ID</strong> - Vendor-specific plant identifier (required, unique per vendor type)</li>
+                        <li><strong>Vendor Type</strong> - Vendor type (required, e.g., SOLARMAN, SOLARDM, PVBLINK, SHINEMONITOR, FOXESSCLOUD)</li>
+                        <li><strong>Plant Name</strong> - Plant name (optional, for reference only, not used for matching)</li>
+                        <li><strong>Description</strong> - Work order description (optional)</li>
+                        <li><strong>Location</strong> - Work order location (optional)</li>
+                      </ul>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                        <strong>Note:</strong> Plants are identified by the combination of Vendor Plant ID and Vendor Type. Vendor Plant ID is unique per vendor type (not globally unique). Plant Name is optional and not used for matching since names can be duplicate. The internal Plant ID is not required for import.
+                      </p>
+                    </div>
+                    <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                      <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">⚠️ Important Rules:</h4>
+                      <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1 list-disc list-inside">
+                        <li><strong>No Updates:</strong> Existing work orders are not updated. Only new work orders are created.</li>
+                        <li><strong>One Plant Per Work Order:</strong> A plant can only be mapped to one active work order.</li>
+                        <li><strong>Same Organization:</strong> All plants in a work order must belong to the same organization.</li>
+                        <li><strong>Validation:</strong> Rows with errors are reported but not processed.</li>
+                        <li><strong>Grouping:</strong> Rows with the same Title and Organization ID are grouped into one work order.</li>
+                      </ul>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Response:</strong> Returns summary with:
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>Total rows processed</li>
+                      <li>Number of successfully created work orders</li>
+                      <li>Number of rows with errors</li>
+                      <li>Detailed error messages for failed rows (first 100)</li>
+                    </ul>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Use Case:</strong> Bulk upload work orders for disaster recovery or initial data migration.
+                    </p>
+                  </div>
+
+                  <h3 className="font-semibold text-lg">Implementation Details</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Library:</strong> Uses <code className="bg-background px-1 rounded">exceljs</code> for Excel file generation and parsing.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Export Logic:</strong>
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>Fetches work orders with plant mappings and vendor information</li>
+                      <li>Creates one row per plant mapping (work orders with multiple plants have multiple rows)</li>
+                      <li>Exports Vendor Plant ID and Plant Name as primary identifiers (not internal Plant ID)</li>
+                      <li>Formats dates as ISO strings</li>
+                      <li>Generates Excel file with styled header row</li>
+                    </ul>
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Import Logic:</strong>
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>Parses Excel file and extracts data rows</li>
+                      <li>Groups rows by Title + Organization ID combination</li>
+                      <li>Validates organization exists</li>
+                      <li>Looks up vendors by Vendor Type</li>
+                      <li>Looks up plants by Vendor Plant ID and Vendor ID (derived from Vendor Type) combination</li>
+                      <li>Vendor Plant ID is unique per vendor type (not globally unique)</li>
+                      <li>Plant Name is optional and not used for matching (names can be duplicate)</li>
+                      <li>Validates all matched plants exist and belong to the same organization</li>
+                      <li>Checks for existing work orders (skips if found - no updates)</li>
+                      <li>Checks for existing plant mappings in other work orders (reports error)</li>
+                      <li>Creates new work orders and plant mappings for valid rows</li>
+                      <li>Returns detailed results with success/error status for each row</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
+
           <Card className="overflow-hidden">
             <SectionHeader id="backlog" title="Production Improvements Backlog" icon={AlertCircle} />
             {expandedSections.has("backlog") && (

@@ -316,6 +316,24 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
   }
 
   /**
+   * Get a single plant by vendor plant ID
+   * Since PVBlink doesn't have a single plant endpoint, we fetch all and filter
+   */
+  async listPlant(vendorPlantId: string): Promise<Plant | null> {
+    const allPlants = await this.listPlants()
+    const plant = allPlants.find((p) => p.id === vendorPlantId)
+    
+    if (!plant) {
+      return null
+    }
+
+    // For PVBlink, we need to fetch live telemetry separately
+    // The listPlants() endpoint doesn't provide current power or energy metrics
+    // So we return what we have, and live telemetry sync will need to use other endpoints
+    return plant
+  }
+
+  /**
    * List all plants from PVBlink
    * Endpoint: GET /api/pvblink/plant/s/all?pageNo={pageNo}
    * Pagination: Iterates until empty data array is received

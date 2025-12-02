@@ -80,6 +80,8 @@ export async function PUT(
       per_plant_sync_interval_minutes,
       plant_list_sync_morning_ist,
       plant_list_sync_evening_ist,
+      telemetry_sync_mode,
+      telemetry_sync_interval,
     } = body
 
     // Use service role client to bypass RLS
@@ -107,6 +109,12 @@ export async function PUT(
     }
     if (plant_list_sync_evening_ist !== undefined) {
       updateData.plant_list_sync_evening_ist = plant_list_sync_evening_ist
+    }
+    if (telemetry_sync_mode !== undefined) {
+      updateData.telemetry_sync_mode = telemetry_sync_mode
+    }
+    if (telemetry_sync_interval !== undefined) {
+      updateData.telemetry_sync_interval = telemetry_sync_interval
     }
 
     const { data: vendor, error } = await supabase

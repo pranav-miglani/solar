@@ -54,10 +54,7 @@ When creating a vendor in the database, the following fields are required:
 |-------|------|----------|-------------|
 | `name` | TEXT | ✅ Yes | Vendor display name (e.g., "Solarman Production") |
 <<<<<<< Updated upstream
-| `vendor_type` | ENUM | ✅ Yes | One of: `SOLARMAN`, `SOLARDM`, `SHINEMONITOR`, `SUNGROW`, `OTHER` |
-=======
-| `vendor_type` | ENUM | ✅ Yes | One of: `SOLARMAN`, `SOLARDM`, `PVBLINK`, `FOXESSCLOUD`, `SUNGROW`, `OTHER` |
->>>>>>> Stashed changes
+| `vendor_type` | ENUM | ✅ Yes | One of: `SOLARMAN`, `SOLARDM`, `SHINEMONITOR`, `PVBLINK`, `FOXESSCLOUD`, `SUNGROW`, `OTHER` |
 | `credentials` | JSONB | ✅ Yes | Vendor-specific authentication credentials (see below) |
 | `org_id` | INTEGER | Optional | Organization ID (NULL for global/shared vendors) |
 | `is_active` | BOOLEAN | Optional | Active status (default: `true`) |

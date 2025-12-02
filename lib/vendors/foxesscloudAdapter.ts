@@ -245,6 +245,15 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
   }
 
   /**
+   * Get a single plant by vendor plant ID
+   * TODO: Implement once API endpoint is available
+   */
+  async listPlant(vendorPlantId: string): Promise<Plant | null> {
+    // TODO: Implement single plant fetching when API endpoint is available
+    throw new Error("Foxesscloud plant listing not yet implemented")
+  }
+
+  /**
    * List all plants from Foxesscloud
    * TODO: Implement once API endpoint is available
    */

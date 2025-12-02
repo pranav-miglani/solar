@@ -504,6 +504,172 @@ export class SolarmanAdapter extends BaseVendorAdapter {
   }
 
   /**
+   * Get a single plant by vendor plant ID
+   * Uses PRO API search with station ID filter, or falls back to base endpoint
+   */
+  async listPlant(vendorPlantId: string): Promise<Plant | null> {
+    const token = await this.authenticate()
+    
+    try {
+      // Try PRO API first (provides richer data including live telemetry)
+      const { url: proApiUrl } = this.getProApiBaseUrl()
+      const stationId = parseInt(vendorPlantId, 10)
+      
+      if (isNaN(stationId)) {
+        throw new Error(`Invalid station ID: ${vendorPlantId}`)
+      }
+
+      const url = `${proApiUrl}/maintain-s/operating/station/v2/search`
+      const requestBody = {
+        station: {
+          id: stationId,
+          powerTypeList: ["PV"],
+        },
+      }
+
+      const response = await this.loggedFetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      }, {
+        operation: 'LIST_PLANT_PRO_API',
+        description: `Fetch single plant ${vendorPlantId} from Solarman PRO API`,
+      })
+
+      if (!response.ok) {
+        // If PRO API fails, try base endpoint
+        return await this.listPlantFromBaseEndpoint(token, stationId)
+      }
+
+      const data = await response.json()
+      
+      if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+        // Try base endpoint as fallback
+        return await this.listPlantFromBaseEndpoint(token, stationId)
+      }
+
+      const station = data.data[0]?.station
+      if (!station) {
+        return null
+      }
+
+      // Map to Plant format (same as listPlantsFromProApi)
+      const capacityKw = station.installedCapacity || 0
+      let location: any = undefined
+      const locationAddress = station.locationAddress || null
+      if (station.locationLat || station.locationLng || locationAddress) {
+        location = {
+          lat: station.locationLat,
+          lng: station.locationLng,
+          address: locationAddress,
+        }
+      }
+
+      const currentPowerKw = station.generationPower ? station.generationPower / 1000 : null
+      const dailyEnergyKwh = station.generationValue || null
+      const monthlyEnergyMwh = station.generationMonth ? station.generationMonth / 1000 : null
+      const yearlyEnergyMwh = station.generationYear ? station.generationYear / 1000 : null
+      const totalEnergyMwh = station.generationUploadTotalOffset 
+        ? station.generationUploadTotalOffset / 1000 
+        : null
+      const lastUpdateTime = station.lastUpdateTime 
+        ? new Date(Math.floor(station.lastUpdateTime) * 1000).toISOString() 
+        : null
+      const createdDate = station.createdDate
+        ? new Date(Math.floor(station.createdDate) * 1000).toISOString()
+        : null
+      const startOperatingTime = station.startOperatingTime
+        ? new Date(Math.floor(station.startOperatingTime) * 1000).toISOString()
+        : null
+
+      return {
+        id: station.id.toString(),
+        name: station.name || `Station ${station.id}`,
+        capacityKw,
+        location,
+        metadata: {
+          stationId: station.id,
+          currentPowerKw,
+          dailyEnergyKwh,
+          monthlyEnergyMwh,
+          yearlyEnergyMwh,
+          totalEnergyMwh,
+          networkStatus: station.networkStatus ? String(station.networkStatus).trim() : null,
+          lastUpdateTime,
+          createdDate,
+          startOperatingTime,
+          locationAddress,
+        },
+      }
+    } catch (error: any) {
+      console.error(`[Solarman] Error fetching plant ${vendorPlantId}:`, error.message)
+      throw error
+    }
+  }
+
+  /**
+   * Fallback: Get plant from base endpoint (less data, but more reliable)
+   */
+  private async listPlantFromBaseEndpoint(token: string, stationId: number): Promise<Plant | null> {
+    const baseUrl = this.getApiBaseUrl()
+    const url = `${baseUrl}/station/v1.0/base?language=en`
+
+    const response = await this.loggedFetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ stationId }),
+    }, {
+      operation: 'LIST_PLANT_BASE',
+      description: `Fetch single plant ${stationId} from Solarman base endpoint`,
+    })
+
+    if (!response.ok) {
+      return null
+    }
+
+    const station = await response.json()
+    
+    if (!station || !station.stationId) {
+      return null
+    }
+
+    const capacityKw = station.installedCapacity ? station.installedCapacity / 1000 : 0
+    let location: any = undefined
+    if (station.location) {
+      location = {
+        lat: parseFloat(station.location.lat) || null,
+        lng: parseFloat(station.location.lng) || null,
+        address: station.location.address || null,
+      }
+    }
+
+    const startOperatingTime = station.startOperatingTime
+      ? new Date(station.startOperatingTime * 1000).toISOString()
+      : null
+
+    return {
+      id: station.stationId.toString(),
+      name: station.name || `Station ${station.stationId}`,
+      capacityKw,
+      location,
+      metadata: {
+        stationId: station.stationId,
+        startOperatingTime,
+        ownerName: station.ownerName || null,
+        ownerCompany: station.ownerCompany || null,
+        // Note: Base endpoint doesn't provide live telemetry metrics
+        // These would need to be fetched separately or from PRO API
+      },
+    }
+  }
+
+  /**
    * Fetch plants from Solarman PRO API (v2/search endpoint)
    * Returns richer data including generationValue, generationTotal, etc.
    */

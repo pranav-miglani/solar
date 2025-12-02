@@ -12,7 +12,18 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { ExternalLink, Plus, Pencil, Trash2 } from "lucide-react"
+import { ExternalLink, Plus, Pencil, Trash2, Download, Upload } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { WorkOrderModal } from "@/components/WorkOrderModal"
 import {
   AlertDialog,
@@ -50,6 +61,10 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
   const [modalOpen, setModalOpen] = useState(false)
   const [editingWorkOrderId, setEditingWorkOrderId] = useState<number | undefined>()
   const [deletingWorkOrderId, setDeletingWorkOrderId] = useState<number | null>(null)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importResult, setImportResult] = useState<any>(null)
 
   const isSuperAdmin = accountType === "SUPERADMIN" || accountType === "DEVELOPER"
 
@@ -108,6 +123,70 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
     }
   }
 
+  async function handleExport() {
+    if (!isSuperAdmin) return
+    try {
+      const url = orgId ? `/api/workorders/export?orgId=${orgId}` : `/api/workorders/export`
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        const error = await response.json()
+        alert(error.error || "Failed to export work orders")
+        return
+      }
+
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = downloadUrl
+      link.download = `work_orders_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+    } catch (error) {
+      console.error("Error exporting work orders:", error)
+      alert("Failed to export work orders")
+    }
+  }
+
+  async function handleImport() {
+    if (!isSuperAdmin || !importFile) return
+    
+    setImportLoading(true)
+    setImportResult(null)
+    
+    try {
+      const formData = new FormData()
+      formData.append("file", importFile)
+
+      const response = await fetch("/api/workorders/import", {
+        method: "POST",
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || "Failed to import work orders")
+        setImportLoading(false)
+        return
+      }
+
+      setImportResult(data)
+      setImportLoading(false)
+      
+      // Refresh the list if any were processed
+      if (data.summary.processed > 0) {
+        fetchWorkOrders()
+      }
+    } catch (error) {
+      console.error("Error importing work orders:", error)
+      alert("Failed to import work orders")
+      setImportLoading(false)
+    }
+  }
+
   const editingWorkOrder = workOrders.find((wo) => wo.id === editingWorkOrderId)
   const editingWorkOrderOrgName = editingWorkOrder?.work_order_plants?.[0]?.plants?.organizations?.name
 
@@ -126,20 +205,147 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-4 p-4 md:p-6 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border border-border shadow-sm">
         {isSuperAdmin && (
-          <motion.div 
-            whileHover={{ scale: 1.05 }} 
-            whileTap={{ scale: 0.95 }}
-            className="w-full sm:w-auto"
-          >
-            <Button 
-              onClick={handleCreate}
-              size="lg"
-              className="w-full sm:w-auto transition-all duration-200 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg hover:shadow-xl font-semibold text-base"
+          <>
+            <motion.div 
+              whileHover={{ scale: 1.05 }} 
+              whileTap={{ scale: 0.95 }}
+              className="w-full sm:w-auto"
             >
-              <Plus className="h-5 w-5 mr-2" />
-              Create Work Order
-            </Button>
-          </motion.div>
+              <Button 
+                onClick={handleExport}
+                size="lg"
+                variant="outline"
+                className="w-full sm:w-auto transition-all duration-200"
+              >
+                <Download className="h-5 w-5 mr-2" />
+                Export Excel
+              </Button>
+            </motion.div>
+            <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+              <DialogTrigger asChild>
+                <motion.div 
+                  whileHover={{ scale: 1.05 }} 
+                  whileTap={{ scale: 0.95 }}
+                  className="w-full sm:w-auto"
+                >
+                  <Button 
+                    size="lg"
+                    variant="outline"
+                    className="w-full sm:w-auto transition-all duration-200"
+                  >
+                    <Upload className="h-5 w-5 mr-2" />
+                    Import Excel
+                  </Button>
+                </motion.div>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Import Work Orders from Excel</DialogTitle>
+                  <DialogDescription>
+                    Upload an Excel file to bulk import work orders. Required columns: Title, Organization ID, Plant ID.
+                    <br />
+                    <br />
+                    <strong>Important:</strong>
+                    <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                      <li>Existing work orders will not be updated</li>
+                      <li>A plant can only be mapped to one work order</li>
+                      <li>All plants in a work order must belong to the same organization</li>
+                      <li>Rows with errors will be reported but not processed</li>
+                    </ul>
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="file">Excel File (.xlsx or .xls)</Label>
+                    <Input
+                      id="file"
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                      className="mt-2"
+                    />
+                  </div>
+                    <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
+                    <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Required Columns:</h4>
+                    <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+                      <li><strong>Title</strong> - Work order title</li>
+                      <li><strong>Organization ID</strong> - Organization ID (must exist)</li>
+                      <li><strong>Vendor Plant ID</strong> - Vendor-specific plant identifier (must exist, unique per vendor type)</li>
+                      <li><strong>Vendor Type</strong> - Vendor type (e.g., SOLARMAN, SOLARDM, PVBLINK, SHINEMONITOR, FOXESSCLOUD)</li>
+                      <li><strong>Plant Name</strong> (optional) - Plant name (for reference only, not used for matching)</li>
+                      <li><strong>Description</strong> (optional) - Work order description</li>
+                      <li><strong>Location</strong> (optional) - Work order location</li>
+                    </ul>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                      <strong>Note:</strong> Plants are identified by Vendor Plant ID and Vendor Type combination. Vendor Plant ID is unique per vendor type. Plant Name is optional and not used for matching (names can be duplicate).
+                    </p>
+                  </div>
+                  {importResult && (
+                    <div className={`p-4 rounded-lg border ${
+                      importResult.summary.errors > 0 
+                        ? "bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900"
+                        : "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
+                    }`}>
+                      <h4 className="font-semibold mb-2">Import Results:</h4>
+                      <div className="text-sm space-y-1">
+                        <p><strong>Total Rows:</strong> {importResult.summary.totalRows}</p>
+                        <p className="text-green-700 dark:text-green-300"><strong>Processed:</strong> {importResult.summary.processed}</p>
+                        <p className="text-yellow-700 dark:text-yellow-300"><strong>Errors:</strong> {importResult.summary.errors}</p>
+                      </div>
+                      {importResult.results && importResult.results.length > 0 && (
+                        <div className="mt-4">
+                          <h5 className="font-medium mb-2">Error Details (first 10):</h5>
+                          <div className="max-h-40 overflow-y-auto space-y-1 text-xs">
+                            {importResult.results
+                              .filter((r: any) => !r.success)
+                              .slice(0, 10)
+                              .map((r: any, idx: number) => (
+                                <div key={idx} className="p-2 bg-white dark:bg-background rounded border">
+                                  <p><strong>Row {r.rowNumber}:</strong> {r.error}</p>
+                                  {r.plantId && <p className="text-muted-foreground">Plant ID: {r.plantId}</p>}
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setImportDialogOpen(false)
+                      setImportFile(null)
+                      setImportResult(null)
+                    }}
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    onClick={handleImport}
+                    disabled={!importFile || importLoading}
+                  >
+                    {importLoading ? "Importing..." : "Import"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <motion.div 
+              whileHover={{ scale: 1.05 }} 
+              whileTap={{ scale: 0.95 }}
+              className="w-full sm:w-auto"
+            >
+              <Button 
+                onClick={handleCreate}
+                size="lg"
+                className="w-full sm:w-auto transition-all duration-200 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg hover:shadow-xl font-semibold text-base"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Create Work Order
+              </Button>
+            </motion.div>
+          </>
         )}
       </div>
 

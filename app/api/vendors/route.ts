@@ -132,6 +132,8 @@ export async function POST(request: NextRequest) {
         per_plant_sync_interval_minutes,
         plant_list_sync_morning_ist,
         plant_list_sync_evening_ist,
+        telemetry_sync_mode,
+        telemetry_sync_interval,
       } = body
 
       if (!name || !vendor_type || !credentials) {
@@ -166,6 +168,8 @@ export async function POST(request: NextRequest) {
           per_plant_sync_interval_minutes: per_plant_sync_interval_minutes ?? 15,
           plant_list_sync_morning_ist: plant_list_sync_morning_ist || null,
           plant_list_sync_evening_ist: plant_list_sync_evening_ist || null,
+          telemetry_sync_mode: telemetry_sync_mode || 'LIST_PLANTS',
+          telemetry_sync_interval: telemetry_sync_interval ?? 15,
         })
         .select()
         .single()

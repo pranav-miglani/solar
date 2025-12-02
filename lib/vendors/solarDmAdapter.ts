@@ -222,6 +222,24 @@ export class SolarDmAdapter extends BaseVendorAdapter {
   }
 
   /**
+   * Get a single plant by vendor plant ID
+   * Since SolarDM doesn't have a single plant endpoint, we fetch all and filter
+   */
+  async listPlant(vendorPlantId: string): Promise<Plant | null> {
+    const allPlants = await this.listPlants()
+    const plant = allPlants.find((p) => p.id === vendorPlantId)
+    
+    if (!plant) {
+      return null
+    }
+
+    // For SolarDM, we need to fetch live telemetry separately
+    // The listPlants() endpoint doesn't provide current power or energy metrics
+    // So we return what we have, and live telemetry sync will need to use other endpoints
+    return plant
+  }
+
+  /**
    * List all plants from SolarDM
    * Endpoint: GET /dms/plant/list_all
    */

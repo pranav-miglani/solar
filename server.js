@@ -51,6 +51,15 @@ app.prepare().then(() => {
         } else {
           console.log('⏸️ Alert sync cron is disabled (ENABLE_ALERT_SYNC_CRON=false)')
         }
+
+        // Live telemetry sync cron (updates current_power_kw, daily_energy_kwh, etc.)
+        const enableLiveTelemetryCron = process.env.ENABLE_LIVE_TELEMETRY_SYNC_CRON !== 'false'
+        if (enableLiveTelemetryCron) {
+          const { startLiveTelemetrySyncCron } = require('./lib/cron/liveTelemetrySyncCron')
+          startLiveTelemetrySyncCron()
+        } else {
+          console.log('⏸️ Live telemetry sync cron is disabled (ENABLE_LIVE_TELEMETRY_SYNC_CRON=false)')
+        }
       } catch (error) {
         console.error('Failed to start cron job(s):', error)
       }

@@ -30,6 +30,17 @@ export abstract class BaseVendorAdapter {
   abstract listPlants(): Promise<Plant[]>
 
   /**
+   * Get a single plant by vendor plant ID
+   * Used for fetching live telemetry when not available in listPlants()
+   * Default implementation throws - vendors should override if they support this
+   */
+  async listPlant(vendorPlantId: string): Promise<Plant | null> {
+    // Default implementation: not supported
+    // Vendors that support per-plant fetching should override this method
+    throw new Error(`listPlant() not implemented for vendor type: ${this.config.vendorType}`)
+  }
+
+  /**
    * Get telemetry data for a specific plant
    * @param plantId - Vendor-specific plant identifier
    * @param startTime - Start time for telemetry range

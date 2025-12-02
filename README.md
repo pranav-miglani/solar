@@ -308,7 +308,7 @@ User accounts with role-based access.
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | UUID | Primary key |
-| `account_type` | ENUM | SUPERADMIN, ORG, or GOVT |
+| `account_type` | ENUM | SUPERADMIN, ORG, GOVT, or DEVELOPER |
 | `email` | TEXT | Unique email address |
 | `password_hash` | TEXT | Password (bcrypt hash - passwords are hashed before storage) |
 | `org_id` | INTEGER | Foreign key to organizations (NULL for SUPERADMIN/GOVT) |
@@ -317,7 +317,7 @@ User accounts with role-based access.
 
 **Constraints**:
 - ORG accounts must have `org_id` set
-- SUPERADMIN and GOVT must have `org_id` as NULL
+- SUPERADMIN, GOVT, and DEVELOPER must have `org_id` as NULL
 
 #### `organizations`
 Organizations that own solar plants.
@@ -338,7 +338,7 @@ Vendor configurations for API integrations. Vendors are mapped to organizations 
 |--------|------|-------------|
 | `id` | SERIAL | Primary key |
 | `name` | TEXT | Vendor name |
-| `vendor_type` | ENUM | SOLARMAN, SUNGROW, OTHER |
+| `vendor_type` | ENUM | SOLARMAN, SOLARDM, SHINEMONITOR, PVBLINK, FOXESSCLOUD, SUNGROW, OTHER |
 | `credentials` | JSONB | Encrypted API credentials |
 | | | **Note:** `api_base_url` removed - now stored in environment variables (e.g., `SOLARMAN_API_BASE_URL`) |
 | `org_id` | INTEGER | Foreign key to organizations (nullable, for vendor-org mapping) |
@@ -558,6 +558,7 @@ VendorManager (Factory)
     │       │
     │       ├── authenticate()
     │       ├── listPlants()
+    │       ├── listPlant()
     │       ├── getTelemetry()
     │       ├── getRealtime()
     │       ├── getAlerts()
@@ -1348,6 +1349,8 @@ Calculate efficiency metrics for work orders.
    ENABLE_PLANT_SYNC_CRON=true
    # Alert Sync Cron (optional)
    ENABLE_ALERT_SYNC_CRON=true
+   # Live Telemetry Sync Cron (optional)
+   ENABLE_LIVE_TELEMETRY_SYNC_CRON=true
    CRON_SECRET=your-secret-token-here
    ```
 
@@ -1411,8 +1414,10 @@ Calculate efficiency metrics for work orders.
 | `CRON_SECRET` | Secret token for securing cron endpoints (plants & alerts) | No (recommended) |
 | `ENABLE_PLANT_SYNC_CRON` | Enable/disable server-side plant sync cron (`true` by default) | No |
 | `ENABLE_ALERT_SYNC_CRON` | Enable/disable server-side alert sync cron (`true` by default) | No |
-| `SYNC_WINDOW_START` | Start time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "19:00") | No |
-| `SYNC_WINDOW_END` | End time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "06:00") | No |
+| `ENABLE_LIVE_TELEMETRY_SYNC_CRON` | Enable/disable server-side live telemetry sync cron (`true` by default) | No |
+| `ENABLE_PER_PLANT_LIVE_TELEMETRY` | Enable per-plant live telemetry fetching in plant sync when not available in listPlants() (`true` by default) | No |
+| `SYNC_WINDOW_START` | Start time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "20:00") | No |
+| `SYNC_WINDOW_END` | End time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "05:00") | No |
 
 ### Database Configuration
 
@@ -1435,11 +1440,11 @@ Plant synchronization is automatically enabled for all organizations by default 
 - **Enable/Disable Auto-Sync**: Toggle automatic synchronization for each organization
 - **Sync Interval**: Set the interval in minutes (1-1440 minutes, default: 15)
 - **Clock-Based Scheduling**: Sync runs at fixed clock times based on the interval (e.g., 15 min = :00, :15, :30, :45)
-- **Time Window Restriction**: Sync is automatically skipped during the configured time window (default: 7 PM to 6 AM Asia/Kolkata timezone)
+- **Time Window Restriction**: Sync is automatically skipped during the configured time window (default: 8 PM to 5 AM Asia/Kolkata timezone)
 
 **Environment Variables for Sync Window**:
-- `SYNC_WINDOW_START`: Start time in HH:MM format (Asia/Kolkata timezone, default: "19:00")
-- `SYNC_WINDOW_END`: End time in HH:MM format (Asia/Kolkata timezone, default: "06:00")
+- `SYNC_WINDOW_START`: Start time in HH:MM format (Asia/Kolkata timezone, default: "20:00")
+- `SYNC_WINDOW_END`: End time in HH:MM format (Asia/Kolkata timezone, default: "05:00")
 
 **Note**: Time calculations use the `Asia/Kolkata` timezone (IST) via JavaScript's Intl API for accurate timezone handling.
 

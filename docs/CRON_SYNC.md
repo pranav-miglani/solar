@@ -26,6 +26,9 @@ ENABLE_PLANT_SYNC_CRON=true
 # Enable/disable the alert sync cron job (default: true)
 ENABLE_ALERT_SYNC_CRON=true
 
+# Enable/disable the live telemetry sync cron job (default: true)
+ENABLE_LIVE_TELEMETRY_SYNC_CRON=true
+
 # Secret token for securing the cron endpoint (optional but recommended)
 CRON_SECRET=your-secret-token-here
 
@@ -43,7 +46,7 @@ The cron job runs automatically on the Node.js server when it starts. It's initi
 2. A cron job is scheduled to run every 15 minutes (`*/15 * * * *`)
 3. Each time it runs, it checks the current IST time
 4. Organizations with `auto_sync_enabled=true` are synced if their `sync_interval_minutes` matches the current clock time (e.g., :00, :15, :30, :45 for 15-minute intervals)
-5. Sync is automatically skipped during the restricted time window (default: 7 PM - 6 AM IST)
+5. Sync is automatically skipped during the restricted time window (default: 8 PM - 5 AM IST)
 
 **No additional configuration needed** - just start your server with `npm run dev` or `npm start` and the cron will run automatically.
 
@@ -205,7 +208,7 @@ Check your deployment logs to monitor cron execution.
 
 2. **Check Environment Variables**:
    - Ensure all required Supabase environment variables are set
-   - `SYNC_WINDOW_START` and `SYNC_WINDOW_END` are optional (defaults: 19:00 and 06:00 IST)
+   - `SYNC_WINDOW_START` and `SYNC_WINDOW_END` are optional (defaults: 20:00 and 05:00 IST)
 
 3. **Verify Server is Running**:
    - The cron only runs when the Node.js server is active

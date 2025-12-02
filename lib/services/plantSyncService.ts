@@ -174,6 +174,68 @@ async function syncVendorPlants(
     result.total = vendorPlants.length
     logger.info(`Found ${vendorPlants.length} plants for vendor ${vendor.name}`)
 
+    // Check if listPlants() provides live telemetry (current_power_kw, daily_energy_kwh, etc.)
+    // If not, optionally fetch it using listPlant() for each plant
+    const samplePlant = vendorPlants[0]
+    const hasLiveTelemetryInListPlants = samplePlant?.metadata?.currentPowerKw !== undefined ||
+      samplePlant?.metadata?.dailyEnergyKwh !== undefined ||
+      samplePlant?.metadata?.monthlyEnergyMwh !== undefined
+
+    // If live telemetry is not available in listPlants(), try to fetch it using listPlant()
+    // This is optional and can be disabled via environment variable
+    const enablePerPlantLiveTelemetry = process.env.ENABLE_PER_PLANT_LIVE_TELEMETRY !== 'false'
+    
+    if (!hasLiveTelemetryInListPlants && enablePerPlantLiveTelemetry) {
+      logger.info(
+        `[Sync] Live telemetry not available in listPlants() for vendor ${vendor.name}, ` +
+        `attempting to fetch via listPlant() for ${vendorPlants.length} plants`
+      )
+
+      // Fetch live telemetry for each plant in parallel (batched)
+      const LIVE_TELEMETRY_BATCH_SIZE = 20 // Smaller batch size to avoid overwhelming vendor API
+      const enrichedPlants: Plant[] = []
+
+      for (let i = 0; i < vendorPlants.length; i += LIVE_TELEMETRY_BATCH_SIZE) {
+        const batch = vendorPlants.slice(i, i + LIVE_TELEMETRY_BATCH_SIZE)
+        const batchNumber = Math.floor(i / LIVE_TELEMETRY_BATCH_SIZE) + 1
+
+        logger.info(
+          `[Sync] Fetching live telemetry for batch ${batchNumber} (${batch.length} plants)`
+        )
+
+        const batchPromises = batch.map(async (plant) => {
+          try {
+            const enrichedPlant = await adapter.listPlant(plant.id)
+            if (enrichedPlant && enrichedPlant.metadata) {
+              // Merge live telemetry from listPlant() into plant metadata
+              return {
+                ...plant,
+                metadata: {
+                  ...plant.metadata,
+                  ...enrichedPlant.metadata,
+                },
+              }
+            }
+            return plant
+          } catch (error: any) {
+            // If listPlant() fails, use the plant from listPlants() as-is
+            logger.debug(
+              `[Sync] listPlant() failed for plant ${plant.id}, using data from listPlants(): ${error.message}`
+            )
+            return plant
+          }
+        })
+
+        const batchResults = await Promise.all(batchPromises)
+        enrichedPlants.push(...batchResults)
+      }
+
+      vendorPlants = enrichedPlants
+      logger.info(
+        `[Sync] Enriched ${vendorPlants.length} plants with live telemetry data`
+      )
+    }
+
     // Prepare plant data for upsert
     // All these fields are refreshed on every sync to keep data up-to-date
     const plantDataArray = vendorPlants.map((plant) => {
@@ -449,9 +511,10 @@ export async function syncAllPlants(): Promise<SyncSummary> {
 
   logger.info(`Found ${vendors.length} active vendor(s)`)
 
-  // Filter vendors by organization sync settings
+  // Filter vendors - plant sync now runs only twice a day (morning/evening)
+  // This is to fetch newly added plants from vendors
   const vendorsToSync: any[] = []
-  const skippedOrgs = new Set<number>()
+  const skippedVendors = new Set<number>()
 
   for (const vendor of vendors) {
     const org = vendor.organizations
@@ -460,10 +523,22 @@ export async function syncAllPlants(): Promise<SyncSummary> {
       continue
     }
 
-    // Check if this org should be synced
-    const shouldSync = shouldSyncOrg(org)
+    // Check if auto-sync is enabled for the organization
+    if (!org.auto_sync_enabled) {
+      if (!skippedVendors.has(vendor.id)) {
+        logger.info(
+          `⏭️ Skipping vendor ${vendor.id} (${vendor.name}): ` +
+          `auto_sync_enabled=false for org ${org.id} (${org.name})`
+        )
+        skippedVendors.add(vendor.id)
+      }
+      continue
+    }
+
+    // Check if it's time to run plant sync (morning or evening)
+    const shouldSync = shouldRunPlantSync(vendor)
     if (!shouldSync) {
-      if (!skippedOrgs.has(org.id)) {
+      if (!skippedVendors.has(vendor.id)) {
         // Get current IST time for logging
         const now = new Date()
         const kolkataTime = new Intl.DateTimeFormat("en-US", {
@@ -474,15 +549,15 @@ export async function syncAllPlants(): Promise<SyncSummary> {
         }).formatToParts(now)
         const currentHour = parseInt(kolkataTime.find((part) => part.type === "hour")?.value || "0")
         const currentMinute = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
+        const morningTime = vendor.plant_list_sync_morning_ist || '06:00'
+        const eveningTime = vendor.plant_list_sync_evening_ist || '23:00'
         
         logger.info(
-          `⏭️ Skipping org ${org.id} (${org.name}): ` +
-          `auto_sync_enabled=${org.auto_sync_enabled}, ` +
-          `interval=${org.sync_interval_minutes}min, ` +
+          `⏭️ Skipping plant sync for vendor ${vendor.id} (${vendor.name}): ` +
           `current IST time=${currentHour}:${currentMinute.toString().padStart(2, "0")}, ` +
-          `doesn't match interval boundary`
+          `not near morning (${morningTime}) or evening (${eveningTime}) sync times`
         )
-        skippedOrgs.add(org.id)
+        skippedVendors.add(vendor.id)
       }
       continue
     }
