@@ -33,11 +33,11 @@ export async function PATCH(
 
       const accountType = sessionData.accountType as string
 
-      // Only SUPERADMIN can update accounts (e.g., display names)
-      if (accountType !== "SUPERADMIN") {
+      // SUPERADMIN and DEVELOPER can update accounts (e.g., display names)
+      if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER") {
         logApiResponse(request, 403, Date.now() - startTime)
         return NextResponse.json(
-          { error: "Only SUPERADMIN can update accounts" },
+          { error: "Only SUPERADMIN and DEVELOPER can update accounts" },
           { status: 403 }
         )
       }
@@ -159,11 +159,11 @@ export async function DELETE(
 
       const accountType = sessionData.accountType as string
 
-      // Only SUPERADMIN can delete accounts (including GOVT users)
-      if (accountType !== "SUPERADMIN") {
+      // SUPERADMIN and DEVELOPER can delete accounts (including GOVT users)
+      if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER") {
         logApiResponse(request, 403, Date.now() - startTime)
         return NextResponse.json(
-          { error: "Only SUPERADMIN can delete accounts" },
+          { error: "Only SUPERADMIN and DEVELOPER can delete accounts" },
           { status: 403 }
         )
       }

@@ -22,8 +22,8 @@ export default async function OrgsPage() {
 
   const accountType = sessionData.accountType as string
 
-  // SUPERADMIN has full access, GOVT has read-only access
-  if (accountType !== "SUPERADMIN" && accountType !== "GOVT") {
+  // SUPERADMIN and DEVELOPER have full access, GOVT has read-only access
+  if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER" && accountType !== "GOVT") {
     redirect("/dashboard")
   }
 
@@ -36,7 +36,7 @@ export default async function OrgsPage() {
             Organizations
           </h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
-            {accountType === "SUPERADMIN"
+            {accountType === "SUPERADMIN" || accountType === "DEVELOPER"
               ? "Manage all organizations and their accounts"
               : "View all organizations and their accounts (read-only)"}
           </p>

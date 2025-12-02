@@ -158,17 +158,17 @@ export async function GET(request: NextRequest) {
        * 
        * Even though requirePermission was called, we add an explicit check here
        * because vendor sync status is sensitive information that should only be
-       * visible to SUPERADMIN users.
+       * visible to SUPERADMIN and DEVELOPER users.
        * 
        * This provides defense-in-depth security.
        */
-      if (accountType !== "SUPERADMIN") {
-        logger.warn("Non-SUPERADMIN attempted to access vendor sync status", {
+      if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER") {
+        logger.warn("Non-SUPERADMIN/DEVELOPER attempted to access vendor sync status", {
           accountType,
           userId,
         })
         const response = NextResponse.json(
-          { error: "Forbidden - SUPERADMIN only" },
+          { error: "Forbidden - SUPERADMIN and DEVELOPER only" },
           { status: 403 }
         )
         logApiResponse(request, 403, Date.now() - startTime)

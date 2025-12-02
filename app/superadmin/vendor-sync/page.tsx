@@ -22,8 +22,8 @@ export default async function VendorSyncPage() {
 
   const accountType = sessionData.accountType
 
-  // Only SUPERADMIN can access this page
-  if (accountType !== "SUPERADMIN") {
+  // SUPERADMIN and DEVELOPER can access this page
+  if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER") {
     redirect("/dashboard")
   }
 

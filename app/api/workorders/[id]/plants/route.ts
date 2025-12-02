@@ -25,10 +25,10 @@ export async function POST(
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    // Only SUPERADMIN can add plants to work orders
-    if (sessionData.accountType !== "SUPERADMIN") {
+    // SUPERADMIN and DEVELOPER can add plants to work orders
+    if (sessionData.accountType !== "SUPERADMIN" && sessionData.accountType !== "DEVELOPER") {
       return NextResponse.json(
-        { error: "Only SUPERADMIN can modify work orders" },
+        { error: "Only SUPERADMIN and DEVELOPER can modify work orders" },
         { status: 403 }
       )
     }

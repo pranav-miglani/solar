@@ -90,11 +90,11 @@ export async function POST(request: NextRequest) {
 
       const accountType = sessionData.accountType as string
 
-      // Only SUPERADMIN can create accounts
-      if (accountType !== "SUPERADMIN") {
+      // SUPERADMIN and DEVELOPER can create accounts
+      if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER") {
         logApiResponse(request, 403, Date.now() - startTime)
         return NextResponse.json(
-          { error: "Only SUPERADMIN can create accounts" },
+          { error: "Only SUPERADMIN and DEVELOPER can create accounts" },
           { status: 403 }
         )
       }

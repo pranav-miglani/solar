@@ -51,7 +51,7 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
   const [editingWorkOrderId, setEditingWorkOrderId] = useState<number | undefined>()
   const [deletingWorkOrderId, setDeletingWorkOrderId] = useState<number | null>(null)
 
-  const isSuperAdmin = accountType === "SUPERADMIN"
+  const isSuperAdmin = accountType === "SUPERADMIN" || accountType === "DEVELOPER"
 
   useEffect(() => {
     fetchWorkOrders()

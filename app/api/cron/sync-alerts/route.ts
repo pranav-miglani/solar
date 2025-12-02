@@ -85,9 +85,9 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: "Invalid session" }, { status: 401 })
         }
 
-        if (sessionData.accountType !== "SUPERADMIN") {
+        if (sessionData.accountType !== "SUPERADMIN" && sessionData.accountType !== "DEVELOPER") {
           return NextResponse.json(
-            { error: "Forbidden - SUPERADMIN only" },
+            { error: "Forbidden - SUPERADMIN and DEVELOPER only" },
             { status: 403 }
           )
         }

@@ -20,10 +20,10 @@ export default async function VendorsPage() {
     redirect("/auth/login")
   }
 
-  const accountType = sessionData.accountType as "SUPERADMIN" | "ORG" | "GOVT"
+  const accountType = sessionData.accountType as "SUPERADMIN" | "DEVELOPER" | "ORG" | "GOVT"
 
-  // SUPERADMIN can manage vendors, GOVT can only view (read-only)
-  if (accountType !== "SUPERADMIN" && accountType !== "GOVT") {
+  // SUPERADMIN and DEVELOPER can manage vendors, GOVT can only view (read-only)
+  if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER" && accountType !== "GOVT") {
     redirect("/dashboard")
   }
 

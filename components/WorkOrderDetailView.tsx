@@ -90,7 +90,7 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  const isSuperAdmin = accountType === "SUPERADMIN"
+  const isSuperAdmin = accountType === "SUPERADMIN" || accountType === "DEVELOPER"
   const isGovt = accountType === "GOVT"
 
   useEffect(() => {

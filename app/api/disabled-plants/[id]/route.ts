@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 /**
  * DELETE /api/disabled-plants/[id]
- * - Only SUPERADMIN can delete
+ * - SUPERADMIN and DEVELOPER can delete
  * - Only allows deletion if plant is not associated with any work orders
  */
 export async function DELETE(
@@ -31,10 +31,10 @@ export async function DELETE(
     const accountType = sessionData.accountType as string
     requirePermission(accountType as any, "vendors", "delete")
 
-    // Only SUPERADMIN can delete disabled plants
-    if (accountType !== "SUPERADMIN") {
+    // SUPERADMIN and DEVELOPER can delete disabled plants
+    if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER") {
       return NextResponse.json(
-        { error: "Access denied. Only SUPERADMIN can delete disabled plants." },
+        { error: "Access denied. Only SUPERADMIN and DEVELOPER can delete disabled plants." },
         { status: 403 }
       )
     }

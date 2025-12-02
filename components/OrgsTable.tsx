@@ -58,7 +58,7 @@ interface OrgsTableProps {
 }
 
 export function OrgsTable({ accountType }: OrgsTableProps) {
-  const isSuperAdmin = accountType === "SUPERADMIN"
+  const isSuperAdmin = accountType === "SUPERADMIN" || accountType === "DEVELOPER"
   const isGovt = accountType === "GOVT"
   const [orgs, setOrgs] = useState<Org[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])

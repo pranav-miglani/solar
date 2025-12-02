@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/disabled-plants
- * - Only SUPERADMIN can access
+ * - SUPERADMIN and DEVELOPER can access
  * - Returns list of disabled plants with work order association info
  */
 export async function GET(request: NextRequest) {
@@ -28,10 +28,10 @@ export async function GET(request: NextRequest) {
     const accountType = sessionData.accountType as string
     requirePermission(accountType as any, "vendors", "read")
 
-    // Only SUPERADMIN can view disabled plants
-    if (accountType !== "SUPERADMIN") {
+    // SUPERADMIN and DEVELOPER can view disabled plants
+    if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER") {
       return NextResponse.json(
-        { error: "Access denied. Only SUPERADMIN can view disabled plants." },
+        { error: "Access denied. Only SUPERADMIN and DEVELOPER can view disabled plants." },
         { status: 403 }
       )
     }
