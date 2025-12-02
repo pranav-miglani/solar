@@ -425,22 +425,17 @@ export function SystemFlowDocumentation() {
                     <text x="150" y="285" textAnchor="middle" className="text-sm font-semibold fill-foreground">Main Database</text>
                     <text x="150" y="305" textAnchor="middle" className="text-xs fill-muted-foreground">Supabase PostgreSQL</text>
                     
-                    {/* Telemetry DB */}
-                    <rect x="300" y="250" width="200" height="100" rx="8" fill="#f59e0b" opacity="0.2" stroke="#f59e0b" strokeWidth="2"/>
-                    <text x="400" y="285" textAnchor="middle" className="text-sm font-semibold fill-foreground">Telemetry Database</text>
-                    <text x="400" y="305" textAnchor="middle" className="text-xs fill-muted-foreground">Separate Instance</text>
-                    
                     {/* Vendor APIs */}
-                    <rect x="550" y="250" width="200" height="100" rx="8" fill="#ef4444" opacity="0.2" stroke="#ef4444" strokeWidth="2"/>
-                    <text x="650" y="285" textAnchor="middle" className="text-sm font-semibold fill-foreground">Vendor APIs</text>
-                    <text x="650" y="305" textAnchor="middle" className="text-xs fill-muted-foreground">Solarman, SolarDM, etc.</text>
+                    <rect x="300" y="250" width="200" height="100" rx="8" fill="#ef4444" opacity="0.2" stroke="#ef4444" strokeWidth="2"/>
+                    <text x="400" y="285" textAnchor="middle" className="text-sm font-semibold fill-foreground">Vendor APIs</text>
+                    <text x="400" y="305" textAnchor="middle" className="text-xs fill-muted-foreground">Solarman, SolarDM, etc.</text>
                     
                     {/* Arrows */}
                     <path d="M 250 100 L 300 100" stroke="#3b82f6" strokeWidth="2" markerEnd="url(#arrowhead)"/>
                     <path d="M 500 100 L 400 250" stroke="#8b5cf6" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 500 100 L 550 250" stroke="#8b5cf6" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                    <path d="M 500 100 L 300 250" stroke="#8b5cf6" strokeWidth="2" markerEnd="url(#arrowhead)"/>
                     <path d="M 250 300 L 300 300" stroke="#10b981" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 500 300 L 550 300" stroke="#f59e0b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                    <path d="M 500 300 L 400 300" stroke="#ef4444" strokeWidth="2" markerEnd="url(#arrowhead)"/>
                     
                     {/* Arrow marker */}
                     <defs>
@@ -470,12 +465,11 @@ export function SystemFlowDocumentation() {
                         </ul>
                       </div>
                       <div>
-                        <h4 className="font-medium mb-2">Telemetry Database (Separate Supabase Instance)</h4>
+                        <h4 className="font-medium mb-2">Telemetry Storage</h4>
                         <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                          <li><code className="bg-background px-1 rounded">telemetry_15m</code> - 15-minute resolution time-series data</li>
-                          <li><code className="bg-background px-1 rounded">plant_aggregates</code> - Pre-computed plant-level aggregates</li>
-                          <li><code className="bg-background px-1 rounded">work_order_aggregates</code> - Work order-level aggregates</li>
-                          <li><code className="bg-background px-1 rounded">organization_aggregates</code> - Organization-level aggregates</li>
+                          <li><strong>Live Telemetry:</strong> Stored in <code className="bg-background px-1 rounded">plants</code> table (current_power_kw, daily_energy_kwh, monthly_energy_mwh, yearly_energy_mwh, total_energy_mwh, network_status)</li>
+                          <li><strong>Historical Telemetry (Graphs):</strong> Fetched on-demand from vendor APIs via <code className="bg-background px-1 rounded">GET /api/plants/[id]/telemetry</code> - not persisted in database</li>
+                          <li><strong>Note:</strong> Separate telemetry database has been removed. All telemetry is either stored in main database (live metrics) or fetched on-demand (historical graphs).</li>
                         </ul>
                       </div>
                     </div>
@@ -607,12 +601,13 @@ export function SystemFlowDocumentation() {
                         <strong>Purpose:</strong> Time-series data for visualization and analysis
                       </p>
                       <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
-                        <li><strong>Storage:</strong> Separate telemetry database (<code className="bg-background px-1 rounded">telemetry_15m</code> table)</li>
-                        <li><strong>Update:</strong> Fetched on-demand when user requests graph data</li>
-                        <li><strong>API:</strong> <code className="bg-background px-1 rounded">GET /api/plants/[id]/telemetry</code></li>
-                        <li><strong>Resolution:</strong> 15-minute intervals (configurable)</li>
-                        <li><strong>Retention:</strong> 24-hour rolling window</li>
+                        <li><strong>Storage:</strong> <strong>NOT PERSISTED</strong> - Fetched on-demand from vendor APIs when user requests graph data</li>
+                        <li><strong>Update:</strong> Fetched on-demand when user requests graph data via <code className="bg-background px-1 rounded">GET /api/plants/[id]/telemetry</code></li>
+                        <li><strong>API:</strong> <code className="bg-background px-1 rounded">GET /api/plants/[id]/telemetry?year={year}&month={month}&day={day}</code></li>
+                        <li><strong>Resolution:</strong> Vendor-dependent (Solarman: 15-min, ShineMonitor: 5-min, SolarDM: 20-min, PVBlink: varies)</li>
+                        <li><strong>Data Source:</strong> Direct vendor API calls (no database storage)</li>
                         <li><strong>Data:</strong> Power generation over time (kW values at each timestamp)</li>
+                        <li><strong>Note:</strong> Separate telemetry database has been removed. Historical telemetry is fetched directly from vendor APIs on-demand.</li>
                       </ul>
                     </div>
                     
@@ -655,9 +650,29 @@ export function SystemFlowDocumentation() {
                       The system uses two sync modes based on vendor configuration (<code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">telemetry_sync_mode</code>):
                     </p>
                     <ol className="text-sm text-yellow-800 dark:text-yellow-200 space-y-2 ml-4 list-decimal">
-                      <li><strong>LIST_PLANTS Mode (Efficient):</strong> Calls <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">adapter.listPlants()</code> once to get all plants telemetry in a single API call. Maps vendor response to database fields and updates in batches of 100.</li>
-                      <li><strong>PER_PLANT Mode (Costly):</strong> Calls <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">adapter.listPlant(vendorPlantId)</code> for each plant individually. Fetches in batches of 50 plants (parallel), then updates database in batches of 100 (reduces transactions).</li>
+                      <li><strong>LIST_PLANTS Mode (Efficient):</strong> 
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Calls <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">adapter.listPlants()</code> once to get all plants with their live telemetry in a single API call</li>
+                          <li>Extracts live telemetry fields from each plant&apos;s metadata: current_power_kw, daily_energy_kwh, monthly_energy_mwh, yearly_energy_mwh, total_energy_mwh, network_status</li>
+                          <li>Maps vendor response to database fields (handles unit conversions: W→kW, kWh→MWh)</li>
+                          <li>Updates <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">plants</code> table in batches of 100</li>
+                          <li><strong>Used by:</strong> Solarman, ShineMonitor (when telemetry_sync_mode = LIST_PLANTS)</li>
+                        </ul>
+                      </li>
+                      <li><strong>PER_PLANT Mode (Costly but Necessary):</strong>
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Fetches all active plants for vendor from database</li>
+                          <li>For each plant, calls <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">adapter.listPlant(vendorPlantId)</code> to get individual plant telemetry</li>
+                          <li>Fetches in batches of 50 plants (parallel API calls to avoid overwhelming vendor)</li>
+                          <li>Extracts live telemetry fields from each plant&apos;s metadata</li>
+                          <li>Collects all updates and performs batch database update (100 plants per transaction to reduce DB load)</li>
+                          <li><strong>Used by:</strong> SolarDM, PVBlink (when telemetry_sync_mode = PER_PLANT, or when listPlants() doesn&apos;t provide live telemetry)</li>
+                        </ul>
+                      </li>
                       <li><strong>Interval-Based Sync:</strong> Cron runs every 15 minutes, but only syncs vendors whose <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">telemetry_sync_interval</code> matches the current time (e.g., 15 min syncs at :00, :15, :30, :45)</li>
+                      <li><strong>listPlant() Usage in Plant Sync:</strong> During plant sync (twice daily), if live telemetry is not available in <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">listPlants()</code> response, 
+                      optionally enriches each plant by calling <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">adapter.listPlant(vendorPlantId)</code> (configurable via <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">ENABLE_PER_PLANT_LIVE_TELEMETRY</code> env var, default: enabled). 
+                      This happens in batches of 20 plants in parallel.</li>
                     </ol>
                   </div>
                 </div>
@@ -737,13 +752,14 @@ export function SystemFlowDocumentation() {
               <div className="p-6 pt-0 space-y-6 border-t">
                 <div className="space-y-4">
                   <h3 className="font-semibold text-lg">Database Architecture</h3>
-                  <p className="text-sm text-muted-foreground">
-                    WOMS uses <strong>two separate Supabase instances</strong>:
-                  </p>
-                  <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
-                    <li><strong>Main Database:</strong> Application data (accounts, organizations, vendors, plants, work orders, alerts)</li>
-                    <li><strong>Telemetry Database:</strong> Time-series telemetry data with 24-hour retention window</li>
-                  </ul>
+                    <p className="text-sm text-muted-foreground">
+                      WOMS uses <strong>a single Supabase database instance</strong>:
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
+                      <li><strong>Main Database:</strong> All application data including live telemetry metrics stored in <code className="bg-background px-1 rounded">plants</code> table</li>
+                      <li><strong>Historical Telemetry:</strong> Fetched on-demand from vendor APIs - not persisted in database</li>
+                      <li><strong>Note:</strong> Separate telemetry database has been removed. All data is stored in the main database or fetched on-demand.</li>
+                    </ul>
                 </div>
 
                 <div className="space-y-4">
@@ -1191,66 +1207,17 @@ export function SystemFlowDocumentation() {
                     </div>
                   </div>
 
-                  {/* Work Order Plant Efficiency Table */}
-                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-                    <h4 className="font-semibold">work_order_plant_eff</h4>
-                    <p className="text-sm text-muted-foreground">Efficiency metrics for plants in work orders</p>
-                    <table className="w-full text-xs border-collapse mt-2">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left p-2">Column</th>
-                          <th className="text-left p-2">Type</th>
-                          <th className="text-left p-2">Description</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b">
-                          <td className="p-2"><code>id</code></td>
-                          <td className="p-2">SERIAL</td>
-                          <td className="p-2">Primary key</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-2"><code>work_order_id</code></td>
-                          <td className="p-2">INTEGER</td>
-                          <td className="p-2">FK to work_orders (CASCADE delete)</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-2"><code>plant_id</code></td>
-                          <td className="p-2">INTEGER</td>
-                          <td className="p-2">FK to plants (CASCADE delete)</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-2"><code>recorded_at</code></td>
-                          <td className="p-2">TIMESTAMPTZ</td>
-                          <td className="p-2">When efficiency was calculated</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-2"><code>actual_gen</code></td>
-                          <td className="p-2">NUMERIC(10,2)</td>
-                          <td className="p-2">Actual generation (MWh)</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-2"><code>expected_gen</code></td>
-                          <td className="p-2">NUMERIC(10,2)</td>
-                          <td className="p-2">Expected generation (MWh)</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-2"><code>pr</code></td>
-                          <td className="p-2">NUMERIC(5,4)</td>
-                          <td className="p-2">Performance ratio (actual / expected)</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-2"><code>efficiency_pct</code></td>
-                          <td className="p-2">NUMERIC(5,2)</td>
-                          <td className="p-2">Efficiency percentage (pr × 100)</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-2"><code>category</code></td>
-                          <td className="p-2">TEXT</td>
-                          <td className="p-2">Healthy (≥85%), Suboptimal (65-84%), Critical (&lt;65%)</td>
-                        </tr>
-                      </tbody>
-                    </table>
+                  {/* Work Order Plant Efficiency Table - DEPRECATED */}
+                  <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg space-y-2 border border-red-200 dark:border-red-900">
+                    <h4 className="font-semibold text-red-900 dark:text-red-100">work_order_plant_eff (DEPRECATED - NOT USED)</h4>
+                    <p className="text-sm text-red-800 dark:text-red-200">
+                      <strong>⚠️ This table exists in the schema but is NOT being used.</strong> Performance ratio (PR) calculations are not implemented. 
+                      The table should be dropped in a future migration. Currently only referenced by <code className="bg-red-100 dark:bg-red-900 px-1 rounded">/api/workorders/[id]/efficiency</code> 
+                      endpoint which reads from it but no data is written to it.
+                    </p>
+                    <div className="mt-2 text-xs text-red-700 dark:text-red-300">
+                      <strong>Recommendation:</strong> Drop this table and the efficiency endpoint as PR calculations are not part of the current system.
+                    </div>
                   </div>
 
                   {/* Disabled Plants Table */}
@@ -1324,17 +1291,34 @@ vendors (1) ──< (N) alerts
 
 plants (1) ──< (N) alerts
 plants (1) ──< (N) work_order_plants
-plants (1) ──< (N) work_order_plant_eff
 
 work_orders (1) ──< (N) work_order_plants
-work_orders (1) ──< (N) work_order_plant_eff
 
 Unique Constraints:
 - accounts.email (unique)
-- (vendors.vendor_id, plants.vendor_plant_id) (unique)
+- (vendors.id, plants.vendor_plant_id) (unique) - prevents duplicate plants from same vendor
 - (work_order_plants.work_order_id, work_order_plants.plant_id) (unique)
 - uq_active_plant: one active work order per plant`}
                       </pre>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">Unused/Deprecated Tables</h3>
+                    <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-900">
+                      <h4 className="font-semibold text-red-900 dark:text-red-100 mb-2">⚠️ Tables to be Dropped</h4>
+                      <ul className="text-sm text-red-800 dark:text-red-200 space-y-2 ml-4 list-disc">
+                        <li>
+                          <code className="bg-red-100 dark:bg-red-900 px-1 rounded">work_order_plant_eff</code> - Performance ratio (PR) calculations not implemented. 
+                          Table exists in schema but is never populated. Only referenced by <code className="bg-red-100 dark:bg-red-900 px-1 rounded">/api/workorders/[id]/efficiency</code> endpoint which reads from it but no data is written.
+                          <div className="mt-1 text-xs">
+                            <strong>Migration:</strong> <code className="bg-red-100 dark:bg-red-900 px-1 rounded">026_drop_unused_tables.sql</code> created to drop this table.
+                          </div>
+                        </li>
+                      </ul>
+                      <div className="mt-3 text-xs text-red-700 dark:text-red-300">
+                        <strong>Note:</strong> Separate telemetry database has been removed. All telemetry is stored in main database (live metrics in <code className="bg-red-100 dark:bg-red-900 px-1 rounded">plants</code> table) or fetched on-demand from vendor APIs (historical graphs).
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1532,8 +1516,11 @@ Unique Constraints:
                           <li>Calls <code className="bg-background px-1 rounded">adapter.listPlants()</code></li>
                           <li>Normalizes plant data (unit conversions, timestamps)</li>
                           <li>Upserts plants in batches of 100 to <code className="bg-background px-1 rounded">plants</code> table</li>
-                          <li>Updates production metrics (daily/monthly/yearly/total energy)</li>
-                          <li>If live telemetry not in listPlants(), optionally uses <code className="bg-background px-1 rounded">listPlant()</code> per plant (configurable via <code className="bg-background px-1 rounded">ENABLE_PER_PLANT_LIVE_TELEMETRY</code>)</li>
+                          <li>Updates production metrics (daily/monthly/yearly/total energy) from <code className="bg-background px-1 rounded">listPlants()</code> response</li>
+                          <li><strong>Live Telemetry Enrichment:</strong> If live telemetry fields (current_power_kw, daily_energy_kwh, monthly_energy_mwh, yearly_energy_mwh, total_energy_mwh, network_status) 
+                          are not present in <code className="bg-background px-1 rounded">listPlants()</code> response, optionally enriches each plant by calling <code className="bg-background px-1 rounded">adapter.listPlant(vendorPlantId)</code> 
+                          (configurable via <code className="bg-background px-1 rounded">ENABLE_PER_PLANT_LIVE_TELEMETRY</code> env var, default: enabled). 
+                          Processes in batches of 20 plants in parallel, then merges telemetry data into plant metadata before database upsert.</li>
                         </ul>
                       </li>
                       <li>
@@ -1611,19 +1598,23 @@ Unique Constraints:
                         <ul className="ml-4 mt-1 list-disc">
                           <li>Gets <code className="bg-background px-1 rounded">telemetry_sync_mode</code> (LIST_PLANTS or PER_PLANT)</li>
                           <li>Creates vendor adapter and validates token</li>
-                          <li><strong>If LIST_PLANTS mode:</strong>
+                          <li><strong>If LIST_PLANTS mode (Efficient):</strong>
                             <ul className="ml-4 mt-1 list-disc">
-                              <li>Calls <code className="bg-background px-1 rounded">adapter.listPlants()</code> once</li>
-                              <li>Maps all plants telemetry from response</li>
-                              <li>Updates database in batches of 100</li>
+                              <li>Calls <code className="bg-background px-1 rounded">adapter.listPlants()</code> once to get all plants with their live telemetry in a single API call</li>
+                              <li>Extracts live telemetry fields from each plant&apos;s metadata: current_power_kw, daily_energy_kwh, monthly_energy_mwh, yearly_energy_mwh, total_energy_mwh, network_status</li>
+                              <li>Maps vendor response to database fields (handles unit conversions: W→kW, kWh→MWh)</li>
+                              <li>Updates <code className="bg-background px-1 rounded">plants</code> table in batches of 100</li>
+                              <li><strong>Vendors using this mode:</strong> Solarman, ShineMonitor (when telemetry_sync_mode = LIST_PLANTS)</li>
                             </ul>
                           </li>
-                          <li><strong>If PER_PLANT mode:</strong>
+                          <li><strong>If PER_PLANT mode (Costly but Necessary):</strong>
                             <ul className="ml-4 mt-1 list-disc">
-                              <li>Fetches all active plants for vendor</li>
-                              <li>Processes in batches of 50 (parallel API calls)</li>
-                              <li>For each plant, calls <code className="bg-background px-1 rounded">adapter.listPlant(vendorPlantId)</code></li>
-                              <li>Collects updates and performs batch database update (100 plants per transaction)</li>
+                              <li>Fetches all active plants for vendor from database</li>
+                              <li>Processes in batches of 50 plants (parallel API calls to avoid overwhelming vendor)</li>
+                              <li>For each plant, calls <code className="bg-background px-1 rounded">adapter.listPlant(vendorPlantId)</code> to get individual plant telemetry</li>
+                              <li>Extracts live telemetry fields from each plant&apos;s metadata</li>
+                              <li>Collects all updates and performs batch database update (100 plants per transaction to reduce DB load)</li>
+                              <li><strong>Vendors using this mode:</strong> SolarDM, PVBlink (when telemetry_sync_mode = PER_PLANT, or when listPlants() doesn&apos;t provide live telemetry)</li>
                             </ul>
                           </li>
                           <li>Updates fields: <code className="bg-background px-1 rounded">current_power_kw</code>, <code className="bg-background px-1 rounded">daily_energy_kwh</code>, <code className="bg-background px-1 rounded">monthly_energy_mwh</code>, <code className="bg-background px-1 rounded">yearly_energy_mwh</code>, <code className="bg-background px-1 rounded">total_energy_mwh</code>, <code className="bg-background px-1 rounded">network_status</code></li>
@@ -1741,8 +1732,10 @@ Unique Constraints:
                         <li>Batch upserts (100 plants per batch) for performance</li>
                         <li>Unit conversions (W→kW, kWh→MWh) during normalization</li>
                         <li>Timestamp conversions (Unix seconds → ISO strings)</li>
-                        <li>Fetches newly added plants from vendors</li>
-                        <li>Optionally enriches plants with live telemetry if not in listPlants() (via <code className="bg-background px-1 rounded">listPlant()</code>)</li>
+                          <li>Fetches newly added plants from vendors</li>
+                          <li><strong>Optional Live Telemetry Enrichment:</strong> If live telemetry (current_power_kw, daily_energy_kwh, etc.) is not available in <code className="bg-background px-1 rounded">listPlants()</code> response, 
+                          optionally enriches plants by calling <code className="bg-background px-1 rounded">adapter.listPlant(vendorPlantId)</code> for each plant (configurable via <code className="bg-background px-1 rounded">ENABLE_PER_PLANT_LIVE_TELEMETRY</code> env var, default: enabled). 
+                          This is done in batches of 20 plants in parallel to avoid overwhelming vendor APIs.</li>
                       </ul>
                     </div>
                     <div className="bg-muted/50 p-4 rounded-lg">
@@ -2054,22 +2047,22 @@ Unique Constraints:
                           <td className="p-2">✅ Yes</td>
                           <td className="p-2">-</td>
                         </tr>
-                        <tr className="border-b">
+                        <tr className="border-b bg-red-50 dark:bg-red-950/10">
                           <td className="p-2"><code className="bg-background px-1 rounded">TELEMETRY_SUPABASE_URL</code></td>
-                          <td className="p-2">Telemetry database URL (separate instance)</td>
-                          <td className="p-2">✅ Yes</td>
+                          <td className="p-2">Telemetry database URL - <strong>DEPRECATED</strong> (separate telemetry database has been removed)</td>
+                          <td className="p-2">❌ No</td>
                           <td className="p-2">-</td>
                         </tr>
-                        <tr className="border-b">
+                        <tr className="border-b bg-red-50 dark:bg-red-950/10">
                           <td className="p-2"><code className="bg-background px-1 rounded">TELEMETRY_SUPABASE_ANON_KEY</code></td>
-                          <td className="p-2">Telemetry DB anon key</td>
-                          <td className="p-2">✅ Yes</td>
+                          <td className="p-2">Telemetry DB anon key - <strong>DEPRECATED</strong> (not used)</td>
+                          <td className="p-2">❌ No</td>
                           <td className="p-2">-</td>
                         </tr>
-                        <tr className="border-b">
+                        <tr className="border-b bg-red-50 dark:bg-red-950/10">
                           <td className="p-2"><code className="bg-background px-1 rounded">TELEMETRY_SUPABASE_SERVICE_ROLE_KEY</code></td>
-                          <td className="p-2">Telemetry DB service role key (for Edge Functions)</td>
-                          <td className="p-2">✅ Yes</td>
+                          <td className="p-2">Telemetry DB service role key - <strong>DEPRECATED</strong> (not used)</td>
+                          <td className="p-2">❌ No</td>
                           <td className="p-2">-</td>
                         </tr>
                         <tr className="border-b">
@@ -2185,8 +2178,8 @@ Unique Constraints:
                     <div>
                       <h4 className="font-medium mb-2">Database Infrastructure</h4>
                       <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                        <li><strong>Main Database:</strong> Supabase PostgreSQL instance</li>
-                        <li><strong>Telemetry Database:</strong> Separate Supabase PostgreSQL instance</li>
+                        <li><strong>Main Database:</strong> Single Supabase PostgreSQL instance (all data stored here)</li>
+                        <li><strong>Telemetry Storage:</strong> Live telemetry stored in <code className="bg-background px-1 rounded">plants</code> table; historical telemetry fetched on-demand from vendor APIs (not persisted)</li>
                         <li><strong>Connection Pooling:</strong> HTTP connection reuse via pooledFetch</li>
                         <li><strong>RLS:</strong> Enabled but bypassed via service role key</li>
                         <li><strong>Backups:</strong> Supabase point-in-time recovery (configure in dashboard)</li>
@@ -2324,9 +2317,10 @@ Build a production-ready **Work Order Management System (WOMS)** for managing so
 ## BaseVendorAdapter Interface
 All vendor adapters must extend BaseVendorAdapter and implement:
 - authenticate(): Promise<string> - Returns access token
-- listPlants(): Promise<Plant[]> - Returns all plants from vendor
-- getTelemetry(plantId, startTime, endTime): Promise<TelemetryData[]>
-- getAlerts(plantId): Promise<Alert[]>
+- listPlants(): Promise<Plant[]> - Returns all plants from vendor (may include live telemetry)
+- listPlant(vendorPlantId): Promise<Plant | null> - Returns single plant by vendor plant ID (for PER_PLANT mode or enrichment)
+- getTelemetry(plantId, startTime, endTime): Promise<TelemetryData[]> - Historical telemetry (graphs)
+- getAlerts(plantId): Promise<Alert[]> - Alert data (if supported)
 - normalizeTelemetry(rawData): TelemetryData
 - normalizeAlert(rawData): Alert
 
@@ -2337,8 +2331,16 @@ All vendor adapters must extend BaseVendorAdapter and implement:
 - Automatic refresh on expiry
 
 ## Plant Sync Modes
-- LIST_PLANTS: Metrics from listPlants() API
-- PER_PLANT: Metrics from per-plant telemetry APIs`}
+- LIST_PLANTS: Metrics from listPlants() API (efficient, single call)
+- PER_PLANT: Metrics from per-plant telemetry APIs (costly, individual calls)
+
+## Live Telemetry Sync Modes
+- LIST_PLANTS: Fetches all plants telemetry via listPlants() in single call
+- PER_PLANTS: Fetches each plant telemetry via listPlant(vendorPlantId) individually
+
+## listPlant() Usage
+- Used in live telemetry sync when telemetry_sync_mode = PER_PLANT
+- Used during plant sync to optionally enrich plants if live telemetry missing from listPlants() (ENABLE_PER_PLANT_LIVE_TELEMETRY env var)`}
                     />
                   </div>
                 </div>
@@ -2363,6 +2365,19 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                   
                   {expandedSections.has("vendor-solarman") && (
                   <div className="bg-muted/50 p-4 rounded-lg space-y-4 border-t">
+                    <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900 mb-4">
+                      <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">🔵 Live Telemetry Sync Flow</h4>
+                      <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                        <strong>Telemetry Sync Mode:</strong> LIST_PLANTS (default) - All live telemetry is fetched in a single API call via <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">listPlants()</code>
+                      </p>
+                      <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                        <strong>listPlant() Usage:</strong> Used during plant sync to optionally enrich plants if live telemetry is missing from <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">listPlants()</code> response (configurable via <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">ENABLE_PER_PLANT_LIVE_TELEMETRY</code>). 
+                        Implementation: Calls PRO API <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">/maintain-s/operating/station/v2/search</code> filtered by stationId, or falls back to base endpoint.
+                      </p>
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        <strong>Live Telemetry Fields from listPlants():</strong> generationPower (→ current_power_kw), generationValue (→ daily_energy_kwh), generationMonth (→ monthly_energy_mwh), generationYear (→ yearly_energy_mwh), generationUploadTotalOffset (→ total_energy_mwh), networkStatus (→ network_status)
+                      </p>
+                    </div>
                     <div>
                       <h4 className="font-semibold mb-2">1. Authentication</h4>
                       <div className="bg-background p-3 rounded text-sm space-y-2">
@@ -2632,6 +2647,18 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                   
                   {expandedSections.has("vendor-solardm") && (
                   <div className="bg-muted/50 p-4 rounded-lg space-y-4 border-t">
+                    <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg border border-purple-200 dark:border-purple-900 mb-4">
+                      <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">🟣 Live Telemetry Sync Flow</h4>
+                      <p className="text-sm text-purple-800 dark:text-purple-200 mb-2">
+                        <strong>Telemetry Sync Mode:</strong> PER_PLANT (default) - Live telemetry is fetched individually for each plant via <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">listPlant(vendorPlantId)</code>
+                      </p>
+                      <p className="text-sm text-purple-800 dark:text-purple-200 mb-2">
+                        <strong>listPlant() Implementation:</strong> Calls <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">listPlants()</code> and filters client-side by vendorPlantId. Used by live telemetry sync service in PER_PLANT mode.
+                      </p>
+                      <p className="text-sm text-purple-800 dark:text-purple-200">
+                        <strong>Live Telemetry Fields:</strong> communicateStatus (→ network_status). Other fields (current_power_kw, daily_energy_kwh, etc.) are fetched via per-plant telemetry APIs during live telemetry sync.
+                      </p>
+                    </div>
                     <div>
                       <h4 className="font-semibold mb-2">1. Authentication</h4>
                       <div className="bg-background p-3 rounded text-sm space-y-2">
@@ -2769,6 +2796,18 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                   
                   {expandedSections.has("vendor-pvblink") && (
                   <div className="bg-muted/50 p-4 rounded-lg space-y-4 border-t">
+                    <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg border border-purple-200 dark:border-purple-900 mb-4">
+                      <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">🟣 Live Telemetry Sync Flow</h4>
+                      <p className="text-sm text-purple-800 dark:text-purple-200 mb-2">
+                        <strong>Telemetry Sync Mode:</strong> PER_PLANT (default) - Live telemetry is fetched individually for each plant via <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">listPlant(vendorPlantId)</code>
+                      </p>
+                      <p className="text-sm text-purple-800 dark:text-purple-200 mb-2">
+                        <strong>listPlant() Implementation:</strong> Calls <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">listPlants()</code> and filters client-side by vendorPlantId. Used by live telemetry sync service in PER_PLANT mode.
+                      </p>
+                      <p className="text-sm text-purple-800 dark:text-purple-200">
+                        <strong>Live Telemetry Fields:</strong> isOnline (→ network_status). Other fields are fetched via per-plant telemetry APIs during live telemetry sync.
+                      </p>
+                    </div>
                     <div>
                       <h4 className="font-semibold mb-2">1. Authentication</h4>
                       <div className="bg-background p-3 rounded text-sm space-y-2">
@@ -2893,6 +2932,18 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                   
                   {expandedSections.has("vendor-shinemonitor") && (
                   <div className="bg-muted/50 p-4 rounded-lg space-y-4 border-t">
+                    <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900 mb-4">
+                      <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">🔵 Live Telemetry Sync Flow</h4>
+                      <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                        <strong>Telemetry Sync Mode:</strong> LIST_PLANTS (default) - All live telemetry is fetched in a single API call via <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">listPlants()</code>
+                      </p>
+                      <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                        <strong>listPlant() Implementation:</strong> Calls <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">listPlants()</code> and filters client-side by vendorPlantId. Used during plant sync for optional enrichment.
+                      </p>
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        <strong>Live Telemetry Fields from listPlants():</strong> outputPower (→ current_power_kw), energy (→ daily_energy_kwh), energyMonth (→ monthly_energy_mwh), energyYear (→ yearly_energy_mwh), energyTotal (→ total_energy_mwh), status (→ network_status)
+                      </p>
+                    </div>
                     <div>
                       <h4 className="font-semibold mb-2">1. Authentication</h4>
                       <div className="bg-background p-3 rounded text-sm space-y-2">
@@ -3708,23 +3759,26 @@ User-Agent: Mozilla/5.0...`}
                       </div>
 
                       <div>
-                        <h4 className="font-semibold mb-2">10. Telemetry Database Retention & Cleanup</h4>
+                        <h4 className="font-semibold mb-2">10. Remove Unused Tables & Deprecated Features</h4>
                         <p className="text-sm text-muted-foreground mb-2">
-                          <strong>Blast Radius:</strong> Telemetry system - storage costs, query performance
+                          <strong>Blast Radius:</strong> Database schema cleanup - reduces confusion and maintenance overhead
                         </p>
                         <p className="text-sm text-muted-foreground mb-2">
-                          <strong>Issue:</strong> 24-hour retention mentioned but no automated cleanup job. 
-                          Old data accumulates, increasing storage costs and slowing queries.
-                        </p>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          <strong>Impact:</strong> Increasing storage costs, degraded query performance
+                          <strong>Issue:</strong> Several tables and features exist in schema but are not being used:
                         </p>
                         <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                          <li>Implement automated cleanup job (delete data older than 24 hours)</li>
-                          <li>Add retention policy configuration per organization</li>
-                          <li>Archive old data to cold storage before deletion</li>
-                          <li>Monitor storage usage and cleanup job execution</li>
-                          <li>Add alerts for storage threshold breaches</li>
+                          <li><code className="bg-background px-1 rounded">work_order_plant_eff</code> - Performance ratio (PR) calculations not implemented, table exists but empty. Only referenced by <code className="bg-background px-1 rounded">/api/workorders/[id]/efficiency</code> endpoint which reads from it but no data is written.</li>
+                          <li>Telemetry database environment variables (TELEMETRY_SUPABASE_*) - separate telemetry database removed, all telemetry stored in main DB or fetched on-demand from vendor APIs</li>
+                          <li>Efficiency endpoint (<code className="bg-background px-1 rounded">/api/workorders/[id]/efficiency</code>) - reads from unused table, should be removed or documented as deprecated</li>
+                        </ul>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Impact:</strong> Confusion, unnecessary maintenance, potential for bugs if someone tries to use deprecated features
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Create migration to drop <code className="bg-background px-1 rounded">work_order_plant_eff</code> table and related indexes (migration <code className="bg-background px-1 rounded">026_drop_unused_tables.sql</code> created)</li>
+                          <li>Remove or deprecate efficiency endpoint</li>
+                          <li>Remove telemetry database environment variable references from documentation and code comments</li>
+                          <li>Clean up any remaining references to separate telemetry database in codebase</li>
                         </ul>
                       </div>
                     </div>
