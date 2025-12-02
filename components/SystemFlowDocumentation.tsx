@@ -599,7 +599,7 @@ export function SystemFlowDocumentation() {
                         2. Manual Sync
                       </h4>
                       <p className="text-sm text-muted-foreground mb-2">
-                        "Sync Plants" button in VendorsTable
+                        &quot;Sync Plants&quot; button in VendorsTable
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Calls <code className="bg-background px-1 rounded">POST /api/vendors/:id/sync-plants</code>
@@ -1217,7 +1217,7 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                             <tr>
                               <td className="p-2"><code>createTime</code></td>
                               <td className="p-2"><code>vendor_created_date</code></td>
-                              <td className="p-2">"YYYY-MM-DD HH:mm:ss" → ISO string</td>
+                              <td className="p-2">&quot;YYYY-MM-DD HH:mm:ss&quot; → ISO string</td>
                             </tr>
                           </tbody>
                         </table>
@@ -1244,7 +1244,7 @@ All vendor adapters must extend BaseVendorAdapter and implement:
   }
 }`}
                         />
-                        <div><strong>Note:</strong> SolarDM provides 20-minute intervals (vs Solarman's 15-minute)</div>
+                        <div><strong>Note:</strong> SolarDM provides 20-minute intervals (vs Solarman&apos;s 15-minute)</div>
                       </div>
                     </div>
                   </div>
