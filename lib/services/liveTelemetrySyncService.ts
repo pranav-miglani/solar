@@ -293,7 +293,7 @@ async function syncVendorLiveTelemetry(
         )
 
         // Fetch telemetry for all plants in batch in parallel
-        const batchPromises = batch.map(async (plant) => {
+        const batchPromises = batch.map(async (plant: { id: number; vendor_plant_id: string }) => {
           try {
             let plantData = null
 
