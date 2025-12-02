@@ -138,105 +138,205 @@ const vendorCapabilities: VendorCapability[] = [
   },
 ]
 
-// Mermaid component for System Architecture
-const SystemArchitectureMermaidDiagram = () => {
-  const mermaidRef = useRef<HTMLDivElement>(null)
-  const [svg, setSvg] = useState<string>("")
-
-  useEffect(() => {
-    if (svg) return
-
-    const diagramDefinition = `graph TB
-    subgraph Frontend["🌐 Frontend Layer"]
-        UI["Next.js Frontend<br/>React Components<br/>TypeScript"]
-        Pages["Pages & Components<br/>Dashboard, Plants,<br/>Work Orders, Alerts"]
-    end
-
-    subgraph API["⚙️ API Layer"]
-        Routes["API Routes<br/>Next.js API Endpoints"]
-        Services["Sync Services<br/>plantSyncService<br/>liveTelemetrySyncService<br/>alertSyncService"]
-        Adapters["Vendor Adapters<br/>BaseVendorAdapter<br/>Solarman, SolarDM, etc."]
-    end
-
-    subgraph Database["💾 Database Layer"]
-        MainDB["Main Database<br/>Supabase PostgreSQL"]
-        Tables["Core Tables<br/>accounts, organizations<br/>vendors, plants<br/>work_orders, alerts"]
-        LiveData["Live Telemetry<br/>Stored in plants table<br/>current_power_kw, daily_energy_kwh<br/>monthly_energy_mwh, etc."]
-    end
-
-    subgraph External["🌍 External Services"]
-        VendorAPIs["Vendor APIs<br/>Solarman API<br/>SolarDM API<br/>ShineMonitor API<br/>PVBlink API<br/>Foxesscloud API"]
-    end
-
-    subgraph Cron["⏰ Cron Jobs"]
-        PlantCron["Plant Sync Cron<br/>Every 15 min<br/>Checks morning/evening times"]
-        TelemetryCron["Live Telemetry Cron<br/>Every 15 min<br/>Filters by interval"]
-        AlertCron["Alert Sync Cron<br/>Scheduled sync"]
-    end
-
-    UI --> Pages
-    Pages -->|HTTP Requests| Routes
-    Routes --> Services
-    Services --> Adapters
-    Adapters -->|API Calls| VendorAPIs
-    Services -->|Read/Write| MainDB
-    Routes -->|Query/Update| MainDB
-    MainDB --> Tables
-    MainDB --> LiveData
-    
-    PlantCron -->|Triggers| Routes
-    TelemetryCron -->|Triggers| Routes
-    AlertCron -->|Triggers| Routes
-    
-    VendorAPIs -->|Returns Data| Adapters
-    Adapters -->|Processes| Services
-    Services -->|Stores| MainDB
-
-    style Frontend fill:#3b82f6,stroke:#2563eb,stroke-width:2px,color:#fff
-    style API fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
-    style Database fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff
-    style External fill:#ef4444,stroke:#dc2626,stroke-width:2px,color:#fff
-    style Cron fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff`
-
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'dark',
-      themeVariables: {
-        primaryColor: '#1e293b',
-        primaryTextColor: '#f1f5f9',
-        primaryBorderColor: '#475569',
-        lineColor: '#64748b',
-        secondaryColor: '#334155',
-        tertiaryColor: '#0f172a',
-      },
-      flowchart: {
-        useMaxWidth: true,
-        htmlLabels: true,
-        curve: 'basis',
-      },
-    })
-
-    const id = `system-architecture-${Date.now()}`
-    
-    mermaid.render(id, diagramDefinition).then((result) => {
-      setSvg(result.svg)
-    }).catch((error) => {
-      console.error('Error rendering System Architecture Mermaid diagram:', error)
-    })
-  }, [svg])
-
-  if (svg) {
+// Custom System Architecture Diagram Component
+const SystemArchitectureDiagram = () => {
+  const Arrow = ({ direction = "right", label }: { direction?: "right" | "down" | "up" | "left"; label?: string }) => {
+    const arrowClass = {
+      right: "w-12 h-0.5 bg-primary/60 relative after:content-[''] after:absolute after:right-0 after:top-1/2 after:-translate-y-1/2 after:border-l-4 after:border-l-primary/60 after:border-t-2 after:border-t-transparent after:border-b-2 after:border-b-transparent",
+      down: "h-12 w-0.5 bg-primary/60 relative after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:border-t-4 after:border-t-primary/60 after:border-l-2 after:border-l-transparent after:border-r-2 after:border-r-transparent",
+      up: "h-12 w-0.5 bg-primary/60 relative after:content-[''] after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:border-b-4 after:border-b-primary/60 after:border-l-2 after:border-l-transparent after:border-r-2 after:border-r-transparent",
+      left: "w-12 h-0.5 bg-primary/60 relative after:content-[''] after:absolute after:left-0 after:top-1/2 after:-translate-y-1/2 after:border-r-4 after:border-r-primary/60 after:border-t-2 after:border-t-transparent after:border-b-2 after:border-b-transparent"
+    }
     return (
-      <div 
-        className="flex justify-center items-center min-h-[600px] overflow-x-auto w-full" 
-        dangerouslySetInnerHTML={{ __html: svg }} 
-      />
+      <div className="flex flex-col items-center gap-1">
+        <div className={`${arrowClass[direction]}`} />
+        {label && <span className="text-xs text-muted-foreground whitespace-nowrap">{label}</span>}
+      </div>
+    )
+  }
+
+  const Node = ({ 
+    title, 
+    children, 
+    color = "blue",
+    icon,
+    className = ""
+  }: { 
+    title: string
+    children: React.ReactNode
+    color?: "blue" | "purple" | "green" | "red" | "orange"
+    icon?: React.ReactNode
+    className?: string
+  }) => {
+    const colorClasses = {
+      blue: "bg-blue-500/10 border-blue-500/50 text-blue-100",
+      purple: "bg-purple-500/10 border-purple-500/50 text-purple-100",
+      green: "bg-green-500/10 border-green-500/50 text-green-100",
+      red: "bg-red-500/10 border-red-500/50 text-red-100",
+      orange: "bg-orange-500/10 border-orange-500/50 text-orange-100"
+    }
+    
+    return (
+      <div className={`rounded-lg border-2 p-4 min-h-[140px] ${colorClasses[color]} ${className}`}>
+        <div className="flex items-center gap-2 mb-3 font-semibold text-sm">
+          {icon && <span className="text-lg">{icon}</span>}
+          <h4>{title}</h4>
+        </div>
+        <div className="text-xs text-muted-foreground space-y-1">
+          {children}
+        </div>
+      </div>
     )
   }
 
   return (
-    <div ref={mermaidRef} className="flex justify-center items-center min-h-[600px] overflow-x-auto w-full">
-      <div className="text-muted-foreground">Loading diagram...</div>
+    <div className="w-full overflow-x-auto py-8">
+      <div className="min-w-[1400px] mx-auto space-y-8">
+        {/* Frontend Layer */}
+        <div className="flex flex-col items-center">
+          <Node title="Frontend Layer" color="blue" icon="🌐" className="w-96">
+            <div>Next.js Frontend</div>
+            <div>React Components (TypeScript)</div>
+            <div>Pages: Dashboard, Plants, Work Orders, Alerts</div>
+          </Node>
+        </div>
+
+        <div className="flex justify-center">
+          <Arrow direction="down" label="HTTP Requests" />
+        </div>
+
+        {/* API Layer */}
+        <div className="grid grid-cols-3 gap-4">
+          <Node title="API Routes" color="purple" icon="⚙️">
+            <div>Next.js API Endpoints</div>
+            <div>/api/vendors, /api/plants</div>
+            <div>/api/workorders, /api/alerts</div>
+            <div>/api/cron/*</div>
+          </Node>
+          
+          <Node title="Sync Services" color="purple" icon="🔄">
+            <div>plantSyncService.ts</div>
+            <div>liveTelemetrySyncService.ts</div>
+            <div>alertSyncService.ts</div>
+          </Node>
+          
+          <Node title="Vendor Adapters" color="purple" icon="🔌">
+            <div>BaseVendorAdapter</div>
+            <div>Solarman, SolarDM</div>
+            <div>PVBlink, ShineMonitor</div>
+            <div>Foxesscloud</div>
+          </Node>
+        </div>
+
+        {/* Connections from API Layer */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="flex flex-col items-center">
+            <Arrow direction="down" label="Query/Update" />
+          </div>
+          <div className="flex flex-col items-center">
+            <Arrow direction="down" label="Read/Write" />
+          </div>
+          <div className="flex flex-col items-center">
+            <Arrow direction="down" label="API Calls" />
+          </div>
+        </div>
+
+        {/* Database & External Services */}
+        <div className="grid grid-cols-2 gap-6">
+          <Node title="Main Database" color="green" icon="💾">
+            <div className="font-medium mb-2">Supabase PostgreSQL</div>
+            <div className="mt-2 pt-2 border-t border-green-500/30">
+              <div className="font-medium mb-1">Core Tables:</div>
+              <div>accounts, organizations</div>
+              <div>vendors, plants</div>
+              <div>work_orders, alerts</div>
+            </div>
+            <div className="mt-2 pt-2 border-t border-green-500/30">
+              <div className="font-medium mb-1">Live Telemetry:</div>
+              <div>Stored in plants table</div>
+              <div>current_power_kw, daily_energy_kwh</div>
+              <div>monthly_energy_mwh, etc.</div>
+            </div>
+          </Node>
+
+          <Node title="External Vendor APIs" color="red" icon="🌍">
+            <div>Solarman API</div>
+            <div>SolarDM API</div>
+            <div>ShineMonitor API</div>
+            <div>PVBlink API</div>
+            <div>Foxesscloud API</div>
+            <div className="mt-2 pt-2 border-t border-red-500/30">
+              <div className="text-xs italic">Returns telemetry & plant data</div>
+            </div>
+          </Node>
+        </div>
+
+        {/* Bidirectional flow indicator */}
+        <div className="flex justify-center items-center gap-4">
+          <Arrow direction="left" label="Returns Data" />
+          <span className="text-xs text-muted-foreground">Bidirectional Data Flow</span>
+          <Arrow direction="right" label="API Calls" />
+        </div>
+
+        {/* Cron Jobs */}
+        <div className="mt-8 pt-6 border-t border-border/50">
+          <div className="text-center mb-4 text-sm font-semibold text-muted-foreground">Scheduled Jobs (Triggers API Routes)</div>
+          <div className="grid grid-cols-3 gap-4 max-w-5xl mx-auto">
+            <Node title="Plant Sync Cron" color="orange" icon="⏰">
+              <div>Every 15 min</div>
+              <div>Checks morning/evening times</div>
+              <div>Twice daily sync</div>
+              <div className="mt-2 pt-2 border-t border-orange-500/30">
+                <div className="text-xs">→ /api/cron/sync-plants</div>
+              </div>
+            </Node>
+            
+            <Node title="Live Telemetry Cron" color="orange" icon="⏰">
+              <div>Every 15 min</div>
+              <div>Filters by interval</div>
+              <div>15/30/45 min sync</div>
+              <div className="mt-2 pt-2 border-t border-orange-500/30">
+                <div className="text-xs">→ /api/cron/sync-live-telemetry</div>
+              </div>
+            </Node>
+            
+            <Node title="Alert Sync Cron" color="orange" icon="⏰">
+              <div>Scheduled sync</div>
+              <div>Vendor alerts</div>
+              <div className="mt-2 pt-2 border-t border-orange-500/30">
+                <div className="text-xs">→ /api/cron/sync-alerts</div>
+              </div>
+            </Node>
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="mt-8 pt-6 border-t border-border">
+          <div className="text-center text-sm font-semibold mb-4 text-muted-foreground">Legend</div>
+          <div className="grid grid-cols-5 gap-4 text-xs">
+            <div className="flex items-center gap-2 justify-center">
+              <div className="w-4 h-4 rounded bg-blue-500/20 border border-blue-500/50"></div>
+              <span>Frontend</span>
+            </div>
+            <div className="flex items-center gap-2 justify-center">
+              <div className="w-4 h-4 rounded bg-purple-500/20 border border-purple-500/50"></div>
+              <span>API Layer</span>
+            </div>
+            <div className="flex items-center gap-2 justify-center">
+              <div className="w-4 h-4 rounded bg-green-500/20 border border-green-500/50"></div>
+              <span>Database</span>
+            </div>
+            <div className="flex items-center gap-2 justify-center">
+              <div className="w-4 h-4 rounded bg-red-500/20 border border-red-500/50"></div>
+              <span>External APIs</span>
+            </div>
+            <div className="flex items-center gap-2 justify-center">
+              <div className="w-4 h-4 rounded bg-orange-500/20 border border-orange-500/50"></div>
+              <span>Cron Jobs</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -512,7 +612,7 @@ export function SystemFlowDocumentation() {
                 {/* Architecture Diagram */}
                 <div className="bg-muted/50 p-6 rounded-lg">
                   <h3 className="font-semibold text-lg mb-4">System Architecture Flow</h3>
-                  <SystemArchitectureMermaidDiagram />
+                  <SystemArchitectureDiagram />
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
