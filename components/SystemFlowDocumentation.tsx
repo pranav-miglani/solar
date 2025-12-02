@@ -111,6 +111,31 @@ export function SystemFlowDocumentation() {
     setExpandedSections(newExpanded)
   }
 
+  const toggleVendorSection = (vendorId: string) => {
+    const newExpanded = new Set(expandedSections)
+    
+    // If clicking on an already expanded vendor, collapse it
+    if (newExpanded.has(vendorId)) {
+      newExpanded.delete(vendorId)
+    } else {
+      // Collapse all other vendor sections first
+      newExpanded.delete("vendor-solarman")
+      newExpanded.delete("vendor-solardm")
+      newExpanded.delete("vendor-pvblink")
+      // Then expand the selected vendor
+      newExpanded.add(vendorId)
+      
+      // Scroll to the expanded vendor section after a short delay
+      setTimeout(() => {
+        const element = document.getElementById(vendorId)
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+      }, 100)
+    }
+    setExpandedSections(newExpanded)
+  }
+
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text)
     setCopiedCode(prev => new Set(prev).add(id))
@@ -133,6 +158,40 @@ export function SystemFlowDocumentation() {
         <h2 className="text-xl font-bold">{title}</h2>
       </div>
       {expandedSections.has(id) ? (
+        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+      ) : (
+        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+      )}
+    </button>
+  )
+
+  const VendorSectionHeader = ({ vendorId, vendorName, icon: Icon }: { vendorId: string; vendorName: string; icon: any }) => (
+    <button
+      onClick={() => toggleVendorSection(vendorId)}
+      className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors rounded-lg border border-border"
+    >
+      <div className="flex items-center gap-3">
+        <Icon className="h-5 w-5 text-primary" />
+        <h3 className="text-xl font-bold">{vendorName}</h3>
+      </div>
+      {expandedSections.has(vendorId) ? (
+        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+      ) : (
+        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+      )}
+    </button>
+  )
+
+  const FlowSectionHeader = ({ flowId, flowTitle, icon: Icon }: { flowId: string; flowTitle: string; icon: any }) => (
+    <button
+      onClick={() => toggleSection(flowId)}
+      className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors rounded-lg border border-border"
+    >
+      <div className="flex items-center gap-3">
+        <Icon className="h-5 w-5 text-primary" />
+        <h3 className="text-xl font-bold">{flowTitle}</h3>
+      </div>
+      {expandedSections.has(flowId) ? (
         <ChevronDown className="h-5 w-5 text-muted-foreground" />
       ) : (
         <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -500,8 +559,9 @@ export function SystemFlowDocumentation() {
         <TabsContent value="flows" className="space-y-6">
           {/* Plant Sync Flow */}
           <Card className="overflow-hidden">
-            <SectionHeader id="plant-sync" title="Plant Sync Flow" icon={RefreshCw} />
-            {expandedSections.has("plant-sync") && (
+            <FlowSectionHeader flowId="flow-plant-sync" flowTitle="Plant Sync Flow" icon={RefreshCw} />
+            {expandedSections.has("flow-plant-sync") && (
+              <div className="p-6 pt-0 space-y-6 border-t">
               <div className="p-6 pt-0 space-y-6 border-t">
                 {/* Flow Diagram */}
                 <div className="bg-muted/50 p-6 rounded-lg">
@@ -861,13 +921,11 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                 </p>
 
                 {/* Solarman Section */}
-                <div className="space-y-4">
-                  <h3 className="text-xl font-bold flex items-center gap-2">
-                    <Factory className="h-5 w-5" />
-                    Solarman
-                  </h3>
+                <div id="vendor-solarman" className="space-y-4">
+                  <VendorSectionHeader vendorId="vendor-solarman" vendorName="Solarman" icon={Factory} />
                   
-                  <div className="bg-muted/50 p-4 rounded-lg space-y-4">
+                  {expandedSections.has("vendor-solarman") && (
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-4 border-t">
                     <div>
                       <h4 className="font-semibold mb-2">1. Authentication</h4>
                       <div className="bg-background p-3 rounded text-sm space-y-2">
@@ -1116,16 +1174,15 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                       </div>
                     </div>
                   </div>
+                  )}
                 </div>
 
                 {/* SolarDM Section */}
-                <div className="space-y-4 mt-8">
-                  <h3 className="text-xl font-bold flex items-center gap-2">
-                    <Factory className="h-5 w-5" />
-                    SolarDM
-                  </h3>
+                <div id="vendor-solardm" className="space-y-4 mt-8">
+                  <VendorSectionHeader vendorId="vendor-solardm" vendorName="SolarDM" icon={Factory} />
                   
-                  <div className="bg-muted/50 p-4 rounded-lg space-y-4">
+                  {expandedSections.has("vendor-solardm") && (
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-4 border-t">
                     <div>
                       <h4 className="font-semibold mb-2">1. Authentication</h4>
                       <div className="bg-background p-3 rounded text-sm space-y-2">
@@ -1248,16 +1305,15 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                       </div>
                     </div>
                   </div>
+                  )}
                 </div>
 
                 {/* PVBlink Section */}
-                <div className="space-y-4 mt-8">
-                  <h3 className="text-xl font-bold flex items-center gap-2">
-                    <Factory className="h-5 w-5" />
-                    PVBlink
-                  </h3>
+                <div id="vendor-pvblink" className="space-y-4 mt-8">
+                  <VendorSectionHeader vendorId="vendor-pvblink" vendorName="PVBlink" icon={Factory} />
                   
-                  <div className="bg-muted/50 p-4 rounded-lg space-y-4">
+                  {expandedSections.has("vendor-pvblink") && (
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-4 border-t">
                     <div>
                       <h4 className="font-semibold mb-2">1. Authentication</h4>
                       <div className="bg-background p-3 rounded text-sm space-y-2">
@@ -1367,6 +1423,7 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                       </div>
                     </div>
                   </div>
+                  )}
                 </div>
               </div>
             )}
