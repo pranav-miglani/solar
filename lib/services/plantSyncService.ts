@@ -1,5 +1,5 @@
 import { VendorManager } from "@/lib/vendors/vendorManager"
-import type { VendorConfig } from "@/lib/vendors/types"
+import type { VendorConfig, Plant } from "@/lib/vendors/types"
 import MDC from "@/lib/context/mdc"
 import { logger } from "@/lib/context/logger"
 import { getMainClient } from "@/lib/supabase/pooled"
@@ -422,6 +422,52 @@ async function syncVendorPlants(
     result.error = error.message || "Unknown error"
     return result
   }
+}
+
+/**
+ * Check if a vendor's plant sync should run based on configured morning/evening times.
+ * Plant sync runs only twice a day to fetch new plants.
+ * Uses Asia/Kolkata timezone.
+ */
+function shouldRunPlantSync(vendor: any): boolean {
+  const now = new Date()
+  const kolkataTime = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(now)
+
+  const currentHour = parseInt(kolkataTime.find((part) => part.type === "hour")?.value || "0")
+  const currentMinute = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
+
+  const morningSyncTime = vendor.plant_list_sync_morning_ist || "06:00"
+  const eveningSyncTime = vendor.plant_list_sync_evening_ist || "23:00"
+
+  const [morningHour, morningMin] = morningSyncTime.split(":").map(Number)
+  const [eveningHour, eveningMin] = eveningSyncTime.split(":").map(Number)
+
+  // Allow a small window around the configured time (e.g., +/- 5 minutes)
+  const SYNC_WINDOW_BUFFER_MINUTES = 5
+
+  const isNearMorningSync =
+    currentHour === morningHour &&
+    currentMinute >= morningMin - SYNC_WINDOW_BUFFER_MINUTES &&
+    currentMinute <= morningMin + SYNC_WINDOW_BUFFER_MINUTES
+
+  const isNearEveningSync =
+    currentHour === eveningHour &&
+    currentMinute >= eveningMin - SYNC_WINDOW_BUFFER_MINUTES &&
+    currentMinute <= eveningMin + SYNC_WINDOW_BUFFER_MINUTES
+
+  if (isNearMorningSync) {
+    logger.info(`[PlantSync] Vendor ${vendor.name} is scheduled for morning plant sync at ${morningSyncTime} IST.`)
+  }
+  if (isNearEveningSync) {
+    logger.info(`[PlantSync] Vendor ${vendor.name} is scheduled for evening plant sync at ${eveningSyncTime} IST.`)
+  }
+
+  return isNearMorningSync || isNearEveningSync
 }
 
 /**
