@@ -142,15 +142,15 @@ const vendorCapabilities: VendorCapability[] = [
 const SystemArchitectureDiagram = () => {
   const Arrow = ({ direction = "right", label }: { direction?: "right" | "down" | "up" | "left"; label?: string }) => {
     const arrowClass = {
-      right: "w-12 h-0.5 bg-primary/60 relative after:content-[''] after:absolute after:right-0 after:top-1/2 after:-translate-y-1/2 after:border-l-4 after:border-l-primary/60 after:border-t-2 after:border-t-transparent after:border-b-2 after:border-b-transparent",
-      down: "h-12 w-0.5 bg-primary/60 relative after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:border-t-4 after:border-t-primary/60 after:border-l-2 after:border-l-transparent after:border-r-2 after:border-r-transparent",
-      up: "h-12 w-0.5 bg-primary/60 relative after:content-[''] after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:border-b-4 after:border-b-primary/60 after:border-l-2 after:border-l-transparent after:border-r-2 after:border-r-transparent",
-      left: "w-12 h-0.5 bg-primary/60 relative after:content-[''] after:absolute after:left-0 after:top-1/2 after:-translate-y-1/2 after:border-r-4 after:border-r-primary/60 after:border-t-2 after:border-t-transparent after:border-b-2 after:border-b-transparent"
+      right: "w-8 h-0.5 bg-primary/60 relative after:content-[''] after:absolute after:right-0 after:top-1/2 after:-translate-y-1/2 after:border-l-3 after:border-l-primary/60 after:border-t-1.5 after:border-t-transparent after:border-b-1.5 after:border-b-transparent",
+      down: "h-6 w-0.5 bg-primary/60 relative after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:border-t-3 after:border-t-primary/60 after:border-l-1.5 after:border-l-transparent after:border-r-1.5 after:border-r-transparent",
+      up: "h-6 w-0.5 bg-primary/60 relative after:content-[''] after:absolute after:top-0 after:left-1/2 after:-translate-x-1/2 after:border-b-3 after:border-b-primary/60 after:border-l-1.5 after:border-l-transparent after:border-r-1.5 after:border-r-transparent",
+      left: "w-8 h-0.5 bg-primary/60 relative after:content-[''] after:absolute after:left-0 after:top-1/2 after:-translate-y-1/2 after:border-r-3 after:border-r-primary/60 after:border-t-1.5 after:border-t-transparent after:border-b-1.5 after:border-b-transparent"
     }
     return (
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-0.5">
         <div className={`${arrowClass[direction]}`} />
-        {label && <span className="text-xs text-muted-foreground whitespace-nowrap">{label}</span>}
+        {label && <span className="text-[10px] text-muted-foreground whitespace-nowrap">{label}</span>}
       </div>
     )
   }
@@ -177,12 +177,12 @@ const SystemArchitectureDiagram = () => {
     }
     
     return (
-      <div className={`rounded-lg border-2 p-4 min-h-[140px] ${colorClasses[color]} ${className}`}>
-        <div className="flex items-center gap-2 mb-3 font-semibold text-sm">
-          {icon && <span className="text-lg">{icon}</span>}
+      <div className={`rounded-lg border-2 p-3 ${colorClasses[color]} ${className}`}>
+        <div className="flex items-center gap-1.5 mb-2 font-semibold text-xs">
+          {icon && <span className="text-sm">{icon}</span>}
           <h4>{title}</h4>
         </div>
-        <div className="text-xs text-muted-foreground space-y-1">
+        <div className="text-[10px] text-muted-foreground space-y-0.5 leading-tight">
           {children}
         </div>
       </div>
@@ -190,13 +190,12 @@ const SystemArchitectureDiagram = () => {
   }
 
   return (
-    <div className="w-full overflow-x-auto py-8">
-      <div className="min-w-[1400px] mx-auto space-y-8">
+    <div className="w-full py-4">
+      <div className="mx-auto space-y-3 max-w-7xl">
         {/* Frontend Layer */}
         <div className="flex flex-col items-center">
-          <Node title="Frontend Layer" color="blue" icon="🌐" className="w-96">
-            <div>Next.js Frontend</div>
-            <div>React Components (TypeScript)</div>
+          <Node title="Frontend Layer" color="blue" icon="🌐" className="w-full max-w-md">
+            <div>Next.js Frontend • React Components (TypeScript)</div>
             <div>Pages: Dashboard, Plants, Work Orders, Alerts</div>
           </Node>
         </div>
@@ -206,30 +205,26 @@ const SystemArchitectureDiagram = () => {
         </div>
 
         {/* API Layer */}
-        <div className="grid grid-cols-3 gap-4">
-          <Node title="API Routes" color="purple" icon="⚙️">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Node title="API Routes" color="purple" icon="⚙️" className="min-h-[100px]">
             <div>Next.js API Endpoints</div>
-            <div>/api/vendors, /api/plants</div>
-            <div>/api/workorders, /api/alerts</div>
-            <div>/api/cron/*</div>
+            <div>/api/vendors, /api/plants, /api/workorders, /api/alerts, /api/cron/*</div>
           </Node>
           
-          <Node title="Sync Services" color="purple" icon="🔄">
+          <Node title="Sync Services" color="purple" icon="🔄" className="min-h-[100px]">
             <div>plantSyncService.ts</div>
             <div>liveTelemetrySyncService.ts</div>
             <div>alertSyncService.ts</div>
           </Node>
           
-          <Node title="Vendor Adapters" color="purple" icon="🔌">
+          <Node title="Vendor Adapters" color="purple" icon="🔌" className="min-h-[100px]">
             <div>BaseVendorAdapter</div>
-            <div>Solarman, SolarDM</div>
-            <div>PVBlink, ShineMonitor</div>
-            <div>Foxesscloud</div>
+            <div>Solarman, SolarDM, PVBlink, ShineMonitor, Foxesscloud</div>
           </Node>
         </div>
 
         {/* Connections from API Layer */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="flex flex-col items-center">
             <Arrow direction="down" label="Query/Update" />
           </div>
@@ -242,96 +237,77 @@ const SystemArchitectureDiagram = () => {
         </div>
 
         {/* Database & External Services */}
-        <div className="grid grid-cols-2 gap-6">
-          <Node title="Main Database" color="green" icon="💾">
-            <div className="font-medium mb-2">Supabase PostgreSQL</div>
-            <div className="mt-2 pt-2 border-t border-green-500/30">
-              <div className="font-medium mb-1">Core Tables:</div>
-              <div>accounts, organizations</div>
-              <div>vendors, plants</div>
-              <div>work_orders, alerts</div>
-            </div>
-            <div className="mt-2 pt-2 border-t border-green-500/30">
-              <div className="font-medium mb-1">Live Telemetry:</div>
-              <div>Stored in plants table</div>
-              <div>current_power_kw, daily_energy_kwh</div>
-              <div>monthly_energy_mwh, etc.</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Node title="Main Database" color="green" icon="💾" className="min-h-[100px]">
+            <div className="font-medium mb-1">Supabase PostgreSQL</div>
+            <div className="text-[10px] space-y-0.5">
+              <div><strong>Tables:</strong> accounts, organizations, vendors, plants, work_orders, alerts</div>
+              <div><strong>Live Telemetry:</strong> Stored in plants table (current_power_kw, daily_energy_kwh, monthly_energy_mwh, etc.)</div>
             </div>
           </Node>
 
-          <Node title="External Vendor APIs" color="red" icon="🌍">
-            <div>Solarman API</div>
-            <div>SolarDM API</div>
-            <div>ShineMonitor API</div>
-            <div>PVBlink API</div>
-            <div>Foxesscloud API</div>
-            <div className="mt-2 pt-2 border-t border-red-500/30">
-              <div className="text-xs italic">Returns telemetry & plant data</div>
-            </div>
+          <Node title="External Vendor APIs" color="red" icon="🌍" className="min-h-[100px]">
+            <div>Solarman • SolarDM • ShineMonitor • PVBlink • Foxesscloud</div>
+            <div className="text-[10px] italic mt-1">Returns telemetry & plant data</div>
           </Node>
         </div>
 
         {/* Bidirectional flow indicator */}
-        <div className="flex justify-center items-center gap-4">
-          <Arrow direction="left" label="Returns Data" />
-          <span className="text-xs text-muted-foreground">Bidirectional Data Flow</span>
-          <Arrow direction="right" label="API Calls" />
+        <div className="flex justify-center items-center gap-2 py-1">
+          <Arrow direction="left" label="Returns" />
+          <span className="text-[10px] text-muted-foreground">Bidirectional Flow</span>
+          <Arrow direction="right" label="Calls" />
         </div>
 
         {/* Cron Jobs */}
-        <div className="mt-8 pt-6 border-t border-border/50">
-          <div className="text-center mb-4 text-sm font-semibold text-muted-foreground">Scheduled Jobs (Triggers API Routes)</div>
-          <div className="grid grid-cols-3 gap-4 max-w-5xl mx-auto">
-            <Node title="Plant Sync Cron" color="orange" icon="⏰">
-              <div>Every 15 min</div>
-              <div>Checks morning/evening times</div>
-              <div>Twice daily sync</div>
-              <div className="mt-2 pt-2 border-t border-orange-500/30">
-                <div className="text-xs">→ /api/cron/sync-plants</div>
+        <div className="pt-3 border-t border-border/50">
+          <div className="text-center mb-2 text-xs font-semibold text-muted-foreground">Scheduled Jobs (Triggers API Routes)</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Node title="Plant Sync Cron" color="orange" icon="⏰" className="min-h-[90px]">
+              <div className="text-[10px] space-y-0.5">
+                <div>Every 15 min • Checks morning/evening • Twice daily</div>
+                <div className="pt-1 border-t border-orange-500/30">→ /api/cron/sync-plants</div>
               </div>
             </Node>
             
-            <Node title="Live Telemetry Cron" color="orange" icon="⏰">
-              <div>Every 15 min</div>
-              <div>Filters by interval</div>
-              <div>15/30/45 min sync</div>
-              <div className="mt-2 pt-2 border-t border-orange-500/30">
-                <div className="text-xs">→ /api/cron/sync-live-telemetry</div>
+            <Node title="Live Telemetry Cron" color="orange" icon="⏰" className="min-h-[90px]">
+              <div className="text-[10px] space-y-0.5">
+                <div>Every 15 min • Filters by interval • 15/30/45 min sync</div>
+                <div className="pt-1 border-t border-orange-500/30">→ /api/cron/sync-live-telemetry</div>
               </div>
             </Node>
             
-            <Node title="Alert Sync Cron" color="orange" icon="⏰">
-              <div>Scheduled sync</div>
-              <div>Vendor alerts</div>
-              <div className="mt-2 pt-2 border-t border-orange-500/30">
-                <div className="text-xs">→ /api/cron/sync-alerts</div>
+            <Node title="Alert Sync Cron" color="orange" icon="⏰" className="min-h-[90px]">
+              <div className="text-[10px] space-y-0.5">
+                <div>Scheduled sync • Vendor alerts</div>
+                <div className="pt-1 border-t border-orange-500/30">→ /api/cron/sync-alerts</div>
               </div>
             </Node>
           </div>
         </div>
 
         {/* Legend */}
-        <div className="mt-8 pt-6 border-t border-border">
-          <div className="text-center text-sm font-semibold mb-4 text-muted-foreground">Legend</div>
-          <div className="grid grid-cols-5 gap-4 text-xs">
-            <div className="flex items-center gap-2 justify-center">
-              <div className="w-4 h-4 rounded bg-blue-500/20 border border-blue-500/50"></div>
+        <div className="pt-3 border-t border-border">
+          <div className="text-center text-xs font-semibold mb-2 text-muted-foreground">Legend</div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-[10px]">
+            <div className="flex items-center gap-1.5 justify-center">
+              <div className="w-3 h-3 rounded bg-blue-500/20 border border-blue-500/50"></div>
               <span>Frontend</span>
             </div>
-            <div className="flex items-center gap-2 justify-center">
-              <div className="w-4 h-4 rounded bg-purple-500/20 border border-purple-500/50"></div>
+            <div className="flex items-center gap-1.5 justify-center">
+              <div className="w-3 h-3 rounded bg-purple-500/20 border border-purple-500/50"></div>
               <span>API Layer</span>
             </div>
-            <div className="flex items-center gap-2 justify-center">
-              <div className="w-4 h-4 rounded bg-green-500/20 border border-green-500/50"></div>
+            <div className="flex items-center gap-1.5 justify-center">
+              <div className="w-3 h-3 rounded bg-green-500/20 border border-green-500/50"></div>
               <span>Database</span>
             </div>
-            <div className="flex items-center gap-2 justify-center">
-              <div className="w-4 h-4 rounded bg-red-500/20 border border-red-500/50"></div>
+            <div className="flex items-center gap-1.5 justify-center">
+              <div className="w-3 h-3 rounded bg-red-500/20 border border-red-500/50"></div>
               <span>External APIs</span>
             </div>
-            <div className="flex items-center gap-2 justify-center">
-              <div className="w-4 h-4 rounded bg-orange-500/20 border border-orange-500/50"></div>
+            <div className="flex items-center gap-1.5 justify-center">
+              <div className="w-3 h-3 rounded bg-orange-500/20 border border-orange-500/50"></div>
               <span>Cron Jobs</span>
             </div>
           </div>
