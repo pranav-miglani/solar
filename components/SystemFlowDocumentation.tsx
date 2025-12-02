@@ -603,7 +603,7 @@ export function SystemFlowDocumentation() {
                       <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
                         <li><strong>Storage:</strong> <strong>NOT PERSISTED</strong> - Fetched on-demand from vendor APIs when user requests graph data</li>
                         <li><strong>Update:</strong> Fetched on-demand when user requests graph data via <code className="bg-background px-1 rounded">GET /api/plants/[id]/telemetry</code></li>
-                        <li><strong>API:</strong> <code className="bg-background px-1 rounded">GET /api/plants/[id]/telemetry?year={year}&month={month}&day={day}</code></li>
+                        <li><strong>API:</strong> <code className="bg-background px-1 rounded">GET /api/plants/[id]/telemetry?year=YYYY&month=MM&day=DD</code></li>
                         <li><strong>Resolution:</strong> Vendor-dependent (Solarman: 15-min, ShineMonitor: 5-min, SolarDM: 20-min, PVBlink: varies)</li>
                         <li><strong>Data Source:</strong> Direct vendor API calls (no database storage)</li>
                         <li><strong>Data:</strong> Power generation over time (kW values at each timestamp)</li>
@@ -1358,35 +1358,45 @@ Unique Constraints:
                           </td>
                           <td className="p-3 text-center">
                             {vendor.auth ? (
-                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" title={vendor.authApi} />
+                              <div title={vendor.authApi} className="cursor-help">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              </div>
                             ) : (
                               <XCircle className="h-5 w-5 text-red-500 mx-auto" />
                             )}
                           </td>
                           <td className="p-3 text-center">
                             {vendor.listPlants ? (
-                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" title={vendor.listPlantsApi} />
+                              <div title={vendor.listPlantsApi} className="cursor-help">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              </div>
                             ) : (
                               <XCircle className="h-5 w-5 text-red-500 mx-auto" />
                             )}
                           </td>
                           <td className="p-3 text-center">
                             {vendor.listPlant ? (
-                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" title={vendor.listPlantApi} />
+                              <div title={vendor.listPlantApi} className="cursor-help">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              </div>
                             ) : (
                               <XCircle className="h-5 w-5 text-red-500 mx-auto" />
                             )}
                           </td>
                           <td className="p-3 text-center">
                             {vendor.telemetry ? (
-                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" title={vendor.telemetryApi} />
+                              <div title={vendor.telemetryApi} className="cursor-help">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              </div>
                             ) : (
                               <XCircle className="h-5 w-5 text-red-500 mx-auto" />
                             )}
                           </td>
                           <td className="p-3 text-center">
                             {vendor.alerts ? (
-                              <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" title={vendor.alertsApi} />
+                              <div title={vendor.alertsApi} className="cursor-help">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              </div>
                             ) : (
                               <XCircle className="h-5 w-5 text-red-500 mx-auto" />
                             )}
