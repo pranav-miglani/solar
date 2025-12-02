@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
+import mermaid from "mermaid"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -94,6 +95,82 @@ const vendorCapabilities: VendorCapability[] = [
     notes: "Auth only - plants, telemetry, alerts TODO"
   },
 ]
+
+// Mermaid component for Plant Sync Flow
+const PlantSyncMermaidDiagram = () => {
+  const mermaidRef = useRef<HTMLDivElement>(null)
+  const [svg, setSvg] = useState<string>("")
+
+  useEffect(() => {
+    if (svg) return
+
+    const diagramDefinition = `flowchart TD
+    A["Cron Trigger<br/>Every 15 min"] --> D{"Check Restricted<br/>Window<br/>8 PM - 5 AM IST"}
+    B["Manual Sync<br/>UI Button"] --> D
+    D -->|"Not in window"| E["syncAllPlants()<br/>plantSyncService.ts"]
+    D -->|"In window"| F["Skip Sync"]
+    E --> G["Filter Organizations<br/>auto_sync_enabled = true<br/>Check sync_interval_minutes"]
+    G --> H["For Each Vendor<br/>Get plant_sync_mode<br/>Create adapter"]
+    H --> I{"plant_sync_mode?"}
+    I -->|"LIST_PLANTS"| J["LIST_PLANTS Mode<br/>Authenticate<br/>Call listPlants()<br/>Upsert to DB<br/>Batch size: 100"]
+    I -->|"PER_PLANT"| K["PER_PLANT Mode<br/>Skip listPlants()<br/>Intended for<br/>per-plant cron"]
+    J --> L["Results<br/>Success/Failure counts<br/>Plants synced/created/updated"]
+    K --> L
+
+    style A fill:#3b82f6,stroke:#2563eb,stroke-width:2px,color:#fff
+    style B fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+    style D fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff
+    style E fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff
+    style F fill:#ef4444,stroke:#dc2626,stroke-width:2px,color:#fff
+    style G fill:#ef4444,stroke:#dc2626,stroke-width:2px,color:#fff
+    style H fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+    style I fill:#6366f1,stroke:#4f46e5,stroke-width:2px,color:#fff
+    style J fill:#3b82f6,stroke:#2563eb,stroke-width:2px,color:#fff
+    style K fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+    style L fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff`
+
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      themeVariables: {
+        primaryColor: '#1e293b',
+        primaryTextColor: '#f1f5f9',
+        primaryBorderColor: '#475569',
+        lineColor: '#64748b',
+        secondaryColor: '#334155',
+        tertiaryColor: '#0f172a',
+      },
+      flowchart: {
+        useMaxWidth: true,
+        htmlLabels: true,
+        curve: 'basis',
+      },
+    })
+
+    const id = `plant-sync-diagram-${Date.now()}`
+    
+    mermaid.render(id, diagramDefinition).then((result) => {
+      setSvg(result.svg)
+    }).catch((error) => {
+      console.error('Error rendering Mermaid diagram:', error)
+    })
+  }, [svg])
+
+  if (svg) {
+    return (
+      <div 
+        className="flex justify-center items-center min-h-[500px] overflow-x-auto w-full" 
+        dangerouslySetInnerHTML={{ __html: svg }} 
+      />
+    )
+  }
+
+  return (
+    <div ref={mermaidRef} className="flex justify-center items-center min-h-[500px] overflow-x-auto w-full">
+      <div className="text-muted-foreground">Loading diagram...</div>
+    </div>
+  )
+}
 
 export function SystemFlowDocumentation() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
@@ -562,80 +639,10 @@ export function SystemFlowDocumentation() {
             <FlowSectionHeader flowId="flow-plant-sync" flowTitle="Plant Sync Flow" icon={RefreshCw} />
             {expandedSections.has("flow-plant-sync") && (
               <div className="p-6 pt-0 space-y-6 border-t">
-              <div className="p-6 pt-0 space-y-6 border-t">
                 {/* Flow Diagram */}
                 <div className="bg-muted/50 p-6 rounded-lg">
                   <h3 className="font-semibold text-lg mb-4">Plant Sync Flow Diagram</h3>
-                  <svg viewBox="0 0 1000 700" className="w-full h-auto">
-                    {/* Entry Points */}
-                    <rect x="50" y="50" width="150" height="60" rx="8" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" strokeWidth="2"/>
-                    <text x="125" y="80" textAnchor="middle" className="text-xs font-semibold fill-foreground">Cron Trigger</text>
-                    <text x="125" y="95" textAnchor="middle" className="text-xs fill-muted-foreground">(Every 15 min)</text>
-                    
-                    <rect x="250" y="50" width="150" height="60" rx="8" fill="#8b5cf6" opacity="0.2" stroke="#8b5cf6" strokeWidth="2"/>
-                    <text x="325" y="80" textAnchor="middle" className="text-xs font-semibold fill-foreground">Manual Sync</text>
-                    <text x="325" y="95" textAnchor="middle" className="text-xs fill-muted-foreground">(UI Button)</text>
-                    
-                    {/* Check Restricted Window */}
-                    <rect x="450" y="50" width="200" height="60" rx="8" fill="#f59e0b" opacity="0.2" stroke="#f59e0b" strokeWidth="2"/>
-                    <text x="550" y="80" textAnchor="middle" className="text-xs font-semibold fill-foreground">Check Restricted Window</text>
-                    <text x="550" y="95" textAnchor="middle" className="text-xs fill-muted-foreground">(8 PM - 5 AM IST)</text>
-                    
-                    {/* syncAllPlants */}
-                    <rect x="700" y="50" width="200" height="60" rx="8" fill="#10b981" opacity="0.2" stroke="#10b981" strokeWidth="2"/>
-                    <text x="800" y="80" textAnchor="middle" className="text-xs font-semibold fill-foreground">syncAllPlants()</text>
-                    <text x="800" y="95" textAnchor="middle" className="text-xs fill-muted-foreground">plantSyncService.ts</text>
-                    
-                    {/* Filter Orgs */}
-                    <rect x="50" y="200" width="250" height="80" rx="8" fill="#ef4444" opacity="0.2" stroke="#ef4444" strokeWidth="2"/>
-                    <text x="175" y="225" textAnchor="middle" className="text-xs font-semibold fill-foreground">Filter Organizations</text>
-                    <text x="175" y="245" textAnchor="middle" className="text-xs fill-muted-foreground">auto_sync_enabled = true</text>
-                    <text x="175" y="260" textAnchor="middle" className="text-xs fill-muted-foreground">Check sync_interval_minutes</text>
-                    
-                    {/* For Each Vendor */}
-                    <rect x="350" y="200" width="250" height="80" rx="8" fill="#8b5cf6" opacity="0.2" stroke="#8b5cf6" strokeWidth="2"/>
-                    <text x="475" y="225" textAnchor="middle" className="text-xs font-semibold fill-foreground">For Each Vendor</text>
-                    <text x="475" y="245" textAnchor="middle" className="text-xs fill-muted-foreground">Get plant_sync_mode</text>
-                    <text x="475" y="260" textAnchor="middle" className="text-xs fill-muted-foreground">Create adapter</text>
-                    
-                    {/* LIST_PLANTS Branch */}
-                    <rect x="50" y="350" width="250" height="100" rx="8" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" strokeWidth="2"/>
-                    <text x="175" y="375" textAnchor="middle" className="text-xs font-semibold fill-foreground">LIST_PLANTS Mode</text>
-                    <text x="175" y="395" textAnchor="middle" className="text-xs fill-muted-foreground">Authenticate</text>
-                    <text x="175" y="410" textAnchor="middle" className="text-xs fill-muted-foreground">Call listPlants()</text>
-                    <text x="175" y="425" textAnchor="middle" className="text-xs fill-muted-foreground">Upsert to DB</text>
-                    <text x="175" y="440" textAnchor="middle" className="text-xs fill-muted-foreground">(Batch size: 100)</text>
-                    
-                    {/* PER_PLANT Branch */}
-                    <rect x="350" y="350" width="250" height="100" rx="8" fill="#8b5cf6" opacity="0.2" stroke="#8b5cf6" strokeWidth="2"/>
-                    <text x="475" y="375" textAnchor="middle" className="text-xs font-semibold fill-foreground">PER_PLANT Mode</text>
-                    <text x="475" y="395" textAnchor="middle" className="text-xs fill-muted-foreground">Skip listPlants()</text>
-                    <text x="475" y="410" textAnchor="middle" className="text-xs fill-muted-foreground">(Intended for</text>
-                    <text x="475" y="425" textAnchor="middle" className="text-xs fill-muted-foreground">per-plant cron)</text>
-                    
-                    {/* Results */}
-                    <rect x="650" y="350" width="250" height="100" rx="8" fill="#10b981" opacity="0.2" stroke="#10b981" strokeWidth="2"/>
-                    <text x="775" y="375" textAnchor="middle" className="text-xs font-semibold fill-foreground">Results</text>
-                    <text x="775" y="395" textAnchor="middle" className="text-xs fill-muted-foreground">Success/Failure counts</text>
-                    <text x="775" y="410" textAnchor="middle" className="text-xs fill-muted-foreground">Plants synced/created/updated</text>
-                    
-                    {/* Arrows */}
-                    <path d="M 200 110 L 450 80" stroke="#3b82f6" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 400 110 L 450 80" stroke="#8b5cf6" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 650 80 L 700 80" stroke="#f59e0b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 900 80 L 800 200" stroke="#10b981" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 800 240 L 475 240" stroke="#10b981" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 300 280 L 175 350" stroke="#ef4444" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 600 280 L 475 350" stroke="#8b5cf6" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 300 400 L 650 400" stroke="#3b82f6" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    <path d="M 600 400 L 650 400" stroke="#8b5cf6" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                    
-                    <defs>
-                      <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-                        <polygon points="0 0, 10 3, 0 6" fill="#currentColor"/>
-                      </marker>
-                    </defs>
-                  </svg>
+                  <PlantSyncMermaidDiagram />
                 </div>
 
                 <div className="space-y-4">
