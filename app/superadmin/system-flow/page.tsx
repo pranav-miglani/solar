@@ -20,10 +20,10 @@ export default async function SystemFlowPage() {
     redirect("/auth/login")
   }
 
-  const accountType = sessionData.accountType as "SUPERADMIN" | "ORG" | "GOVT"
+  const accountType = sessionData.accountType as "SUPERADMIN" | "ORG" | "GOVT" | "DEVELOPER"
 
-  // Only SUPERADMIN can access system flow documentation
-  if (accountType !== "SUPERADMIN") {
+  // Only DEVELOPER can access system flow documentation (SUPERADMIN cannot)
+  if (accountType !== "DEVELOPER") {
     redirect("/dashboard")
   }
 

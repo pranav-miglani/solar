@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       widgets: {},
     }
 
-    if (accountType === "SUPERADMIN") {
+    if (accountType === "SUPERADMIN" || accountType === "DEVELOPER") {
       // For SUPERADMIN, compute counts for:
       // - Plants
       // - Active alerts only (status = 'ACTIVE')

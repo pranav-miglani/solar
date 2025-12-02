@@ -61,7 +61,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
             logoUrl: data.superAdmin.logoUrl || null,
             displayName: data.superAdmin.displayName || null,
           }
-        : data.account.accountType === "SUPERADMIN"
+        : data.account.accountType === "SUPERADMIN" || data.account.accountType === "DEVELOPER"
         ? {
             logoUrl: data.account.logoUrl || null,
             displayName: data.account.displayName || null,

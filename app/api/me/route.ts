@@ -80,10 +80,10 @@ export async function GET(request: NextRequest) {
       }
 
       // Get SUPERADMIN account for footer
-      // If current user is SUPERADMIN, use their own info; otherwise get first SUPERADMIN
+      // If current user is SUPERADMIN or DEVELOPER, use their own info; otherwise get first SUPERADMIN
       let superAdminLogoUrl = null
       let superAdminDisplayName = null
-      if (account.account_type === "SUPERADMIN") {
+      if (account.account_type === "SUPERADMIN" || account.account_type === "DEVELOPER") {
         // Use current user's info for footer
         superAdminLogoUrl = account.logo_url || null
         superAdminDisplayName = account.display_name || null

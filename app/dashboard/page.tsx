@@ -170,7 +170,7 @@ export default function DashboardPage() {
             </h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">
               Welcome back, <span className="font-semibold text-foreground">
-                {displayName || (role === "SUPERADMIN" ? "Super Admin" : role === "GOVT" ? "Government Agency" : "Organization")}
+                {displayName || (role === "SUPERADMIN" ? "Super Admin" : role === "DEVELOPER" ? "Developer" : role === "GOVT" ? "Government Agency" : "Organization")}
               </span>
             </p>
           </div>

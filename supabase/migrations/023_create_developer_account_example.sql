@@ -7,7 +7,7 @@
 -- This migration updates the constraint to allow DEVELOPER accounts with org_id = NULL.
 --
 -- Credentials:
---   Email/Username: pranav
+--   Email/Username: pranav@woms.com
 --   Password: paytm@123
 --   Password Hash: $2b$10$6qsTDVyhwUkCdmnughOr7eoGlRGbYppgCsmDKg0LjNevXb2ETbfXG
 --
@@ -16,7 +16,7 @@
 --   2. Then run this script in Supabase SQL Editor
 --
 -- Alternative: Use the TypeScript script instead:
---   npm run create:developer pranav paytm@123
+--   npm run create:developer pranav@woms.com paytm@123
 --
 -- ============================================
 
@@ -33,7 +33,7 @@ BEGIN
 END $$;
 
 -- Delete existing account if it exists (makes script idempotent)
-DELETE FROM accounts WHERE email = 'pranav';
+DELETE FROM accounts WHERE email = 'pranav@woms.com';
 
 -- Insert DEVELOPER account for pranav
 INSERT INTO accounts (
@@ -44,7 +44,7 @@ INSERT INTO accounts (
   is_active
 ) VALUES (
   'DEVELOPER',
-  'pranav',
+  'pranav@woms.com',
   '$2b$10$6qsTDVyhwUkCdmnughOr7eoGlRGbYppgCsmDKg0LjNevXb2ETbfXG',  -- bcrypt hash of 'paytm@123'
   NULL,  -- DEVELOPER accounts don't belong to any organization
   true
@@ -59,7 +59,7 @@ SELECT
   is_active,
   created_at
 FROM accounts
-WHERE email = 'pranav';
+WHERE email = 'pranav@woms.com';
 
 -- ============================================
 -- NOTES:
@@ -68,7 +68,7 @@ WHERE email = 'pranav';
 -- 2. DEVELOPER accounts can access documentation at /superadmin/system-flow
 -- 3. SUPERADMIN accounts CANNOT access documentation
 -- 4. Login credentials:
---    Email/Username: pranav
+--    Email/Username: pranav@woms.com
 --    Password: paytm@123
 -- 5. Keep credentials secure!
 -- ============================================

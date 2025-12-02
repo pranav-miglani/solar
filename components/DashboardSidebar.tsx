@@ -44,31 +44,31 @@ export function DashboardSidebar() {
       title: "Dashboard",
       href: "/dashboard",
       icon: LayoutDashboard,
-      roles: ["SUPERADMIN", "ORG", "GOVT"],
+      roles: ["SUPERADMIN", "DEVELOPER", "ORG", "GOVT"],
     },
     {
       title: "Organizations",
       href: "/orgs",
       icon: Building2,
-      roles: ["SUPERADMIN", "GOVT"],
+      roles: ["SUPERADMIN", "DEVELOPER", "GOVT"],
     },
     {
       title: "Vendors",
       href: "/superadmin/vendors",
       icon: Factory,
-      roles: ["SUPERADMIN"],
+      roles: ["SUPERADMIN", "DEVELOPER"],
     },
     {
       title: "Vendor Sync",
       href: "/superadmin/vendor-sync",
       icon: RefreshCw,
-      roles: ["SUPERADMIN"],
+      roles: ["SUPERADMIN", "DEVELOPER"],
     },
     {
       title: "Disabled Plants",
       href: "/superadmin/disabled-plants",
       icon: AlertTriangle,
-      roles: ["SUPERADMIN"],
+      roles: ["SUPERADMIN", "DEVELOPER"],
     },
     {
       title: "System Flow",
@@ -80,13 +80,13 @@ export function DashboardSidebar() {
       title: "Work Orders",
       href: "/workorders",
       icon: FileText,
-      roles: ["SUPERADMIN", "ORG", "GOVT"],
+      roles: ["SUPERADMIN", "DEVELOPER", "ORG", "GOVT"],
     },
     {
       title: "Alerts",
       href: "/alerts",
       icon: AlertTriangle,
-      roles: ["SUPERADMIN", "ORG", "GOVT"],
+      roles: ["SUPERADMIN", "DEVELOPER", "ORG", "GOVT"],
     },
   ]
 
