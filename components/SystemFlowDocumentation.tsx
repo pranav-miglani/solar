@@ -2655,7 +2655,61 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                     </div>
 
                     <div>
-                      <h4 className="font-semibold mb-2">3. Daily Telemetry</h4>
+                      <h4 className="font-semibold mb-2">3. List Single Plant (listPlant)</h4>
+                      <div className="bg-background p-3 rounded text-sm space-y-2">
+                        <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">POST {process.env.SOLARMAN_PRO_API_BASE_URL || "https://globalpro.solarmanpv.com"}/maintain-s/operating/station/v2/search</code></div>
+                        <div><strong>Purpose:</strong> Fetch a single plant by vendor plant ID. Used for live telemetry enrichment during plant sync or in PER_PLANT telemetry sync mode.</div>
+                        <div><strong>Request Body:</strong></div>
+                        <CodeBlock 
+                          id="solarman-listplant-request"
+                          code={`{
+  "station": {
+    "id": number (stationId),
+    "powerTypeList": ["PV"]
+  }
+}`}
+                        />
+                        <div><strong>Response Structure:</strong></div>
+                        <CodeBlock 
+                          id="solarman-listplant-response"
+                          code={`{
+  "data": [
+    {
+      "station": {
+        "id": number,
+        "name": string,
+        "installedCapacity": number (kW),
+        "generationPower": number (W),
+        "generationValue": number (kWh - daily),
+        "generationMonth": number (kWh - monthly),
+        "generationYear": number (kWh - yearly),
+        "generationUploadTotalOffset": number (kWh - total),
+        "lastUpdateTime": number (Unix seconds),
+        "networkStatus": string,
+        "locationLat": number,
+        "locationLng": number,
+        "locationAddress": string
+      }
+    }
+  ]
+}`}
+                        />
+                        <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                          <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Implementation Details</h5>
+                          <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 ml-4 list-disc">
+                            <li>Uses PRO API endpoint with station ID filter in request body</li>
+                            <li>Falls back to base endpoint if PRO API fails</li>
+                            <li>Returns same structure as listPlants() but filtered to single plant</li>
+                            <li>Used during plant sync for optional live telemetry enrichment (ENABLE_PER_PLANT_LIVE_TELEMETRY env var)</li>
+                            <li>Used in PER_PLANT telemetry sync mode for live telemetry updates</li>
+                          </ul>
+                        </div>
+                        <div><strong>Database Mapping:</strong> Same as listPlants() - see section 2 above. All fields map identically.</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">4. Daily Telemetry</h4>
                       <div className="bg-background p-3 rounded text-sm space-y-2">
                         <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">GET {process.env.SOLARMAN_PRO_API_BASE_URL || "https://globalpro.solarmanpv.com"}/maintain-s/history/power/{`{systemId}`}/record?year={`{year}`}&month={`{month}`}&day={`{day}`}</code></div>
                         <div><strong>Response:</strong></div>
@@ -2686,7 +2740,7 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                     </div>
 
                     <div>
-                      <h4 className="font-semibold mb-2">4. Alerts</h4>
+                      <h4 className="font-semibold mb-2">5. Alerts</h4>
                       <div className="bg-background p-3 rounded text-sm space-y-2">
                         <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">POST {process.env.SOLARMAN_PRO_API_BASE_URL || "https://globalpro.solarmanpv.com"}/maintain-s/operating/station/alert?order.direction=ASC&order.property=alertTime&size=100&page={`{page}`}</code></div>
                         <div><strong>Request Body:</strong></div>
@@ -2896,7 +2950,27 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                     </div>
 
                     <div>
-                      <h4 className="font-semibold mb-2">3. Daily Telemetry</h4>
+                      <h4 className="font-semibold mb-2">3. List Single Plant (listPlant)</h4>
+                      <div className="bg-background p-3 rounded text-sm space-y-2">
+                        <div><strong>Implementation:</strong> Client-side filtering from <code className="bg-muted px-1 rounded">listPlants()</code></div>
+                        <div><strong>Purpose:</strong> Fetch a single plant by vendor plant ID. Used for live telemetry enrichment during plant sync or in PER_PLANT telemetry sync mode.</div>
+                        <div className="bg-purple-50 dark:bg-purple-950/20 p-3 rounded-lg border border-purple-200 dark:border-purple-900 mb-3">
+                          <h5 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">📋 Implementation Details</h5>
+                          <ul className="text-xs text-purple-800 dark:text-purple-200 space-y-1 ml-4 list-disc">
+                            <li>Calls <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">GET /dms/plant/list_all</code> (same as listPlants())</li>
+                            <li>Filters the response client-side by matching <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">vendorPlantId</code></li>
+                            <li>Returns the matching plant or null if not found</li>
+                            <li><strong>Note:</strong> SolarDM&apos;s listPlants() doesn&apos;t provide live telemetry fields (current_power_kw, daily_energy_kwh, etc.)</li>
+                            <li>Live telemetry must be fetched separately via telemetry APIs during live telemetry sync</li>
+                            <li>Used in PER_PLANT telemetry sync mode for live telemetry updates</li>
+                          </ul>
+                        </div>
+                        <div><strong>Database Mapping:</strong> Same as listPlants() - see section 2 above. Only provides basic plant info (id, name, capacity, location, network_status).</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">4. Daily Telemetry</h4>
                       <div className="bg-background p-3 rounded text-sm space-y-2">
                         <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">GET {process.env.SOLARDM_API_BASE_URL || "http://global.solar-dm.com:8010"}/dms/data_panel/history/stats/daily/{`{plantId}`}?plantId={`{plantId}`}&type=date&time=YYYY-MM-DD</code></div>
                         <div><strong>Response:</strong></div>
@@ -3033,7 +3107,27 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                     </div>
 
                     <div>
-                      <h4 className="font-semibold mb-2">3. Daily Telemetry</h4>
+                      <h4 className="font-semibold mb-2">3. List Single Plant (listPlant)</h4>
+                      <div className="bg-background p-3 rounded text-sm space-y-2">
+                        <div><strong>Implementation:</strong> Client-side filtering from <code className="bg-muted px-1 rounded">listPlants()</code></div>
+                        <div><strong>Purpose:</strong> Fetch a single plant by vendor plant ID. Used for live telemetry enrichment during plant sync or in PER_PLANT telemetry sync mode.</div>
+                        <div className="bg-purple-50 dark:bg-purple-950/20 p-3 rounded-lg border border-purple-200 dark:border-purple-900 mb-3">
+                          <h5 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">📋 Implementation Details</h5>
+                          <ul className="text-xs text-purple-800 dark:text-purple-200 space-y-1 ml-4 list-disc">
+                            <li>Calls <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">GET /api/pvblink/plant/s/all</code> (same as listPlants(), paginated)</li>
+                            <li>Filters the response client-side by matching <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">vendorPlantId</code></li>
+                            <li>Returns the matching plant or null if not found</li>
+                            <li><strong>Note:</strong> PVBlink&apos;s listPlants() doesn&apos;t provide live telemetry fields (current_power_kw, daily_energy_kwh, etc.)</li>
+                            <li>Live telemetry must be fetched separately via telemetry APIs during live telemetry sync</li>
+                            <li>Used in PER_PLANT telemetry sync mode for live telemetry updates</li>
+                          </ul>
+                        </div>
+                        <div><strong>Database Mapping:</strong> Same as listPlants() - see section 2 above. Only provides basic plant info (id, name, capacity, network_status).</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">4. Daily Telemetry</h4>
                       <div className="bg-background p-3 rounded text-sm space-y-2">
                         <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">GET {process.env.PVBLINK_API_BASE_URL || "https://cloud.pvblink.com"}/api/pvblink/plant/s/production/detail/{`{vendorPlantId}`}/day?year={`{year}`}&month={`{month}`}&day={`{day}`}</code></div>
                         <div><strong>Response:</strong></div>
@@ -3255,7 +3349,27 @@ Example: &action=webQueryPlants&orderBy=ascPlantId&page=0&pagesize=100`}
                     </div>
 
                     <div>
-                      <h4 className="font-semibold mb-2">3. Daily Telemetry</h4>
+                      <h4 className="font-semibold mb-2">3. List Single Plant (listPlant)</h4>
+                      <div className="bg-background p-3 rounded text-sm space-y-2">
+                        <div><strong>Implementation:</strong> Client-side filtering from <code className="bg-muted px-1 rounded">listPlants()</code></div>
+                        <div><strong>Purpose:</strong> Fetch a single plant by vendor plant ID. Used for live telemetry enrichment during plant sync or in PER_PLANT telemetry sync mode.</div>
+                        <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                          <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Implementation Details</h5>
+                          <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 ml-4 list-disc">
+                            <li>Calls <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">GET /?action=webQueryPlants</code> (same as listPlants(), paginated)</li>
+                            <li>Filters the response client-side by matching <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">vendorPlantId</code> (pid field)</li>
+                            <li>Returns the matching plant or null if not found</li>
+                            <li><strong>Note:</strong> ShineMonitor&apos;s listPlants() already provides live telemetry fields in metadata (outputPower, energy, energyMonth, energyYear, energyTotal, status)</li>
+                            <li>Live telemetry is available directly from listPlants() response, so listPlant() is primarily used for optional enrichment during plant sync</li>
+                            <li>Used during plant sync for optional live telemetry enrichment (ENABLE_PER_PLANT_LIVE_TELEMETRY env var)</li>
+                          </ul>
+                        </div>
+                        <div><strong>Database Mapping:</strong> Same as listPlants() - see section 2 above. All live telemetry fields are available (current_power_kw, daily_energy_kwh, monthly_energy_mwh, yearly_energy_mwh, total_energy_mwh, network_status).</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">4. Daily Telemetry</h4>
                       <div className="bg-background p-3 rounded text-sm space-y-2">
                         <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">GET {process.env.SHINEMONITOR_API_BASE_URL || "https://web.shinemonitor.com/public"}/?sign={`{sign}`}&salt={`{salt}`}&token={`{token}`}&action=queryPlantActiveOuputPowerOneDay&plantid={`{vendorPlantId}`}&date=YYYY-MM-DD</code></div>
                         <div><strong>Response:</strong></div>
@@ -3433,7 +3547,7 @@ User-Agent: Mozilla/5.0...`}
                     </div>
 
                     <div>
-                      <h4 className="font-semibold mb-2">4. Alerts & Realtime</h4>
+                      <h4 className="font-semibold mb-2">5. Alerts & Realtime</h4>
                       <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-900">
                         <p className="text-sm text-yellow-800 dark:text-yellow-200">
                           <strong>⚠️ Not Yet Implemented:</strong> Alerts and realtime data endpoints are not yet implemented for Foxesscloud.
