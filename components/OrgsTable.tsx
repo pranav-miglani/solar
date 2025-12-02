@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import Link from "next/link"
-import { ExternalLink, Building2, Plus, User, Mail, Trash2, FileText } from "lucide-react"
+import { ExternalLink, Building2, Plus, User, Mail, Trash2, FileText, Download, Upload, Loader2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -92,6 +92,11 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
   const [savingLogoUrl, setSavingLogoUrl] = useState(false)
   const [savingIsActive, setSavingIsActive] = useState(false)
   const [deletingGovtAccountId, setDeletingGovtAccountId] = useState<string | null>(null)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importResult, setImportResult] = useState<any>(null)
+  const [selectedOrgForExport, setSelectedOrgForExport] = useState<number | null>(null)
 
   useEffect(() => {
     fetchOrgs()
@@ -293,6 +298,71 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
       alert("Failed to update password")
     } finally {
       setSavingPassword(false)
+    }
+  }
+
+  async function handleExportAccounts(orgId?: number) {
+    if (!isSuperAdmin) return
+    try {
+      const url = orgId ? `/api/accounts/export?orgId=${orgId}` : `/api/accounts/export`
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        const error = await response.json()
+        alert(error.error || "Failed to export accounts")
+        return
+      }
+
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = downloadUrl
+      link.download = `accounts_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+    } catch (error) {
+      console.error("Error exporting accounts:", error)
+      alert("Failed to export accounts")
+    }
+  }
+
+  async function handleImportAccounts() {
+    if (!isSuperAdmin || !importFile) return
+    
+    setImportLoading(true)
+    setImportResult(null)
+    
+    try {
+      const formData = new FormData()
+      formData.append("file", importFile)
+
+      const response = await fetch("/api/accounts/import", {
+        method: "POST",
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || "Failed to import accounts")
+        setImportLoading(false)
+        return
+      }
+
+      setImportResult(data)
+      setImportLoading(false)
+      
+      // Refresh the list if any were processed
+      if (data.summary.totalCreated > 0) {
+        fetchAccounts()
+        fetchOrgs()
+      }
+    } catch (error) {
+      console.error("Error importing accounts:", error)
+      alert("Failed to import accounts")
+      setImportLoading(false)
     }
   }
 
@@ -572,6 +642,120 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
               </form>
             </DialogContent>
           </Dialog>
+        )}
+        {isSuperAdmin && (
+          <>
+            <motion.div 
+              whileHover={{ scale: 1.05 }} 
+              whileTap={{ scale: 0.95 }}
+              className="w-full sm:w-auto"
+            >
+              <Button 
+                onClick={() => handleExportAccounts()}
+                size="lg"
+                variant="outline"
+                className="w-full sm:w-auto transition-all duration-200"
+              >
+                <Download className="h-5 w-5 mr-2" />
+                Export Accounts Excel
+              </Button>
+            </motion.div>
+            <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+              <DialogTrigger asChild>
+                <motion.div 
+                  whileHover={{ scale: 1.05 }} 
+                  whileTap={{ scale: 0.95 }}
+                  className="w-full sm:w-auto"
+                >
+                  <Button 
+                    size="lg"
+                    variant="outline"
+                    className="w-full sm:w-auto transition-all duration-200"
+                  >
+                    <Upload className="h-5 w-5 mr-2" />
+                    Import Accounts Excel
+                  </Button>
+                </motion.div>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Import Accounts from Excel</DialogTitle>
+                  <DialogDescription>
+                    Upload an Excel file to bulk import accounts. Required columns: Email, Password, Account Type.
+                    <br />
+                    <br />
+                    <strong>Important:</strong>
+                    <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                      <li>Only creates new accounts - does not update existing ones</li>
+                      <li>Email must be unique</li>
+                      <li>For ORG accounts, Organization ID is required and must exist</li>
+                      <li>For SUPERADMIN and GOVT accounts, Organization ID must be empty</li>
+                      <li>DEVELOPER accounts cannot be created via import</li>
+                      <li>Each organization can only have one ORG account</li>
+                    </ul>
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div>
+                    <Label htmlFor="import-accounts-file">Select Excel File</Label>
+                    <Input
+                      id="import-accounts-file"
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                      className="mt-1"
+                    />
+                  </div>
+                  {importResult && (
+                    <div className="bg-muted p-4 rounded-lg space-y-2">
+                      <h4 className="font-semibold">Import Results:</h4>
+                      <p>Total Processed: {importResult.summary.totalProcessed}</p>
+                      <p className="text-green-600">Successfully Created: {importResult.summary.totalCreated}</p>
+                      <p className="text-red-600">Errors: {importResult.summary.totalErrors}</p>
+                      {importResult.results && importResult.results.length > 0 && (
+                        <div className="mt-2 max-h-40 overflow-y-auto">
+                          <p className="font-semibold text-sm">Details:</p>
+                          {importResult.results.slice(0, 10).map((result: any, idx: number) => (
+                            <p key={idx} className={`text-xs ${result.success ? 'text-green-600' : 'text-red-600'}`}>
+                              Row {result.rowNumber}: {result.success ? `Created (ID: ${result.accountId})` : result.error}
+                            </p>
+                          ))}
+                          {importResult.results.length > 10 && (
+                            <p className="text-xs text-muted-foreground">... and {importResult.results.length - 10} more</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setImportDialogOpen(false)
+                      setImportFile(null)
+                      setImportResult(null)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleImportAccounts}
+                    disabled={!importFile || importLoading}
+                  >
+                    {importLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Importing...
+                      </>
+                    ) : (
+                      "Import"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
         )}
       </div>
 

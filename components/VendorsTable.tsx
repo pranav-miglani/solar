@@ -16,6 +16,8 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -42,7 +44,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Switch } from "@/components/ui/switch"
-import { Loader2, Factory, Plus, Pencil, Trash2, RefreshCw, Building2, CheckCircle2, XCircle, Settings, Clock, Zap, AlertCircle } from "lucide-react"
+import { Loader2, Factory, Plus, Pencil, Trash2, RefreshCw, Building2, CheckCircle2, XCircle, Settings, Clock, Zap, AlertCircle, Download, Upload } from "lucide-react"
 import type { AccountType } from "@/lib/rbac"
 
 interface Organization {
@@ -103,6 +105,10 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
   const [syncSettingsDialogOpen, setSyncSettingsDialogOpen] = useState(false)
   const [selectedOrgForSync, setSelectedOrgForSync] = useState<{ id: number, name: string } | null>(null)
   const [selectedVendorForSyncId, setSelectedVendorForSyncId] = useState<number | null>(null)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importResult, setImportResult] = useState<any>(null)
   const [syncSettings, setSyncSettings] = useState<{
     enabled: boolean
     interval: number
@@ -525,22 +531,88 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     )
   }
 
+  const isSuperAdmin = accountType === "SUPERADMIN" || accountType === "DEVELOPER"
+
+  async function handleExport() {
+    if (!isSuperAdmin) return
+    try {
+      const response = await fetch("/api/vendors/export")
+      
+      if (!response.ok) {
+        const error = await response.json()
+        alert(error.error || "Failed to export vendors")
+        return
+      }
+
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = downloadUrl
+      link.download = `vendors_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+    } catch (error) {
+      console.error("Error exporting vendors:", error)
+      alert("Failed to export vendors")
+    }
+  }
+
+  async function handleImport() {
+    if (!isSuperAdmin || !importFile) return
+    
+    setImportLoading(true)
+    setImportResult(null)
+    
+    try {
+      const formData = new FormData()
+      formData.append("file", importFile)
+
+      const response = await fetch("/api/vendors/import", {
+        method: "POST",
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || "Failed to import vendors")
+        setImportLoading(false)
+        return
+      }
+
+      setImportResult(data)
+      setImportLoading(false)
+      
+      // Refresh the list if any were processed
+      if (data.summary.totalCreated > 0) {
+        fetchVendors()
+      }
+    } catch (error) {
+      console.error("Error importing vendors:", error)
+      alert("Failed to import vendors")
+      setImportLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border">
-        {!isReadOnlyGovt && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button
-                  onClick={() => openDialog()}
-                  className="w-full sm:w-auto transition-all duration-200 hover:scale-105 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg hover:shadow-xl"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Vendor
-                </Button>
-              </motion.div>
-            </DialogTrigger>
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          {!isReadOnlyGovt && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button
+                    onClick={() => openDialog()}
+                    className="w-full sm:w-auto transition-all duration-200 hover:scale-105 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg hover:shadow-xl"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Vendor
+                  </Button>
+                </motion.div>
+              </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
@@ -1008,7 +1080,120 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
               </form>
             </DialogContent>
           </Dialog>
-        )}
+          )}
+          {isSuperAdmin && (
+            <>
+              <motion.div 
+                whileHover={{ scale: 1.05 }} 
+                whileTap={{ scale: 0.95 }}
+                className="w-full sm:w-auto"
+              >
+                <Button 
+                  onClick={handleExport}
+                  size="lg"
+                  variant="outline"
+                  className="w-full sm:w-auto transition-all duration-200"
+                >
+                  <Download className="h-5 w-5 mr-2" />
+                  Export Excel
+                </Button>
+              </motion.div>
+              <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+                <DialogTrigger asChild>
+                  <motion.div 
+                    whileHover={{ scale: 1.05 }} 
+                    whileTap={{ scale: 0.95 }}
+                    className="w-full sm:w-auto"
+                  >
+                    <Button 
+                      size="lg"
+                      variant="outline"
+                      className="w-full sm:w-auto transition-all duration-200"
+                    >
+                      <Upload className="h-5 w-5 mr-2" />
+                      Import Excel
+                    </Button>
+                  </motion.div>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Import Vendors from Excel</DialogTitle>
+                    <DialogDescription>
+                      Upload an Excel file to bulk import vendors. Required columns: Name, Vendor Type, Organization ID, Credentials (JSON).
+                      <br />
+                      <br />
+                      <strong>Important:</strong>
+                      <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                        <li>Only creates new vendors - does not update existing ones</li>
+                        <li>Credentials must be valid JSON format</li>
+                        <li>Vendor name + Organization ID combination must be unique</li>
+                        <li>Organization ID must exist in the system</li>
+                      </ul>
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div>
+                      <Label htmlFor="import-file">Select Excel File</Label>
+                      <Input
+                        id="import-file"
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                        className="mt-1"
+                      />
+                    </div>
+                    {importResult && (
+                      <div className="bg-muted p-4 rounded-lg space-y-2">
+                        <h4 className="font-semibold">Import Results:</h4>
+                        <p>Total Processed: {importResult.summary.totalProcessed}</p>
+                        <p className="text-green-600">Successfully Created: {importResult.summary.totalCreated}</p>
+                        <p className="text-red-600">Errors: {importResult.summary.totalErrors}</p>
+                        {importResult.results && importResult.results.length > 0 && (
+                          <div className="mt-2 max-h-40 overflow-y-auto">
+                            <p className="font-semibold text-sm">Details:</p>
+                            {importResult.results.slice(0, 10).map((result: any, idx: number) => (
+                              <p key={idx} className={`text-xs ${result.success ? 'text-green-600' : 'text-red-600'}`}>
+                                Row {result.rowNumber}: {result.success ? `Created (ID: ${result.vendorId})` : result.error}
+                              </p>
+                            ))}
+                            {importResult.results.length > 10 && (
+                              <p className="text-xs text-muted-foreground">... and {importResult.results.length - 10} more</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setImportDialogOpen(false)
+                        setImportFile(null)
+                        setImportResult(null)
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleImport}
+                      disabled={!importFile || importLoading}
+                    >
+                      {importLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        "Import"
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Desktop Table View */}
