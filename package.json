@@ -3,19 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "node server.js",
-    "dev:next": "next dev",
-    "dev:debug": "NODE_OPTIONS='--inspect' node server.js",
-    "build": "NODE_OPTIONS='--max-old-space-size=4096' next build",
-    "start": "NODE_ENV=production node server.js",
-    "start:next": "next start",
-    "lint": "next lint",
-    "type-check": "tsc --noEmit",
-    "seed": "tsx scripts/seed.ts",
-    "create:developer": "tsx scripts/create-developer-account.ts",
-    "test:login": "bash scripts/test-login.sh",
-    "verify:setup": "bash scripts/verify-setup.sh",
-    "debug": "NODE_OPTIONS='--inspect-brk' node server.js"
+  "dev": "next dev",
+  "build": "NODE_OPTIONS='--max-old-space-size=4096' next build",
+  "start": "NODE_ENV=production node server.js",
+
+  "lint": "next lint",
+  "type-check": "tsc --noEmit",
+
+  "seed": "tsx scripts/seed.ts",
+  "create:developer": "tsx scripts/create-developer-account.ts",
+  "test:login": "bash scripts/test-login.sh",
+  "verify:setup": "bash scripts/verify-setup.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
@@ -62,6 +60,7 @@
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.20.6",
+    "turbo": "^2.6.1",
     "typescript": "^5.3.3"
   }
 }
