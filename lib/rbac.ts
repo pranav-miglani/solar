@@ -28,7 +28,6 @@ const ROLE_PERMISSIONS: Record<AccountType, Permission[]> = {
     { resource: "alerts", action: "read" },
     { resource: "alerts", action: "update" },
     { resource: "telemetry", action: "read" },
-    { resource: "efficiency", action: "read" },
   ],
   DEVELOPER: [
     // Same as SUPERADMIN + doc access
@@ -52,7 +51,6 @@ const ROLE_PERMISSIONS: Record<AccountType, Permission[]> = {
     { resource: "alerts", action: "read" },
     { resource: "alerts", action: "update" },
     { resource: "telemetry", action: "read" },
-    { resource: "efficiency", action: "read" },
     { resource: "docs", action: "read" },
   ],
   GOVT: [
@@ -63,7 +61,6 @@ const ROLE_PERMISSIONS: Record<AccountType, Permission[]> = {
     { resource: "work_orders", action: "read" },
     { resource: "alerts", action: "read" },
     { resource: "telemetry", action: "read" },
-    { resource: "efficiency", action: "read" },
   ],
   ORG: [
     // Read-only access to own org data
@@ -73,7 +70,6 @@ const ROLE_PERMISSIONS: Record<AccountType, Permission[]> = {
     { resource: "work_orders", action: "read" },
     { resource: "alerts", action: "read" },
     { resource: "telemetry", action: "read" },
-    { resource: "efficiency", action: "read" },
   ],
 }
 

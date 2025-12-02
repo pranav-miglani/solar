@@ -1352,19 +1352,6 @@ export function SystemFlowDocumentation() {
                     </div>
                   </div>
 
-                  {/* Work Order Plant Efficiency Table - DEPRECATED */}
-                  <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg space-y-2 border border-red-200 dark:border-red-900">
-                    <h4 className="font-semibold text-red-900 dark:text-red-100">work_order_plant_eff (DEPRECATED - NOT USED)</h4>
-                    <p className="text-sm text-red-800 dark:text-red-200">
-                      <strong>⚠️ This table exists in the schema but is NOT being used.</strong> Performance ratio (PR) calculations are not implemented. 
-                      The table should be dropped in a future migration. Currently only referenced by <code className="bg-red-100 dark:bg-red-900 px-1 rounded">/api/workorders/[id]/efficiency</code> 
-                      endpoint which reads from it but no data is written to it.
-                    </p>
-                    <div className="mt-2 text-xs text-red-700 dark:text-red-300">
-                      <strong>Recommendation:</strong> Drop this table and the efficiency endpoint as PR calculations are not part of the current system.
-                    </div>
-                  </div>
-
                   {/* Disabled Plants Table */}
                   <div className="bg-muted/50 p-4 rounded-lg space-y-2">
                     <h4 className="font-semibold">disabled_plants</h4>
@@ -1450,16 +1437,10 @@ Unique Constraints:
 
                   <div className="space-y-4">
                     <h3 className="font-semibold text-lg">Unused/Deprecated Tables</h3>
-                    <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-900">
-                      <h4 className="font-semibold text-red-900 dark:text-red-100 mb-2">⚠️ Tables to be Dropped</h4>
-                      <ul className="text-sm text-red-800 dark:text-red-200 space-y-2 ml-4 list-disc">
-                        <li>
-                          <code className="bg-red-100 dark:bg-red-900 px-1 rounded">work_order_plant_eff</code> - Performance ratio (PR) calculations not implemented. 
-                          Table exists in schema but is never populated. Only referenced by <code className="bg-red-100 dark:bg-red-900 px-1 rounded">/api/workorders/[id]/efficiency</code> endpoint which reads from it but no data is written.
-                        </li>
-                      </ul>
-                      <div className="mt-3 text-xs text-red-700 dark:text-red-300">
-                        <strong>Note:</strong> Separate telemetry database has been removed. All telemetry is stored in main database (live metrics in <code className="bg-red-100 dark:bg-red-900 px-1 rounded">plants</code> table) or fetched on-demand from vendor APIs (historical graphs).
+                    <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
+                      <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">✅ Cleanup Completed</h4>
+                      <div className="mt-3 text-xs text-blue-700 dark:text-blue-300">
+                        <strong>Note:</strong> Separate telemetry database has been removed. All telemetry is stored in main database (live metrics in <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">plants</code> table) or fetched on-demand from vendor APIs (historical graphs). The <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">work_order_plant_eff</code> table and efficiency endpoint have been removed as PR calculations are not part of the current system.
                       </div>
                     </div>
                   </div>
@@ -2347,7 +2328,6 @@ Unique Constraints:
                             <li><code className="bg-background px-1 rounded">vendor-auth</code> - Generic vendor authentication</li>
                             <li><code className="bg-background px-1 rounded">sync-telemetry</code> - Telemetry sync (scheduled)</li>
                             <li><code className="bg-background px-1 rounded">sync-alerts</code> - Alert sync (scheduled)</li>
-                            <li><code className="bg-background px-1 rounded">compute-efficiency</code> - Efficiency calculations</li>
                           </ul>
                         </li>
                         <li><strong>Deployment:</strong> Supabase CLI (<code className="bg-background px-1 rounded">supabase functions deploy</code>)</li>
@@ -3916,21 +3896,18 @@ User-Agent: Mozilla/5.0...`}
                           <strong>Blast Radius:</strong> Database schema cleanup - reduces confusion and maintenance overhead
                         </p>
                         <p className="text-sm text-muted-foreground mb-2">
-                          <strong>Issue:</strong> Several tables and features exist in schema but are not being used:
+                          <strong>✅ Completed:</strong> The following cleanup has been done:
                         </p>
                         <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                          <li><code className="bg-background px-1 rounded">work_order_plant_eff</code> - Performance ratio (PR) calculations not implemented, table exists but empty. Only referenced by <code className="bg-background px-1 rounded">/api/workorders/[id]/efficiency</code> endpoint which reads from it but no data is written.</li>
-                          <li>Telemetry database environment variables (TELEMETRY_SUPABASE_*) - separate telemetry database removed, all telemetry stored in main DB or fetched on-demand from vendor APIs</li>
-                          <li>Efficiency endpoint (<code className="bg-background px-1 rounded">/api/workorders/[id]/efficiency</code>) - reads from unused table, should be removed or documented as deprecated</li>
+                          <li><code className="bg-background px-1 rounded">work_order_plant_eff</code> table - Dropped (migration 026)</li>
+                          <li>Efficiency endpoint (<code className="bg-background px-1 rounded">/api/workorders/[id]/efficiency</code>) - Removed</li>
+                          <li>Efficiency UI components (<code className="bg-background px-1 rounded">EfficiencyBadge</code>, <code className="bg-background px-1 rounded">EfficiencySummary</code>) - Removed</li>
+                          <li>Efficiency permissions from RBAC - Removed</li>
+                          <li>Telemetry database environment variables (TELEMETRY_SUPABASE_*) - Deprecated (separate telemetry database removed, all telemetry stored in main DB or fetched on-demand from vendor APIs)</li>
                         </ul>
                         <p className="text-sm text-muted-foreground mb-2">
-                          <strong>Impact:</strong> Confusion, unnecessary maintenance, potential for bugs if someone tries to use deprecated features
+                          <strong>Note:</strong> PR (Performance Ratio) calculations are not part of the current system architecture.
                         </p>
-                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                          <li>Remove or deprecate efficiency endpoint</li>
-                          <li>Remove telemetry database environment variable references from documentation and code comments</li>
-                          <li>Clean up any remaining references to separate telemetry database in codebase</li>
-                        </ul>
                       </div>
                     </div>
                   </div>

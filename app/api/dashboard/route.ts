@@ -33,7 +33,6 @@ interface DashboardData {
     showWorkOrdersSummary?: boolean
     showOrgBreakdown?: boolean
     showExportCSV?: boolean
-    showEfficiencySummary?: boolean
   }
 }
 
@@ -274,7 +273,6 @@ export async function GET(request: NextRequest) {
         showTelemetryChart: false,
         showAlertsFeed: true,
         showWorkOrdersSummary: true,
-        showEfficiencySummary: true,
       }
     }
 

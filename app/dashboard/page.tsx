@@ -7,7 +7,6 @@ import { DashboardSidebar } from "@/components/DashboardSidebar"
 import { DashboardMetrics } from "@/components/DashboardMetrics"
 // TelemetryChart removed - telemetry is now fetched on-demand from vendor APIs
 import { AlertsFeed } from "@/components/AlertsFeed"
-import { EfficiencySummary } from "@/components/EfficiencySummary"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { useUser } from "@/context/UserContext"
 import { Building2, Factory, Plus, FileText } from "lucide-react"
@@ -39,7 +38,6 @@ interface DashboardData {
     showTelemetryChart?: boolean
     showAlertsFeed?: boolean
     showWorkOrdersSummary?: boolean
-    showEfficiencySummary?: boolean
   }
 }
 
@@ -282,13 +280,6 @@ export default function DashboardPage() {
           </motion.div>
         )}
 
-
-        {/* Efficiency Summary for ORG */}
-        {role === "ORG" && widgets.showEfficiencySummary && orgId && (
-          <div className="mb-8">
-            <EfficiencySummary orgId={orgId} />
-          </div>
-        )}
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatusBadge } from "@/components/StatusBadge"
-import { EfficiencyBadge } from "@/components/EfficiencyBadge"
 import { TelemetryChart } from "@/components/TelemetryChart"
 import {
   Table,
@@ -43,18 +42,6 @@ interface WorkOrder {
   }>
 }
 
-interface Efficiency {
-  id: number
-  plant_id: number
-  recorded_at: string
-  actual_gen: number
-  expected_gen: number
-  pr: number
-  efficiency_pct: number
-  category: string
-  plants: { name: string }
-}
-
 interface Log {
   id: number
   message: string
@@ -65,7 +52,6 @@ interface Log {
 
 export function WorkOrderDetail({ workOrderId }: { workOrderId: string }) {
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null)
-  const [efficiency, setEfficiency] = useState<Efficiency[]>([])
   const [logs, setLogs] = useState<Log[]>([])
   const [telemetry, setTelemetry] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -75,7 +61,6 @@ export function WorkOrderDetail({ workOrderId }: { workOrderId: string }) {
 
   useEffect(() => {
     fetchWorkOrder()
-    fetchEfficiency()
     fetchLogs()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workOrderId])
@@ -91,12 +76,6 @@ export function WorkOrderDetail({ workOrderId }: { workOrderId: string }) {
     const data = await response.json()
     setWorkOrder(data.workOrder)
     setLoading(false)
-  }
-
-  async function fetchEfficiency() {
-    const response = await fetch(`/api/workorders/${workOrderId}/efficiency`)
-    const data = await response.json()
-    setEfficiency(data.efficiency || [])
   }
 
   async function fetchLogs() {
@@ -147,20 +126,6 @@ export function WorkOrderDetail({ workOrderId }: { workOrderId: string }) {
     }
   }
 
-  async function handleRecalculateEfficiency() {
-    const response = await fetch(`/api/workorders/${workOrderId}/efficiency`, {
-      method: "POST",
-    })
-
-    if (response.ok) {
-      fetchEfficiency()
-      alert("Efficiency recalculated")
-    } else {
-      const error = await response.json()
-      alert(error.error || "Failed to recalculate efficiency")
-    }
-  }
-
   if (loading) {
     return <div>Loading...</div>
   }
@@ -190,7 +155,6 @@ export function WorkOrderDetail({ workOrderId }: { workOrderId: string }) {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="plants">Plants</TabsTrigger>
-          <TabsTrigger value="efficiency">Efficiency</TabsTrigger>
           <TabsTrigger value="telemetry">Telemetry</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
           <TabsTrigger value="actions">Actions</TabsTrigger>
@@ -246,50 +210,6 @@ export function WorkOrderDetail({ workOrderId }: { workOrderId: string }) {
                       <TableCell>{woPlant.plants.capacity_kw} kW</TableCell>
                       <TableCell>
                         {woPlant.assigned_engineer_user?.email || "Unassigned"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="efficiency">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>Efficiency</CardTitle>
-                <Button onClick={handleRecalculateEfficiency}>
-                  Recalculate
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Plant</TableHead>
-                    <TableHead>Actual Gen (kWh)</TableHead>
-                    <TableHead>Expected Gen (kWh)</TableHead>
-                    <TableHead>PR</TableHead>
-                    <TableHead>Efficiency</TableHead>
-                    <TableHead>Category</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {efficiency.map((eff) => (
-                    <TableRow key={eff.id}>
-                      <TableCell>{eff.plants.name}</TableCell>
-                      <TableCell>{eff.actual_gen.toFixed(2)}</TableCell>
-                      <TableCell>{eff.expected_gen.toFixed(2)}</TableCell>
-                      <TableCell>{eff.pr.toFixed(4)}</TableCell>
-                      <TableCell>{eff.efficiency_pct.toFixed(1)}%</TableCell>
-                      <TableCell>
-                        <EfficiencyBadge
-                          category={eff.category}
-                          efficiencyPct={eff.efficiency_pct}
-                        />
                       </TableCell>
                     </TableRow>
                   ))}

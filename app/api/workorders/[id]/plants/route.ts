@@ -144,11 +144,6 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Trigger efficiency computation (work orders are static, but we can still compute efficiency)
-    // Note: compute-efficiency edge function removed (Telemetry DB removed)
-    // Efficiency is now calculated differently or not used
-    // If efficiency computation is needed, it should be done via vendor APIs directly
-
     return NextResponse.json({ plants }, { status: 201 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
