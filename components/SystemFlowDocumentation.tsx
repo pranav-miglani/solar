@@ -2084,7 +2084,7 @@ Unique Constraints:
                         <li><strong>Framework:</strong> Next.js 14.2.33 (App Router)</li>
                         <li><strong>Runtime:</strong> Node.js 18+</li>
                         <li><strong>Server:</strong> Custom server.js with in-process cron jobs</li>
-                        <li><strong>Build:</strong> <code className="bg-background px-1 rounded">NODE_OPTIONS='--max-old-space-size=4096' next build</code> (4GB heap)</li>
+                        <li><strong>Build:</strong> <code className="bg-background px-1 rounded">NODE_OPTIONS=&apos;--max-old-space-size=4096&apos; next build</code> (4GB heap)</li>
                         <li><strong>Experimental:</strong> Turbo mode enabled for faster builds</li>
                       </ul>
                     </div>
