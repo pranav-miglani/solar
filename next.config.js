@@ -1,8 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    turbo: {},         // <-- FIX: must be {}
-  },
+  // Disable Turbopack — Webpack is more stable and uses far less disk
+  experimental: {},
 
   eslint: {
     ignoreDuringBuilds: false,
