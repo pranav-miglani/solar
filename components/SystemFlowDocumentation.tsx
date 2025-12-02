@@ -199,6 +199,8 @@ export function SystemFlowDocumentation() {
       newExpanded.delete("vendor-solarman")
       newExpanded.delete("vendor-solardm")
       newExpanded.delete("vendor-pvblink")
+      newExpanded.delete("vendor-shinemonitor")
+      newExpanded.delete("vendor-foxesscloud")
       // Then expand the selected vendor
       newExpanded.add(vendorId)
       
@@ -313,10 +315,14 @@ export function SystemFlowDocumentation() {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="overview">
             <BookOpen className="h-4 w-4 mr-2" />
             Overview
+          </TabsTrigger>
+          <TabsTrigger value="database">
+            <Database className="h-4 w-4 mr-2" />
+            Database
           </TabsTrigger>
           <TabsTrigger value="vendors">
             <Factory className="h-4 w-4 mr-2" />
@@ -341,6 +347,10 @@ export function SystemFlowDocumentation() {
           <TabsTrigger value="mappings">
             <GitBranch className="h-4 w-4 mr-2" />
             Mappings
+          </TabsTrigger>
+          <TabsTrigger value="backlog">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            Backlog
           </TabsTrigger>
         </TabsList>
 
@@ -562,6 +572,597 @@ export function SystemFlowDocumentation() {
           </Card>
         </TabsContent>
 
+        {/* Database Tab */}
+        <TabsContent value="database" className="space-y-6">
+          <Card className="overflow-hidden">
+            <SectionHeader id="db-schema" title="Complete Database Schema" icon={Database} />
+            {expandedSections.has("db-schema") && (
+              <div className="p-6 pt-0 space-y-6 border-t">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Database Architecture</h3>
+                  <p className="text-sm text-muted-foreground">
+                    WOMS uses <strong>two separate Supabase instances</strong>:
+                  </p>
+                  <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
+                    <li><strong>Main Database:</strong> Application data (accounts, organizations, vendors, plants, work orders, alerts)</li>
+                    <li><strong>Telemetry Database:</strong> Time-series telemetry data with 24-hour retention window</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Main Database Tables</h3>
+                  
+                  {/* Accounts Table */}
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <h4 className="font-semibold">accounts</h4>
+                    <p className="text-sm text-muted-foreground">Custom authentication table (NOT Supabase Auth)</p>
+                    <table className="w-full text-xs border-collapse mt-2">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-2">Column</th>
+                          <th className="text-left p-2">Type</th>
+                          <th className="text-left p-2">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="p-2"><code>id</code></td>
+                          <td className="p-2">UUID</td>
+                          <td className="p-2">Primary key (auto-generated)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>account_type</code></td>
+                          <td className="p-2">ENUM</td>
+                          <td className="p-2">SUPERADMIN, ORG, GOVT, DEVELOPER</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>email</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Unique email (used as username)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>password_hash</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Bcrypt hash (10 rounds)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>org_id</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">FK to organizations (NULL for SUPERADMIN/GOVT/DEVELOPER, required for ORG)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>is_active</code></td>
+                          <td className="p-2">BOOLEAN</td>
+                          <td className="p-2">Account active status (default: true)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>logo_url</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Organization logo URL (nullable)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>display_name</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Display name for footer (nullable)</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Constraints:</strong> ORG accounts must have org_id; SUPERADMIN/GOVT/DEVELOPER must have org_id = NULL
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      <strong>Indexes:</strong> email (unique), org_id, account_type
+                    </div>
+                  </div>
+
+                  {/* Organizations Table */}
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <h4 className="font-semibold">organizations</h4>
+                    <p className="text-sm text-muted-foreground">Organizations that own solar plants</p>
+                    <table className="w-full text-xs border-collapse mt-2">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-2">Column</th>
+                          <th className="text-left p-2">Type</th>
+                          <th className="text-left p-2">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="p-2"><code>id</code></td>
+                          <td className="p-2">SERIAL</td>
+                          <td className="p-2">Primary key</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>name</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Organization name</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>auto_sync_enabled</code></td>
+                          <td className="p-2">BOOLEAN</td>
+                          <td className="p-2">Enable auto-sync (default: true)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>sync_interval_minutes</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">Sync interval 1-1440 min (default: 15). Sync runs at fixed clock times.</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Relationships:</strong> Referenced by accounts.org_id, vendors.org_id, plants.org_id, work_orders.org_id
+                    </div>
+                  </div>
+
+                  {/* Vendors Table */}
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <h4 className="font-semibold">vendors</h4>
+                    <p className="text-sm text-muted-foreground">Vendor integrations with token caching</p>
+                    <table className="w-full text-xs border-collapse mt-2">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-2">Column</th>
+                          <th className="text-left p-2">Type</th>
+                          <th className="text-left p-2">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="p-2"><code>id</code></td>
+                          <td className="p-2">SERIAL</td>
+                          <td className="p-2">Primary key</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>name</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Vendor name</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>vendor_type</code></td>
+                          <td className="p-2">ENUM</td>
+                          <td className="p-2">SOLARMAN, SOLARDM, PVBLINK, SHINEMONITOR, FOXESSCLOUD, OTHER</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>credentials</code></td>
+                          <td className="p-2">JSONB</td>
+                          <td className="p-2">Encrypted API credentials (vendor-specific)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>org_id</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">FK to organizations (nullable, for vendor-org mapping)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>access_token</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Cached access token (checked before auth)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>token_expires_at</code></td>
+                          <td className="p-2">TIMESTAMPTZ</td>
+                          <td className="p-2">Token expiration timestamp</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>plant_sync_mode</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">LIST_PLANTS or PER_PLANT (default based on vendor_type)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>per_plant_sync_interval_minutes</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">Interval for PER_PLANT mode (default: 15)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>plant_list_sync_morning_ist</code></td>
+                          <td className="p-2">TIME</td>
+                          <td className="p-2">Morning listPlants sync time (default: 06:00)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>plant_list_sync_evening_ist</code></td>
+                          <td className="p-2">TIME</td>
+                          <td className="p-2">Evening listPlants sync time (default: 23:00)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>last_synced_at</code></td>
+                          <td className="p-2">TIMESTAMPTZ</td>
+                          <td className="p-2">Last successful plant sync timestamp</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>last_alert_synced_at</code></td>
+                          <td className="p-2">TIMESTAMPTZ</td>
+                          <td className="p-2">Last successful alert sync timestamp</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Note:</strong> api_base_url removed - stored in environment variables (e.g., SOLARMAN_API_BASE_URL)
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      <strong>Indexes:</strong> org_id, token_expires_at (where not null)
+                    </div>
+                  </div>
+
+                  {/* Plants Table */}
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <h4 className="font-semibold">plants</h4>
+                    <p className="text-sm text-muted-foreground">Solar plants with production metrics</p>
+                    <table className="w-full text-xs border-collapse mt-2">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-2">Column</th>
+                          <th className="text-left p-2">Type</th>
+                          <th className="text-left p-2">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="p-2"><code>id</code></td>
+                          <td className="p-2">SERIAL</td>
+                          <td className="p-2">Primary key</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>org_id</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">FK to organizations (required, CASCADE delete)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>vendor_id</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">FK to vendors (required, CASCADE delete)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>vendor_plant_id</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Vendor-specific plant identifier</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>name</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Plant name</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>capacity_kw</code></td>
+                          <td className="p-2">NUMERIC(10,2)</td>
+                          <td className="p-2">Installed capacity in kW</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>current_power_kw</code></td>
+                          <td className="p-2">NUMERIC(10,3)</td>
+                          <td className="p-2">Current generation power in kW</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>daily_energy_kwh</code></td>
+                          <td className="p-2">NUMERIC(10,3)</td>
+                          <td className="p-2">Daily energy in kWh (stored in kWh to avoid rounding errors)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>monthly_energy_mwh</code></td>
+                          <td className="p-2">NUMERIC(10,3)</td>
+                          <td className="p-2">Monthly energy in MWh</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>yearly_energy_mwh</code></td>
+                          <td className="p-2">NUMERIC(10,3)</td>
+                          <td className="p-2">Yearly energy in MWh</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>total_energy_mwh</code></td>
+                          <td className="p-2">NUMERIC(10,3)</td>
+                          <td className="p-2">Total cumulative energy in MWh</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>last_update_time</code></td>
+                          <td className="p-2">TIMESTAMPTZ</td>
+                          <td className="p-2">Last update from vendor (shown as &quot;Last Updated&quot;)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>last_refreshed_at</code></td>
+                          <td className="p-2">TIMESTAMPTZ</td>
+                          <td className="p-2">Last refresh in our DB (shown as &quot;Last Refresh&quot;)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>network_status</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">NORMAL, ALL_OFFLINE, PARTIAL_OFFLINE (whitespace normalized)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>location</code></td>
+                          <td className="p-2">JSONB</td>
+                          <td className="p-2">{"{lat, lng, address}"}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Unique Constraint:</strong> (vendor_id, vendor_plant_id) - prevents duplicate plants from same vendor
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      <strong>Indexes:</strong> org_id, vendor_id, (vendor_id, org_id), last_update_time, network_status
+                    </div>
+                  </div>
+
+                  {/* Work Orders Table */}
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <h4 className="font-semibold">work_orders</h4>
+                    <p className="text-sm text-muted-foreground">Static work orders (no status field)</p>
+                    <table className="w-full text-xs border-collapse mt-2">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-2">Column</th>
+                          <th className="text-left p-2">Type</th>
+                          <th className="text-left p-2">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="p-2"><code>id</code></td>
+                          <td className="p-2">SERIAL</td>
+                          <td className="p-2">Primary key</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>title</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Work order title</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>description</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Work order description</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>location</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Physical location</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>org_id</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">FK to organizations (required for CASCADE delete)</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Note:</strong> No status field - work orders are static per requirements
+                    </div>
+                  </div>
+
+                  {/* Alerts Table */}
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <h4 className="font-semibold">alerts</h4>
+                    <p className="text-sm text-muted-foreground">System alerts from vendor APIs</p>
+                    <table className="w-full text-xs border-collapse mt-2">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-2">Column</th>
+                          <th className="text-left p-2">Type</th>
+                          <th className="text-left p-2">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="p-2"><code>id</code></td>
+                          <td className="p-2">SERIAL</td>
+                          <td className="p-2">Primary key</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>plant_id</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">FK to plants (required, CASCADE delete)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>vendor_id</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">FK to vendors (helps disambiguate vendor_alert_id)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>vendor_alert_id</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Original alert ID from vendor</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>vendor_plant_id</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Vendor-specific plant identifier</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>alert_time</code></td>
+                          <td className="p-2">TIMESTAMPTZ</td>
+                          <td className="p-2">When alert started (vendor timestamp)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>end_time</code></td>
+                          <td className="p-2">TIMESTAMPTZ</td>
+                          <td className="p-2">When alert ended/cleared (if provided)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>grid_down_seconds</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">Computed grid downtime: max(0, end_time - alert_time)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>grid_down_benefit_kwh</code></td>
+                          <td className="p-2">NUMERIC(12,3)</td>
+                          <td className="p-2">Downtime benefit: 0.5 × hours(9am-4pm overlap) × capacity_kw</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>title</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Alert title</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>severity</code></td>
+                          <td className="p-2">ENUM</td>
+                          <td className="p-2">LOW, MEDIUM, HIGH, CRITICAL</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>status</code></td>
+                          <td className="p-2">ENUM</td>
+                          <td className="p-2">ACTIVE, RESOLVED, ACKNOWLEDGED</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>metadata</code></td>
+                          <td className="p-2">JSONB</td>
+                          <td className="p-2">Vendor-specific alert data</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Indexes:</strong> plant_id, status, created_at, (vendor_id, plant_id, alert_time DESC), (vendor_id, vendor_alert_id, plant_id), (vendor_id, vendor_plant_id)
+                    </div>
+                  </div>
+
+                  {/* Work Order Plant Efficiency Table */}
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <h4 className="font-semibold">work_order_plant_eff</h4>
+                    <p className="text-sm text-muted-foreground">Efficiency metrics for plants in work orders</p>
+                    <table className="w-full text-xs border-collapse mt-2">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-2">Column</th>
+                          <th className="text-left p-2">Type</th>
+                          <th className="text-left p-2">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="p-2"><code>id</code></td>
+                          <td className="p-2">SERIAL</td>
+                          <td className="p-2">Primary key</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>work_order_id</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">FK to work_orders (CASCADE delete)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>plant_id</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">FK to plants (CASCADE delete)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>recorded_at</code></td>
+                          <td className="p-2">TIMESTAMPTZ</td>
+                          <td className="p-2">When efficiency was calculated</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>actual_gen</code></td>
+                          <td className="p-2">NUMERIC(10,2)</td>
+                          <td className="p-2">Actual generation (MWh)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>expected_gen</code></td>
+                          <td className="p-2">NUMERIC(10,2)</td>
+                          <td className="p-2">Expected generation (MWh)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>pr</code></td>
+                          <td className="p-2">NUMERIC(5,4)</td>
+                          <td className="p-2">Performance ratio (actual / expected)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>efficiency_pct</code></td>
+                          <td className="p-2">NUMERIC(5,2)</td>
+                          <td className="p-2">Efficiency percentage (pr × 100)</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>category</code></td>
+                          <td className="p-2">TEXT</td>
+                          <td className="p-2">Healthy (≥85%), Suboptimal (65-84%), Critical (&lt;65%)</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Disabled Plants Table */}
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <h4 className="font-semibold">disabled_plants</h4>
+                    <p className="text-sm text-muted-foreground">Plants inactive for 15+ days</p>
+                    <table className="w-full text-xs border-collapse mt-2">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-2">Column</th>
+                          <th className="text-left p-2">Type</th>
+                          <th className="text-left p-2">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="p-2"><code>id</code></td>
+                          <td className="p-2">SERIAL</td>
+                          <td className="p-2">Primary key</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>plant_id</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">FK to plants</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>org_id</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">FK to organizations</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>vendor_id</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">FK to vendors</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>disabled_at</code></td>
+                          <td className="p-2">TIMESTAMPTZ</td>
+                          <td className="p-2">When plant was marked as disabled</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Note:</strong> Created by function <code>disable_inactive_plants()</code> which runs daily
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">Row-Level Security (RLS)</h3>
+                    <p className="text-sm text-muted-foreground">
+                      All tables have RLS enabled. However, <strong>all API routes use SUPABASE_SERVICE_ROLE_KEY</strong> to bypass RLS because:
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
+                      <li>Custom authentication doesn&apos;t use Supabase Auth (no auth.uid())</li>
+                      <li>RLS policies require auth.uid() which doesn&apos;t exist in our system</li>
+                      <li>Authorization is handled at application level via RBAC (lib/rbac.ts)</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">Database Relationships</h3>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <pre className="text-xs overflow-x-auto">
+{`organizations (1) ──< (N) accounts
+organizations (1) ──< (N) vendors
+organizations (1) ──< (N) plants
+organizations (1) ──< (N) work_orders
+
+vendors (1) ──< (N) plants
+vendors (1) ──< (N) alerts
+
+plants (1) ──< (N) alerts
+plants (1) ──< (N) work_order_plants
+plants (1) ──< (N) work_order_plant_eff
+
+work_orders (1) ──< (N) work_order_plants
+work_orders (1) ──< (N) work_order_plant_eff
+
+Unique Constraints:
+- accounts.email (unique)
+- (vendors.vendor_id, plants.vendor_plant_id) (unique)
+- (work_order_plants.work_order_id, work_order_plants.plant_id) (unique)
+- uq_active_plant: one active work order per plant`}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+
         {/* Vendors Tab */}
         <TabsContent value="vendors" className="space-y-6">
           <Card className="overflow-hidden">
@@ -740,32 +1341,310 @@ export function SystemFlowDocumentation() {
           </Card>
         </TabsContent>
 
-        {/* Code Tab - Will continue in next part */}
+        {/* Code Tab */}
         <TabsContent value="code" className="space-y-6">
           <Card className="overflow-hidden">
-            <SectionHeader id="code-structure" title="Code Structure & Key Files" icon={Code} />
+            <SectionHeader id="code-structure" title="Code Structure & Architecture" icon={Code} />
             {expandedSections.has("code-structure") && (
               <div className="p-6 pt-0 space-y-6 border-t">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Project Structure</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg">
+                    <pre className="text-xs overflow-x-auto">
+{`woms/
+├── app/                          # Next.js App Router
+│   ├── api/                      # API Routes (Next.js API endpoints)
+│   │   ├── accounts/            # Account management
+│   │   ├── alerts/              # Alert endpoints
+│   │   ├── cron/                # Cron job endpoints
+│   │   ├── dashboard/           # Dashboard data
+│   │   ├── login/               # Authentication
+│   │   ├── orgs/                # Organization management
+│   │   ├── plants/               # Plant endpoints
+│   │   ├── vendors/             # Vendor management & sync
+│   │   └── workorders/          # Work order endpoints
+│   ├── auth/                     # Auth pages
+│   ├── dashboard/                # Dashboard page
+│   ├── superadmin/               # Super admin pages
+│   └── workorders/               # Work order pages
+├── components/                   # React components
+│   ├── ui/                      # shadcn/ui components
+│   └── *.tsx                    # Feature components
+├── lib/                          # Core libraries
+│   ├── services/                # Business logic services
+│   │   ├── plantSyncService.ts  # Plant sync orchestration
+│   │   └── alertSyncService.ts  # Alert sync orchestration
+│   ├── vendors/                 # Vendor adapter system
+│   │   ├── baseVendorAdapter.ts # Abstract base class
+│   │   ├── solarmanAdapter.ts   # Solarman implementation
+│   │   ├── solarDmAdapter.ts   # SolarDM implementation
+│   │   ├── pvBlinkAdapter.ts    # PVBlink implementation
+│   │   └── vendorManager.ts     # Factory pattern
+│   ├── cron/                    # Cron job definitions
+│   │   ├── plantSyncCron.js    # Plant sync scheduler
+│   │   └── alertSyncCron.js     # Alert sync scheduler
+│   ├── supabase/                # Database clients
+│   │   ├── pooled.ts            # Connection pooling
+│   │   ├── client.ts            # Client-side client
+│   │   └── server.ts            # Server-side client
+│   ├── context/                 # MDC & Logging
+│   │   ├── mdc.ts               # Mapped Diagnostic Context
+│   │   └── logger.ts            # Structured logger
+│   ├── rbac.ts                  # Role-based access control
+│   └── api-logger.ts            # API request/response logging
+├── supabase/
+│   ├── migrations/              # Database migrations
+│   └── functions/               # Edge Functions (Deno)
+│       ├── vendor-auth/         # Vendor authentication
+│       ├── sync-alerts/         # Alert sync
+│       └── sync-telemetry/      # Telemetry sync
+├── middleware.ts                # Route protection & auth
+├── server.js                    # Custom Next.js server with cron
+└── types/                       # TypeScript definitions`}
+                    </pre>
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   <h3 className="font-semibold text-lg">Core Services</h3>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="bg-muted/50 p-4 rounded-lg">
                       <h4 className="font-medium mb-2">lib/services/plantSyncService.ts</h4>
+                      <p className="text-xs text-muted-foreground mb-2">Main plant synchronization service</p>
                       <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                        <li><code className="bg-background px-1 rounded">syncAllPlants()</code> - Main entry point</li>
-                        <li><code className="bg-background px-1 rounded">syncVendorPlants()</code> - Per-vendor sync logic</li>
-                        <li><code className="bg-background px-1 rounded">getPlantSyncMode()</code> - Resolves sync mode</li>
-                        <li><code className="bg-background px-1 rounded">shouldSyncOrg()</code> - Checks org eligibility</li>
-                        <li><code className="bg-background px-1 rounded">validateAndRefreshToken()</code> - Token management</li>
+                        <li><code className="bg-background px-1 rounded">syncAllPlants()</code> - Main entry point, orchestrates all vendor syncs</li>
+                        <li><code className="bg-background px-1 rounded">syncVendorPlants()</code> - Per-vendor sync logic with mode handling</li>
+                        <li><code className="bg-background px-1 rounded">getPlantSyncMode()</code> - Resolves LIST_PLANTS vs PER_PLANT mode</li>
+                        <li><code className="bg-background px-1 rounded">shouldSyncOrg()</code> - Checks org eligibility (auto_sync_enabled, interval)</li>
+                        <li><code className="bg-background px-1 rounded">validateAndRefreshToken()</code> - Token validation and refresh</li>
+                        <li>Batch upserts (100 plants per batch) for performance</li>
+                        <li>Unit conversions (W→kW, kWh→MWh) during normalization</li>
+                        <li>Timestamp conversions (Unix seconds → ISO strings)</li>
                       </ul>
                     </div>
                     <div className="bg-muted/50 p-4 rounded-lg">
                       <h4 className="font-medium mb-2">lib/services/alertSyncService.ts</h4>
+                      <p className="text-xs text-muted-foreground mb-2">Alert synchronization service</p>
                       <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                        <li><code className="bg-background px-1 rounded">syncAllAlerts()</code> - Sync all vendors</li>
+                        <li><code className="bg-background px-1 rounded">syncAllAlerts()</code> - Sync all vendors&apos; alerts</li>
                         <li><code className="bg-background px-1 rounded">syncSolarmanVendorAlerts()</code> - Solarman implementation</li>
                         <li><code className="bg-background px-1 rounded">syncSolarDmVendorAlerts()</code> - SolarDM implementation</li>
-                        <li><code className="bg-background px-1 rounded">calculateGridDownBenefitKwh()</code> - Benefit calculation</li>
+                        <li><code className="bg-background px-1 rounded">calculateGridDownBenefitKwh()</code> - Grid downtime benefit calculation</li>
+                        <li><code className="bg-background px-1 rounded">getVendorAlertsStartDate()</code> - Configurable lookback window</li>
+                        <li>Severity mapping (vendor-specific → standard enum)</li>
+                        <li>Alert deduplication by vendor_alert_id</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Vendor Adapter System</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Pluggable architecture using adapter pattern. All adapters extend <code className="bg-background px-1 rounded">BaseVendorAdapter</code>.
+                    </p>
+                    <div className="space-y-2">
+                      <div>
+                        <h4 className="font-medium text-sm mb-1">BaseVendorAdapter (lib/vendors/baseVendorAdapter.ts)</h4>
+                        <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Abstract base class with common functionality</li>
+                          <li>Token storage interface (setTokenStorage)</li>
+                          <li>HTTP client with connection pooling</li>
+                          <li>Error handling and retry logic</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-sm mb-1">Required Methods (all adapters must implement)</h4>
+                        <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li><code className="bg-background px-1 rounded">authenticate()</code> - Returns access token</li>
+                          <li><code className="bg-background px-1 rounded">listPlants()</code> - Returns all plants from vendor</li>
+                          <li><code className="bg-background px-1 rounded">getTelemetry()</code> - Time-series telemetry data</li>
+                          <li><code className="bg-background px-1 rounded">getAlerts()</code> - Alert data (if supported)</li>
+                          <li><code className="bg-background px-1 rounded">normalizeTelemetry()</code> - Vendor → standard format</li>
+                          <li><code className="bg-background px-1 rounded">normalizeAlert()</code> - Vendor → standard alert format</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-sm mb-1">VendorManager (lib/vendors/vendorManager.ts)</h4>
+                        <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Factory pattern to get adapter by vendor_type</li>
+                          <li>Singleton adapter instances (reused across requests)</li>
+                          <li>Handles adapter creation and configuration</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">API Routes Pattern</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      All API routes follow this pattern:
+                    </p>
+                    <ol className="text-sm text-muted-foreground space-y-2 ml-4 list-decimal">
+                      <li>Extract session cookie from request</li>
+                      <li>Decode session: <code className="bg-background px-1 rounded">JSON.parse(Buffer.from(session, &quot;base64&quot;).toString())</code></li>
+                      <li>Get <code className="bg-background px-1 rounded">accountType</code> and <code className="bg-background px-1 rounded">orgId</code> from session</li>
+                      <li>Use <code className="bg-background px-1 rounded">requirePermission(accountType, resource, action)</code> for authorization</li>
+                      <li>Use <code className="bg-background px-1 rounded">getMainClient()</code> (service role key) to bypass RLS</li>
+                      <li>Perform database operations</li>
+                      <li>Return JSON response</li>
+                    </ol>
+                    <div className="mt-3">
+                      <h4 className="font-medium text-sm mb-1">MDC Context Integration</h4>
+                      <p className="text-xs text-muted-foreground">
+                        API routes use <code className="bg-background px-1 rounded">withMDCContext()</code> wrapper to:
+                      </p>
+                      <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc mt-1">
+                        <li>Set MDC context with request metadata (source, user, operation)</li>
+                        <li>Automatically propagate context to all async operations</li>
+                        <li>Enable structured logging with context</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Authentication & Authorization</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">Custom Authentication</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><strong>NOT Supabase Auth</strong> - uses custom accounts table</li>
+                        <li>Login: <code className="bg-background px-1 rounded">POST /api/login</code></li>
+                        <li>Password: bcrypt hash (10 rounds) stored in <code className="bg-background px-1 rounded">password_hash</code></li>
+                        <li>Session: base64-encoded JSON cookie with <code className="bg-background px-1 rounded">{"{accountId, accountType, orgId, email}"}</code></li>
+                        <li>Session expiry: 7 days (configurable)</li>
+                        <li>HTTP-only cookies prevent XSS</li>
+                        <li>Secure flag in production</li>
+                      </ul>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">RBAC (lib/rbac.ts)</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Four account types: SUPERADMIN, DEVELOPER, GOVT, ORG</li>
+                        <li>Granular permissions per resource/action</li>
+                        <li><code className="bg-background px-1 rounded">requirePermission()</code> throws on unauthorized</li>
+                        <li>DEVELOPER has all SUPERADMIN permissions + docs access</li>
+                        <li>GOVT: read-only global access</li>
+                        <li>ORG: read-only access to own org data</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Middleware (middleware.ts)</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>Runs on all routes except <code className="bg-background px-1 rounded">/_next</code>, <code className="bg-background px-1 rounded">/api</code>, <code className="bg-background px-1 rounded">/favicon.ico</code></li>
+                      <li>Checks for session cookie</li>
+                      <li>Decodes session to get accountType</li>
+                      <li>Enforces role-based route protection:
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li><code className="bg-background px-1 rounded">/superadmin/*</code> - SUPERADMIN and DEVELOPER only</li>
+                          <li><code className="bg-background px-1 rounded">/superadmin/system-flow</code> - DEVELOPER only</li>
+                          <li>Redirects unauthorized users to dashboard</li>
+                        </ul>
+                      </li>
+                      <li>Redirects root and <code className="bg-background px-1 rounded">/auth/login</code> to dashboard</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Cron Jobs (lib/cron/)</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">plantSyncCron.js</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Schedule: Every 15 minutes (<code className="bg-background px-1 rounded">*/15 * * * *</code>)</li>
+                        <li>Calls: <code className="bg-background px-1 rounded">GET /api/cron/sync-plants</code></li>
+                        <li>Checks restricted window (8 PM - 5 AM IST by default)</li>
+                        <li>Skips sync if in restricted window</li>
+                        <li>Uses <code className="bg-background px-1 rounded">CRON_SECRET</code> for security (if configured)</li>
+                        <li>Runs in-process (server.js starts it)</li>
+                      </ul>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">alertSyncCron.js</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Schedule: Every 30 minutes (<code className="bg-background px-1 rounded">*/30 * * * *</code>)</li>
+                        <li>Calls: <code className="bg-background px-1 rounded">GET /api/cron/sync-alerts</code></li>
+                        <li>Syncs alerts for all active vendors</li>
+                        <li>Runs in-process (server.js starts it)</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                    <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                      <strong>⚠️ Production Note:</strong> In-process cron jobs are lost if server crashes. 
+                      Consider moving to external scheduler (Supabase Edge Functions, Cloud Scheduler) for production.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Database Clients (lib/supabase/)</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <div>
+                      <h4 className="font-medium text-sm mb-1">pooled.ts - Connection Pooling</h4>
+                      <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><code className="bg-background px-1 rounded">getMainClient()</code> - Singleton main DB client</li>
+                        <li>Uses <code className="bg-background px-1 rounded">pooledFetch</code> for HTTP connection reuse</li>
+                        <li>Service role key bypasses RLS</li>
+                        <li>Reuses client instances across requests</li>
+                      </ul>
+                    </div>
+                    <div className="mt-2">
+                      <h4 className="font-medium text-sm mb-1">client.ts - Client-Side Client</h4>
+                      <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Uses anon key (limited by RLS)</li>
+                        <li>For client-side components (currently minimal usage)</li>
+                      </ul>
+                    </div>
+                    <div className="mt-2">
+                      <h4 className="font-medium text-sm mb-1">server.ts - Server-Side Client</h4>
+                      <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Uses service role key</li>
+                        <li>For server components and API routes</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">MDC & Logging (lib/context/)</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <div>
+                      <h4 className="font-medium text-sm mb-1">MDC (mdc.ts)</h4>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Mapped Diagnostic Context - thread-local-like storage for async operations
+                      </p>
+                      <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Uses <code className="bg-background px-1 rounded">AsyncLocalStorage</code> for context propagation</li>
+                        <li>Stores: source, requestId, userId, accountType, orgId, operation, vendorId</li>
+                        <li>Automatically propagates to all async operations</li>
+                        <li>Used by logger for structured logging</li>
+                      </ul>
+                    </div>
+                    <div className="mt-2">
+                      <h4 className="font-medium text-sm mb-1">Logger (logger.ts)</h4>
+                      <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Structured logging with MDC context</li>
+                        <li>Logs to console (can be extended to external service)</li>
+                        <li>Includes context prefix in log messages</li>
+                      </ul>
+                    </div>
+                    <div className="mt-2">
+                      <h4 className="font-medium text-sm mb-1">API Logger (api-logger.ts)</h4>
+                      <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Logs all API requests/responses</li>
+                        <li>Includes user information, action, duration</li>
+                        <li>Uses MDC context for consistent logging</li>
+                        <li>Helper: <code className="bg-background px-1 rounded">withMDCContext()</code> wraps API handlers</li>
                       </ul>
                     </div>
                   </div>
@@ -778,7 +1657,7 @@ export function SystemFlowDocumentation() {
         {/* Config Tab */}
         <TabsContent value="config" className="space-y-6">
           <Card className="overflow-hidden">
-            <SectionHeader id="config-details" title="Configuration Details" icon={Settings} />
+            <SectionHeader id="config-details" title="Configuration & Infrastructure" icon={Settings} />
             {expandedSections.has("config-details") && (
               <div className="p-6 pt-0 space-y-6 border-t">
                 <div className="space-y-4">
@@ -789,57 +1668,233 @@ export function SystemFlowDocumentation() {
                         <tr className="border-b">
                           <th className="text-left p-2 font-semibold">Variable</th>
                           <th className="text-left p-2 font-semibold">Description</th>
+                          <th className="text-left p-2 font-semibold">Required</th>
                           <th className="text-left p-2 font-semibold">Default</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr className="border-b">
-                          <td className="p-2"><code className="bg-background px-1 rounded">SOLARMAN_API_BASE_URL</code></td>
-                          <td className="p-2">Solarman API base URL</td>
+                          <td className="p-2"><code className="bg-background px-1 rounded">NEXT_PUBLIC_SUPABASE_URL</code></td>
+                          <td className="p-2">Main Supabase database URL</td>
+                          <td className="p-2">✅ Yes</td>
                           <td className="p-2">-</td>
                         </tr>
                         <tr className="border-b">
-                          <td className="p-2"><code className="bg-background px-1 rounded">SOLARMAN_PRO_API_BASE_URL</code></td>
-                          <td className="p-2">Solarman PRO API base URL (preferred)</td>
+                          <td className="p-2"><code className="bg-background px-1 rounded">NEXT_PUBLIC_SUPABASE_ANON_KEY</code></td>
+                          <td className="p-2">Main DB anon key (limited permissions)</td>
+                          <td className="p-2">✅ Yes</td>
                           <td className="p-2">-</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">SUPABASE_SERVICE_ROLE_KEY</code></td>
+                          <td className="p-2">Main DB service role key (bypasses RLS) - <strong>CRITICAL</strong></td>
+                          <td className="p-2">✅ Yes</td>
+                          <td className="p-2">-</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">TELEMETRY_SUPABASE_URL</code></td>
+                          <td className="p-2">Telemetry database URL (separate instance)</td>
+                          <td className="p-2">✅ Yes</td>
+                          <td className="p-2">-</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">TELEMETRY_SUPABASE_ANON_KEY</code></td>
+                          <td className="p-2">Telemetry DB anon key</td>
+                          <td className="p-2">✅ Yes</td>
+                          <td className="p-2">-</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">TELEMETRY_SUPABASE_SERVICE_ROLE_KEY</code></td>
+                          <td className="p-2">Telemetry DB service role key (for Edge Functions)</td>
+                          <td className="p-2">✅ Yes</td>
+                          <td className="p-2">-</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">SOLARMAN_API_BASE_URL</code></td>
+                          <td className="p-2">Solarman API base URL</td>
+                          <td className="p-2">✅ Yes (if using Solarman)</td>
+                          <td className="p-2">https://globalapi.solarmanpv.com</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">SOLARMAN_PRO_API_BASE_URL</code></td>
+                          <td className="p-2">Solarman PRO API base URL (preferred, richer data)</td>
+                          <td className="p-2">⚠️ Optional</td>
+                          <td className="p-2">https://globalpro.solarmanpv.com</td>
                         </tr>
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">SOLARDM_API_BASE_URL</code></td>
                           <td className="p-2">SolarDM API base URL</td>
+                          <td className="p-2">✅ Yes (if using SolarDM)</td>
                           <td className="p-2">-</td>
                         </tr>
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">PVBLINK_API_BASE_URL</code></td>
                           <td className="p-2">PVBlink API base URL</td>
+                          <td className="p-2">✅ Yes (if using PVBlink)</td>
                           <td className="p-2">-</td>
                         </tr>
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">FOXESSCLOUD_API_BASE_URL</code></td>
                           <td className="p-2">Foxesscloud API base URL</td>
+                          <td className="p-2">✅ Yes (if using Foxesscloud)</td>
+                          <td className="p-2">-</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">SHINEMONITOR_API_BASE_URL</code></td>
+                          <td className="p-2">ShineMonitor API base URL</td>
+                          <td className="p-2">✅ Yes (if using ShineMonitor)</td>
                           <td className="p-2">-</td>
                         </tr>
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">SYNC_WINDOW_START</code></td>
-                          <td className="p-2">Restricted sync window start (HH:mm IST)</td>
+                          <td className="p-2">Global restricted sync window start (HH:mm IST) - <strong>Deprecated</strong> (use per-vendor config)</td>
+                          <td className="p-2">⚠️ Optional</td>
                           <td className="p-2">20:00</td>
                         </tr>
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">SYNC_WINDOW_END</code></td>
-                          <td className="p-2">Restricted sync window end (HH:mm IST)</td>
+                          <td className="p-2">Global restricted sync window end (HH:mm IST) - <strong>Deprecated</strong> (use per-vendor config)</td>
+                          <td className="p-2">⚠️ Optional</td>
                           <td className="p-2">05:00</td>
                         </tr>
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">CRON_SECRET</code></td>
-                          <td className="p-2">Secret token for cron endpoint security</td>
+                          <td className="p-2">Secret token for cron endpoint security (Authorization: Bearer header)</td>
+                          <td className="p-2">⚠️ Recommended</td>
                           <td className="p-2">-</td>
                         </tr>
-                        <tr>
-                          <td className="p-2"><code className="bg-background px-1 rounded">TELEMETRY_SUPABASE_URL</code></td>
-                          <td className="p-2">Telemetry database URL</td>
-                          <td className="p-2">-</td>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_PLANT_SYNC_CRON</code></td>
+                          <td className="p-2">Enable in-process plant sync cron (true/false)</td>
+                          <td className="p-2">⚠️ Optional</td>
+                          <td className="p-2">true</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_ALERT_SYNC_CRON</code></td>
+                          <td className="p-2">Enable in-process alert sync cron (true/false)</td>
+                          <td className="p-2">⚠️ Optional</td>
+                          <td className="p-2">true</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">NODE_ENV</code></td>
+                          <td className="p-2">Node environment (development/production)</td>
+                          <td className="p-2">⚠️ Optional</td>
+                          <td className="p-2">development</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">PORT</code></td>
+                          <td className="p-2">Server port</td>
+                          <td className="p-2">⚠️ Optional</td>
+                          <td className="p-2">3000</td>
                         </tr>
                       </tbody>
                     </table>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Infrastructure & Deployment</h3>
+                  
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    <div>
+                      <h4 className="font-medium mb-2">Application Server</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><strong>Framework:</strong> Next.js 14.2.33 (App Router)</li>
+                        <li><strong>Runtime:</strong> Node.js 18+</li>
+                        <li><strong>Server:</strong> Custom server.js with in-process cron jobs</li>
+                        <li><strong>Build:</strong> <code className="bg-background px-1 rounded">NODE_OPTIONS='--max-old-space-size=4096' next build</code> (4GB heap)</li>
+                        <li><strong>Experimental:</strong> Turbo mode enabled for faster builds</li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium mb-2">Database Infrastructure</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><strong>Main Database:</strong> Supabase PostgreSQL instance</li>
+                        <li><strong>Telemetry Database:</strong> Separate Supabase PostgreSQL instance</li>
+                        <li><strong>Connection Pooling:</strong> HTTP connection reuse via pooledFetch</li>
+                        <li><strong>RLS:</strong> Enabled but bypassed via service role key</li>
+                        <li><strong>Backups:</strong> Supabase point-in-time recovery (configure in dashboard)</li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium mb-2">Edge Functions (Supabase)</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><strong>Runtime:</strong> Deno</li>
+                        <li><strong>Functions:</strong>
+                          <ul className="ml-4 mt-1 list-disc">
+                            <li><code className="bg-background px-1 rounded">vendor-auth</code> - Generic vendor authentication</li>
+                            <li><code className="bg-background px-1 rounded">sync-telemetry</code> - Telemetry sync (scheduled)</li>
+                            <li><code className="bg-background px-1 rounded">sync-alerts</code> - Alert sync (scheduled)</li>
+                            <li><code className="bg-background px-1 rounded">compute-efficiency</code> - Efficiency calculations</li>
+                          </ul>
+                        </li>
+                        <li><strong>Deployment:</strong> Supabase CLI (<code className="bg-background px-1 rounded">supabase functions deploy</code>)</li>
+                        <li><strong>Scheduling:</strong> Supabase dashboard or external cron (cron-job.org, GitHub Actions)</li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium mb-2">Recommended Production Setup</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><strong>Hosting:</strong> Vercel (recommended) or self-hosted (Node.js server)</li>
+                        <li><strong>Cron Jobs:</strong> Move to external scheduler (Supabase Edge Functions, Cloud Scheduler, cron-job.org)</li>
+                        <li><strong>Monitoring:</strong> Integrate APM (Datadog, New Relic, Sentry)</li>
+                        <li><strong>Logging:</strong> Structured logging to external service (Datadog, CloudWatch, etc.)</li>
+                        <li><strong>Error Tracking:</strong> Sentry or similar for error aggregation</li>
+                        <li><strong>Database:</strong> Enable connection pooling in Supabase dashboard</li>
+                        <li><strong>CDN:</strong> Vercel Edge Network or Cloudflare for static assets</li>
+                        <li><strong>SSL:</strong> Automatic with Vercel, configure for self-hosted</li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium mb-2">Security Considerations</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><strong>Service Role Key:</strong> Never expose to client, only server-side</li>
+                        <li><strong>Session Tokens:</strong> Currently base64-encoded (consider encryption)</li>
+                        <li><strong>CORS:</strong> Configure allowed origins in production</li>
+                        <li><strong>Rate Limiting:</strong> Implement at API gateway level (Vercel Pro, Cloudflare)</li>
+                        <li><strong>Secrets Management:</strong> Use environment variables, never commit secrets</li>
+                        <li><strong>Database:</strong> Enable Supabase network restrictions (IP allowlist)</li>
+                        <li><strong>Backup Encryption:</strong> Ensure Supabase backups are encrypted</li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h4 className="font-medium mb-2">Performance Optimization</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><strong>Connection Pooling:</strong> Already implemented via pooledFetch</li>
+                        <li><strong>Batch Operations:</strong> Plant sync uses batches of 100</li>
+                        <li><strong>Database Indexes:</strong> Comprehensive indexes on foreign keys and query patterns</li>
+                        <li><strong>Build Optimization:</strong> Increased heap size, Turbo mode enabled</li>
+                        <li><strong>Code Splitting:</strong> Next.js automatic code splitting</li>
+                        <li><strong>Caching:</strong> Consider Redis for API response caching</li>
+                        <li><strong>CDN:</strong> Static assets served via CDN (Vercel Edge Network)</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Deployment Checklist</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg">
+                    <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
+                      <li>✅ All environment variables configured</li>
+                      <li>✅ Database migrations applied (001_initial_schema.sql, 002_rls_policies.sql, etc.)</li>
+                      <li>✅ RLS policies enabled (though bypassed by service role key)</li>
+                      <li>✅ Edge Functions deployed and scheduled</li>
+                      <li>✅ Default passwords changed (run migration 004_manual_user_setup.sql or create new accounts)</li>
+                      <li>✅ SSL certificates valid</li>
+                      <li>✅ Monitoring and error tracking configured</li>
+                      <li>✅ Backup strategy in place (Supabase point-in-time recovery)</li>
+                      <li>✅ CRON_SECRET set for cron endpoint security</li>
+                      <li>✅ Vendor API credentials configured in UI</li>
+                      <li>⚠️ Consider moving cron jobs to external scheduler</li>
+                      <li>⚠️ Implement structured logging to external service</li>
+                      <li>⚠️ Add rate limiting at API gateway level</li>
+                    </ul>
                   </div>
                 </div>
               </div>
@@ -1431,6 +2486,777 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                     </div>
                   </div>
                   )}
+                </div>
+
+                {/* ShineMonitor Section */}
+                <div id="vendor-shinemonitor" className="space-y-4 mt-8">
+                  <VendorSectionHeader vendorId="vendor-shinemonitor" vendorName="ShineMonitor" icon={Factory} />
+                  
+                  {expandedSections.has("vendor-shinemonitor") && (
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-4 border-t">
+                    <div>
+                      <h4 className="font-semibold mb-2">1. Authentication</h4>
+                      <div className="bg-background p-3 rounded text-sm space-y-2">
+                        <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">GET {process.env.SHINEMONITOR_API_BASE_URL || "https://web.shinemonitor.com/public"}/?sign={`{sign}`}&salt={`{salt}`}&action=auth&usr={`{user_name}`}&company-key={`{company_key}`}</code></div>
+                        <div><strong>Authentication Method:</strong> SHA1-based sign/salt mechanism</div>
+                        <div><strong>Sign Generation:</strong></div>
+                        <CodeBlock 
+                          id="shinemonitor-auth-sign"
+                          code={`salt = current timestamp (milliseconds)
+pass_hash = SHA1(password)
+action_string = "&action=auth&usr={user_name}&company-key={company_key}"
+sign = SHA1(salt + pass_hash + action_string)`}
+                        />
+                        <div><strong>Request Headers:</strong></div>
+                        <CodeBlock 
+                          id="shinemonitor-auth-headers"
+                          code={`Accept: application/json
+Origin: https://kstar.shinemonitor.com
+Referer: https://kstar.shinemonitor.com/`}
+                        />
+                        <div><strong>Response:</strong></div>
+                        <CodeBlock 
+                          id="shinemonitor-auth-response"
+                          code={`{
+  "err": 0,
+  "desc": "success",
+  "dat": {
+    "token": "string",
+    "secret": "string",
+    "expire": number (seconds),
+    "role": number,
+    "usr": string,
+    "uid": number
+  }
+}`}
+                        />
+                        <div><strong>Token Storage:</strong> Stored in <code className="bg-muted px-1 rounded">vendors.access_token</code>, <code className="bg-muted px-1 rounded">vendors.token_expires_at</code>, <code className="bg-muted px-1 rounded">vendors.token_metadata.secret</code></div>
+                        <div><strong>Note:</strong> Both <code className="bg-muted px-1 rounded">token</code> and <code className="bg-muted px-1 rounded">secret</code> are required for all subsequent API calls</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">2. List Plants</h4>
+                      <div className="bg-background p-3 rounded text-sm space-y-2">
+                        <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">GET {process.env.SHINEMONITOR_API_BASE_URL || "https://web.shinemonitor.com/public"}/?sign={`{sign}`}&salt={`{salt}`}&token={`{token}`}&action=webQueryPlants&orderBy=ascPlantId&page={`{page}`}&pagesize={`{pagesize}`}</code></div>
+                        <div><strong>Pagination:</strong> Iterates through pages (page size: 100) until all plants are fetched</div>
+                        <div><strong>Sign Generation for API Calls:</strong></div>
+                        <CodeBlock 
+                          id="shinemonitor-api-sign"
+                          code={`1. Remove sign, salt, token from query string
+2. Get remaining query string from &action onwards
+3. sign = SHA1(salt + secret + token + finalQueryString)
+Example: &action=webQueryPlants&orderBy=ascPlantId&page=0&pagesize=100`}
+                        />
+                        <div><strong>Response Structure:</strong></div>
+                        <CodeBlock 
+                          id="shinemonitor-listplants-response"
+                          code={`{
+  "err": 0,
+  "desc": "success",
+  "dat": {
+    "total": number,
+    "page": number,
+    "pagesize": number,
+    "plant": [
+      {
+        "pid": number,
+        "uid": number,
+        "usr": string,
+        "name": string,
+        "type": number,
+        "status": number (0=NORMAL, 1=ALL_OFFLINE, others=PARTIAL_OFFLINE),
+        "address": {
+          "lon": string,
+          "lat": string,
+          "address": string (optional),
+          "timezone": number
+        },
+        "nominalPower": string (kW, e.g., "3.0000"),
+        "install": string ("YYYY-MM-DD HH:mm:ss"),
+        "gts": string ("YYYY-MM-DD HH:mm:ss"),
+        "outputPower": string (kW, e.g., "0.7574"),
+        "energy": string (kWh daily, e.g., "2.5000"),
+        "energyMonth": string (kWh monthly, e.g., "131.6000"),
+        "energyYear": string (kWh yearly, e.g., "2034.7000"),
+        "energyTotal": string (kWh total, e.g., "2034.7000"),
+        "energyDatDate": string ("YYYY-MM-DD HH:mm:ss")
+      }
+    ]
+  }
+}`}
+                        />
+                        <div><strong>Database Mapping:</strong></div>
+                        <table className="w-full text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left p-2">API Field</th>
+                              <th className="text-left p-2">DB Column</th>
+                              <th className="text-left p-2">Transformation</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="p-2"><code>pid</code></td>
+                              <td className="p-2"><code>vendor_plant_id</code></td>
+                              <td className="p-2">Convert to string</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code>name</code></td>
+                              <td className="p-2"><code>name</code></td>
+                              <td className="p-2">Direct</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code>nominalPower</code></td>
+                              <td className="p-2"><code>capacity_kw</code></td>
+                              <td className="p-2">ParseFloat (string → number, already in kW)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code>outputPower</code></td>
+                              <td className="p-2"><code>current_power_kw</code></td>
+                              <td className="p-2">ParseFloat (already in kW)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code>energy</code></td>
+                              <td className="p-2"><code>daily_energy_kwh</code></td>
+                              <td className="p-2">ParseFloat (already in kWh)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code>energyMonth</code></td>
+                              <td className="p-2"><code>monthly_energy_mwh</code></td>
+                              <td className="p-2">ParseFloat → divide by 1000 (kWh → MWh)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code>energyYear</code></td>
+                              <td className="p-2"><code>yearly_energy_mwh</code></td>
+                              <td className="p-2">ParseFloat → divide by 1000 (kWh → MWh)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code>energyTotal</code></td>
+                              <td className="p-2"><code>total_energy_mwh</code></td>
+                              <td className="p-2">ParseFloat → divide by 1000 (kWh → MWh)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code>status</code></td>
+                              <td className="p-2"><code>network_status</code></td>
+                              <td className="p-2">0→NORMAL, 1→ALL_OFFLINE, others→PARTIAL_OFFLINE</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code>install</code></td>
+                              <td className="p-2"><code>vendor_created_date</code></td>
+                              <td className="p-2">&quot;YYYY-MM-DD HH:mm:ss&quot; → ISO string</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code>gts</code></td>
+                              <td className="p-2"><code>start_operating_time</code></td>
+                              <td className="p-2">&quot;YYYY-MM-DD HH:mm:ss&quot; → ISO string</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code>energyDatDate</code></td>
+                              <td className="p-2"><code>last_update_time</code></td>
+                              <td className="p-2">&quot;YYYY-MM-DD HH:mm:ss&quot; → ISO string</td>
+                            </tr>
+                            <tr>
+                              <td className="p-2"><code>address.lat/lon/address</code></td>
+                              <td className="p-2"><code>location</code> (JSONB)</td>
+                              <td className="p-2">{"{lat, lng, address}"}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">3. Daily Telemetry</h4>
+                      <div className="bg-background p-3 rounded text-sm space-y-2">
+                        <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">GET {process.env.SHINEMONITOR_API_BASE_URL || "https://web.shinemonitor.com/public"}/?sign={`{sign}`}&salt={`{salt}`}&token={`{token}`}&action=queryPlantActiveOuputPowerOneDay&plantid={`{vendorPlantId}`}&date=YYYY-MM-DD</code></div>
+                        <div><strong>Response:</strong></div>
+                        <CodeBlock 
+                          id="shinemonitor-daily-telemetry"
+                          code={`{
+  "err": 0,
+  "desc": "success",
+  "dat": {
+    "outputPower": [
+      {
+        "val": string (kW, e.g., "0.0000", "1.7508"),
+        "ts": string ("YYYY-MM-DD HH:mm:ss")
+      }
+    ],
+    "activePowerSwitch": boolean
+  }
+}`}
+                        />
+                        <div><strong>Note:</strong> ShineMonitor provides 5-minute intervals (vs Solarman&apos;s 15-minute)</div>
+                        <div><strong>Transformation:</strong> Power values are in kW, converted to W for consistency with Solarman format (API route converts back to kW)</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">4. Monthly Telemetry</h4>
+                      <div className="bg-background p-3 rounded text-sm space-y-2">
+                        <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">GET {process.env.SHINEMONITOR_API_BASE_URL || "https://web.shinemonitor.com/public"}/?sign={`{sign}`}&salt={`{salt}`}&token={`{token}`}&action=queryPlantEnergyMonthPerDay&plantid={`{vendorPlantId}`}&date=YYYY-MM</code></div>
+                        <div><strong>Response:</strong></div>
+                        <CodeBlock 
+                          id="shinemonitor-monthly-telemetry"
+                          code={`{
+  "err": 0,
+  "desc": "success",
+  "dat": {
+    "perday": [
+      {
+        "val": string (kWh daily, e.g., "8.4000", "9.8000"),
+        "ts": string ("YYYY-MM-DD HH:mm:ss")
+      }
+    ],
+    "energyTotal": number (kWh monthly total)
+  }
+}`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">5. Yearly Telemetry</h4>
+                      <div className="bg-background p-3 rounded text-sm space-y-2">
+                        <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">GET {process.env.SHINEMONITOR_API_BASE_URL || "https://web.shinemonitor.com/public"}/?sign={`{sign}`}&salt={`{salt}`}&token={`{token}`}&action=queryPlantEnergyYearPerMonth&plantid={`{vendorPlantId}`}&date=YYYY</code></div>
+                        <div><strong>Response:</strong></div>
+                        <CodeBlock 
+                          id="shinemonitor-yearly-telemetry"
+                          code={`{
+  "err": 0,
+  "desc": "success",
+  "dat": {
+    "permonth": [
+      {
+        "val": string (kWh monthly, e.g., "248.4000", "284.2000"),
+        "ts": string ("YYYY-MM-DD HH:mm:ss")
+      }
+    ]
+  }
+}`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">6. Total Telemetry</h4>
+                      <div className="bg-background p-3 rounded text-sm space-y-2">
+                        <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">GET {process.env.SHINEMONITOR_API_BASE_URL || "https://web.shinemonitor.com/public"}/?sign={`{sign}`}&salt={`{salt}`}&token={`{token}`}&action=queryPlantEnergyTotalPerYear&plantid={`{vendorPlantId}`}</code></div>
+                        <div><strong>Note:</strong> API doesn&apos;t support year range filtering, so results are filtered client-side</div>
+                        <div><strong>Response:</strong></div>
+                        <CodeBlock 
+                          id="shinemonitor-total-telemetry"
+                          code={`{
+  "err": 0,
+  "desc": "success",
+  "dat": {
+    "peryear": [
+      {
+        "val": string (kWh yearly, e.g., "967.3000"),
+        "ts": string ("YYYY-MM-DD HH:mm:ss")
+      }
+    ]
+  }
+}`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">7. Alerts & Realtime</h4>
+                      <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-900">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                          <strong>⚠️ Not Yet Implemented:</strong> Alerts and realtime data endpoints are not yet implemented for ShineMonitor.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  )}
+                </div>
+
+                {/* Foxesscloud Section */}
+                <div id="vendor-foxesscloud" className="space-y-4 mt-8">
+                  <VendorSectionHeader vendorId="vendor-foxesscloud" vendorName="Foxesscloud" icon={Factory} />
+                  
+                  {expandedSections.has("vendor-foxesscloud") && (
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-4 border-t">
+                    <div>
+                      <h4 className="font-semibold mb-2">1. Authentication</h4>
+                      <div className="bg-background p-3 rounded text-sm space-y-2">
+                        <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">POST {process.env.FOXESSCLOUD_API_BASE_URL || "https://www.foxesscloud.com"}/c/v0/user/login</code></div>
+                        <div><strong>Request Body:</strong></div>
+                        <CodeBlock 
+                          id="foxesscloud-auth-request"
+                          code={`{
+  "user": "string (username)",
+  "password": "string (MD5 hashed password)"
+}`}
+                        />
+                        <div><strong>Request Headers:</strong></div>
+                        <CodeBlock 
+                          id="foxesscloud-auth-headers"
+                          code={`Accept: application/json, text/plain, */*
+Accept-Language: en-GB,en-US;q=0.9,en;q=0.8
+Content-Type: application/json;charset=UTF-8
+contenttype: application/json
+lang: en
+Origin: {baseUrl}
+Referer: {baseUrl}/login
+timezone: Asia/Calcutta
+timestamp: {current_timestamp_ms}
+User-Agent: Mozilla/5.0...`}
+                        />
+                        <div><strong>Response:</strong></div>
+                        <CodeBlock 
+                          id="foxesscloud-auth-response"
+                          code={`{
+  "errno": 0,
+  "result": {
+    "token": "string",
+    "access": number,
+    "user": string,
+    "weakFlag": boolean
+  }
+}`}
+                        />
+                        <div><strong>Token Storage:</strong> Stored in <code className="bg-muted px-1 rounded">vendors.access_token</code>, <code className="bg-muted px-1 rounded">vendors.token_expires_at</code></div>
+                        <div><strong>Token Expiration:</strong> Default 23 hours 30 minutes (84600 seconds)</div>
+                        <div><strong>Retry Logic:</strong> Implements automatic retry (max 3 attempts) with exponential backoff on authentication failures</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">2. List Plants</h4>
+                      <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-900">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                          <strong>⚠️ Not Yet Implemented:</strong> Plant listing endpoint is not yet implemented for Foxesscloud.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">3. Telemetry</h4>
+                      <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-900">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                          <strong>⚠️ Not Yet Implemented:</strong> Telemetry endpoints (daily, monthly, yearly, total) are not yet implemented for Foxesscloud.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">4. Alerts & Realtime</h4>
+                      <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-900">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                          <strong>⚠️ Not Yet Implemented:</strong> Alerts and realtime data endpoints are not yet implemented for Foxesscloud.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* Backlog Tab - Production Improvements */}
+        <TabsContent value="backlog" className="space-y-6">
+          <Card className="overflow-hidden">
+            <SectionHeader id="backlog" title="Production Improvements Backlog" icon={AlertCircle} />
+            {expandedSections.has("backlog") && (
+              <div className="p-6 pt-0 space-y-6 border-t">
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Production improvements prioritized by <strong>blast radius</strong> (impact/severity). 
+                    Higher blast radius = more critical for production stability and scalability.
+                  </p>
+                  
+                  {/* Critical Blast Radius */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg text-red-600 dark:text-red-400">🔴 Critical Blast Radius (System-Wide Impact)</h3>
+                    
+                    <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-900 space-y-3">
+                      <div>
+                        <h4 className="font-semibold mb-2">1. Database Connection Pooling & Connection Limits</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Entire system - all API routes, cron jobs, vendor syncs
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> Current implementation uses pooled fetch but doesn&apos;t enforce connection limits. 
+                          Under high load, could exhaust Supabase connection pool leading to connection timeouts and cascading failures.
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Impact:</strong> Complete system unavailability during peak load or vendor sync bursts
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Implement connection pool size limits in <code className="bg-background px-1 rounded">lib/vendors/httpClient.ts</code></li>
+                          <li>Add connection queue with timeout for rejected connections</li>
+                          <li>Monitor connection pool metrics (active, idle, waiting)</li>
+                          <li>Add circuit breaker pattern for vendor API calls</li>
+                          <li>Implement retry with exponential backoff for transient failures</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">2. Error Handling & Observability</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> All operations - silent failures can cause data inconsistency
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> Many error paths log to console but don&apos;t surface to monitoring. 
+                          MDC context exists but not fully utilized for error tracking.
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Impact:</strong> Undetected failures, data loss, difficult troubleshooting
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Integrate structured logging with external service (Datadog, Sentry, CloudWatch)</li>
+                          <li>Add error tracking for all vendor API failures with context</li>
+                          <li>Implement alerting for critical error patterns (vendor auth failures, sync failures)</li>
+                          <li>Add distributed tracing for request flows across services</li>
+                          <li>Create error dashboard showing failure rates by vendor/operation</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">3. Rate Limiting & Vendor API Throttling</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> All vendor syncs - can cause vendor API bans
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> No rate limiting on vendor API calls. Concurrent syncs could exceed vendor rate limits, 
+                          leading to API bans and complete sync failures.
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Impact:</strong> Vendor API bans, complete sync failure for affected vendors
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Implement per-vendor rate limiting (requests per minute/hour)</li>
+                          <li>Add request queue with priority for critical operations</li>
+                          <li>Respect vendor API rate limit headers (Retry-After, X-RateLimit-*)</li>
+                          <li>Add exponential backoff on 429 (Too Many Requests) responses</li>
+                          <li>Monitor and alert on rate limit violations</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">4. Database Transaction Management</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Data consistency - partial updates can corrupt data
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> Plant sync uses batch upserts but no explicit transactions. 
+                          Partial failures could leave data in inconsistent state.
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Impact:</strong> Data corruption, inconsistent plant metrics, orphaned records
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Wrap batch operations in database transactions</li>
+                          <li>Implement idempotency keys for sync operations</li>
+                          <li>Add data validation before batch inserts</li>
+                          <li>Create reconciliation jobs to detect and fix inconsistencies</li>
+                          <li>Add database constraints to prevent invalid states</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">5. Session Security & Token Management</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Authentication system - security breach
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> Session tokens in cookies are base64-encoded (not encrypted). 
+                          No token rotation, no session invalidation on password change.
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Impact:</strong> Session hijacking, unauthorized access, security breach
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Encrypt session tokens (use JWT with signing or AES encryption)</li>
+                          <li>Implement session rotation on sensitive operations</li>
+                          <li>Add session invalidation on password change</li>
+                          <li>Store active sessions in database for revocation</li>
+                          <li>Add CSRF protection for state-changing operations</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* High Blast Radius */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg text-orange-600 dark:text-orange-400">🟠 High Blast Radius (Multi-Service Impact)</h3>
+                    
+                    <div className="bg-orange-50 dark:bg-orange-950/20 p-4 rounded-lg border border-orange-200 dark:border-orange-900 space-y-3">
+                      <div>
+                        <h4 className="font-semibold mb-2">6. Cron Job Reliability & Failure Recovery</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> All scheduled syncs - data staleness
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> Cron jobs run in-process. If server crashes, jobs are lost. 
+                          No retry mechanism for failed syncs. No dead letter queue.
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Impact:</strong> Missed syncs, stale data, manual intervention required
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Move cron jobs to external scheduler (Supabase Edge Functions, Cloud Scheduler, cron-job.org)</li>
+                          <li>Implement job queue with retry mechanism (Bull, BullMQ, or Supabase Queue)</li>
+                          <li>Add dead letter queue for permanently failed jobs</li>
+                          <li>Store job execution history in database</li>
+                          <li>Add monitoring and alerting for missed cron executions</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">7. Vendor Token Expiration & Refresh</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> All operations for affected vendors
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> Token expiration checked but refresh logic may fail silently. 
+                          No proactive token refresh before expiration.
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Impact:</strong> Sync failures when tokens expire, manual token refresh required
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Implement proactive token refresh (refresh 5 minutes before expiration)</li>
+                          <li>Add token refresh retry with exponential backoff</li>
+                          <li>Store refresh tokens securely (encrypted in credentials JSONB)</li>
+                          <li>Alert on repeated token refresh failures</li>
+                          <li>Add manual token refresh endpoint for troubleshooting</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">8. Memory Leaks & Resource Management</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Server stability - OOM crashes
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> Large batch operations may hold references. 
+                          Build process already requires increased heap size (4GB). No memory monitoring.
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Impact:</strong> Server crashes, service unavailability, data loss
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Add memory monitoring and alerting</li>
+                          <li>Implement streaming for large batch operations</li>
+                          <li>Add resource cleanup in error paths</li>
+                          <li>Profile memory usage during sync operations</li>
+                          <li>Consider pagination for large result sets</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">9. Database Index Optimization</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Query performance - slow API responses
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> Some queries may not use optimal indexes. 
+                          No query performance monitoring. Missing composite indexes for common query patterns.
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Impact:</strong> Slow API responses, poor user experience, database load
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Analyze slow query logs (enable pg_stat_statements)</li>
+                          <li>Add composite indexes for common query patterns (org_id + vendor_id, etc.)</li>
+                          <li>Add partial indexes for filtered queries (WHERE is_active = true)</li>
+                          <li>Monitor index usage and remove unused indexes</li>
+                          <li>Add query performance metrics to monitoring</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">10. Telemetry Database Retention & Cleanup</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Telemetry system - storage costs, query performance
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> 24-hour retention mentioned but no automated cleanup job. 
+                          Old data accumulates, increasing storage costs and slowing queries.
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Impact:</strong> Increasing storage costs, degraded query performance
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Implement automated cleanup job (delete data older than 24 hours)</li>
+                          <li>Add retention policy configuration per organization</li>
+                          <li>Archive old data to cold storage before deletion</li>
+                          <li>Monitor storage usage and cleanup job execution</li>
+                          <li>Add alerts for storage threshold breaches</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Medium Blast Radius */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg text-yellow-600 dark:text-yellow-400">🟡 Medium Blast Radius (Feature/Service Impact)</h3>
+                    
+                    <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-900 space-y-3">
+                      <div>
+                        <h4 className="font-semibold mb-2">11. Per-Vendor Restricted Sync Window Implementation</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Vendor sync scheduling
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> Restricted window is global (env var). 
+                          Should be per-vendor configurable via UI (currently only default exists).
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Add restricted_window_start/end columns to vendors table</li>
+                          <li>Update cron to check per-vendor windows</li>
+                          <li>Add UI controls in vendor sync settings</li>
+                          <li>Default to 8 PM - 5 AM IST if not specified</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">12. Twice-Daily listPlants for PER_PLANT Vendors</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> PER_PLANT vendor sync accuracy
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> plant_list_sync_morning_ist/evening_ist configured but not wired into cron.
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Create separate cron job for twice-daily listPlants refresh</li>
+                          <li>Only run for PER_PLANT mode vendors</li>
+                          <li>Respect vendor-specific morning/evening times</li>
+                          <li>Add monitoring for execution success</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">13. ShineMonitor & Foxesscloud Full Implementation</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Feature completeness for these vendors
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> Only authentication implemented. Plants, telemetry, alerts pending.
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Implement listPlants() for both vendors</li>
+                          <li>Implement telemetry endpoints</li>
+                          <li>Implement alert sync (if supported by vendor)</li>
+                          <li>Add to vendor capabilities matrix</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">14. API Response Caching</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> API performance, database load
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> No caching for read-heavy endpoints (dashboard, plant lists, etc.)
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Implement Redis or in-memory cache for dashboard data</li>
+                          <li>Add cache invalidation on data updates</li>
+                          <li>Cache with appropriate TTLs (1-5 minutes for dynamic data)</li>
+                          <li>Add cache hit/miss metrics</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">15. Database Backup & Disaster Recovery</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Data loss risk
+                        </p>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Issue:</strong> No documented backup strategy or recovery procedures.
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Document Supabase backup configuration (point-in-time recovery)</li>
+                          <li>Create disaster recovery runbook</li>
+                          <li>Test backup restoration procedures</li>
+                          <li>Add backup verification alerts</li>
+                          <li>Document RTO/RPO requirements</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Low Blast Radius */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg text-blue-600 dark:text-blue-400">🔵 Low Blast Radius (Optimization/Enhancement)</h3>
+                    
+                    <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900 space-y-3">
+                      <div>
+                        <h4 className="font-semibold mb-2">16. API Documentation (OpenAPI/Swagger)</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Developer experience
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Generate OpenAPI spec from Next.js API routes</li>
+                          <li>Add Swagger UI endpoint</li>
+                          <li>Document request/response schemas</li>
+                          <li>Add example requests/responses</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">17. Performance Monitoring & APM</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Observability
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Integrate APM tool (New Relic, Datadog APM, or similar)</li>
+                          <li>Add custom metrics for business operations (sync duration, plant counts, etc.)</li>
+                          <li>Create performance dashboards</li>
+                          <li>Set up SLOs/SLIs for critical operations</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">18. Load Testing & Capacity Planning</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Scalability planning
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Create load test scenarios (k6, Artillery, or Locust)</li>
+                          <li>Test vendor sync under load</li>
+                          <li>Identify bottlenecks and capacity limits</li>
+                          <li>Document scaling recommendations</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">19. Automated Testing Suite</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Code quality, regression prevention
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Add unit tests for services (plantSyncService, alertSyncService)</li>
+                          <li>Add integration tests for API routes</li>
+                          <li>Add E2E tests for critical user flows</li>
+                          <li>Add vendor adapter mock tests</li>
+                          <li>Set up CI/CD test pipeline</li>
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">20. Documentation & Runbooks</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Operational efficiency
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Create runbooks for common issues (vendor sync failures, token expiration, etc.)</li>
+                          <li>Document troubleshooting procedures</li>
+                          <li>Add architecture decision records (ADRs)</li>
+                          <li>Create onboarding documentation for new developers</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
