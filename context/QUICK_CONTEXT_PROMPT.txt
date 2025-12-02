@@ -1,4 +1,4 @@
-You are continuing development on WOMS (Work Order Management System) - a unified solar monitoring platform built with Next.js 14, TypeScript, TailwindCSS, and Supabase.
+You are continuing development on Solar Information System (SIS) - a unified solar monitoring platform built with Next.js 14, TypeScript, TailwindCSS, and Supabase.
 
 KEY CONTEXT:
 - Custom authentication using `accounts` table (NOT Supabase Auth)

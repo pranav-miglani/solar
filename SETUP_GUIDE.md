@@ -1,6 +1,6 @@
-# WOMS Setup Guide
+# Solar Information System Setup Guide
 
-This guide will help you set up the Work Order Management System from scratch.
+This guide will help you set up the Solar Information System from scratch.
 
 ## Prerequisites
 

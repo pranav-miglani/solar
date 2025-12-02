@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a comprehensive analysis of the cron job implementation for plant synchronization in the WOMS (Work Order Management System). The cron system automatically syncs plant data from vendor APIs at regular intervals, with support for time-based restrictions, organization-level configuration, and comprehensive logging.
+This document provides a comprehensive analysis of the cron job implementation for plant synchronization in the Solar Information System (SIS). The cron system automatically syncs plant data from vendor APIs at regular intervals, with support for time-based restrictions, organization-level configuration, and comprehensive logging.
 
 ## Architecture Overview
 

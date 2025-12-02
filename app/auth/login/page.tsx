@@ -330,7 +330,7 @@ function LoginForm() {
               className="mt-6 text-center text-xs text-muted-foreground flex items-center justify-center gap-2"
             >
               <Zap className="w-3 h-3" />
-              <span>Work Order Management System</span>
+              <span>Solar Information System</span>
             </motion.div>
           </CardContent>
         </Card>

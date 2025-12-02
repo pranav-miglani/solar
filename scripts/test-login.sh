@@ -3,7 +3,7 @@
 # Test Login API Script
 # This script tests the login API endpoint with various scenarios
 
-echo "🧪 Testing WOMS Login API"
+echo "🧪 Testing Solar Information System Login API"
 echo "=========================="
 echo ""
 

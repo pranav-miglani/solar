@@ -1,6 +1,6 @@
-# WOMS - Unified Solar Monitoring & Work Order System
+# Solar Information System
 
-A complete, production-ready Work Order Management System (WOMS) designed for solar energy monitoring, work order management, and multi-vendor integration. The system provides a unified dashboard that adapts to different user roles, real-time telemetry tracking, alert management, and comprehensive efficiency analytics.
+A complete, production-ready Solar Information System (SIS) designed for solar energy monitoring, information management, and multi-vendor integration. The system provides a unified dashboard that adapts to different user roles, real-time telemetry tracking, alert management, and comprehensive analytics.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ A complete, production-ready Work Order Management System (WOMS) designed for so
 
 ## Overview
 
-WOMS is a comprehensive platform that enables:
+Solar Information System is a comprehensive platform that enables:
 
 - **Unified Monitoring**: Single dashboard interface for all user roles with role-specific data views
 - **Multi-Vendor Integration**: Pluggable adapter system supporting multiple solar inverter vendors
@@ -1762,7 +1762,7 @@ After creating users via the Supabase console (see [Setup & Installation](#setup
 
 ## Additional Resources
 
-- **[SETUP_GUIDE.md](./SETUP_GUIDE.md)** - **📖 Complete setup guide** - Step-by-step instructions for setting up WOMS from scratch
+- **[SETUP_GUIDE.md](./SETUP_GUIDE.md)** - **📖 Complete setup guide** - Step-by-step instructions for setting up Solar Information System from scratch
 - **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - **🔧 Troubleshooting guide** - Common issues and solutions
 - **[TROUBLESHOOTING_MIGRATIONS.md](./TROUBLESHOOTING_MIGRATIONS.md)** - **🗄️ Database migration troubleshooting** - Specific help for migration issues
 

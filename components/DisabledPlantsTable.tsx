@@ -132,7 +132,7 @@ export function DisabledPlantsTable() {
               {plants.length} Disabled Plant{plants.length !== 1 ? "s" : ""}
             </h3>
             <p className="text-sm text-orange-700 dark:text-orange-300">
-              Plants that haven&apos;t been refreshed in 15+ days
+              Plants that haven&apos;t been refreshed in 3+ days
             </p>
           </div>
         </div>
@@ -164,7 +164,7 @@ export function DisabledPlantsTable() {
                         No disabled plants found
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Plants are automatically disabled after 15 days of inactivity
+                        Plants are automatically disabled after 3 days of inactivity
                       </p>
                     </div>
                   </TableCell>

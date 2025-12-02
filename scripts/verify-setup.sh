@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Setup Verification Script
-# This script verifies that the WOMS setup is complete and working
+# This script verifies that the Solar Information System setup is complete and working
 
-echo "🔍 WOMS Setup Verification"
+echo "🔍 Solar Information System Setup Verification"
 echo "=========================="
 echo ""
 

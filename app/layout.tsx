@@ -6,8 +6,8 @@ import { Providers } from "@/components/providers"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Work Order Management System",
-  description: "Complete work order and telemetry management platform",
+  title: "Solar Information System",
+  description: "Complete solar plant monitoring, telemetry, and information management platform",
 }
 
 export default function RootLayout({

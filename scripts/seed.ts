@@ -1,5 +1,5 @@
 /**
- * Seed script for WOMS database
+ * Seed script for Solar Information System database
  * Run with: npx tsx scripts/seed.ts
  * 
  * Make sure to have .env.local file with required environment variables

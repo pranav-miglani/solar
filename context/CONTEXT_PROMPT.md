@@ -1,14 +1,14 @@
-# WOMS - Complete Project Context Prompt
+# Solar Information System - Complete Project Context Prompt
 
 Use this prompt to restore full context after clearing chat history.
 
 ---
 
-You are an expert full-stack engineer continuing development on a **Work Order Management System (WOMS)** - a unified solar monitoring and work order management platform. The system is built with Next.js 14 (App Router), TypeScript, TailwindCSS/shadcn/ui, and Supabase.
+You are an expert full-stack engineer continuing development on **Solar Information System (SIS)** - a unified solar monitoring and information management platform. The system is built with Next.js 14 (App Router), TypeScript, TailwindCSS/shadcn/ui, and Supabase.
 
 ## PROJECT OVERVIEW
 
-**Name**: WOMS — Unified Solar Monitoring & Work Order System
+**Name**: Solar Information System — Unified Solar Monitoring & Information Management
 
 **Core Goals**:
 - One **unified dashboard** (`/dashboard`) for all user types

@@ -2,11 +2,11 @@
 
 ---
 
-You are an expert full-stack engineer continuing development on **WOMS (Work Order Management System)** - a unified solar monitoring and work order management platform.
+You are an expert full-stack engineer continuing development on **Solar Information System (SIS)** - a unified solar monitoring and information management platform.
 
 ## PROJECT SUMMARY
 
-**WOMS** is a production-ready system built with:
+**Solar Information System** is a production-ready system built with:
 - **Next.js 14** (App Router), **TypeScript**, **TailwindCSS/shadcn/ui**, **Supabase**
 - **Custom authentication** (NOT Supabase Auth) using `accounts` table
 - **Unified dashboard** at `/dashboard` that adapts to user role (SUPERADMIN, GOVT, ORG)

@@ -267,11 +267,11 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         }
       }
 
-      setSyncSettingsDialogOpen(false)
-      setSelectedOrgForSync(null)
+        setSyncSettingsDialogOpen(false)
+        setSelectedOrgForSync(null)
       setSelectedVendorForSyncId(null)
       // Refresh vendors to get updated org + vendor data
-      fetchVendors()
+        fetchVendors()
     } catch (error: any) {
       alert(`Error updating sync settings: ${error.message}`)
     }
@@ -600,19 +600,19 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border">
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          {!isReadOnlyGovt && (
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button
-                    onClick={() => openDialog()}
-                    className="w-full sm:w-auto transition-all duration-200 hover:scale-105 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg hover:shadow-xl"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Vendor
-                  </Button>
-                </motion.div>
-              </DialogTrigger>
+        {!isReadOnlyGovt && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button
+                  onClick={() => openDialog()}
+                  className="w-full sm:w-auto transition-all duration-200 hover:scale-105 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg hover:shadow-xl"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Vendor
+                </Button>
+              </motion.div>
+            </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
@@ -944,8 +944,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-xs font-semibold text-muted-foreground">
-                        Mode
-                      </Label>
+                      Mode
+                    </Label>
                     <div className="flex flex-col gap-2 text-xs">
                       <Button
                         type="button"
@@ -1080,7 +1080,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
               </form>
             </DialogContent>
           </Dialog>
-          )}
+        )}
           {isSuperAdmin && (
             <>
               <motion.div 
@@ -1632,7 +1632,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                     Manual/force sync is always available on request.
                   </p>
                 </div>
-                <div className="space-y-2">
+                  <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="w-32 text-xs text-blue-800 dark:text-blue-200">
                       Morning Sync
@@ -1684,8 +1684,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                   <p className="text-xs text-purple-800 dark:text-purple-200">
                     Live telemetry (current power, daily/monthly/yearly energy, network status) is synced at regular intervals.
                     Choose how telemetry is fetched from the vendor.
-                  </p>
-                </div>
+                    </p>
+                  </div>
 
                 <div className="space-y-3">
                   <div className="space-y-2">

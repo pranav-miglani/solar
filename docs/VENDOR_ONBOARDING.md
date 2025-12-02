@@ -1,6 +1,6 @@
 # Vendor Onboarding Guide
 
-This document outlines the requirements and process for onboarding a new vendor integration into WOMS (Work Order Management System). Use this guide to understand what data is required, how it's stored, and what needs to be implemented.
+This document outlines the requirements and process for onboarding a new vendor integration into Solar Information System (SIS). Use this guide to understand what data is required, how it's stored, and what needs to be implemented.
 
 ## Table of Contents
 
@@ -30,7 +30,7 @@ This document outlines the requirements and process for onboarding a new vendor 
 
 ## Overview
 
-WOMS uses a vendor adapter pattern to integrate with different solar inverter vendors. Each vendor must implement a standardized interface that provides:
+Solar Information System uses a vendor adapter pattern to integrate with different solar inverter vendors. Each vendor must implement a standardized interface that provides:
 
 - **Plant Listing**: Fetch all plants/stations from the vendor
 - **Authentication**: Handle vendor API authentication and token management

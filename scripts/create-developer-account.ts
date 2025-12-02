@@ -2,7 +2,7 @@
 /**
  * Create DEVELOPER Account Script
  * 
- * This script creates a DEVELOPER account in the WOMS system.
+ * This script creates a DEVELOPER account in the Solar Information System.
  * DEVELOPER accounts have all SUPERADMIN privileges plus access to documentation.
  * 
  * DEVELOPER accounts CANNOT be created via the UI - they must be created using this script.

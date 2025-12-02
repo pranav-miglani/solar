@@ -1,4 +1,4 @@
-# Work Order Management System - UI & Functionality Updates
+# Solar Information System - UI & Functionality Updates
 
 ## Summary
 This PR includes major UI improvements, plant selection fixes, API optimization, and new views for organization plants and work order details.

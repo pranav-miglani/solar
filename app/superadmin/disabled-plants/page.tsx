@@ -36,7 +36,7 @@ export default async function DisabledPlantsPage() {
             Disabled Plants
           </h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
-            Manage plants that have been inactive for 15+ days
+            Manage plants that have been inactive for 3+ days
           </p>
         </div>
         <DisabledPlantsTable />

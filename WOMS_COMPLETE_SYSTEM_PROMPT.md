@@ -1,8 +1,8 @@
-# WOMS (Work Order Management System) - Complete System Specification
+# Solar Information System - Complete System Specification
 
 ## System Overview
 
-Build a production-ready **Work Order Management System (WOMS)** for managing solar power plant operations, work orders, alerts, and vendor integrations. The system must handle multiple organizations, vendors (Solarman, Sungrow, etc.), plants, telemetry data, alerts, and work order efficiency tracking.
+Build a production-ready **Solar Information System (SIS)** for managing solar power plant operations, information management, alerts, and vendor integrations. The system must handle multiple organizations, vendors (Solarman, Sungrow, etc.), plants, telemetry data, alerts, and comprehensive analytics.
 
 ## Tech Stack Requirements
 

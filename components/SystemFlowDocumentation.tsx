@@ -753,7 +753,7 @@ export function SystemFlowDocumentation() {
                 <div className="space-y-4">
                   <h3 className="font-semibold text-lg">Database Architecture</h3>
                     <p className="text-sm text-muted-foreground">
-                      WOMS uses <strong>a single Supabase database instance</strong>:
+                      Solar Information System uses <strong>a single Supabase database instance</strong>:
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
                       <li><strong>Main Database:</strong> All application data including live telemetry metrics stored in <code className="bg-background px-1 rounded">plants</code> table</li>
@@ -1223,7 +1223,7 @@ export function SystemFlowDocumentation() {
                   {/* Disabled Plants Table */}
                   <div className="bg-muted/50 p-4 rounded-lg space-y-2">
                     <h4 className="font-semibold">disabled_plants</h4>
-                    <p className="text-sm text-muted-foreground">Plants inactive for 15+ days</p>
+                    <p className="text-sm text-muted-foreground">Plants inactive for 3+ days</p>
                     <table className="w-full text-xs border-collapse mt-2">
                       <thead>
                         <tr className="border-b">
@@ -1311,9 +1311,6 @@ Unique Constraints:
                         <li>
                           <code className="bg-red-100 dark:bg-red-900 px-1 rounded">work_order_plant_eff</code> - Performance ratio (PR) calculations not implemented. 
                           Table exists in schema but is never populated. Only referenced by <code className="bg-red-100 dark:bg-red-900 px-1 rounded">/api/workorders/[id]/efficiency</code> endpoint which reads from it but no data is written.
-                          <div className="mt-1 text-xs">
-                            <strong>Migration:</strong> <code className="bg-red-100 dark:bg-red-900 px-1 rounded">026_drop_unused_tables.sql</code> created to drop this table.
-                          </div>
                         </li>
                       </ul>
                       <div className="mt-3 text-xs text-red-700 dark:text-red-300">
@@ -2289,7 +2286,7 @@ Unique Constraints:
                 <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
                   <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">System Prompt</h4>
                   <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
-                    These prompts can be used with Cursor AI to understand and work with the WOMS codebase.
+                    These prompts can be used with Cursor AI to understand and work with the Solar Information System codebase.
                   </p>
                 </div>
 
@@ -2298,10 +2295,10 @@ Unique Constraints:
                     <h4 className="font-medium mb-2">Complete System Specification Prompt</h4>
                     <CodeBlock 
                       id="system-prompt"
-                      code={`# WOMS (Work Order Management System) - Complete System Specification
+                      code={`# Solar Information System - Complete System Specification
 
 ## System Overview
-Build a production-ready **Work Order Management System (WOMS)** for managing solar power plant operations, work orders, alerts, and vendor integrations. The system must handle multiple organizations, vendors (Solarman, Sungrow, etc.), plants, telemetry data, alerts, and work order efficiency tracking.
+Build a production-ready **Solar Information System (SIS)** for managing solar power plant operations, information management, alerts, and vendor integrations. The system must handle multiple organizations, vendors (Solarman, Sungrow, etc.), plants, telemetry data, alerts, and comprehensive analytics.
 
 ## Tech Stack Requirements
 - **Next.js 14+** with App Router (TypeScript)
@@ -3785,7 +3782,6 @@ User-Agent: Mozilla/5.0...`}
                           <strong>Impact:</strong> Confusion, unnecessary maintenance, potential for bugs if someone tries to use deprecated features
                         </p>
                         <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                          <li>Create migration to drop <code className="bg-background px-1 rounded">work_order_plant_eff</code> table and related indexes (migration <code className="bg-background px-1 rounded">026_drop_unused_tables.sql</code> created)</li>
                           <li>Remove or deprecate efficiency endpoint</li>
                           <li>Remove telemetry database environment variable references from documentation and code comments</li>
                           <li>Clean up any remaining references to separate telemetry database in codebase</li>
