@@ -4121,20 +4121,7 @@ User-Agent: Mozilla/5.0...`}
                     
                     <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900 space-y-3">
                       <div>
-                        <h4 className="font-semibold mb-2">16. API Documentation (OpenAPI/Swagger)</h4>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          <strong>Blast Radius:</strong> Developer experience
-                        </p>
-                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                          <li>Generate OpenAPI spec from Next.js API routes</li>
-                          <li>Add Swagger UI endpoint</li>
-                          <li>Document request/response schemas</li>
-                          <li>Add example requests/responses</li>
-                        </ul>
-                      </div>
-
-                      <div>
-                        <h4 className="font-semibold mb-2">17. Performance Monitoring & APM</h4>
+                        <h4 className="font-semibold mb-2">16. Performance Monitoring & APM</h4>
                         <p className="text-sm text-muted-foreground mb-2">
                           <strong>Blast Radius:</strong> Observability
                         </p>
