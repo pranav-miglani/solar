@@ -222,28 +222,230 @@ export class SolarDmAdapter extends BaseVendorAdapter {
   }
 
   /**
-   * Get a single plant by vendor plant ID
-   * Since SolarDM doesn't have a single plant endpoint, we fetch all and filter
+   * Parse SolarDM value string (e.g., "12.8_kWh", "0_KW") to numeric value
+   * @param valueStr - String in format "number_unit" (e.g., "12.8_kWh")
+   * @returns Parsed numeric value or null if parsing fails
    */
-  async listPlant(vendorPlantId: string): Promise<Plant | null> {
-    const allPlants = await this.listPlants()
-    const plant = allPlants.find((p) => p.id === vendorPlantId)
-    
-    if (!plant) {
+  private parseSolarDmValue(valueStr: string | null | undefined): number | null {
+    if (!valueStr || typeof valueStr !== 'string') {
       return null
     }
 
-    // For SolarDM, we need to fetch live telemetry separately
-    // The listPlants() endpoint doesn't provide current power or energy metrics
-    // So we return what we have, and live telemetry sync will need to use other endpoints
-    return plant
+    // Split by underscore to separate number from unit
+    const parts = valueStr.split('_')
+    if (parts.length === 0) {
+      return null
+    }
+
+    const numericPart = parts[0]
+    const parsed = parseFloat(numericPart)
+    
+    return isNaN(parsed) ? null : parsed
+  }
+
+  /**
+   * Get a single plant by vendor plant ID with live telemetry
+   * Uses SolarDM's plant info and metering endpoints to fetch all data in 2 API calls
+   * 
+   * Endpoints:
+   * - GET /dms/plant/{vendorPlantId} - Plant info (name, network status, last update time)
+   * - GET /dms/data_panel/metering/sub_v2/{vendorPlantId} - Live telemetry (power, energy)
+   * 
+   * Note: This method does NOT call listPlants() to avoid fetching all plants unnecessarily.
+   * The returned Plant object may have minimal data (name, capacityKw=0) since we only
+   * fetch what's needed for live telemetry sync. The sync service only uses the metadata.
+   * 
+   * @param vendorPlantId - The vendor-specific plant ID
+   * @returns Plant object with live telemetry in metadata, or null if plant not found
+   */
+  async listPlant(vendorPlantId: string): Promise<Plant | null> {
+    const baseUrl = this.getApiBaseUrl()
+
+    // Fetch plant info to get name, network status (communicateStatus), and lastUpdateTime
+    let plantName: string | null = null
+    let networkStatus: string | null = null
+    let lastUpdateTime: string | null = null
+
+    try {
+      const plantInfoUrl = `${baseUrl}/dms/plant/${vendorPlantId}`
+      console.log(`[SolarDM] Fetching plant info for plant ${vendorPlantId} from: ${plantInfoUrl}`)
+
+      const plantInfoResponse = await this.loggedFetch(
+        plantInfoUrl,
+        {
+          method: "GET",
+        },
+        {
+          operation: "GET_PLANT_INFO",
+          description: `Fetch SolarDM plant info for plant ${vendorPlantId}`,
+        }
+      )
+
+      if (!plantInfoResponse.ok) {
+        const errorText = await plantInfoResponse.text()
+        console.error(`[SolarDM] Failed to fetch plant info for plant ${vendorPlantId}:`, {
+          status: plantInfoResponse.status,
+          statusText: plantInfoResponse.statusText,
+          error: errorText,
+        })
+        // Continue to try metering endpoint - plant might still exist
+      } else {
+        const plantInfoData = await plantInfoResponse.json()
+
+        if (plantInfoData.code === 0 && plantInfoData.data) {
+          const plantData = plantInfoData.data
+          plantName = plantData.plantName || null
+
+          // Map communicateStatus to networkStatus (same mapping as listPlants)
+          if (plantData.communicateStatus === 1) {
+            networkStatus = "NORMAL"
+          } else if (plantData.communicateStatus === 2) {
+            networkStatus = "ALL_OFFLINE"
+          } else if (plantData.communicateStatus === 3) {
+            networkStatus = "PARTIAL_OFFLINE"
+          }
+
+          // Parse lastUpdateTime from "2025-12-03 17:24:27" format to ISO string
+          if (plantData.lastUpdateTime) {
+            try {
+              // Replace space with T to make it ISO-like, then convert
+              const dateStr = plantData.lastUpdateTime.replace(" ", "T")
+              const date = new Date(dateStr)
+              if (!isNaN(date.getTime())) {
+                lastUpdateTime = date.toISOString()
+              }
+            } catch (parseError) {
+              console.warn(`[SolarDM] Failed to parse lastUpdateTime: ${plantData.lastUpdateTime}`, parseError)
+            }
+          }
+
+          console.log(`[SolarDM] Plant info fetched:`, {
+            plantName,
+            communicateStatus: plantData.communicateStatus,
+            networkStatus,
+            lastUpdateTime,
+          })
+        } else if (plantInfoData.code !== 0) {
+          // Plant not found
+          console.warn(`[SolarDM] Plant ${vendorPlantId} not found: ${plantInfoData.message}`)
+          return null
+        }
+      }
+    } catch (plantInfoError: any) {
+      console.warn(`[SolarDM] Error fetching plant info for plant ${vendorPlantId}:`, plantInfoError.message)
+      // Continue to try metering endpoint - might still be able to get telemetry
+    }
+
+    // If plant info fetch failed and we don't have a name, the plant likely doesn't exist
+    if (!plantName) {
+      console.warn(`[SolarDM] Could not fetch plant info for ${vendorPlantId}, plant may not exist`)
+      // Still try metering endpoint in case it works
+    }
+
+    // Fetch live telemetry data from metering endpoint
+    try {
+      const meteringUrl = `${baseUrl}/dms/data_panel/metering/sub_v2/${vendorPlantId}`
+      console.log(`[SolarDM] Fetching live telemetry for plant ${vendorPlantId} from: ${meteringUrl}`)
+
+      const response = await this.loggedFetch(
+        meteringUrl,
+        {
+          method: "GET",
+        },
+        {
+          operation: "GET_PLANT_LIVE_TELEMETRY",
+          description: `Fetch SolarDM live telemetry for plant ${vendorPlantId}`,
+        }
+      )
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`[SolarDM] Failed to fetch live telemetry for plant ${vendorPlantId}:`, {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+        })
+        throw new Error(`Failed to fetch live telemetry: ${response.statusText} - ${errorText}`)
+      }
+
+      const data = await response.json()
+
+      if (data.code !== 0 || !data.data?.energy) {
+        throw new Error(`SolarDM API error: ${data.message || "Unknown error"}`)
+      }
+
+      const energy = data.data.energy
+
+      // Parse values from strings like "12.8_kWh", "0_KW"
+      // currDay, currMonth, currYear, total are in kWh format: "12.8_kWh"
+      // power is in kW format: "0_KW"
+      const dailyEnergyKwh = this.parseSolarDmValue(energy.currDay)
+      const monthlyEnergyKwh = this.parseSolarDmValue(energy.currMonth)
+      const yearlyEnergyKwh = this.parseSolarDmValue(energy.currYear)
+      const totalEnergyKwh = this.parseSolarDmValue(energy.total)
+      const currentPowerKw = this.parseSolarDmValue(energy.power)
+
+      // Convert monthly, yearly, and total from kWh to MWh
+      const monthlyEnergyMwh = monthlyEnergyKwh !== null ? monthlyEnergyKwh / 1000 : null
+      const yearlyEnergyMwh = yearlyEnergyKwh !== null ? yearlyEnergyKwh / 1000 : null
+      const totalEnergyMwh = totalEnergyKwh !== null ? totalEnergyKwh / 1000 : null
+
+      // Use lastUpdateTime from plant info, or fallback to current time
+      if (!lastUpdateTime) {
+        lastUpdateTime = new Date().toISOString()
+      }
+
+      console.log(`[SolarDM] Successfully fetched live telemetry for plant ${vendorPlantId}:`, {
+        currentPowerKw,
+        dailyEnergyKwh,
+        monthlyEnergyMwh,
+        yearlyEnergyMwh,
+        totalEnergyMwh,
+      })
+
+      // Construct Plant object from fetched data
+      // Note: capacityKw is set to 0 since we don't fetch it here (only needed for live telemetry sync)
+      // The sync service only uses metadata, so this is acceptable
+      return {
+        id: vendorPlantId,
+        name: plantName || `Plant ${vendorPlantId}`,
+        capacityKw: 0, // Not available from plant info endpoint, but sync service only uses metadata
+        location: undefined, // Not available from plant info endpoint
+        metadata: {
+          currentPowerKw,
+          dailyEnergyKwh,
+          monthlyEnergyMwh,
+          yearlyEnergyMwh,
+          totalEnergyMwh,
+          networkStatus,
+          lastUpdateTime,
+        },
+      }
+    } catch (error: any) {
+      console.error(`[SolarDM] Error fetching live telemetry for plant ${vendorPlantId}:`, error.message)
+      // If we have plant name from plant info, return minimal plant object
+      // Otherwise return null (plant doesn't exist or both endpoints failed)
+      if (plantName) {
+        return {
+          id: vendorPlantId,
+          name: plantName,
+          capacityKw: 0,
+          location: undefined,
+          metadata: {
+            networkStatus,
+            lastUpdateTime,
+          },
+        }
+      }
+      return null
+    }
   }
 
   /**
    * List all plants from SolarDM
    * Endpoint: GET /dms/plant/list_all
    */
-  async listPlants(): Promise<Plant[]> {
+async listPlants(): Promise<Plant[]> {
     const token = await this.authenticate()
     const baseUrl = this.getApiBaseUrl()
     const url = `${baseUrl}/dms/plant/list_all`

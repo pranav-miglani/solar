@@ -82,7 +82,7 @@ const vendorCapabilities: VendorCapability[] = [
     defaultMode: "PER_PLANT",
     authApi: "POST /ums/business/email_login",
     listPlantsApi: "GET /dms/plant/list_all",
-    listPlantApi: "GET /dms/plant/list_all (filtered client-side)",
+    listPlantApi: "GET /dms/plant/{vendorPlantId} + GET /dms/data_panel/metering/sub_v2/{vendorPlantId}",
     telemetryApi: "GET /dms/data_panel/history/stats/daily/{plantId}",
     alertsApi: "GET /dms/inverter_fault/page_list/all (paginated)",
     mappingStatus: "Complete",
@@ -3157,20 +3157,79 @@ All vendor adapters must extend BaseVendorAdapter and implement:
                     <div>
                       <h4 className="font-semibold mb-2">3. List Single Plant (listPlant)</h4>
                       <div className="bg-background p-3 rounded text-sm space-y-2">
-                        <div><strong>Implementation:</strong> Client-side filtering from <code className="bg-muted px-1 rounded">listPlants()</code></div>
-                        <div><strong>Purpose:</strong> Fetch a single plant by vendor plant ID. Used for live telemetry enrichment during plant sync or in PER_PLANT telemetry sync mode.</div>
+                        <div><strong>Endpoints:</strong> 
+                          <ul className="ml-4 mt-1 list-disc">
+                            <li><code className="bg-muted px-1 rounded">GET /dms/plant/{`{vendorPlantId}`}</code> - Plant info (name, network status, last update time)</li>
+                            <li><code className="bg-muted px-1 rounded">GET /dms/data_panel/metering/sub_v2/{`{vendorPlantId}`}</code> - Live telemetry (power, energy)</li>
+                          </ul>
+                        </div>
+                        <div><strong>Purpose:</strong> Fetch a single plant by vendor plant ID with live telemetry. Used for live telemetry sync in PER_PLANT mode.</div>
                         <div className="bg-purple-50 dark:bg-purple-950/20 p-3 rounded-lg border border-purple-200 dark:border-purple-900 mb-3">
                           <h5 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">📋 Implementation Details</h5>
                           <ul className="text-xs text-purple-800 dark:text-purple-200 space-y-1 ml-4 list-disc">
-                            <li>Calls <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">GET /dms/plant/list_all</code> (same as listPlants())</li>
-                            <li>Filters the response client-side by matching <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">vendorPlantId</code></li>
-                            <li>Returns the matching plant or null if not found</li>
-                            <li><strong>Note:</strong> SolarDM&apos;s listPlants() doesn&apos;t provide live telemetry fields (current_power_kw, daily_energy_kwh, etc.)</li>
-                            <li>Live telemetry must be fetched separately via telemetry APIs during live telemetry sync</li>
-                            <li>Used in PER_PLANT telemetry sync mode for live telemetry updates</li>
+                            <li><strong>Plant Info Endpoint:</strong> <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">GET /dms/plant/{`{vendorPlantId}`}</code>
+                              <ul className="ml-4 mt-1 list-disc">
+                                <li>Returns: <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">plantName</code>, <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">communicateStatus</code>, <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">lastUpdateTime</code></li>
+                                <li>Maps <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">communicateStatus</code> to <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">networkStatus</code> (1=NORMAL, 2=ALL_OFFLINE, 3=PARTIAL_OFFLINE)</li>
+                              </ul>
+                            </li>
+                            <li><strong>Metering Endpoint:</strong> <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">GET /dms/data_panel/metering/sub_v2/{`{vendorPlantId}`}</code>
+                              <ul className="ml-4 mt-1 list-disc">
+                                <li>Returns live telemetry: <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">currDay</code>, <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">currMonth</code>, <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">currYear</code>, <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">total</code>, <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">power</code></li>
+                                <li>Values are in string format: <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">&quot;12.8_kWh&quot;</code>, <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">&quot;0_KW&quot;</code></li>
+                                <li>Parsed and converted: kWh → MWh for monthly/yearly/total, W → kW for power</li>
+                              </ul>
+                            </li>
+                            <li><strong>Optimization:</strong> No longer calls <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">listPlants()</code> - makes only 2 direct API calls per plant</li>
+                            <li><strong>Used in:</strong> PER_PLANT telemetry sync mode for live telemetry updates</li>
                           </ul>
                         </div>
-                        <div><strong>Database Mapping:</strong> Same as listPlants() - see section 2 above. Only provides basic plant info (id, name, capacity, location, network_status).</div>
+                        <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                          <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📊 Response Format</h5>
+                          <div className="text-xs text-blue-800 dark:text-blue-200 space-y-2">
+                            <div><strong>Plant Info Response:</strong></div>
+                            <CodeBlock 
+                              id="solardm-listplant-info"
+                              code={`{
+  "code": 0,
+  "data": {
+    "id": "1994347708036210689",
+    "plantName": "4261,2,46",
+    "communicateStatus": 2,
+    "alarmStatus": 1,
+    "lastUpdateTime": "2025-12-03 17:24:27"
+  }
+}`}
+                            />
+                            <div><strong>Metering Response:</strong></div>
+                            <CodeBlock 
+                              id="solardm-listplant-metering"
+                              code={`{
+  "code": 0,
+  "data": {
+    "energy": {
+      "currDay": "12.8_kWh",
+      "currMonth": "12.8_kWh",
+      "currYear": "12.8_kWh",
+      "total": "12.8_kWh",
+      "power": "0_KW"
+    }
+  }
+}`}
+                            />
+                          </div>
+                        </div>
+                        <div><strong>Database Mapping:</strong>
+                          <ul className="ml-4 mt-1 list-disc text-xs">
+                            <li><code className="bg-muted px-1 rounded">current_power_kw</code> ← <code className="bg-muted px-1 rounded">energy.power</code> (parsed from &quot;0_KW&quot; format, already in kW)</li>
+                            <li><code className="bg-muted px-1 rounded">daily_energy_kwh</code> ← <code className="bg-muted px-1 rounded">energy.currDay</code> (parsed from &quot;12.8_kWh&quot; format)</li>
+                            <li><code className="bg-muted px-1 rounded">monthly_energy_mwh</code> ← <code className="bg-muted px-1 rounded">energy.currMonth</code> (parsed, converted kWh → MWh)</li>
+                            <li><code className="bg-muted px-1 rounded">yearly_energy_mwh</code> ← <code className="bg-muted px-1 rounded">energy.currYear</code> (parsed, converted kWh → MWh)</li>
+                            <li><code className="bg-muted px-1 rounded">total_energy_mwh</code> ← <code className="bg-muted px-1 rounded">energy.total</code> (parsed, converted kWh → MWh)</li>
+                            <li><code className="bg-muted px-1 rounded">network_status</code> ← <code className="bg-muted px-1 rounded">communicateStatus</code> (1=NORMAL, 2=ALL_OFFLINE, 3=PARTIAL_OFFLINE)</li>
+                            <li><code className="bg-muted px-1 rounded">last_update_time</code> ← <code className="bg-muted px-1 rounded">lastUpdateTime</code> (parsed from &quot;YYYY-MM-DD HH:mm:ss&quot; to ISO string)</li>
+                          </ul>
+                        </div>
                       </div>
                     </div>
 
