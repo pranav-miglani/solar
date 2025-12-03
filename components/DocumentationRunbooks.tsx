@@ -19,7 +19,9 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Zap
+  Zap,
+  Settings,
+  Server
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 // CodeBlock component (inline definition)
@@ -57,7 +59,7 @@ function SectionHeader({ id, title, icon: Icon }: SectionHeaderProps) {
 
 export function DocumentationRunbooks() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(["runbooks", "troubleshooting", "adrs", "onboarding"])
+    new Set(["runbooks", "troubleshooting", "vendor-config", "adrs", "onboarding"])
   )
 
   const toggleSection = (sectionId: string) => {
@@ -83,7 +85,7 @@ export function DocumentationRunbooks() {
       </div>
 
       <Tabs defaultValue="runbooks" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="runbooks">
             <FileText className="h-4 w-4 mr-2" />
             Runbooks
@@ -91,6 +93,10 @@ export function DocumentationRunbooks() {
           <TabsTrigger value="troubleshooting">
             <AlertTriangle className="h-4 w-4 mr-2" />
             Troubleshooting
+          </TabsTrigger>
+          <TabsTrigger value="vendor-config">
+            <Settings className="h-4 w-4 mr-2" />
+            Vendor Config
           </TabsTrigger>
           <TabsTrigger value="adrs">
             <Code className="h-4 w-4 mr-2" />
@@ -411,6 +417,565 @@ export function DocumentationRunbooks() {
                           <li>Check application logs for specific error</li>
                           <li>Database connection issues - verify Supabase connection</li>
                           <li>Memory issues - check server resources</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* Vendor Configuration Tab */}
+        <TabsContent value="vendor-config" className="space-y-6">
+          <Card className="overflow-hidden">
+            <SectionHeader id="vendor-config" title="Vendor Configuration & Sync Modes" icon={Settings} />
+            {expandedSections.has("vendor-config") && (
+              <div className="p-6 pt-0 space-y-6 border-t">
+                <div className="space-y-6">
+                  {/* Overview */}
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 p-6 rounded-lg border border-blue-200 dark:border-blue-900">
+                    <h3 className="font-semibold text-lg mb-3">Overview</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      This guide explains all vendor configuration attributes and how the two sync modes work:
+                    </p>
+                    <ol className="text-sm text-muted-foreground space-y-2 ml-4 list-decimal">
+                      <li><strong>Plant Sync Mode</strong> - Controls how plant listing and basic info is synced</li>
+                      <li><strong>Live Telemetry Sync Mode</strong> - Controls how live telemetry (power, energy) is synced</li>
+                    </ol>
+                  </div>
+
+                  {/* Vendor Configuration Attributes */}
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-semibold">Vendor Configuration Attributes</h3>
+                    
+                    {/* Basic Vendor Information */}
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <Server className="h-5 w-5" />
+                        1. Basic Vendor Information
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left p-2 font-semibold">Field</th>
+                              <th className="text-left p-2 font-semibold">Type</th>
+                              <th className="text-left p-2 font-semibold">Description</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">id</code></td>
+                              <td className="p-2">SERIAL</td>
+                              <td className="p-2">Primary key</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">name</code></td>
+                              <td className="p-2">TEXT</td>
+                              <td className="p-2">Vendor name (e.g., &quot;Solarman&quot;, &quot;SolarDM&quot;)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">vendor_type</code></td>
+                              <td className="p-2">ENUM</td>
+                              <td className="p-2">Vendor type: <code className="bg-background px-1 rounded">SOLARMAN</code>, <code className="bg-background px-1 rounded">SOLARDM</code>, <code className="bg-background px-1 rounded">SHINEMONITOR</code>, <code className="bg-background px-1 rounded">PVBLINK</code>, <code className="bg-background px-1 rounded">FOXESSCLOUD</code>, <code className="bg-background px-1 rounded">OTHER</code></td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">org_id</code></td>
+                              <td className="p-2">INTEGER</td>
+                              <td className="p-2">Organization this vendor belongs to (nullable for global vendors)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">credentials</code></td>
+                              <td className="p-2">JSONB</td>
+                              <td className="p-2">Encrypted API credentials (vendor-specific)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">is_active</code></td>
+                              <td className="p-2">BOOLEAN</td>
+                              <td className="p-2">Whether vendor is active (default: true)</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Token Storage */}
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <Key className="h-5 w-5" />
+                        2. Token Storage (for API authentication)
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left p-2 font-semibold">Field</th>
+                              <th className="text-left p-2 font-semibold">Type</th>
+                              <th className="text-left p-2 font-semibold">Description</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">access_token</code></td>
+                              <td className="p-2">TEXT</td>
+                              <td className="p-2">Cached access token from vendor API</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">refresh_token</code></td>
+                              <td className="p-2">TEXT</td>
+                              <td className="p-2">Refresh token for token renewal (if supported)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">token_expires_at</code></td>
+                              <td className="p-2">TIMESTAMPTZ</td>
+                              <td className="p-2">Token expiration timestamp</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">token_metadata</code></td>
+                              <td className="p-2">JSONB</td>
+                              <td className="p-2">Additional token metadata (token_type, scope, expires_in, etc.)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">last_synced_at</code></td>
+                              <td className="p-2">TIMESTAMPTZ</td>
+                              <td className="p-2">Last time plants were synced from this vendor</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Plant Sync Mode Configuration */}
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <RefreshCw className="h-5 w-5" />
+                        3. Plant Sync Mode Configuration
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left p-2 font-semibold">Field</th>
+                              <th className="text-left p-2 font-semibold">Type</th>
+                              <th className="text-left p-2 font-semibold">Default</th>
+                              <th className="text-left p-2 font-semibold">Description</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">plant_sync_mode</code></td>
+                              <td className="p-2">TEXT</td>
+                              <td className="p-2"><code className="bg-background px-1 rounded">&apos;LIST_PLANTS&apos;</code></td>
+                              <td className="p-2">Controls how plant sync runs: <code className="bg-background px-1 rounded">&apos;LIST_PLANTS&apos;</code> or <code className="bg-background px-1 rounded">&apos;PER_PLANT&apos;</code></td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">per_plant_sync_interval_minutes</code></td>
+                              <td className="p-2">INTEGER</td>
+                              <td className="p-2"><code className="bg-background px-1 rounded">15</code></td>
+                              <td className="p-2">Interval for per-plant sync (reserved for future use)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">plant_list_sync_morning_ist</code></td>
+                              <td className="p-2">TIME</td>
+                              <td className="p-2"><code className="bg-background px-1 rounded">&apos;06:00&apos;</code></td>
+                              <td className="p-2">Morning time (IST) for listPlants() sync when <code className="bg-background px-1 rounded">plant_sync_mode = PER_PLANT</code></td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">plant_list_sync_evening_ist</code></td>
+                              <td className="p-2">TIME</td>
+                              <td className="p-2"><code className="bg-background px-1 rounded">&apos;23:00&apos;</code></td>
+                              <td className="p-2">Evening time (IST) for listPlants() sync when <code className="bg-background px-1 rounded">plant_sync_mode = PER_PLANT</code></td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Live Telemetry Sync Mode Configuration */}
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <Zap className="h-5 w-5" />
+                        4. Live Telemetry Sync Mode Configuration
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left p-2 font-semibold">Field</th>
+                              <th className="text-left p-2 font-semibold">Type</th>
+                              <th className="text-left p-2 font-semibold">Default</th>
+                              <th className="text-left p-2 font-semibold">Description</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">telemetry_sync_mode</code></td>
+                              <td className="p-2">TEXT</td>
+                              <td className="p-2"><code className="bg-background px-1 rounded">&apos;LIST_PLANTS&apos;</code></td>
+                              <td className="p-2">Controls how live telemetry is synced: <code className="bg-background px-1 rounded">&apos;LIST_PLANTS&apos;</code> or <code className="bg-background px-1 rounded">&apos;PER_PLANT&apos;</code></td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">telemetry_sync_interval</code></td>
+                              <td className="p-2">INTEGER</td>
+                              <td className="p-2"><code className="bg-background px-1 rounded">15</code></td>
+                              <td className="p-2">Interval in minutes (15, 30, or 45) for live telemetry sync</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Restricted Sync Window */}
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-semibold mb-3 flex items-center gap-2">
+                        <Clock className="h-5 w-5" />
+                        5. Restricted Sync Window (Per-Vendor)
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left p-2 font-semibold">Field</th>
+                              <th className="text-left p-2 font-semibold">Type</th>
+                              <th className="text-left p-2 font-semibold">Default</th>
+                              <th className="text-left p-2 font-semibold">Description</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">restricted_sync_window_start_ist</code></td>
+                              <td className="p-2">TIME</td>
+                              <td className="p-2"><code className="bg-background px-1 rounded">&apos;20:00&apos;</code></td>
+                              <td className="p-2">Start time (IST) when syncs are skipped (default: 8 PM)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-background px-1 rounded">restricted_sync_window_end_ist</code></td>
+                              <td className="p-2">TIME</td>
+                              <td className="p-2"><code className="bg-background px-1 rounded">&apos;05:00&apos;</code></td>
+                              <td className="p-2">End time (IST) when syncs are skipped (default: 5 AM)</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        <strong>Note:</strong> If sync window spans midnight (e.g., 20:00 to 05:00), syncs are skipped during that period.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Sync Mode 1: Plant Sync Mode */}
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-semibold">Sync Mode 1: Plant Sync Mode</h3>
+                    
+                    <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
+                      <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-3">Purpose</h4>
+                      <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                        Controls how <strong>plant listing and basic plant information</strong> is synced. This includes:
+                      </p>
+                      <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 ml-4 list-disc">
+                        <li>Plant topology (id, name, capacity, location)</li>
+                        <li>Basic metadata (network status, created date, operating time)</li>
+                        <li><strong>Does NOT include live telemetry</strong> (power, energy metrics)</li>
+                      </ul>
+                    </div>
+
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-semibold mb-3">When It Runs</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><strong>Twice daily</strong> at configured times (morning and evening)</li>
+                        <li><strong>Manual/force sync</strong> on user request</li>
+                        <li>Runs via cron: <code className="bg-background px-1 rounded">lib/cron/plantSyncCron.js</code> → <code className="bg-background px-1 rounded">GET /api/cron/sync-plants</code></li>
+                      </ul>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="font-semibold">Mode Options</h4>
+                      
+                      {/* LIST_PLANTS Mode */}
+                      <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-lg border border-green-200 dark:border-green-900">
+                        <h5 className="font-semibold text-green-900 dark:text-green-100 mb-3">
+                          <code className="bg-green-100 dark:bg-green-900 px-2 py-1 rounded">LIST_PLANTS</code> Mode (Default for Solarman, ShineMonitor)
+                        </h5>
+                        <div className="space-y-3 text-sm text-green-800 dark:text-green-200">
+                          <div>
+                            <strong>How it works:</strong>
+                            <ol className="ml-4 mt-1 list-decimal space-y-1">
+                              <li>Calls <code className="bg-green-100 dark:bg-green-900 px-1 rounded">adapter.listPlants()</code> once to get all plants</li>
+                              <li>Upserts all plants into database with topology and basic info</li>
+                              <li>If live telemetry is available in <code className="bg-green-100 dark:bg-green-900 px-1 rounded">listPlants()</code> response, optionally enriches plants</li>
+                              <li>Updates: <code className="bg-green-100 dark:bg-green-900 px-1 rounded">name</code>, <code className="bg-green-100 dark:bg-green-900 px-1 rounded">capacity_kw</code>, <code className="bg-green-100 dark:bg-green-900 px-1 rounded">location</code>, <code className="bg-green-100 dark:bg-green-900 px-1 rounded">network_status</code>, <code className="bg-green-100 dark:bg-green-900 px-1 rounded">vendor_created_date</code>, <code className="bg-green-100 dark:bg-green-900 px-1 rounded">start_operating_time</code></li>
+                            </ol>
+                          </div>
+                          <div>
+                            <strong>Used by:</strong>
+                            <ul className="ml-4 mt-1 list-disc">
+                              <li>Solarman</li>
+                              <li>ShineMonitor</li>
+                              <li>Foxesscloud</li>
+                              <li>Default for most vendors</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* PER_PLANT Mode */}
+                      <div className="bg-orange-50 dark:bg-orange-950/20 p-4 rounded-lg border border-orange-200 dark:border-orange-900">
+                        <h5 className="font-semibold text-orange-900 dark:text-orange-100 mb-3">
+                          <code className="bg-orange-100 dark:bg-orange-900 px-2 py-1 rounded">PER_PLANT</code> Mode (Default for SolarDM, PVBlink)
+                        </h5>
+                        <div className="space-y-3 text-sm text-orange-800 dark:text-orange-200">
+                          <div>
+                            <strong>How it works:</strong>
+                            <ol className="ml-4 mt-1 list-decimal space-y-1">
+                              <li><strong>During regular cron (15-minute intervals):</strong> Skips plant sync entirely</li>
+                              <li><strong>Twice daily (morning/evening):</strong> Calls <code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">adapter.listPlants()</code> to refresh plant topology</li>
+                              <li>Live telemetry is handled separately by Live Telemetry Sync Mode</li>
+                              <li>Purpose: Avoid expensive <code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">listPlants()</code> calls during regular syncs</li>
+                            </ol>
+                          </div>
+                          <div>
+                            <strong>Used by:</strong>
+                            <ul className="ml-4 mt-1 list-disc">
+                              <li>SolarDM</li>
+                              <li>PVBlink</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sync Mode 2: Live Telemetry Sync Mode */}
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-semibold">Sync Mode 2: Live Telemetry Sync Mode</h3>
+                    
+                    <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg border border-purple-200 dark:border-purple-900">
+                      <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-3">Purpose</h4>
+                      <p className="text-sm text-purple-800 dark:text-purple-200 mb-2">
+                        Controls how <strong>live telemetry fields</strong> are synced. This includes:
+                      </p>
+                      <ul className="text-sm text-purple-800 dark:text-purple-200 space-y-1 ml-4 list-disc">
+                        <li><code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">current_power_kw</code> - Current generation power</li>
+                        <li><code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">daily_energy_kwh</code> - Daily energy generation</li>
+                        <li><code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">monthly_energy_mwh</code> - Monthly energy generation</li>
+                        <li><code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">yearly_energy_mwh</code> - Yearly energy generation</li>
+                        <li><code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">total_energy_mwh</code> - Total cumulative energy</li>
+                        <li><code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">network_status</code> - Network connectivity status</li>
+                        <li><code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">last_update_time</code> - Last time data was updated from vendor</li>
+                      </ul>
+                    </div>
+
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-semibold mb-3">When It Runs</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><strong>Interval-based:</strong> Every 15, 30, or 45 minutes (configurable per vendor)</li>
+                        <li>Syncs run at fixed clock times:
+                          <ul className="ml-4 mt-1 list-disc">
+                            <li>15 min: <code className="bg-background px-1 rounded">:00</code>, <code className="bg-background px-1 rounded">:15</code>, <code className="bg-background px-1 rounded">:30</code>, <code className="bg-background px-1 rounded">:45</code></li>
+                            <li>30 min: <code className="bg-background px-1 rounded">:00</code>, <code className="bg-background px-1 rounded">:30</code></li>
+                            <li>45 min: <code className="bg-background px-1 rounded">:00</code>, <code className="bg-background px-1 rounded">:45</code></li>
+                          </ul>
+                        </li>
+                        <li>Runs via cron: <code className="bg-background px-1 rounded">lib/cron/liveTelemetrySyncCron.js</code> → <code className="bg-background px-1 rounded">GET /api/cron/sync-live-telemetry</code></li>
+                        <li><strong>Respects restricted sync window</strong> (skips syncs during configured hours)</li>
+                      </ul>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="font-semibold">Mode Options</h4>
+                      
+                      {/* LIST_PLANTS Mode */}
+                      <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-lg border border-green-200 dark:border-green-900">
+                        <h5 className="font-semibold text-green-900 dark:text-green-100 mb-3">
+                          <code className="bg-green-100 dark:bg-green-900 px-2 py-1 rounded">LIST_PLANTS</code> Mode (Efficient - Single API Call)
+                        </h5>
+                        <div className="space-y-3 text-sm text-green-800 dark:text-green-200">
+                          <div>
+                            <strong>How it works:</strong>
+                            <ol className="ml-4 mt-1 list-decimal space-y-1">
+                              <li>Calls <code className="bg-green-100 dark:bg-green-900 px-1 rounded">adapter.listPlants()</code> once to get all plants with live telemetry</li>
+                              <li>Extracts telemetry fields from each plant&apos;s metadata</li>
+                              <li>Updates all plants in database in batches (100 plants per transaction)</li>
+                              <li><strong>Most efficient</strong> - single API call for all plants</li>
+                            </ol>
+                          </div>
+                          <div>
+                            <strong>Used by:</strong>
+                            <ul className="ml-4 mt-1 list-disc">
+                              <li>Solarman (when <code className="bg-green-100 dark:bg-green-900 px-1 rounded">listPlants()</code> provides live telemetry)</li>
+                              <li>ShineMonitor</li>
+                              <li>Default for most vendors</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* PER_PLANT Mode */}
+                      <div className="bg-orange-50 dark:bg-orange-950/20 p-4 rounded-lg border border-orange-200 dark:border-orange-900">
+                        <h5 className="font-semibold text-orange-900 dark:text-orange-100 mb-3">
+                          <code className="bg-orange-100 dark:bg-orange-900 px-2 py-1 rounded">PER_PLANT</code> Mode (Costly - Individual API Calls)
+                        </h5>
+                        <div className="space-y-3 text-sm text-orange-800 dark:text-orange-200">
+                          <div>
+                            <strong>How it works:</strong>
+                            <ol className="ml-4 mt-1 list-decimal space-y-1">
+                              <li>Fetches all active plants from database</li>
+                              <li>For each plant, calls <code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">adapter.listPlant(vendorPlantId)</code> individually</li>
+                              <li>Fetches in batches of 50 plants (parallel API calls)</li>
+                              <li>Updates database in batches of 100 plants per transaction</li>
+                              <li><strong>More expensive</strong> - one API call per plant, but necessary for some vendors</li>
+                            </ol>
+                          </div>
+                          <div>
+                            <strong>Used by:</strong>
+                            <ul className="ml-4 mt-1 list-disc">
+                              <li>SolarDM (when <code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">listPlants()</code> doesn&apos;t provide live telemetry)</li>
+                              <li>PVBlink</li>
+                              <li>Any vendor where <code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">listPlants()</code> doesn&apos;t include telemetry</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Key Differences Summary */}
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-semibold">Key Differences Summary</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-2 font-semibold">Aspect</th>
+                            <th className="text-left p-2 font-semibold">Plant Sync Mode</th>
+                            <th className="text-left p-2 font-semibold">Live Telemetry Sync Mode</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2"><strong>Purpose</strong></td>
+                            <td className="p-2">Sync plant listing &amp; topology</td>
+                            <td className="p-2">Sync live telemetry (power, energy)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><strong>Frequency</strong></td>
+                            <td className="p-2">Twice daily (morning/evening)</td>
+                            <td className="p-2">Every 15/30/45 minutes</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><strong>Fields Updated</strong></td>
+                            <td className="p-2"><code className="bg-background px-1 rounded">name</code>, <code className="bg-background px-1 rounded">capacity_kw</code>, <code className="bg-background px-1 rounded">location</code>, <code className="bg-background px-1 rounded">network_status</code>, <code className="bg-background px-1 rounded">vendor_created_date</code>, <code className="bg-background px-1 rounded">start_operating_time</code></td>
+                            <td className="p-2"><code className="bg-background px-1 rounded">current_power_kw</code>, <code className="bg-background px-1 rounded">daily_energy_kwh</code>, <code className="bg-background px-1 rounded">monthly_energy_mwh</code>, <code className="bg-background px-1 rounded">yearly_energy_mwh</code>, <code className="bg-background px-1 rounded">total_energy_mwh</code>, <code className="bg-background px-1 rounded">network_status</code>, <code className="bg-background px-1 rounded">last_update_time</code></td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><strong>LIST_PLANTS Mode</strong></td>
+                            <td className="p-2">Calls <code className="bg-background px-1 rounded">listPlants()</code> twice daily</td>
+                            <td className="p-2">Calls <code className="bg-background px-1 rounded">listPlants()</code> every interval</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><strong>PER_PLANT Mode</strong></td>
+                            <td className="p-2">Calls <code className="bg-background px-1 rounded">listPlants()</code> twice daily only</td>
+                            <td className="p-2">Calls <code className="bg-background px-1 rounded">listPlant()</code> for each plant every interval</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><strong>Default for Solarman</strong></td>
+                            <td className="p-2"><code className="bg-background px-1 rounded">LIST_PLANTS</code></td>
+                            <td className="p-2"><code className="bg-background px-1 rounded">LIST_PLANTS</code></td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><strong>Default for SolarDM</strong></td>
+                            <td className="p-2"><code className="bg-background px-1 rounded">PER_PLANT</code></td>
+                            <td className="p-2"><code className="bg-background px-1 rounded">PER_PLANT</code></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* How Syncs Work Together */}
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-semibold">How Syncs Work Together</h3>
+                    
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-semibold mb-3">Scenario 1: Solarman (LIST_PLANTS for both)</h4>
+                      <ol className="text-sm text-muted-foreground space-y-2 ml-4 list-decimal">
+                        <li><strong>Plant Sync (twice daily):</strong>
+                          <ul className="ml-4 mt-1 list-disc">
+                            <li>Calls <code className="bg-background px-1 rounded">listPlants()</code> → Gets all plants with topology</li>
+                            <li>Upserts to database</li>
+                          </ul>
+                        </li>
+                        <li><strong>Live Telemetry Sync (every 15 min):</strong>
+                          <ul className="ml-4 mt-1 list-disc">
+                            <li>Calls <code className="bg-background px-1 rounded">listPlants()</code> → Gets all plants with live telemetry</li>
+                            <li>Updates telemetry fields in database</li>
+                          </ul>
+                        </li>
+                      </ol>
+                    </div>
+
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-semibold mb-3">Scenario 2: SolarDM (PER_PLANT for both)</h4>
+                      <ol className="text-sm text-muted-foreground space-y-2 ml-4 list-decimal">
+                        <li><strong>Plant Sync (twice daily):</strong>
+                          <ul className="ml-4 mt-1 list-disc">
+                            <li>Morning (06:00): Calls <code className="bg-background px-1 rounded">listPlants()</code> → Refreshes plant topology</li>
+                            <li>Evening (20:00): Calls <code className="bg-background px-1 rounded">listPlants()</code> → Refreshes plant topology</li>
+                            <li>Regular cron (15-min): Skips (no API calls)</li>
+                          </ul>
+                        </li>
+                        <li><strong>Live Telemetry Sync (every 15 min):</strong>
+                          <ul className="ml-4 mt-1 list-disc">
+                            <li>Fetches all active plants from database</li>
+                            <li>For each plant: Calls <code className="bg-background px-1 rounded">listPlant(vendorPlantId)</code> → Gets live telemetry</li>
+                            <li>Updates telemetry fields in database</li>
+                          </ul>
+                        </li>
+                      </ol>
+                    </div>
+                  </div>
+
+                  {/* Best Practices */}
+                  <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
+                    <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-3">Best Practices</h3>
+                    <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-2 ml-4 list-decimal">
+                      <li><strong>Use LIST_PLANTS when possible</strong> - Most efficient (single API call)</li>
+                      <li><strong>Use PER_PLANT only when necessary</strong> - When vendor doesn&apos;t provide telemetry in <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">listPlants()</code></li>
+                      <li><strong>Set appropriate intervals</strong> - 15 min for critical systems, 30-45 min for less critical</li>
+                      <li><strong>Configure restricted windows</strong> - Skip syncs during off-peak hours to reduce API load</li>
+                      <li><strong>Monitor sync performance</strong> - Check logs for failed syncs and adjust accordingly</li>
+                    </ol>
+                  </div>
+
+                  {/* Troubleshooting */}
+                  <div className="bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-900">
+                    <h3 className="font-semibold text-red-900 dark:text-red-100 mb-3">Troubleshooting</h3>
+                    <div className="space-y-3 text-sm text-red-800 dark:text-red-200">
+                      <div>
+                        <h4 className="font-semibold mb-2">Plant Sync Not Running</h4>
+                        <ul className="ml-4 list-disc space-y-1">
+                          <li>Check <code className="bg-red-100 dark:bg-red-900 px-1 rounded">plant_sync_mode</code> configuration</li>
+                          <li>Verify cron is enabled: <code className="bg-red-100 dark:bg-red-900 px-1 rounded">ENABLE_PLANT_SYNC_CRON=true</code></li>
+                          <li>Check vendor <code className="bg-red-100 dark:bg-red-900 px-1 rounded">is_active</code> status</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold mb-2">Live Telemetry Not Updating</h4>
+                        <ul className="ml-4 list-disc space-y-1">
+                          <li>Check <code className="bg-red-100 dark:bg-red-900 px-1 rounded">telemetry_sync_mode</code> configuration</li>
+                          <li>Verify cron is enabled: <code className="bg-red-100 dark:bg-red-900 px-1 rounded">ENABLE_LIVE_TELEMETRY_SYNC_CRON=true</code></li>
+                          <li>Check <code className="bg-red-100 dark:bg-red-900 px-1 rounded">telemetry_sync_interval</code> matches current time (syncs at fixed clock times)</li>
+                          <li>Verify restricted sync window isn&apos;t blocking syncs</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold mb-2">Too Many API Calls</h4>
+                        <ul className="ml-4 list-disc space-y-1">
+                          <li>Switch to <code className="bg-red-100 dark:bg-red-900 px-1 rounded">LIST_PLANTS</code> mode if vendor supports it</li>
+                          <li>Increase <code className="bg-red-100 dark:bg-red-900 px-1 rounded">telemetry_sync_interval</code> (15 → 30 → 45 minutes)</li>
+                          <li>Configure restricted sync window to skip off-peak hours</li>
                         </ul>
                       </div>
                     </div>
