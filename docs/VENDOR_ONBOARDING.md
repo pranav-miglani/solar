@@ -8,12 +8,6 @@ This document outlines the requirements and process for onboarding a new vendor 
 2. [Vendor Configuration Requirements](#vendor-configuration-requirements)
 3. [Database Schema](#database-schema)
 4. [Required API Endpoints](#required-api-endpoints)
-<<<<<<< Updated upstream
-5. [Data Mapping Requirements](#data-mapping-requirements)
-6. [Solarman Example](#solarman-example)
-7. [Implementation Checklist](#implementation-checklist)
-8. [Testing Requirements](#testing-requirements)
-=======
 5. [Alert Mapping Requirements](#alert-mapping-requirements)
 6. [Data Mapping Requirements](#data-mapping-requirements)
 7. [Vendor Comparison: Solarman vs SolarDM](#vendor-comparison-solarman-vs-solardm)
@@ -21,10 +15,10 @@ This document outlines the requirements and process for onboarding a new vendor 
 9. [SolarDM Example](#solardm-example)
 10. [PVBlink Example](#pvblink-example)
 11. [Foxesscloud Example](#foxesscloud-example)
-12. [Implementation Checklist](#implementation-checklist)
-11. [Testing Requirements](#testing-requirements)
-12. [Common Pitfalls](#common-pitfalls)
->>>>>>> Stashed changes
+12. [ShineMonitor Example](#shinemonitor-example)
+13. [Implementation Checklist](#implementation-checklist)
+14. [Testing Requirements](#testing-requirements)
+15. [Common Pitfalls](#common-pitfalls)
 
 ---
 
@@ -53,8 +47,7 @@ When creating a vendor in the database, the following fields are required:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | TEXT | ✅ Yes | Vendor display name (e.g., "Solarman Production") |
-<<<<<<< Updated upstream
-| `vendor_type` | ENUM | ✅ Yes | One of: `SOLARMAN`, `SOLARDM`, `SHINEMONITOR`, `PVBLINK`, `FOXESSCLOUD`, `SUNGROW`, `OTHER` |
+| `vendor_type` | ENUM | ✅ Yes | One of: `SOLARMAN`, `SOLARDM`, `SHINEMONITOR`, `PVBLINK`, `FOXESSCLOUD`, `OTHER` |
 | `credentials` | JSONB | ✅ Yes | Vendor-specific authentication credentials (see below) |
 | `org_id` | INTEGER | Optional | Organization ID (NULL for global/shared vendors) |
 | `is_active` | BOOLEAN | Optional | Active status (default: `true`) |
@@ -82,13 +75,9 @@ API base URLs are stored in environment variables, not in the database:
 - `SOLARMAN_API_BASE_URL` - Base URL for Solarman API
 - `SOLARMAN_PRO_API_BASE_URL` - (Optional) PRO API base URL for Solarman
 - `SOLARDM_API_BASE_URL` - Base URL for SolarDM API
-<<<<<<< Updated upstream
 - `SHINEMONITOR_API_BASE_URL` - Base URL for ShineMonitor API
-=======
 - `PVBLINK_API_BASE_URL` - Base URL for PVBlink API
 - `FOXESSCLOUD_API_BASE_URL` - Base URL for Foxesscloud API
->>>>>>> Stashed changes
-- `SUNGROW_API_BASE_URL` - Base URL for Sungrow API
 - `{VENDOR}_API_BASE_URL` - Pattern for other vendors
 
 **Example**:
@@ -96,12 +85,9 @@ API base URLs are stored in environment variables, not in the database:
 SOLARMAN_API_BASE_URL=https://globalapi.solarmanpv.com
 SOLARMAN_PRO_API_BASE_URL=https://globalpro.solarmanpv.com
 SOLARDM_API_BASE_URL=http://global.solar-dm.com:8010
-<<<<<<< Updated upstream
 SHINEMONITOR_API_BASE_URL=https://web.shinemonitor.com/public
-=======
 PVBLINK_API_BASE_URL=https://cloud.pvblink.com
 FOXESSCLOUD_API_BASE_URL=https://www.foxesscloud.com
->>>>>>> Stashed changes
 ```
 
 ### 3. Token Management
@@ -211,9 +197,22 @@ async authenticate(): Promise<string> {
 **Requirements**:
 - Return array of `Plant` objects
 - Each plant must have: `id`, `name`, `capacityKw`
-- Include production metrics in `metadata` object
+- Include production metrics in `metadata` object (live telemetry fields: currentPowerKw, dailyEnergyKwh, monthlyEnergyMwh, yearlyEnergyMwh, totalEnergyMwh, networkStatus)
 - Handle pagination if vendor API supports it
 - Normalize data units (see [Data Mapping Requirements](#data-mapping-requirements))
+
+### 3. Optional: `listPlant(vendorPlantId: string): Promise<Plant | null>`
+
+**Purpose**: Fetch a single plant by vendor plant ID
+
+**Requirements**:
+- Return a single `Plant` object or `null` if not found
+- Used for live telemetry sync in PER_PLANT mode (when `telemetry_sync_mode = PER_PLANT`)
+- Used for enriching plants during plant sync if live telemetry is missing from `listPlants()` response (configurable via `ENABLE_PER_PLANT_LIVE_TELEMETRY` env var)
+- Default implementation throws an error - vendors should override if they support per-plant fetching
+- Should include the same live telemetry fields as `listPlants()` (currentPowerKw, dailyEnergyKwh, etc.)
+
+**Note**: This method is optional but recommended for vendors that support per-plant API endpoints, as it enables more efficient live telemetry sync in PER_PLANT mode.
 
 **Plant Interface**:
 ```typescript
@@ -238,7 +237,7 @@ interface Plant {
 }
 ```
 
-### 3. Optional: `getTelemetry(plantId: string, ...): Promise<TelemetryData[]>`
+### 4. Optional: `getTelemetry(plantId: string, ...): Promise<TelemetryData[]>`
 
 **Purpose**: Fetch historical telemetry data
 
@@ -247,7 +246,7 @@ interface Plant {
 - Support date range queries
 - Normalize timestamps to UTC
 
-### 4. Optional: `getAlerts(plantId: string, ...): Promise<Alert[]>`
+### 5. Optional: `getAlerts(plantId: string, ...): Promise<Alert[]>`
 
 **Purpose**: Fetch alerts/notifications from vendor
 
@@ -1063,15 +1062,9 @@ case 'SOLARDM':
 
 ---
 
-<<<<<<< Updated upstream
-## ShineMonitor Example
-
-This section provides a complete example using ShineMonitor as a reference implementation.
-=======
 ## PVBlink Example
 
 This section provides a complete example using PVBlink as a reference implementation.
->>>>>>> Stashed changes
 
 ### 1. Vendor Configuration
 
@@ -1079,15 +1072,9 @@ This section provides a complete example using PVBlink as a reference implementa
 ```sql
 INSERT INTO vendors (name, vendor_type, credentials, org_id, is_active)
 VALUES (
-<<<<<<< Updated upstream
-  'ShineMonitor Production',
-  'SHINEMONITOR',
-  '{"user_name": "KRPC", "pass_hash": "6c8f8c16df43ccf76d2b05da9b2f8d360eddf5d4", "company_key": "bnrl_frRFjEz8Mkn"}'::jsonb,
-=======
   'PVBlink Production',
   'PVBLINK',
   '{"email": "vendor@example.com", "password": "vendor_password"}'::jsonb,
->>>>>>> Stashed changes
   1,
   true
 );
@@ -1095,41 +1082,11 @@ VALUES (
 
 **Environment Variables**:
 ```env
-<<<<<<< Updated upstream
-SHINEMONITOR_API_BASE_URL=https://web.shinemonitor.com/public
-=======
 PVBLINK_API_BASE_URL=https://cloud.pvblink.com
->>>>>>> Stashed changes
 ```
 
 ### 2. Authentication
 
-<<<<<<< Updated upstream
-**Endpoint**: `GET /?sign={sign}&salt={salt}&action=auth&usr={user_name}&company-key={company_key}`
-
-**Authentication Process**:
-1. Generate `salt` = current timestamp in milliseconds: `new Date().getTime()`
-2. Generate `sign` = SHA1(salt + pass_hash + action_string)
-   - `action_string` = `&action=auth&usr={user_name}&company-key={company_key}`
-3. Make GET request with sign and salt as query parameters
-
-**Example Calculation**:
-- `user_name` = "KRPC"
-- `pass_hash` = "6c8f8c16df43ccf76d2b05da9b2f8d360eddf5d4"
-- `company_key` = "bnrl_frRFjEz8Mkn"
-- `salt` = 1764487501695
-- `action_string` = "&action=auth&usr=KRPC&company-key=bnrl_frRFjEz8Mkn"
-- `sign` = SHA1("1764487501695" + "6c8f8c16df43ccf76d2b05da9b2f8d360eddf5d4" + "&action=auth&usr=KRPC&company-key=bnrl_frRFjEz8Mkn")
-- `sign` = "7ebb5a792ff29c80fecc37f75e2b551f746e1efb"
-
-**Request**:
-```
-GET /?sign=7ebb5a792ff29c80fecc37f75e2b551f746e1efb&salt=1764487501695&action=auth&usr=KRPC&company-key=bnrl_frRFjEz8Mkn
-Headers:
-  Accept: application/json
-  Origin: https://kstar.shinemonitor.com
-  Referer: https://kstar.shinemonitor.com/
-=======
 **Endpoint**: `POST /api/pvblink/user/login`
 
 **Request**:
@@ -1141,23 +1098,11 @@ Headers:
   "resetPasswordToken": null,
   "rememberMe": false
 }
->>>>>>> Stashed changes
 ```
 
 **Response**:
 ```json
 {
-<<<<<<< Updated upstream
-  "err": 0,
-  "desc": "ERR_NONE",
-  "dat": {
-    "secret": "961cfabc5413955995218cae0fe5c195a783086a",
-    "expire": 432000,
-    "token": "fda947c492cd1af56d93bf3806b5c2ca79de3356812d84af608d52abd67443ea",
-    "role": 2,
-    "usr": "KRPC",
-    "uid": 5077101
-=======
   "data": {
     "id": "655A622AD99407D29DBA6F43EF9EFD88",
     "createdOn": "2025-05-02T06:07:47.751+00:00",
@@ -1171,45 +1116,12 @@ Headers:
     "profilePic": "Screenshot 21753447048535.jpg",
     "isDealer": true,
     "accessToken": "yf2apN629pmbHprXV3J_yHTP5jJeK5gr"
->>>>>>> Stashed changes
   }
 }
 ```
 
 **Implementation**:
 - Token is cached in `vendors.access_token`
-<<<<<<< Updated upstream
-- Secret is stored in `vendors.token_metadata.secret`
-- Expiration stored in `vendors.token_expires_at` (expire is in seconds)
-- Token is validated before each API call
-
-**Key Points**:
-- Salt must be generated fresh for each authentication request
-- Sign is calculated using SHA1 hash of (salt + pass_hash + action_string)
-- Both `token` and `secret` are required for future API calls
-- `expire` is in seconds (432000 = 5 days)
-- Success is indicated by `err: 0` and `desc: "ERR_NONE"`
-
-### 3. Adapter Implementation
-
-**File**: `lib/vendors/shineMonitorAdapter.ts`
-
-**Key Methods**:
-- `authenticate()` - Handles sign/salt authentication flow
-- `generateSalt()` - Generates current timestamp as salt
-- `generateSign()` - Calculates SHA1 sign for authentication
-- `getTokenFromDB()` - Retrieves cached token and secret
-- `storeTokenInDB()` - Stores token, secret, and expiration
-- `getApiBaseUrl()` - Gets API base URL from env vars
-
-**Registration**: Adapter is registered in `lib/vendors/vendorManager.ts`:
-```typescript
-case 'SHINEMONITOR':
-  return new ShineMonitorAdapter(config)
-```
-
-**Note**: Plant listing, telemetry, and alerts endpoints are not yet implemented and will need to be added once the API documentation is available.
-=======
 - Token is stored from `data.accessToken` field
 - Default expiration: 11 hours 30 minutes (41400 seconds) - stored in `token_expires_at`
 - Implements retry logic: max 3 attempts on authentication errors
@@ -1259,6 +1171,108 @@ case 'PVBLINK':
 - Token expiration: 11 hours 30 minutes (41400 seconds)
 - Implements automatic retry on authentication errors (max 3 attempts)
 - Browser-like headers are required for API calls
+
+---
+
+## ShineMonitor Example
+
+This section provides a complete example using ShineMonitor as a reference implementation.
+
+### 1. Vendor Configuration
+
+**Database Entry**:
+```sql
+INSERT INTO vendors (name, vendor_type, credentials, org_id, is_active)
+VALUES (
+  'ShineMonitor Production',
+  'SHINEMONITOR',
+  '{"user_name": "KRPC", "pass_hash": "6c8f8c16df43ccf76d2b05da9b2f8d360eddf5d4", "company_key": "bnrl_frRFjEz8Mkn"}'::jsonb,
+  1,
+  true
+);
+```
+
+**Environment Variables**:
+```env
+SHINEMONITOR_API_BASE_URL=https://web.shinemonitor.com/public
+```
+
+### 2. Authentication
+
+**Endpoint**: `GET /?sign={sign}&salt={salt}&action=auth&usr={user_name}&company-key={company_key}`
+
+**Authentication Process**:
+1. Generate `salt` = current timestamp in milliseconds: `new Date().getTime()`
+2. Generate `sign` = SHA1(salt + pass_hash + action_string)
+   - `action_string` = `&action=auth&usr={user_name}&company-key={company_key}`
+3. Make GET request with sign and salt as query parameters
+
+**Example Calculation**:
+- `user_name` = "KRPC"
+- `pass_hash` = "6c8f8c16df43ccf76d2b05da9b2f8d360eddf5d4"
+- `company_key` = "bnrl_frRFjEz8Mkn"
+- `salt` = 1764487501695
+- `action_string` = "&action=auth&usr=KRPC&company-key=bnrl_frRFjEz8Mkn"
+- `sign` = SHA1("1764487501695" + "6c8f8c16df43ccf76d2b05da9b2f8d360eddf5d4" + "&action=auth&usr=KRPC&company-key=bnrl_frRFjEz8Mkn")
+- `sign` = "7ebb5a792ff29c80fecc37f75e2b551f746e1efb"
+
+**Request**:
+```
+GET /?sign=7ebb5a792ff29c80fecc37f75e2b551f746e1efb&salt=1764487501695&action=auth&usr=KRPC&company-key=bnrl_frRFjEz8Mkn
+Headers:
+  Accept: application/json
+  Origin: https://kstar.shinemonitor.com
+  Referer: https://kstar.shinemonitor.com/
+```
+
+**Response**:
+```json
+{
+  "err": 0,
+  "desc": "ERR_NONE",
+  "dat": {
+    "secret": "961cfabc5413955995218cae0fe5c195a783086a",
+    "expire": 432000,
+    "token": "fda947c492cd1af56d93bf3806b5c2ca79de3356812d84af608d52abd67443ea",
+    "role": 2,
+    "usr": "KRPC",
+    "uid": 5077101
+  }
+}
+```
+
+**Implementation**:
+- Token is cached in `vendors.access_token`
+- Secret is stored in `vendors.token_metadata.secret`
+- Expiration stored in `vendors.token_expires_at` (expire is in seconds)
+- Token is validated before each API call
+
+**Key Points**:
+- Salt must be generated fresh for each authentication request
+- Sign is calculated using SHA1 hash of (salt + pass_hash + action_string)
+- Both `token` and `secret` are required for future API calls
+- `expire` is in seconds (432000 = 5 days)
+- Success is indicated by `err: 0` and `desc: "ERR_NONE"`
+
+### 3. Adapter Implementation
+
+**File**: `lib/vendors/shineMonitorAdapter.ts`
+
+**Key Methods**:
+- `authenticate()` - Handles sign/salt authentication flow
+- `generateSalt()` - Generates current timestamp as salt
+- `generateSign()` - Calculates SHA1 sign for authentication
+- `getTokenFromDB()` - Retrieves cached token and secret
+- `storeTokenInDB()` - Stores token, secret, and expiration
+- `getApiBaseUrl()` - Gets API base URL from env vars
+
+**Registration**: Adapter is registered in `lib/vendors/vendorManager.ts`:
+```typescript
+case 'SHINEMONITOR':
+  return new ShineMonitorAdapter(config)
+```
+
+**Note**: Plant listing, telemetry, and alerts endpoints are not yet implemented and will need to be added once the API documentation is available.
 
 ---
 
@@ -1371,7 +1385,6 @@ case 'FOXESSCLOUD':
 - Browser-like headers are required for API calls
 - Check `errno` field in response (0 = success, non-zero = error)
 - Timestamp header is generated dynamically for each request
->>>>>>> Stashed changes
 
 ---
 
@@ -1403,8 +1416,17 @@ Use this checklist when implementing a new vendor adapter:
 - [ ] Extract and normalize plant name
 - [ ] Extract and convert capacity to kW
 - [ ] Extract location data (lat, lng, address)
+- [ ] Extract live telemetry fields (currentPowerKw, dailyEnergyKwh, monthlyEnergyMwh, yearlyEnergyMwh, totalEnergyMwh, networkStatus) if available
 - [ ] Handle pagination (if vendor API supports it)
 - [ ] Test with multiple plants
+
+### Phase 3.5: Optional - Per-Plant Fetching
+
+- [ ] Implement `listPlant(vendorPlantId)` method (optional but recommended)
+- [ ] Used for live telemetry sync in PER_PLANT mode
+- [ ] Used for enriching plants during plant sync if live telemetry missing from listPlants()
+- [ ] Include same live telemetry fields as listPlants()
+- [ ] Test with single plant fetch
 
 ### Phase 4: Production Metrics
 
@@ -1592,13 +1614,22 @@ For questions or issues during vendor onboarding:
 
 ```typescript
 abstract class BaseVendorAdapter {
+  // Required methods
   abstract authenticate(): Promise<string>
   abstract listPlants(): Promise<Plant[]>
+  abstract getTelemetry(plantId: string, startTime: Date, endTime: Date): Promise<TelemetryData[]>
+  abstract getRealtime(plantId: string): Promise<RealtimeData>
+  abstract getAlerts(plantId: string): Promise<Alert[]>
   
   // Optional methods
-  getTelemetry?(plantId: string, ...args: any[]): Promise<TelemetryData[]>
-  getAlerts?(plantId: string, ...args: any[]): Promise<Alert[]>
-  getRealtime?(plantId: string): Promise<RealtimeData>
+  async listPlant(vendorPlantId: string): Promise<Plant | null> {
+    // Default implementation throws - vendors should override if they support per-plant fetching
+    throw new Error(`listPlant() not implemented for vendor type: ${this.config.vendorType}`)
+  }
+  
+  // Protected normalization methods
+  protected abstract normalizeTelemetry(rawData: any): TelemetryData
+  protected abstract normalizeAlert(rawData: any): Alert
   
   // Token management
   setTokenStorage?(vendorId: number, supabaseClient: any): void

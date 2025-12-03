@@ -30,7 +30,8 @@ import {
   Terminal,
   Copy,
   Check,
-  User
+  User,
+  Users
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -3757,6 +3758,318 @@ User-Agent: Mozilla/5.0...`}
                           <strong>⚠️ Not Yet Implemented:</strong> Alerts and realtime data endpoints are not yet implemented for Foxesscloud.
                         </p>
                       </div>
+                    </div>
+                  </div>
+                  )}
+                </div>
+
+                {/* Vendor Onboarding Guide */}
+                <div id="vendor-onboarding" className="space-y-4 mt-12">
+                  <div className="flex items-center justify-between p-4 border-b-2 border-primary">
+                    <div className="flex items-center gap-3">
+                      <Users className="h-6 w-6 text-primary" />
+                      <h2 className="text-2xl font-bold">Vendor Onboarding Guide</h2>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleSection("vendor-onboarding")}
+                    >
+                      {expandedSections.has("vendor-onboarding") ? (
+                        <ChevronDown className="h-5 w-5" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5" />
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {expandedSections.has("vendor-onboarding") && (
+                  <div className="bg-muted/50 p-6 rounded-lg space-y-6 border-t">
+                    <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
+                      <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Overview</h3>
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        This guide outlines the requirements and process for onboarding a new vendor integration into Solar Information System. 
+                        Each vendor must implement a standardized adapter interface that provides authentication, plant listing, telemetry, and alerts.
+                      </p>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-3">1. BaseVendorAdapter Interface</h4>
+                      <div className="bg-background p-4 rounded text-sm space-y-3">
+                        <p className="text-muted-foreground">
+                          All vendor adapters must extend <code className="bg-muted px-1 rounded">BaseVendorAdapter</code> and implement the following abstract methods:
+                        </p>
+                        <CodeBlock 
+                          id="base-adapter-interface"
+                          code={`abstract class BaseVendorAdapter {
+  // Required Methods
+  abstract authenticate(): Promise<string>
+  abstract listPlants(): Promise<Plant[]>
+  abstract getTelemetry(plantId: string, startTime: Date, endTime: Date): Promise<TelemetryData[]>
+  abstract getRealtime(plantId: string): Promise<RealtimeData>
+  abstract getAlerts(plantId: string): Promise<Alert[]>
+  
+  // Optional Methods (with default implementation)
+  async listPlant(vendorPlantId: string): Promise<Plant | null> {
+    // Override if vendor supports per-plant fetching
+    throw new Error(\`listPlant() not implemented for vendor type: \${this.config.vendorType}\`)
+  }
+  
+  // Protected Normalization Methods
+  protected abstract normalizeTelemetry(rawData: any): TelemetryData
+  protected abstract normalizeAlert(rawData: any): Alert
+}`}
+                        />
+                        <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-900">
+                          <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                            <strong>⚠️ Important:</strong> <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">listPlant()</code> is optional but recommended. 
+                            It&apos;s used for live telemetry sync in PER_PLANT mode and for enriching plants during plant sync if live telemetry is missing from <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">listPlants()</code>.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-3">2. Vendor Configuration Requirements</h4>
+                      <div className="bg-background p-4 rounded text-sm space-y-3">
+                        <h5 className="font-medium">Database Configuration</h5>
+                        <p className="text-muted-foreground">
+                          When creating a vendor in the database, the following fields are required:
+                        </p>
+                        <table className="w-full text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b bg-muted">
+                              <th className="text-left p-2 font-semibold">Field</th>
+                              <th className="text-left p-2 font-semibold">Type</th>
+                              <th className="text-left p-2 font-semibold">Required</th>
+                              <th className="text-left p-2 font-semibold">Description</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">name</code></td>
+                              <td className="p-2">TEXT</td>
+                              <td className="p-2">✅ Yes</td>
+                              <td className="p-2">Vendor display name (e.g., &quot;Solarman Production&quot;)</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">vendor_type</code></td>
+                              <td className="p-2">ENUM</td>
+                              <td className="p-2">✅ Yes</td>
+                              <td className="p-2">One of: SOLARMAN, SOLARDM, SHINEMONITOR, PVBLINK, FOXESSCLOUD, OTHER</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">credentials</code></td>
+                              <td className="p-2">JSONB</td>
+                              <td className="p-2">✅ Yes</td>
+                              <td className="p-2">Vendor-specific authentication credentials</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2"><code className="bg-muted px-1 rounded">org_id</code></td>
+                              <td className="p-2">INTEGER</td>
+                              <td className="p-2">Optional</td>
+                              <td className="p-2">Organization ID (NULL for global/shared vendors)</td>
+                            </tr>
+                            <tr>
+                              <td className="p-2"><code className="bg-muted px-1 rounded">is_active</code></td>
+                              <td className="p-2">BOOLEAN</td>
+                              <td className="p-2">Optional</td>
+                              <td className="p-2">Active status (default: true)</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <h5 className="font-medium mt-4">Environment Variables</h5>
+                        <p className="text-muted-foreground">
+                          API base URLs are stored in environment variables, not in the database:
+                        </p>
+                        <CodeBlock 
+                          id="env-vars-example"
+                          code={`# Pattern: {VENDOR_TYPE}_API_BASE_URL
+SOLARMAN_API_BASE_URL=https://globalapi.solarmanpv.com
+SOLARMAN_PRO_API_BASE_URL=https://globalpro.solarmanpv.com
+SOLARDM_API_BASE_URL=http://global.solar-dm.com:8010
+SHINEMONITOR_API_BASE_URL=https://web.shinemonitor.com/public
+PVBLINK_API_BASE_URL=https://cloud.pvblink.com
+FOXESSCLOUD_API_BASE_URL=https://www.foxesscloud.com`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-3">3. Data Mapping Requirements</h4>
+                      <div className="bg-background p-4 rounded text-sm space-y-3">
+                        <h5 className="font-medium">Unit Conversions</h5>
+                        <p className="text-muted-foreground">
+                          The system expects data in specific units. Your adapter must convert vendor data to these units:
+                        </p>
+                        <table className="w-full text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b bg-muted">
+                              <th className="text-left p-2 font-semibold">Metric</th>
+                              <th className="text-left p-2 font-semibold">Required Unit</th>
+                              <th className="text-left p-2 font-semibold">Conversion Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="p-2">Capacity</td>
+                              <td className="p-2">kW</td>
+                              <td className="p-2">If vendor provides in W, divide by 1000</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2">Current Power</td>
+                              <td className="p-2">kW</td>
+                              <td className="p-2">If vendor provides in W, divide by 1000</td>
+                            </tr>
+                            <tr className="border-b bg-green-50 dark:bg-green-950/10">
+                              <td className="p-2"><strong>Daily Energy</strong></td>
+                              <td className="p-2"><strong>kWh</strong></td>
+                              <td className="p-2"><strong>Store in kWh (not MWh) to avoid rounding errors</strong></td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2">Monthly Energy</td>
+                              <td className="p-2">MWh</td>
+                              <td className="p-2">If vendor provides in kWh, divide by 1000</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="p-2">Yearly Energy</td>
+                              <td className="p-2">MWh</td>
+                              <td className="p-2">If vendor provides in kWh, divide by 1000</td>
+                            </tr>
+                            <tr>
+                              <td className="p-2">Total Energy</td>
+                              <td className="p-2">MWh</td>
+                              <td className="p-2">If vendor provides in kWh, divide by 1000</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <h5 className="font-medium mt-4">Timestamp Handling</h5>
+                        <ul className="text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Vendor timestamps may be Unix timestamps (seconds or milliseconds) or ISO strings</li>
+                          <li>Always convert to ISO 8601 format (<code className="bg-muted px-1 rounded">YYYY-MM-DDTHH:mm:ss.sssZ</code>)</li>
+                          <li>Store in UTC, convert from vendor timezone if needed</li>
+                        </ul>
+                        <CodeBlock 
+                          id="timestamp-conversion"
+                          code={`// Unix timestamp (seconds) → ISO string
+const lastUpdateTime = station.lastUpdateTime 
+  ? new Date(station.lastUpdateTime * 1000).toISOString() 
+  : null
+
+// Unix timestamp (milliseconds) → ISO string
+const lastUpdateTime = station.lastUpdateTime 
+  ? new Date(station.lastUpdateTime).toISOString() 
+  : null`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-3">4. Implementation Checklist</h4>
+                      <div className="bg-background p-4 rounded text-sm space-y-3">
+                        <div className="space-y-2">
+                          <div className="flex items-start gap-2">
+                            <CheckCircle2 className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                            <div>
+                              <strong>Phase 1: Setup</strong>
+                              <ul className="ml-4 mt-1 space-y-1 list-disc text-muted-foreground">
+                                <li>Create vendor adapter class extending <code className="bg-muted px-1 rounded">BaseVendorAdapter</code></li>
+                                <li>Register adapter in <code className="bg-muted px-1 rounded">lib/vendors/vendorManager.ts</code></li>
+                                <li>Add vendor type to <code className="bg-muted px-1 rounded">vendor_type</code> ENUM in database</li>
+                                <li>Set up environment variables for API base URL</li>
+                              </ul>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <CheckCircle2 className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                            <div>
+                              <strong>Phase 2: Authentication</strong>
+                              <ul className="ml-4 mt-1 space-y-1 list-disc text-muted-foreground">
+                                <li>Implement <code className="bg-muted px-1 rounded">authenticate()</code> method</li>
+                                <li>Handle token caching (check expiration before re-auth)</li>
+                                <li>Implement <code className="bg-muted px-1 rounded">setTokenStorage()</code> for token persistence</li>
+                                <li>Handle authentication errors gracefully</li>
+                              </ul>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <CheckCircle2 className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                            <div>
+                              <strong>Phase 3: Plant Listing</strong>
+                              <ul className="ml-4 mt-1 space-y-1 list-disc text-muted-foreground">
+                                <li>Implement <code className="bg-muted px-1 rounded">listPlants()</code> method</li>
+                                <li>Map vendor plant ID to <code className="bg-muted px-1 rounded">vendor_plant_id</code> (as string)</li>
+                                <li>Extract and normalize plant name, capacity, location</li>
+                                <li>Extract live telemetry fields (current_power_kw, daily_energy_kwh, etc.)</li>
+                                <li>Handle pagination if vendor API supports it</li>
+                              </ul>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <CheckCircle2 className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                            <div>
+                              <strong>Phase 4: Optional - listPlant()</strong>
+                              <ul className="ml-4 mt-1 space-y-1 list-disc text-muted-foreground">
+                                <li>Implement <code className="bg-muted px-1 rounded">listPlant(vendorPlantId)</code> if vendor supports per-plant fetching</li>
+                                <li>Used for live telemetry sync in PER_PLANT mode</li>
+                                <li>Used for enriching plants during plant sync if live telemetry missing from listPlants()</li>
+                              </ul>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <CheckCircle2 className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                            <div>
+                              <strong>Phase 5: Telemetry & Alerts</strong>
+                              <ul className="ml-4 mt-1 space-y-1 list-disc text-muted-foreground">
+                                <li>Implement <code className="bg-muted px-1 rounded">getTelemetry()</code> for historical data (graphs)</li>
+                                <li>Implement <code className="bg-muted px-1 rounded">getAlerts()</code> if vendor supports alerts</li>
+                                <li>Implement <code className="bg-muted px-1 rounded">normalizeTelemetry()</code> and <code className="bg-muted px-1 rounded">normalizeAlert()</code></li>
+                                <li>Map vendor severity levels to standard enum (LOW, MEDIUM, HIGH, CRITICAL)</li>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-3">5. Common Pitfalls</h4>
+                      <div className="bg-background p-4 rounded text-sm space-y-3">
+                        <div className="space-y-2">
+                          <div className="bg-red-50 dark:bg-red-950/20 p-3 rounded border border-red-200 dark:border-red-900">
+                            <strong className="text-red-900 dark:text-red-100">Unit Conversion Errors</strong>
+                            <p className="text-xs text-red-800 dark:text-red-200 mt-1">
+                              <strong>Problem:</strong> Storing daily energy in MWh instead of kWh<br/>
+                              <strong>Solution:</strong> Always store <code className="bg-red-100 dark:bg-red-900 px-1 rounded">daily_energy_kwh</code> in kWh (not MWh)
+                            </p>
+                          </div>
+                          <div className="bg-orange-50 dark:bg-orange-950/20 p-3 rounded border border-orange-200 dark:border-orange-900">
+                            <strong className="text-orange-900 dark:text-orange-100">Timestamp Handling</strong>
+                            <p className="text-xs text-orange-800 dark:text-orange-200 mt-1">
+                              <strong>Problem:</strong> Storing Unix timestamps as-is<br/>
+                              <strong>Solution:</strong> Always convert to ISO 8601 format using <code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">new Date(timestamp).toISOString()</code>
+                            </p>
+                          </div>
+                          <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-900">
+                            <strong className="text-yellow-900 dark:text-yellow-100">Data Normalization</strong>
+                            <p className="text-xs text-yellow-800 dark:text-yellow-200 mt-1">
+                              <strong>Problem:</strong> Not trimming whitespace from status fields<br/>
+                              <strong>Solution:</strong> Always <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">.trim()</code> string values from vendor API
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
+                      <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📚 Additional Resources</h4>
+                      <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 ml-4 list-disc">
+                        <li>Reference implementations: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">lib/vendors/solarmanAdapter.ts</code>, <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">lib/vendors/solarDmAdapter.ts</code></li>
+                        <li>Base adapter: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">lib/vendors/baseVendorAdapter.ts</code></li>
+                        <li>Type definitions: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">lib/vendors/types.ts</code></li>
+                        <li>Vendor manager: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">lib/vendors/vendorManager.ts</code></li>
+                        <li>Full documentation: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">docs/VENDOR_ONBOARDING.md</code></li>
+                      </ul>
                     </div>
                   </div>
                   )}
