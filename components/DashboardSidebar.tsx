@@ -78,6 +78,12 @@ export function DashboardSidebar() {
       roles: ["DEVELOPER"],
     },
     {
+      title: "Release Notes",
+      href: "/superadmin/release-notes",
+      icon: FileText,
+      roles: ["DEVELOPER"],
+    },
+    {
       title: "Documentation & Runbooks",
       href: "/superadmin/documentation-runbooks",
       icon: BookMarked,

@@ -4648,6 +4648,9 @@ const lastUpdateTime = station.lastUpdateTime
                           <li>Create performance dashboards</li>
                           <li>Set up SLOs/SLIs for critical operations</li>
                         </ul>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          <strong>📚 Setup Guide:</strong> Complete step-by-step guide available at <code className="bg-background px-1 rounded">docs/NEW_RELIC_APM_SETUP.md</code>
+                        </p>
                       </div>
 
                       <div>
