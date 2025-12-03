@@ -1,7 +1,15 @@
 /**
  * Custom Next.js Server with Cron Job
- * This file starts both Next.js and the plant sync cron job
+ * This file starts both Next.js and the plant sync cron job.
  */
+
+'use strict'
+
+// Load New Relic APM early when enabled so it can instrument HTTP, cron jobs, etc.
+if (process.env.NEW_RELIC_ENABLED === 'true') {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('newrelic')
+}
 
 const { createServer } = require('http')
 const { parse } = require('url')
