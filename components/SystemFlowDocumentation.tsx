@@ -12,6 +12,7 @@ import {
   CheckCircle2, 
   XCircle, 
   AlertCircle, 
+  AlertTriangle,
   Clock, 
   Database, 
   RefreshCw, 
@@ -28,7 +29,8 @@ import {
   GitBranch,
   Terminal,
   Copy,
-  Check
+  Check,
+  User
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -883,6 +885,208 @@ export function SystemFlowDocumentation() {
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Alert Sync Flow */}
+          <Card className="overflow-hidden">
+            <FlowSectionHeader flowId="flow-alert-sync" flowTitle="Alert Sync Flow" icon={AlertTriangle} />
+            {expandedSections.has("flow-alert-sync") && (
+              <div className="p-6 pt-0 space-y-6 border-t">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Entry Points</h3>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        1. Auto Cron
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Runs via <code className="bg-background px-1 rounded">lib/cron/alertSyncCron.js</code>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Calls <code className="bg-background px-1 rounded">GET /api/cron/sync-alerts</code>
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        2. Manual Trigger
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        SUPERADMIN/DEVELOPER via UI
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Calls <code className="bg-background px-1 rounded">POST /api/vendors/:id/sync-alerts</code> or <code className="bg-background px-1 rounded">POST /api/cron/sync-alerts</code>
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Database className="h-4 w-4" />
+                        3. External Cron
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        GitHub Actions, cron-job.org, etc.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Calls <code className="bg-background px-1 rounded">GET /api/cron/sync-alerts</code> with <code className="bg-background px-1 rounded">CRON_SECRET</code>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Complete Flow</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    <ol className="text-sm text-muted-foreground space-y-3 ml-4 list-decimal">
+                      <li>
+                        <strong>Entry Point:</strong> Cron or manual trigger
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Cron checks restricted window (8 PM - 5 AM IST by default)</li>
+                          <li>If in window, sync is skipped</li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong>syncAllAlerts()</strong> in <code className="bg-background px-1 rounded">alertSyncService.ts</code>
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Fetches all active vendors with organization info</li>
+                          <li>Filters to vendors with <code className="bg-background px-1 rounded">is_active = true</code> and <code className="bg-background px-1 rounded">org_id IS NOT NULL</code></li>
+                          <li>Currently supports <strong>SOLARMAN</strong> and <strong>SOLARDM</strong> vendors only</li>
+                          <li>Processes all supported vendors in parallel using <code className="bg-background px-1 rounded">Promise.all()</code></li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong>For each vendor:</strong> Vendor-specific sync function
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li><strong>Solarman:</strong> <code className="bg-background px-1 rounded">syncSolarmanVendorAlerts()</code>
+                            <ul className="ml-4 mt-1 list-disc">
+                              <li>Creates vendor adapter and authenticates</li>
+                              <li>Fetches all plants for vendor from database</li>
+                              <li>Builds plant mapping: <code className="bg-background px-1 rounded">stationId → plant_id</code></li>
+                              <li>Determines lookback window from <code className="bg-background px-1 rounded">vendor.credentials.alertsStartDate</code> (default: 1 year)</li>
+                              <li>Calls Solarman PRO API: <code className="bg-background px-1 rounded">POST /maintain-s/operating/station/alert</code></li>
+                              <li>Filters alerts to <code className="bg-background px-1 rounded">deviceType === &quot;INVERTER&quot;</code> and <code className="bg-background px-1 rounded">alertQueryName === &quot;No Mains Voltage&quot;</code></li>
+                              <li>Paginates through alerts (page size: 100) until no more data</li>
+                              <li>For each alert:
+                                <ul className="ml-4 mt-1 list-disc">
+                                  <li>Maps <code className="bg-background px-1 rounded">stationId</code> to internal <code className="bg-background px-1 rounded">plant_id</code></li>
+                                  <li>Calculates <code className="bg-background px-1 rounded">grid_down_seconds</code> (endTime - alertTime)</li>
+                                  <li>Calculates <code className="bg-background px-1 rounded">grid_down_benefit_kwh</code> (0.5 × hours × capacity_kw, only for 9 AM - 4 PM window)</li>
+                                  <li>Maps severity: <code className="bg-background px-1 rounded">level + influence</code> → LOW/MEDIUM/HIGH/CRITICAL (safety influence upgrades to CRITICAL)</li>
+                                  <li>Maps status: <code className="bg-background px-1 rounded">endTime === null</code> → ACTIVE, else → RESOLVED</li>
+                                  <li>Checks for existing alert by <code className="bg-background px-1 rounded">(vendor_id, vendor_alert_id, plant_id)</code></li>
+                                  <li>Upserts alert to <code className="bg-background px-1 rounded">alerts</code> table</li>
+                                </ul>
+                              </li>
+                              <li>Updates <code className="bg-background px-1 rounded">vendors.last_alert_synced_at</code> timestamp</li>
+                            </ul>
+                          </li>
+                          <li><strong>SolarDM:</strong> <code className="bg-background px-1 rounded">syncSolarDmVendorAlerts()</code>
+                            <ul className="ml-4 mt-1 list-disc">
+                              <li>Creates vendor adapter and authenticates</li>
+                              <li>Fetches all plants for vendor from database</li>
+                              <li>Builds plant mapping: <code className="bg-background px-1 rounded">vendor_plant_id → plant_id</code></li>
+                              <li>Determines lookback window from <code className="bg-background px-1 rounded">vendor.credentials.alertsStartDate</code> (default: 1 year)</li>
+                              <li>Calls SolarDM API: <code className="bg-background px-1 rounded">adapter.getAllAlerts()</code> (fetches all alerts, filters client-side)</li>
+                              <li>Filters alerts to <code className="bg-background px-1 rounded">faultInfo === &quot;There is no mains voltage&quot;</code></li>
+                              <li>For each alert:
+                                <ul className="ml-4 mt-1 list-disc">
+                                  <li>Maps <code className="bg-background px-1 rounded">plantId</code> to internal <code className="bg-background px-1 rounded">plant_id</code></li>
+                                  <li>Parses timestamps: <code className="bg-background px-1 rounded">happenTime</code> and <code className="bg-background px-1 rounded">recoverTime</code> (format: &quot;YYYY-MM-DD HH:mm:ss&quot;)</li>
+                                  <li>Filters by date range (alerts outside lookback window are skipped)</li>
+                                  <li>Calculates <code className="bg-background px-1 rounded">grid_down_seconds</code> and <code className="bg-background px-1 rounded">grid_down_benefit_kwh</code></li>
+                                  <li>Maps severity: <code className="bg-background px-1 rounded">faultLevel</code> → LOW/MEDIUM/HIGH/CRITICAL</li>
+                                  <li>Maps status: <code className="bg-background px-1 rounded">recoverTime === null</code> → ACTIVE, else → RESOLVED</li>
+                                  <li>Checks for existing alert by <code className="bg-background px-1 rounded">(vendor_id, vendor_alert_id, plant_id)</code></li>
+                                  <li>Upserts alert to <code className="bg-background px-1 rounded">alerts</code> table</li>
+                                </ul>
+                              </li>
+                              <li>Updates <code className="bg-background px-1 rounded">vendors.last_alert_synced_at</code> timestamp</li>
+                            </ul>
+                          </li>
+                          <li><strong>Other vendors:</strong> Currently not supported (returns error: &quot;Alert sync is not implemented for vendor type: [type]&quot;)</li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong>Results:</strong> Summary with success/failure counts, alerts synced/created/updated per vendor
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Returns <code className="bg-background px-1 rounded">AlertSyncSummary</code> with:
+                            <ul className="ml-4 mt-1 list-disc">
+                              <li><code className="bg-background px-1 rounded">totalVendors</code> - Number of vendors processed</li>
+                              <li><code className="bg-background px-1 rounded">successful</code> - Number of successful syncs</li>
+                              <li><code className="bg-background px-1 rounded">failed</code> - Number of failed syncs</li>
+                              <li><code className="bg-background px-1 rounded">totalAlertsSynced</code> - Total alerts processed</li>
+                              <li><code className="bg-background px-1 rounded">totalAlertsCreated</code> - New alerts inserted</li>
+                              <li><code className="bg-background px-1 rounded">totalAlertsUpdated</code> - Existing alerts updated</li>
+                              <li><code className="bg-background px-1 rounded">results</code> - Per-vendor results array</li>
+                              <li><code className="bg-background px-1 rounded">duration</code> - Total sync duration in milliseconds</li>
+                            </ul>
+                          </li>
+                        </ul>
+                      </li>
+                    </ol>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
+                  <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Alert Processing Details</h4>
+                  <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2 ml-4 list-disc">
+                    <li><strong>Deduplication:</strong> Alerts are deduplicated by <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">(vendor_id, vendor_alert_id, plant_id)</code> - if an alert with the same combination exists, it&apos;s updated instead of creating a duplicate</li>
+                    <li><strong>Severity Mapping:</strong>
+                      <ul className="ml-4 mt-1 list-disc">
+                        <li><strong>Solarman:</strong> <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">level</code> (0=LOW, 1=MEDIUM, 2=HIGH) + <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">influence</code> (2/3=Safety → CRITICAL)</li>
+                        <li><strong>SolarDM:</strong> <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">faultLevel</code> (1=LOW, 2=MEDIUM, 3=HIGH, 4=CRITICAL)</li>
+                      </ul>
+                    </li>
+                    <li><strong>Status Mapping:</strong>
+                      <ul className="ml-4 mt-1 list-disc">
+                        <li><strong>ACTIVE:</strong> Alert has no <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">endTime</code> (Solarman) or <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">recoverTime</code> (SolarDM)</li>
+                        <li><strong>RESOLVED:</strong> Alert has an end/recover time</li>
+                      </ul>
+                    </li>
+                    <li><strong>Grid Down Benefit Calculation:</strong>
+                      <ul className="ml-4 mt-1 list-disc">
+                        <li>Calculates hours of grid downtime within 9 AM - 4 PM window (IST)</li>
+                        <li>Formula: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">benefit_kwh = 0.5 × hours × capacity_kw</code></li>
+                        <li>Only calculated if both <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">alert_time</code> and <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">end_time</code> are present</li>
+                        <li>Stored in <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">alerts.grid_down_benefit_kwh</code></li>
+                      </ul>
+                    </li>
+                    <li><strong>Lookback Window:</strong>
+                      <ul className="ml-4 mt-1 list-disc">
+                        <li>Configurable per vendor via <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">vendor.credentials.alertsStartDate</code> (ISO date string)</li>
+                        <li>Default: 1 year lookback if not configured</li>
+                        <li>Maximum: 1 year (even if configured date is older)</li>
+                        <li>Used to filter alerts by date range</li>
+                      </ul>
+                    </li>
+                    <li><strong>Pagination:</strong>
+                      <ul className="ml-4 mt-1 list-disc">
+                        <li><strong>Solarman:</strong> Uses page size 100, paginates until empty response</li>
+                        <li><strong>SolarDM:</strong> Fetches all alerts in one call via <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">getAllAlerts()</code>, filters client-side</li>
+                      </ul>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                  <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">⚠️ Important Notes</h4>
+                  <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1 ml-4 list-disc">
+                    <li>Alert sync is <strong>separate from plant sync and telemetry sync</strong> - runs independently</li>
+                    <li>Currently only <strong>Solarman</strong> and <strong>SolarDM</strong> vendors are supported</li>
+                    <li>Alert sync respects the restricted time window (8 PM - 5 AM IST)</li>
+                    <li>Alerts are filtered to specific types:
+                      <ul className="ml-4 mt-1 list-disc">
+                        <li><strong>Solarman:</strong> <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">deviceType === &quot;INVERTER&quot;</code> and <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">alertQueryName === &quot;No Mains Voltage&quot;</code></li>
+                        <li><strong>SolarDM:</strong> <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">faultInfo === &quot;There is no mains voltage&quot;</code></li>
+                      </ul>
+                    </li>
+                    <li>Alerts are only synced for plants that exist in the database (mapped plants)</li>
+                    <li>Grid down benefit calculation only applies to alerts within 9 AM - 4 PM window (IST)</li>
+                    <li>Manual sync available per-vendor via <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">POST /api/vendors/:id/sync-alerts</code> (requires vendor update permission)</li>
+                  </ul>
                 </div>
               </div>
             )}
@@ -4134,7 +4338,7 @@ User-Agent: Mozilla/5.0...`}
                       </div>
 
                       <div>
-                        <h4 className="font-semibold mb-2">18. Load Testing & Capacity Planning</h4>
+                        <h4 className="font-semibold mb-2">17. Load Testing & Capacity Planning</h4>
                         <p className="text-sm text-muted-foreground mb-2">
                           <strong>Blast Radius:</strong> Scalability planning
                         </p>
@@ -4147,7 +4351,7 @@ User-Agent: Mozilla/5.0...`}
                       </div>
 
                       <div>
-                        <h4 className="font-semibold mb-2">19. Automated Testing Suite</h4>
+                        <h4 className="font-semibold mb-2">18. Automated Testing Suite</h4>
                         <p className="text-sm text-muted-foreground mb-2">
                           <strong>Blast Radius:</strong> Code quality, regression prevention
                         </p>
@@ -4161,6 +4365,22 @@ User-Agent: Mozilla/5.0...`}
                       </div>
 
                       <div>
+                        <h4 className="font-semibold mb-2">19. Documentation & Runbooks</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          <strong>Blast Radius:</strong> Operational efficiency
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li>Create runbooks for common issues (vendor sync failures, token expiration, etc.)</li>
+                          <li>Document troubleshooting procedures</li>
+                          <li>Add architecture decision records (ADRs)</li>
+                          <li>Create onboarding documentation for new developers</li>
+                        </ul>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          <strong>✅ Status:</strong> Implemented - Available at <code className="bg-background px-1 rounded">/superadmin/documentation-runbooks</code> (DEVELOPER only)
+                        </p>
+                      </div>
+
+                      <div>
                         <h4 className="font-semibold mb-2">20. Documentation & Runbooks</h4>
                         <p className="text-sm text-muted-foreground mb-2">
                           <strong>Blast Radius:</strong> Operational efficiency
@@ -4171,6 +4391,9 @@ User-Agent: Mozilla/5.0...`}
                           <li>Add architecture decision records (ADRs)</li>
                           <li>Create onboarding documentation for new developers</li>
                         </ul>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          <strong>✅ Status:</strong> Implemented - Available at <code className="bg-background px-1 rounded">/superadmin/documentation-runbooks</code> (DEVELOPER only)
+                        </p>
                       </div>
                     </div>
                   </div>

@@ -15,6 +15,7 @@ import {
   X,
   RefreshCw,
   BookOpen,
+  BookMarked,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -74,6 +75,12 @@ export function DashboardSidebar() {
       title: "System Flow",
       href: "/superadmin/system-flow",
       icon: BookOpen,
+      roles: ["DEVELOPER"],
+    },
+    {
+      title: "Documentation & Runbooks",
+      href: "/superadmin/documentation-runbooks",
+      icon: BookMarked,
       roles: ["DEVELOPER"],
     },
     {
