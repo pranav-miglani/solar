@@ -86,6 +86,16 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // Block API documentation in production for security
+  if (pathname.startsWith("/api-docs") || pathname.startsWith("/api/docs")) {
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { error: "API documentation is not available in production" },
+        { status: 404 }
+      )
+    }
+  }
+
   // After login, always redirect to dashboard
   if (pathname === "/" || pathname === "/auth/login") {
     return NextResponse.redirect(new URL("/dashboard", request.url))

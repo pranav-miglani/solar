@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Card } from '@/components/ui/card';
+import { AlertTriangle } from 'lucide-react';
 import 'swagger-ui-react/swagger-ui.css';
 
 // Dynamically import SwaggerUI to avoid SSR issues
@@ -22,16 +23,30 @@ export default function ApiDocsPage() {
   const [spec, setSpec] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isProduction, setIsProduction] = useState(false);
 
   useEffect(() => {
+    // Check if we're in production by checking the API response
     const fetchSpec = async () => {
       try {
         const response = await fetch('/api/docs/swagger.json');
         if (!response.ok) {
-          throw new Error('Failed to fetch OpenAPI spec');
+          if (response.status === 404) {
+            setIsProduction(true);
+            setError('API documentation is not available in production for security reasons.');
+          } else {
+            throw new Error('Failed to fetch OpenAPI spec');
+          }
+        } else {
+          const data = await response.json();
+          // Check if response is an error object
+          if (data.error) {
+            setIsProduction(true);
+            setError(data.error);
+          } else {
+            setSpec(data);
+          }
         }
-        const data = await response.json();
-        setSpec(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -57,8 +72,19 @@ export default function ApiDocsPage() {
     return (
       <div className="container mx-auto py-8">
         <Card className="p-6">
-          <h1 className="text-2xl font-bold mb-4">API Documentation Error</h1>
-          <p className="text-destructive">{error}</p>
+          <div className="flex items-center gap-3 mb-4">
+            <AlertTriangle className="h-6 w-6 text-destructive" />
+            <h1 className="text-2xl font-bold">
+              {isProduction ? 'API Documentation Unavailable' : 'API Documentation Error'}
+            </h1>
+          </div>
+          <p className="text-destructive mb-2">{error}</p>
+          {isProduction && (
+            <p className="text-sm text-muted-foreground mt-4">
+              API documentation is disabled in production environments to prevent unauthorized access to API endpoints and database queries.
+              Please use the development environment to access the Swagger documentation.
+            </p>
+          )}
         </Card>
       </div>
     );
