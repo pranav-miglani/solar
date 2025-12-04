@@ -344,7 +344,7 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
                       className="mt-2"
                     />
                   </div>
-                    <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
+                  <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
                     <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Required Columns:</h4>
                     <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
                       <li><strong>Title</strong> - Work order title</li>
@@ -448,82 +448,83 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
                 </TableRow>
               ) : (
                 workOrders.map((wo, index) => (
-                <TableRow 
-                  key={wo.id}
-                  className="transition-all duration-200 hover:bg-primary/5 cursor-pointer group animate-in"
-                  style={{
-                    animationDelay: `${index * 50}ms`
-                  }}
-                  onClick={() => handleEdit(wo.id)}
-                >
-                  <TableCell className="font-medium group-hover:text-primary transition-colors">
-                    {wo.title}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(wo.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <div 
-                      className="flex gap-2 justify-end"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {canEdit && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(wo.id)}
-                          className="transition-all duration-200 hover:scale-110 hover:bg-primary/10"
-                        >
-                          <Pencil className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
-                      )}
-                      <Link href={`/workorders/${wo.id}`}>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="transition-all duration-200 hover:scale-110 hover:bg-primary/10"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
-                      </Link>
-                      {canDelete && (
-                        <AlertDialog open={deletingWorkOrderId === wo.id} onOpenChange={(open: boolean) => !open && setDeletingWorkOrderId(null)}>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeletingWorkOrderId(wo.id)}
-                              className="transition-all duration-200 hover:scale-110 hover:bg-destructive/10 hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-1" />
-                              Delete
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete &quot;{wo.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDelete(wo.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  <TableRow 
+                    key={wo.id}
+                    className="transition-all duration-200 hover:bg-primary/5 cursor-pointer group animate-in"
+                    style={{
+                      animationDelay: `${index * 50}ms`
+                    }}
+                    onClick={() => handleEdit(wo.id)}
+                  >
+                    <TableCell className="font-medium group-hover:text-primary transition-colors">
+                      {wo.title}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(wo.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <div 
+                        className="flex gap-2 justify-end"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(wo.id)}
+                            className="transition-all duration-200 hover:scale-110 hover:bg-primary/10"
+                          >
+                            <Pencil className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                        )}
+                        <Link href={`/workorders/${wo.id}`}>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="transition-all duration-200 hover:scale-110 hover:bg-primary/10"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        </Link>
+                        {canDelete && (
+                          <AlertDialog open={deletingWorkOrderId === wo.id} onOpenChange={(open: boolean) => !open && setDeletingWorkOrderId(null)}>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeletingWorkOrderId(wo.id)}
+                                className="transition-all duration-200 hover:scale-110 hover:bg-destructive/10 hover:text-destructive"
                               >
+                                <Trash2 className="h-4 w-4 mr-1" />
                                 Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete &quot;{wo.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDelete(wo.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>
@@ -545,63 +546,63 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
               }}
               onClick={() => handleEdit(wo.id)}
             >
-                  <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-start justify-between gap-3 mb-3">
                 <h3 className="font-semibold text-base flex-1">{wo.title}</h3>
-                    <div 
-                      className="flex gap-2"
-                      onClick={(e) => e.stopPropagation()}
+                <div 
+                  className="flex gap-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {canEdit && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(wo.id)}
+                      className="h-8 w-8 p-0"
                     >
-                      {canEdit && (
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Link href={`/workorders/${wo.id}`}>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  {canDelete && (
+                    <AlertDialog open={deletingWorkOrderId === wo.id} onOpenChange={(open: boolean) => !open && setDeletingWorkOrderId(null)}>
+                      <AlertDialogTrigger asChild>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleEdit(wo.id)}
-                          className="h-8 w-8 p-0"
+                          onClick={() => setDeletingWorkOrderId(wo.id)}
+                          className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      )}
-                      <Link href={`/workorders/${wo.id}`}>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      {canDelete && (
-                        <AlertDialog open={deletingWorkOrderId === wo.id} onOpenChange={(open: boolean) => !open && setDeletingWorkOrderId(null)}>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeletingWorkOrderId(wo.id)}
-                              className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete &quot;{wo.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDelete(wo.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-                    </div>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete &quot;{wo.title}&quot;? This action cannot be undone and will remove all associated plant mappings.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDelete(wo.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                </div>
               </div>
               <div className="text-sm text-muted-foreground">
                 Created {new Date(wo.created_at).toLocaleDateString()}
@@ -622,4 +623,3 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
     </div>
   )
 }
-
