@@ -51,6 +51,11 @@ interface WorkOrder {
   }>
 }
 
+interface GroupedWorkOrders {
+  orgId: number
+  orgName: string
+  workOrders: WorkOrder[]
+}
 
 interface WorkOrdersListProps {
   accountType: string
