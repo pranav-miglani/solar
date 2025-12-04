@@ -127,19 +127,18 @@ async function syncVendorLiveTelemetry(
   }
 
   try {
-    // Get all active plants for this vendor
+    // Get all plants for this vendor (including inactive ones - sync continues until user deletes)
     const { data: plants, error: plantsError } = await supabase
       .from("plants")
       .select("id, vendor_plant_id")
       .eq("vendor_id", vendor.id)
-      .eq("is_active", true)
 
     if (plantsError) {
       throw new Error(`Failed to fetch plants: ${plantsError.message}`)
     }
 
     if (!plants || plants.length === 0) {
-      logger.info(`[LiveTelemetry] No active plants found for vendor ${vendor.name}`)
+      logger.info(`[LiveTelemetry] No plants found for vendor ${vendor.name}`)
       result.success = true
       return result
     }
