@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
         created_at,
         updated_at,
         org_id,
+        organizations:org_id(id, name),
         work_order_plants(
           *,
           plants:plant_id (
@@ -56,40 +57,19 @@ export async function GET(request: NextRequest) {
       `)
       .order("created_at", { ascending: false })
 
-    // Filter by organization if orgId query parameter is provided
+    // Filter by organization - always filter at DB level for efficiency
+    // This reduces data fetched from DB and improves performance
     if (targetOrgId) {
+      // Filter by orgId query parameter (for SUPERADMIN/GOVT selecting an org)
       query = query.eq("org_id", targetOrgId)
     } else if (accountType === "ORG" && orgId) {
-      // Get plant IDs for this org
-      const { data: orgPlants } = await supabase
-        .from("plants")
-        .select("id")
-        .eq("org_id", orgId)
-
-      const plantIds = orgPlants?.map((p) => p.id) || []
-
-      if (plantIds.length > 0) {
-        // Get work orders that have plants from this org
-        const { data: workOrderPlants } = await supabase
-          .from("work_order_plants")
-          .select("work_order_id")
-          .in("plant_id", plantIds)
-
-        const workOrderIds = [
-          ...new Set(workOrderPlants?.map((wop) => wop.work_order_id) || []),
-        ]
-
-        if (workOrderIds.length > 0) {
-          query = query.in("id", workOrderIds)
-        } else {
-          // No work orders, return empty
-          return NextResponse.json({ workOrders: [] })
-        }
-      } else {
-        return NextResponse.json({ workOrders: [] })
+      // For ORG users, ALWAYS filter by their org_id - they should never see other orgs' work orders
+      query = query.eq("org_id", orgId)
+    } else if (accountType === "GOVT" || accountType === "SUPERADMIN" || accountType === "DEVELOPER") {
+      // SUPERADMIN/GOVT/DEVELOPER without orgId param can see all work orders
+      // But typically they should select an org first, so this is for backward compatibility
+      // In practice, they should use /workorders/org/[orgId] route
     }
-    }
-    // SUPERADMIN and GOVT see all work orders
 
     const { data: workOrders, error } = await query
 

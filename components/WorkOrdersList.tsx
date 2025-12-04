@@ -42,12 +42,15 @@ interface WorkOrder {
   title: string
   description: string | null
   created_at: string
+  org_id: number | null
+  organizations?: { id: number; name: string } | null
   work_order_plants?: Array<{
     plants: {
-      organizations: { name: string }
+      organizations: { id: number; name: string }
     }
   }>
 }
+
 
 interface WorkOrdersListProps {
   accountType: string
@@ -57,6 +60,7 @@ interface WorkOrdersListProps {
 
 export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrdersListProps) {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
+  const [groupedWorkOrders, setGroupedWorkOrders] = useState<GroupedWorkOrders[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingWorkOrderId, setEditingWorkOrderId] = useState<number | undefined>()
@@ -67,6 +71,9 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
   const [importResult, setImportResult] = useState<any>(null)
 
   const isSuperAdmin = accountType === "SUPERADMIN" || accountType === "DEVELOPER"
+  const canEdit = isSuperAdmin
+  const canDelete = isSuperAdmin
+  const canExportImport = isSuperAdmin
 
   useEffect(() => {
     fetchWorkOrders()
@@ -74,23 +81,90 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
   }, [orgId])
 
   async function fetchWorkOrders() {
+    // Always pass orgId to API for DB-level filtering (more efficient)
+    // API will handle filtering based on user role - reduces data fetched from DB
+    // When orgId is provided, all work orders will be from that org (no need to group)
     const url = orgId ? `/api/workorders?orgId=${orgId}` : `/api/workorders`
     const response = await fetch(url)
     const data = await response.json()
-    setWorkOrders(data.workOrders || [])
+    const orders = data.workOrders || []
+    setWorkOrders(orders)
+    
+    // Group work orders by organization (only needed if viewing all work orders without orgId filter)
+    // When orgId is provided, all work orders are from same org, so grouping is not necessary
+    if (!orgId) {
+      const grouped = groupWorkOrdersByOrg(orders)
+      setGroupedWorkOrders(grouped)
+    } else {
+      // Single group for the selected org
+      if (orders.length > 0) {
+        const orgName = orders[0]?.organizations?.name || organizationName || `Organization ${orgId}`
+        setGroupedWorkOrders([{
+          orgId: orgId!,
+          orgName,
+          workOrders: orders
+        }])
+      } else {
+        setGroupedWorkOrders([])
+      }
+    }
     setLoading(false)
   }
 
+  function groupWorkOrdersByOrg(orders: WorkOrder[]): GroupedWorkOrders[] {
+    const orgMap = new Map<number, { orgName: string; workOrders: WorkOrder[] }>()
+    
+    orders.forEach((wo) => {
+      // Get org from direct organizations relation, work_order_plants, or org_id
+      let orgId: number | null = wo.org_id
+      let orgName = "Unknown Organization"
+      
+      // First try to get from direct organizations relation
+      if (wo.organizations) {
+        orgId = wo.organizations.id
+        orgName = wo.organizations.name
+      } else if (wo.work_order_plants && wo.work_order_plants.length > 0) {
+        // Fallback to getting from first plant's organization
+        const firstPlant = wo.work_order_plants[0]
+        if (firstPlant.plants?.organizations) {
+          orgId = firstPlant.plants.organizations.id
+          orgName = firstPlant.plants.organizations.name
+        }
+      }
+      
+      // If org_id is set but no organization name found, use org_id
+      if (orgId && orgName === "Unknown Organization") {
+        orgName = `Organization ${orgId}`
+      }
+      
+      if (orgId) {
+        if (!orgMap.has(orgId)) {
+          orgMap.set(orgId, { orgName, workOrders: [] })
+        }
+        orgMap.get(orgId)!.workOrders.push(wo)
+      }
+    })
+    
+    return Array.from(orgMap.entries()).map(([orgId, data]) => ({
+      orgId,
+      orgName: data.orgName,
+      workOrders: data.workOrders
+    }))
+  }
+
   function handleEdit(workOrderId: number) {
-    // SUPERADMIN can open edit modal; others go to read-only detail page
-    if (isSuperAdmin) {
+    // Only SUPERADMIN/DEVELOPER can edit - others just view
+    if (canEdit) {
       setEditingWorkOrderId(workOrderId)
       setModalOpen(true)
+    } else {
+      // For ORG/GOVT users, navigate to detail view
+      window.location.href = `/workorders/${workOrderId}`
     }
   }
 
   function handleCreate() {
-    if (!isSuperAdmin) return
+    if (!canEdit) return
     setEditingWorkOrderId(undefined)
     setModalOpen(true)
   }
@@ -102,7 +176,7 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
   }
 
   async function handleDelete(workOrderId: number) {
-    if (!isSuperAdmin) return
+    if (!canDelete) return
     try {
       const response = await fetch(`/api/workorders/${workOrderId}`, {
         method: "DELETE",
@@ -124,7 +198,7 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
   }
 
   async function handleExport() {
-    if (!isSuperAdmin) return
+    if (!canExportImport) return
     try {
       const url = orgId ? `/api/workorders/export?orgId=${orgId}` : `/api/workorders/export`
       const response = await fetch(url)
@@ -151,7 +225,7 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
   }
 
   async function handleImport() {
-    if (!isSuperAdmin || !importFile) return
+    if (!canExportImport || !importFile) return
     
     setImportLoading(true)
     setImportResult(null)
@@ -204,7 +278,7 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-4 p-4 md:p-6 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border border-border shadow-sm">
-        {isSuperAdmin && (
+        {canExportImport && (
           <>
             <motion.div 
               whileHover={{ scale: 1.05 }} 
@@ -353,22 +427,22 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
       <div className="hidden md:block border border-border rounded-lg overflow-hidden shadow-sm bg-card">
         <div className="overflow-x-auto">
           <Table>
-          <TableHeader className="bg-muted/50">
-            <TableRow className="hover:bg-muted/50">
-              <TableHead className="font-semibold">Title</TableHead>
-              <TableHead className="font-semibold">Created At</TableHead>
-              <TableHead className="font-semibold text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-              {workOrders.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={3} className="text-center py-12 text-muted-foreground">
-                  No work orders found
-                </TableCell>
+            <TableHeader className="bg-muted/50">
+              <TableRow className="hover:bg-muted/50">
+                <TableHead className="font-semibold">Title</TableHead>
+                <TableHead className="font-semibold">Created At</TableHead>
+                <TableHead className="font-semibold text-right">Actions</TableHead>
               </TableRow>
-            ) : (
-              workOrders.map((wo, index) => (
+            </TableHeader>
+            <TableBody>
+              {workOrders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center py-12 text-muted-foreground">
+                    No work orders found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                workOrders.map((wo, index) => (
                 <TableRow 
                   key={wo.id}
                   className="transition-all duration-200 hover:bg-primary/5 cursor-pointer group animate-in"
@@ -388,7 +462,7 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
                       className="flex gap-2 justify-end"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {isSuperAdmin && (
+                      {canEdit && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -409,7 +483,7 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
                           View
                         </Button>
                       </Link>
-                      {isSuperAdmin && (
+                      {canDelete && (
                         <AlertDialog open={deletingWorkOrderId === wo.id} onOpenChange={(open: boolean) => !open && setDeletingWorkOrderId(null)}>
                           <AlertDialogTrigger asChild>
                             <Button
@@ -444,10 +518,9 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       </div>
 
@@ -473,7 +546,7 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
                       className="flex gap-2"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {isSuperAdmin && (
+                      {canEdit && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -492,7 +565,7 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
                           <ExternalLink className="h-4 w-4" />
                         </Button>
                       </Link>
-                      {isSuperAdmin && (
+                      {canDelete && (
                         <AlertDialog open={deletingWorkOrderId === wo.id} onOpenChange={(open: boolean) => !open && setDeletingWorkOrderId(null)}>
                           <AlertDialogTrigger asChild>
                             <Button
@@ -533,7 +606,7 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
         )}
       </div>
 
-      {isSuperAdmin && (
+      {canEdit && (
         <WorkOrderModal
           open={modalOpen}
           onOpenChange={handleModalClose}

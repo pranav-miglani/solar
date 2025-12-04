@@ -186,53 +186,98 @@ export function ReleaseNotes() {
             <li>
               <strong>RLS Enabled on disabled_plants Table:</strong> Fixed critical security vulnerability by enabling Row Level Security (RLS) on the <code className="bg-muted px-1 rounded">disabled_plants</code> table.
               Added appropriate access policies for SUPERADMIN, DEVELOPER, GOVT, and ORG roles via migration <code className="bg-muted px-1 rounded">028_enable_rls_disabled_plants.sql</code>.
+              Policies ensure proper access control: SUPERADMIN and DEVELOPER have full access, GOVT has read-only access to all, and ORG accounts can only view disabled plants in their organization.
             </li>
             <li>
               <strong>Swagger/OpenAPI Documentation Protection:</strong> API documentation endpoints (<code className="bg-muted px-1 rounded">/api-docs</code>, <code className="bg-muted px-1 rounded">/api/docs</code>) are now disabled in production environments to prevent unauthorized access to API details.
+              Documentation is only available in development/staging environments.
             </li>
           </ul>
 
-          <h3 className="font-semibold mt-4 mb-1">SolarDM listPlant() Implementation</h3>
+          <h3 className="font-semibold mt-4 mb-1">SolarDM listPlant() Implementation - Optimized</h3>
           <ul className="list-disc ml-6 text-sm space-y-1">
             <li>
-              <strong>Optimized Implementation:</strong> Completely rewrote <code className="bg-muted px-1 rounded">listPlant()</code> for SolarDM to eliminate inefficient <code className="bg-muted px-1 rounded">listPlants()</code> calls.
-              Now makes only 2 direct API calls per plant instead of fetching all plants.
+              <strong>Complete Rewrite:</strong> Completely rewrote <code className="bg-muted px-1 rounded">listPlant()</code> for SolarDM to eliminate inefficient <code className="bg-muted px-1 rounded">listPlants()</code> calls.
+              Previously, the method would fetch all plants and filter client-side, which was extremely inefficient for PER_PLANT mode.
             </li>
             <li>
-              <strong>New Endpoints Used:</strong>
+              <strong>New Direct API Endpoints:</strong> Now uses two dedicated SolarDM endpoints:
               <ul className="list-disc ml-5 mt-1 space-y-1">
-                <li><code className="bg-muted px-1 rounded">GET /dms/plant/{`{vendorPlantId}`}</code> - Fetches plant info (name, network status, last update time)</li>
-                <li><code className="bg-muted px-1 rounded">GET /dms/data_panel/metering/sub_v2/{`{vendorPlantId}`}</code> - Fetches live telemetry (power, energy metrics)</li>
+                <li><code className="bg-muted px-1 rounded">GET /dms/plant/{`{vendorPlantId}`}</code> - Fetches plant info (name, network status via <code className="bg-muted px-1 rounded">communicateStatus</code>, last update time)</li>
+                <li><code className="bg-muted px-1 rounded">GET /dms/data_panel/metering/sub_v2/{`{vendorPlantId}`}</code> - Fetches live telemetry (power, energy metrics in string format)</li>
               </ul>
             </li>
             <li>
-              <strong>Live Telemetry Mapping:</strong> Correctly parses SolarDM&apos;s string format values (<code className="bg-muted px-1 rounded">&quot;12.8_kWh&quot;</code>, <code className="bg-muted px-1 rounded">&quot;0_KW&quot;</code>) and maps to database fields with proper unit conversions (kWh → MWh for monthly/yearly/total).
+              <strong>String Format Parsing:</strong> Implements <code className="bg-muted px-1 rounded">parseSolarDmValue()</code> helper to parse SolarDM&apos;s unique string format values:
+              <ul className="list-disc ml-5 mt-1 space-y-1">
+                <li>Energy values: <code className="bg-muted px-1 rounded">&quot;12.8_kWh&quot;</code> → extracts <code className="bg-muted px-1 rounded">12.8</code></li>
+                <li>Power values: <code className="bg-muted px-1 rounded">&quot;0_KW&quot;</code> → extracts <code className="bg-muted px-1 rounded">0</code></li>
+                <li>Handles <code className="bg-muted px-1 rounded">currDay</code>, <code className="bg-muted px-1 rounded">currMonth</code>, <code className="bg-muted px-1 rounded">currYear</code>, <code className="bg-muted px-1 rounded">total</code>, and <code className="bg-muted px-1 rounded">power</code> fields</li>
+              </ul>
             </li>
             <li>
-              <strong>Network Status:</strong> Extracts <code className="bg-muted px-1 rounded">communicateStatus</code> from plant info endpoint and maps to <code className="bg-muted px-1 rounded">networkStatus</code> (1=NORMAL, 2=ALL_OFFLINE, 3=PARTIAL_OFFLINE).
+              <strong>Live Telemetry Mapping:</strong> Correctly maps all live telemetry fields:
+              <ul className="list-disc ml-5 mt-1 space-y-1">
+                <li><code className="bg-muted px-1 rounded">current_power_kw</code> ← <code className="bg-muted px-1 rounded">energy.power</code> (already in kW)</li>
+                <li><code className="bg-muted px-1 rounded">daily_energy_kwh</code> ← <code className="bg-muted px-1 rounded">energy.currDay</code> (kWh)</li>
+                <li><code className="bg-muted px-1 rounded">monthly_energy_mwh</code> ← <code className="bg-muted px-1 rounded">energy.currMonth</code> (kWh → MWh conversion)</li>
+                <li><code className="bg-muted px-1 rounded">yearly_energy_mwh</code> ← <code className="bg-muted px-1 rounded">energy.currYear</code> (kWh → MWh conversion)</li>
+                <li><code className="bg-muted px-1 rounded">total_energy_mwh</code> ← <code className="bg-muted px-1 rounded">energy.total</code> (kWh → MWh conversion)</li>
+              </ul>
             </li>
             <li>
-              <strong>Performance Improvement:</strong> Reduced from 1 + N API calls (listPlants + N individual calls) to exactly 2 API calls per plant, resulting in ~75% reduction in API calls for PER_PLANT mode.
+              <strong>Network Status Mapping:</strong> Extracts <code className="bg-muted px-1 rounded">communicateStatus</code> from plant info endpoint and maps to standardized <code className="bg-muted px-1 rounded">networkStatus</code>:
+              <ul className="list-disc ml-5 mt-1 space-y-1">
+                <li><code className="bg-muted px-1 rounded">1</code> → <code className="bg-muted px-1 rounded">&quot;NORMAL&quot;</code></li>
+                <li><code className="bg-muted px-1 rounded">2</code> → <code className="bg-muted px-1 rounded">&quot;ALL_OFFLINE&quot;</code></li>
+                <li><code className="bg-muted px-1 rounded">3</code> → <code className="bg-muted px-1 rounded">&quot;PARTIAL_OFFLINE&quot;</code></li>
+              </ul>
+            </li>
+            <li>
+              <strong>Performance Improvement:</strong> 
+              <ul className="list-disc ml-5 mt-1 space-y-1">
+                <li><strong>Before:</strong> Called <code className="bg-muted px-1 rounded">listPlants()</code> for every <code className="bg-muted px-1 rounded">listPlant()</code> call (fetching all plants just to find one)</li>
+                <li><strong>After:</strong> Makes exactly 2 direct API calls per plant (plant info + metering)</li>
+                <li><strong>Result:</strong> ~75% reduction in API calls for PER_PLANT mode, significantly faster sync times</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Error Handling:</strong> Graceful fallback - if plant info fetch fails, still attempts metering endpoint. If metering fails but plant info succeeds, returns minimal plant object with network status.
             </li>
           </ul>
 
-          <h3 className="font-semibold mt-4 mb-1">Documentation Updates</h3>
+          <h3 className="font-semibold mt-4 mb-1">Developer Documentation Portal</h3>
           <ul className="list-disc ml-6 text-sm space-y-1">
             <li>
-              <strong>Vendor Configuration Guide:</strong> Added comprehensive &quot;Vendor Config&quot; tab to Documentation &amp; Runbooks page (<code className="bg-muted px-1 rounded">/superadmin/documentation-runbooks</code>) with complete explanation of:
+              <strong>Vendor Configuration Guide:</strong> Added comprehensive &quot;Vendor Config&quot; tab to Documentation &amp; Runbooks page (<code className="bg-muted px-1 rounded">/superadmin/documentation-runbooks</code>) accessible only to DEVELOPER users. The guide includes:
               <ul className="list-disc ml-5 mt-1 space-y-1">
-                <li>All vendor configuration attributes (basic info, token storage, sync modes, restricted windows)</li>
-                <li>Plant Sync Mode vs Live Telemetry Sync Mode differences</li>
-                <li>LIST_PLANTS vs PER_PLANT mode explanations</li>
-                <li>How syncs work together for different vendor types</li>
-                <li>Best practices and troubleshooting guides</li>
+                <li>Complete vendor configuration attributes reference (basic info, token storage, sync modes, restricted windows)</li>
+                <li>Detailed explanation of Plant Sync Mode vs Live Telemetry Sync Mode</li>
+                <li>LIST_PLANTS vs PER_PLANT mode explanations with examples</li>
+                <li>How syncs work together for different vendor types (Solarman vs SolarDM scenarios)</li>
+                <li>Key differences summary table</li>
+                <li>Best practices for configuration</li>
+                <li>Troubleshooting guides for common sync issues</li>
               </ul>
             </li>
             <li>
-              <strong>System Flow Documentation:</strong> Updated with correct SolarDM <code className="bg-muted px-1 rounded">listPlant()</code> API endpoints and implementation details, including response format examples and database field mappings.
+              <strong>System Flow Documentation Updates:</strong> 
+              <ul className="list-disc ml-5 mt-1 space-y-1">
+                <li>Updated SolarDM <code className="bg-muted px-1 rounded">listPlant()</code> API documentation with correct endpoints and response format examples</li>
+                <li>Added detailed database field mappings with conversion logic</li>
+                <li>Documented the optimization (no longer calls <code className="bg-muted px-1 rounded">listPlants()</code>)</li>
+                <li>Added code blocks showing actual API responses from SolarDM</li>
+              </ul>
             </li>
             <li>
-              <strong>Alert Sync Flow:</strong> Added detailed Alert Sync Flow documentation under the &quot;Flows&quot; tab in System Flow documentation, covering entry points, vendor-specific implementations, and alert processing details.
+              <strong>Alert Sync Flow Documentation:</strong> Added comprehensive Alert Sync Flow section under the &quot;Flows&quot; tab in System Flow documentation, covering:
+              <ul className="list-disc ml-5 mt-1 space-y-1">
+                <li>Entry points (auto cron, manual trigger, external cron)</li>
+                <li>Complete flow diagram and step-by-step process</li>
+                <li>Vendor-specific implementations (Solarman, SolarDM)</li>
+                <li>Alert processing details (mapping, grid-down calculations, status determination)</li>
+                <li>Important notes about date parsing and filtering</li>
+              </ul>
             </li>
           </ul>
 
@@ -240,22 +285,32 @@ export function ReleaseNotes() {
           <ul className="list-disc ml-6 text-sm space-y-1">
             <li>
               <strong>Disabled Plants Logic:</strong> Updated from 15 days to 3 days proactively - plants inactive for 3+ days are now marked as disabled (migration <code className="bg-muted px-1 rounded">027_update_disable_plants_to_3_days.sql</code>).
+              This provides faster detection of inactive plants and more responsive system behavior.
             </li>
             <li>
               <strong>Unused Tables Removed:</strong> Dropped deprecated <code className="bg-muted px-1 rounded">work_order_plant_eff</code> table and unused telemetry database tables via migration <code className="bg-muted px-1 rounded">026_drop_unused_tables.sql</code>.
+              Removed all references to PR (Performance Ratio) calculations from the codebase.
+            </li>
+            <li>
+              <strong>RLS Security Fix:</strong> Added migration <code className="bg-muted px-1 rounded">028_enable_rls_disabled_plants.sql</code> to enable Row Level Security on <code className="bg-muted px-1 rounded">disabled_plants</code> table with proper access policies for all roles.
             </li>
           </ul>
 
           <h3 className="font-semibold mt-4 mb-1">Excel Import/Export Features</h3>
           <ul className="list-disc ml-6 text-sm space-y-1">
             <li>
-              <strong>Work Orders Export/Import:</strong> Added Excel export and import functionality for work orders (SUPERADMIN/DEVELOPER only). Export includes all work order details with associated plant information. Import supports bulk creation/updates from Excel templates.
+              <strong>Work Orders Export/Import:</strong> Added Excel export and import functionality for work orders (SUPERADMIN/DEVELOPER only). 
+              Export includes all work order details with associated plant information using <code className="bg-muted px-1 rounded">Vendor Plant ID</code> and <code className="bg-muted px-1 rounded">Plant Name</code> instead of internal IDs.
+              Import supports bulk creation with validation (prevents duplicates, validates plant mappings, reports processing results).
             </li>
             <li>
-              <strong>Vendors Export/Import:</strong> Added Excel export and import functionality for vendors (SUPERADMIN/DEVELOPER only). Export includes vendor configuration, credentials (encrypted), sync settings, and token metadata. Import supports bulk vendor management from Excel templates.
+              <strong>Vendors Export/Import:</strong> Added Excel export and import functionality for vendors (SUPERADMIN/DEVELOPER only). 
+              Export includes vendor configuration, credentials (JSON format), sync settings, and token metadata. 
+              Import supports bulk vendor management with mandatory fields validation (Name, Vendor Type, Organization ID, Credentials).
             </li>
             <li>
               <strong>Accounts Management:</strong> Excel import/export capabilities for account management, enabling bulk operations for user accounts across organizations.
+              Export includes account details (excluding passwords for security). Import supports bulk account creation with password hashing and role validation.
             </li>
           </ul>
         </section>
