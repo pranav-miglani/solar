@@ -68,6 +68,15 @@ app.prepare().then(() => {
         } else {
           console.log('⏸️ Live telemetry sync cron is disabled (ENABLE_LIVE_TELEMETRY_SYNC_CRON=false)')
         }
+
+        // Disable inactive plants cron (runs daily at 2 AM IST)
+        const enableDisableInactivePlantsCron = process.env.ENABLE_DISABLE_INACTIVE_PLANTS_CRON !== 'false'
+        if (enableDisableInactivePlantsCron) {
+          const { startDisableInactivePlantsCron } = require('./lib/cron/disableInactivePlantsCron')
+          startDisableInactivePlantsCron()
+        } else {
+          console.log('⏸️ Disable inactive plants cron is disabled (ENABLE_DISABLE_INACTIVE_PLANTS_CRON=false)')
+        }
       } catch (error) {
         console.error('Failed to start cron job(s):', error)
       }
