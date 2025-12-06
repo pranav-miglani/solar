@@ -2204,7 +2204,8 @@ Unique Constraints:
 │   │   ├── alerts/              # Alert endpoints
 │   │   ├── cron/                # Cron job endpoints
 │   │   │   ├── sync-wms-sites/  # WMS site sync endpoint
-│   │   │   └── sync-wms-insolation/  # WMS insolation sync endpoint
+│   │   │   ├── sync-wms-insolation/  # WMS insolation sync endpoint
+│   │   │   └── backfill-wms-insolation/  # WMS insolation backfill endpoint (100 days)
 │   │   ├── dashboard/           # Dashboard data
 │   │   ├── login/               # Authentication
 │   │   ├── orgs/                # Organization management
