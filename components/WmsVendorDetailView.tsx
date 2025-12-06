@@ -60,7 +60,15 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
       }
 
       const vendorData = await vendorResponse.json()
-      setVendor(vendorData)
+      // API returns { vendor: {...} }, extract the vendor object
+      const vendor = vendorData.vendor || vendorData
+      setVendor(vendor)
+      
+      // Debug: Log to see what we're getting
+      console.log("Vendor data from API:", vendor)
+      console.log("Organization:", vendor?.organizations)
+      console.log("Org ID:", vendor?.org_id)
+      console.log("Vendor Type:", vendor?.vendor_type)
 
       if (sitesResponse.ok) {
         const sitesData = await sitesResponse.json()
@@ -175,7 +183,7 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium">
-                {vendor.organizations?.name || `Org ID: ${vendor.org_id}`}
+                {vendor.organizations?.name || (vendor.org_id ? `Org ID: ${vendor.org_id}` : "No Organization")}
               </span>
             </div>
           </CardContent>
