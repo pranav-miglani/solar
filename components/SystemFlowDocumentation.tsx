@@ -2232,7 +2232,7 @@ Unique Constraints:
                         <ul className="ml-4 mt-1 list-disc">
                           <li>Vendor API supports per-device insolation fetch only</li>
                           <li>For each device, calls <code className="bg-background px-1 rounded">adapter.getInsolationData(deviceId, fromDate, toDate)</code></li>
-                          <li>Calculates daily insolation (area under IRR vs time curve) in kWh/m² using <code className="bg-background px-1 rounded">calculateDailyInsolation()</code> - uses trapezoidal rule for numerical integration</li>
+                          <li>Calculates daily insolation (area under IRR vs time curve) in kWh/m² using <code className="bg-background px-1 rounded">calculateDailyInsolation()</code> - uses left endpoint method: Σ [IRR_i × Δt_i] / 1000</li>
                           <li>Upserts daily insolation reading into <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
                         </ul>
                       </li>
@@ -2502,7 +2502,7 @@ Unique Constraints:
                             <li>Sites: GET /api/intello/user/v1/sites</li>
                             <li>Insolation: GET /api/intello/rtu/v1/data (with date range and RTU ID)</li>
                             <li>Extracts devices (RTUs) from site response</li>
-                            <li>Calculates daily insolation (area under IRR vs time curve) in kWh/m² using trapezoidal rule for numerical integration</li>
+                            <li>Calculates daily insolation (area under IRR vs time curve) in kWh/m² using left endpoint method: Σ [IRR_i × Δt_i] / 1000</li>
                           </ul>
                         </div>
                       </div>

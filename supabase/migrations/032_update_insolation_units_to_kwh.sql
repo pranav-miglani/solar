@@ -6,7 +6,7 @@
 -- The calculation method changed from simple average to area under curve (integral).
 
 -- Update column comment for insolation_value
-COMMENT ON COLUMN insolation_readings.insolation_value IS 'Daily insolation (energy) in kWh/m², calculated as area under IRR vs time curve using trapezoidal rule for numerical integration';
+COMMENT ON COLUMN insolation_readings.insolation_value IS 'Daily insolation (energy) in kWh/m², calculated as area under IRR vs time curve using left endpoint method: Σ [IRR_i × Δt_i] / 1000';
 
 -- Update column comment for reading_count
 COMMENT ON COLUMN insolation_readings.reading_count IS 'Number of time-series readings used to calculate the daily insolation (integral)';

@@ -404,7 +404,7 @@ CREATE TABLE insolation_readings (
 );
 
 COMMENT ON TABLE insolation_readings IS 'Daily insolation readings for WMS devices. Stores last 100 days in rollover fashion. Insolation is calculated as area under IRR vs time curve (integral) in kWh/m².';
-COMMENT ON COLUMN insolation_readings.insolation_value IS 'Daily insolation (energy) in kWh/m², calculated as area under IRR vs time curve using trapezoidal rule for numerical integration';
+COMMENT ON COLUMN insolation_readings.insolation_value IS 'Daily insolation (energy) in kWh/m², calculated as area under IRR vs time curve using lower limit (minimum value) method for numerical integration';
 COMMENT ON COLUMN insolation_readings.reading_count IS 'Number of hourly readings used to calculate the daily insolation (integral)';
 
 -- ============================================

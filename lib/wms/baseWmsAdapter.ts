@@ -94,9 +94,11 @@ export abstract class BaseWmsAdapter {
    * Calculates the area under the IRR vs time curve (integral of power over time)
    * Returns energy in kWh/m²
    * 
-   * Uses trapezoidal rule for numerical integration:
+   * Uses left endpoint method for numerical integration:
    * - Uses ALL readings provided (no filtering by interval)
    * - Calculates actual time intervals from timestamps between consecutive readings
+   * - Uses the first IRR value (IRR_i) for each interval × time interval
+   * - Formula: Σ [IRR_i × Δt_i] / 1000
    * - Integrates IRR (W/m²) over time to get energy (kWh/m²)
    * - Handles variable time intervals (e.g., 10-minute, hourly, or any interval)
    */
@@ -124,8 +126,9 @@ export abstract class BaseWmsAdapter {
       return 0
     }
 
-    // Use trapezoidal rule for numerical integration
+    // Use left endpoint method for numerical integration
     // This uses ALL consecutive readings to calculate the area under the curve
+    // Uses the first IRR value (IRR_i) for each interval
     let totalEnergyWh = 0
 
     for (let i = 0; i < sortedReadings.length - 1; i++) {
@@ -143,10 +146,9 @@ export abstract class BaseWmsAdapter {
         continue
       }
 
-      // Trapezoidal rule: average of two consecutive IRR values × time interval
-      // This calculates the area of each trapezoid between consecutive readings
-      const avgIrr = (current.irr + next.irr) / 2
-      const energyWh = avgIrr * timeIntervalHours
+      // Use the first IRR value (IRR_i) for each interval × time interval
+      // Formula: Σ [IRR_i × Δt_i] / 1000
+      const energyWh = current.irr * timeIntervalHours
       totalEnergyWh += energyWh
     }
 
