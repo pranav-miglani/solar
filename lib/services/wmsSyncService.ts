@@ -990,7 +990,7 @@ export async function syncAllWmsSites(): Promise<SyncSummary> {
 
 /**
  * Sync insolation data for all WMS vendors
- * @param date - Optional date to sync (YYYY-MM-DD), defaults to yesterday
+ * @param date - Date to sync (YYYY-MM-DD), required. For cron: today (end of day) or yesterday (morning)
  */
 export async function syncAllWmsInsolation(date: string): Promise<InsolationSyncResult[]> {
   return MDC.runAsync(
