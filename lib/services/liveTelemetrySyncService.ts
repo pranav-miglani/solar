@@ -421,9 +421,22 @@ async function syncVendorLiveTelemetry(
           // Live telemetry sync only updates telemetry fields for plants that already exist
           // Update each plant individually since Supabase doesn't support batch updates with different values per row
           const updatePromises = updateChunk.map(async (item) => {
+            // Ensure update data only contains telemetry fields - explicitly construct to avoid accidental field inclusion
+            const updateData = {
+              current_power_kw: item.data.current_power_kw,
+              daily_energy_kwh: item.data.daily_energy_kwh,
+              monthly_energy_mwh: item.data.monthly_energy_mwh,
+              yearly_energy_mwh: item.data.yearly_energy_mwh,
+              total_energy_mwh: item.data.total_energy_mwh,
+              network_status: item.data.network_status,
+              last_update_time: item.data.last_update_time,
+              last_refreshed_at: item.data.last_refreshed_at,
+              // Explicitly exclude: org_id, vendor_id, capacity_kw, name, location, etc.
+            }
+            
             const { error: updateError } = await supabase
               .from("plants")
-              .update(item.data) // Only telemetry fields, no org_id/vendor_id
+              .update(updateData) // Only telemetry fields, explicitly constructed
               .eq("id", item.id)
             
             if (updateError) {
