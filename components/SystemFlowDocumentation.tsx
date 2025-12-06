@@ -2365,6 +2365,8 @@ Unique Constraints:
                       <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                         <li><code className="bg-background px-1 rounded">syncAllWmsSites()</code> - Sync sites and devices for all WMS vendors (twice daily)</li>
                         <li><code className="bg-background px-1 rounded">syncWmsVendorSites()</code> - Sync sites and devices for a single WMS vendor (exported for per-vendor sync)</li>
+                        <li><code className="bg-background px-1 rounded">syncWmsVendorDevices()</code> - Sync devices only for a single WMS vendor (re-fetches sites but only updates devices)</li>
+                        <li><code className="bg-background px-1 rounded">syncWmsDevice()</code> - Sync a single WMS device (re-fetches device from vendor API)</li>
                         <li><code className="bg-background px-1 rounded">syncAllWmsInsolation()</code> - Sync insolation data for all WMS vendors (end of day)</li>
                         <li><code className="bg-background px-1 rounded">syncWmsVendorInsolation()</code> - Sync insolation data for a single WMS vendor (exported for per-vendor sync)</li>
                         <li><code className="bg-background px-1 rounded">backfillAllWmsInsolation()</code> - Backfill insolation data for last 100 days</li>
@@ -2502,8 +2504,10 @@ Unique Constraints:
                         <li><strong>GET /api/wms-vendors/[id]</strong> - Get single WMS vendor</li>
                         <li><strong>PUT /api/wms-vendors/[id]</strong> - Update WMS vendor (SUPERADMIN/DEVELOPER only)</li>
                         <li><strong>DELETE /api/wms-vendors/[id]</strong> - Delete WMS vendor (SUPERADMIN/DEVELOPER only)</li>
-                        <li><strong>POST /api/wms-vendors/[id]/sync-sites</strong> - Sync sites for a specific WMS vendor (user-triggered, SUPERADMIN/DEVELOPER only)</li>
+                        <li><strong>POST /api/wms-vendors/[id]/sync-sites</strong> - Sync sites and devices for a specific WMS vendor (user-triggered, SUPERADMIN/DEVELOPER only)</li>
+                        <li><strong>POST /api/wms-vendors/[id]/sync-devices</strong> - Sync devices only for a specific WMS vendor (re-fetches sites from API but only updates devices, SUPERADMIN/DEVELOPER only)</li>
                         <li><strong>POST /api/wms-vendors/[id]/sync-insolation</strong> - Sync insolation for a specific WMS vendor (user-triggered, SUPERADMIN/DEVELOPER only)</li>
+                        <li><strong>POST /api/wms-devices/[id]/sync</strong> - Sync a single WMS device (re-fetches device from vendor API, SUPERADMIN/DEVELOPER only)</li>
                         <li><strong>GET /api/wms-vendors/[id]/sites</strong> - Fetch sites for a specific WMS vendor</li>
                         <li><strong>GET /api/wms-vendors/[id]/devices</strong> - Fetch devices for a specific WMS vendor</li>
                         <li><strong>GET /api/wms-sites</strong> - List all WMS sites (with optional filters: vendorId, orgId)</li>

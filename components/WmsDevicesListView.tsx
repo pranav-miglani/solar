@@ -17,6 +17,7 @@ import {
   ExternalLink,
   CloudSun,
   Radio,
+  RefreshCw,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -44,6 +45,7 @@ export function WmsDevicesListView({ siteId }: { siteId: string }) {
   const [site, setSite] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [syncingDeviceId, setSyncingDeviceId] = useState<number | null>(null)
 
   useEffect(() => {
     fetchData()
@@ -70,6 +72,27 @@ export function WmsDevicesListView({ siteId }: { siteId: string }) {
       setError(err.message || "Failed to load devices")
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleSyncDevice(deviceId: number) {
+    setSyncingDeviceId(deviceId)
+    try {
+      const response = await fetch(`/api/wms-devices/${deviceId}/sync`, {
+        method: "POST",
+      })
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        alert("Device synced successfully")
+        fetchData() // Refresh device list
+      } else {
+        alert(data.error || "Failed to sync device")
+      }
+    } catch (error: any) {
+      alert(`Error syncing device: ${error.message}`)
+    } finally {
+      setSyncingDeviceId(null)
     }
   }
 
@@ -157,12 +180,28 @@ export function WmsDevicesListView({ siteId }: { siteId: string }) {
                     <span className="text-sm">{device.serial_no || "N/A"}</span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Link href={`/wms/devices/${device.id}/insolation`}>
-                      <Button variant="outline" size="sm">
-                        View Insolation
-                        <ExternalLink className="h-4 w-4 ml-2" />
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSyncDevice(device.id)}
+                        disabled={syncingDeviceId === device.id}
+                        title="Sync this device from vendor API"
+                      >
+                        <RefreshCw
+                          className={`h-4 w-4 mr-2 ${
+                            syncingDeviceId === device.id ? "animate-spin" : ""
+                          }`}
+                        />
+                        Sync
                       </Button>
-                    </Link>
+                      <Link href={`/wms/devices/${device.id}/insolation`}>
+                        <Button variant="outline" size="sm">
+                          View Insolation
+                          <ExternalLink className="h-4 w-4 ml-2" />
+                        </Button>
+                      </Link>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

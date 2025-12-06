@@ -233,6 +233,30 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
     }
   }
 
+  async function handleSyncDevices(vendorId: number) {
+    setSyncingVendorId(vendorId)
+    try {
+      const response = await fetch(`/api/wms-vendors/${vendorId}/sync-devices`, {
+        method: "POST",
+      })
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        alert(
+          `Device sync completed for ${data.result?.wmsVendorName || "WMS vendor"}.\n` +
+          `Devices synced: ${data.result?.devicesSynced || 0} (${data.result?.devicesCreated || 0} created, ${data.result?.devicesUpdated || 0} updated)`
+        )
+        fetchVendors()
+      } else {
+        alert(data.error || "Failed to sync devices")
+      }
+    } catch (error: any) {
+      alert(`Error syncing devices: ${error.message}`)
+    } finally {
+      setSyncingVendorId(null)
+    }
+  }
+
   async function handleExport() {
     if (!canManage) return
     try {
@@ -613,6 +637,20 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
                               }`}
                             />
                             Sync Sites
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSyncDevices(vendor.id)}
+                            disabled={syncingVendorId === vendor.id}
+                            title="Sync devices only (re-fetch from vendor API without updating sites)"
+                          >
+                            <RefreshCw
+                              className={`h-4 w-4 mr-2 ${
+                                syncingVendorId === vendor.id ? "animate-spin" : ""
+                              }`}
+                            />
+                            Sync Devices
                           </Button>
                           <Button
                             variant="outline"
