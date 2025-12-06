@@ -74,10 +74,10 @@ export async function POST(
           )
         }
 
-        // Sync insolation data for all devices
+        // Sync insolation data for all devices (backfill last 100 days)
         // For INTELLO, this will sync per device (vendor supports per-device only)
-        const today = new Date().toISOString().split("T")[0]
-        const result = await syncWmsVendorInsolation(vendor, supabase, today)
+        // Pass null to trigger 100-day backfill
+        const result = await syncWmsVendorInsolation(vendor, supabase, null)
 
         if (result.success) {
           return NextResponse.json({

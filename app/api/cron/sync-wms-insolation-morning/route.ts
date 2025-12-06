@@ -5,8 +5,8 @@ import { logger } from "@/lib/context/logger"
 import { randomUUID } from "crypto"
 
 /**
- * Cron endpoint for syncing WMS insolation data
- * Runs end of day to sync current day's insolation
+ * Cron endpoint for syncing WMS insolation data (morning sync)
+ * Runs in the morning to sync yesterday's insolation (safety check, overrides end-of-day cron)
  */
 
 export const dynamic = 'force-dynamic'
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     {
       source: "cron",
       requestId,
-      operation: "sync-wms-insolation",
+      operation: "sync-wms-insolation-morning",
     },
     async () => {
       try {
@@ -35,15 +35,18 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Sync today's insolation (end of day cron - today's data should be complete)
-        const today = new Date().toISOString().split("T")[0]
-        logger.info(`[WMS Insolation Sync Cron] Starting end-of-day insolation sync for ${today}`)
+        // Sync yesterday's insolation (morning sync - safety check)
+        const yesterday = new Date()
+        yesterday.setDate(yesterday.getDate() - 1)
+        const yesterdayStr = yesterday.toISOString().split("T")[0]
+        logger.info(`[WMS Insolation Sync Cron] Starting morning insolation sync for ${yesterdayStr} (yesterday)`)
 
-        const results = await syncAllWmsInsolation(today)
+        const results = await syncAllWmsInsolation(yesterdayStr)
 
         return NextResponse.json({
           success: true,
-          date: today,
+          date: yesterdayStr,
+          message: "Morning sync completed (yesterday's data)",
           results,
         })
       } catch (error: any) {

@@ -300,10 +300,16 @@ const SystemArchitectureDiagram = () => {
                 <div className="pt-1 border-t border-orange-500/30">→ /api/cron/sync-wms-sites</div>
               </div>
             </Node>
-            <Node title="WMS Insolation Sync Cron" color="orange" icon="⏰" className="min-h-[90px]">
+            <Node title="WMS Insolation Sync Cron (EOD)" color="orange" icon="⏰" className="min-h-[90px]">
               <div className="text-[10px] space-y-0.5">
-                <div>Daily 10 PM IST • Current day insolation</div>
+                <div>Daily 10 PM IST • Today&apos;s insolation</div>
                 <div className="pt-1 border-t border-orange-500/30">→ /api/cron/sync-wms-insolation</div>
+              </div>
+            </Node>
+            <Node title="WMS Insolation Sync Cron (Morning)" color="orange" icon="⏰" className="min-h-[90px]">
+              <div className="text-[10px] space-y-0.5">
+                <div>Daily 6 AM IST • Yesterday&apos;s insolation</div>
+                <div className="pt-1 border-t border-orange-500/30">→ /api/cron/sync-wms-insolation-morning</div>
               </div>
             </Node>
           </div>
@@ -2108,49 +2114,83 @@ Unique Constraints:
                     <div className="bg-muted/50 p-4 rounded-lg">
                       <h4 className="font-medium mb-2 flex items-center gap-2">
                         <Clock className="h-4 w-4" />
-                        1. Auto Cron
+                        1. End of Day Cron (10 PM IST)
                       </h4>
                       <p className="text-sm text-muted-foreground mb-2">
                         Runs daily at 10 PM IST via <code className="bg-background px-1 rounded">lib/cron/wmsInsolationSyncCron.js</code>
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Calls <code className="bg-background px-1 rounded">GET /api/cron/sync-wms-insolation</code>
+                        <br />
+                        Syncs <strong>today&apos;s</strong> insolation data (end of day, data should be complete)
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        2. Morning Cron (6 AM IST)
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Runs daily at 6 AM IST via <code className="bg-background px-1 rounded">lib/cron/wmsInsolationSyncMorningCron.js</code>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Calls <code className="bg-background px-1 rounded">GET /api/cron/sync-wms-insolation-morning</code>
+                        <br />
+                        Syncs <strong>yesterday&apos;s</strong> insolation data (safety check, overrides end-of-day cron)
                       </p>
                     </div>
                     <div className="bg-muted/50 p-4 rounded-lg">
                       <h4 className="font-medium mb-2 flex items-center gap-2">
                         <Database className="h-4 w-4" />
-                        2. External Cron / Manual (API)
+                        3. External Cron / Manual (API)
                       </h4>
                       <p className="text-sm text-muted-foreground mb-2">
                         GitHub Actions, cron-job.org, or manual API call
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Calls <code className="bg-background px-1 rounded">GET /api/cron/sync-wms-insolation</code> with <code className="bg-background px-1 rounded">CRON_SECRET</code>
+                        <br />
+                        Syncs <strong>today&apos;s</strong> insolation data
                       </p>
                     </div>
                     <div className="bg-muted/50 p-4 rounded-lg">
                       <h4 className="font-medium mb-2 flex items-center gap-2">
                         <Database className="h-4 w-4" />
-                        3. Manual Trigger (UI - Per Vendor)
+                        4. Manual Sync Devices (UI - Per Vendor)
                       </h4>
                       <p className="text-sm text-muted-foreground mb-2">
-                        Per-vendor sync via UI button (SUPERADMIN/DEVELOPER only)
+                        Per-vendor insolation sync via UI button (SUPERADMIN/DEVELOPER only)
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Calls <code className="bg-background px-1 rounded">POST /api/wms-vendors/[id]/sync-insolation</code>
+                        Calls <code className="bg-background px-1 rounded">POST /api/wms-vendors/[id]/sync-devices</code>
+                        <br />
+                        <strong>Backfills last 100 days</strong> of insolation data for all devices
                       </p>
                     </div>
                     <div className="bg-muted/50 p-4 rounded-lg">
                       <h4 className="font-medium mb-2 flex items-center gap-2">
                         <Database className="h-4 w-4" />
-                        4. Backfill Trigger (100 Days)
+                        5. Manual Sync Device (UI - Per Device)
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Per-device insolation sync via UI button (SUPERADMIN/DEVELOPER only)
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Calls <code className="bg-background px-1 rounded">POST /api/wms-devices/[id]/sync</code>
+                        <br />
+                        <strong>Backfills last 100 days</strong> of insolation data for this device
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Database className="h-4 w-4" />
+                        6. Backfill Trigger (100 Days - All Vendors)
                       </h4>
                       <p className="text-sm text-muted-foreground mb-2">
                         Manual trigger via UI button or API (SUPERADMIN/DEVELOPER only)
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Calls <code className="bg-background px-1 rounded">GET /api/cron/backfill-wms-insolation</code> to backfill last 100 days of insolation data
+                        Calls <code className="bg-background px-1 rounded">GET /api/cron/backfill-wms-insolation</code> to backfill last 100 days of insolation data for all vendors
                       </p>
                     </div>
                   </div>
@@ -2161,37 +2201,52 @@ Unique Constraints:
                   <div className="bg-muted/50 p-4 rounded-lg space-y-3">
                     <ol className="text-sm text-muted-foreground space-y-3 ml-4 list-decimal">
                       <li>
-                        <strong>Entry Point:</strong> Cron trigger (daily at 10 PM IST) or manual
+                        <strong>Entry Points:</strong>
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li><strong>End of Day Cron (10 PM IST):</strong> Syncs <strong>today&apos;s</strong> insolation (data should be complete by end of day)</li>
+                          <li><strong>Morning Cron (6 AM IST):</strong> Syncs <strong>yesterday&apos;s</strong> insolation (safety check, overrides end-of-day cron)</li>
+                          <li><strong>Manual Sync (UI):</strong> Backfills last 100 days (one-time sync for initial setup)</li>
+                        </ul>
                       </li>
                       <li>
-                        <strong>syncAllWmsInsolation()</strong> in <code className="bg-background px-1 rounded">wmsSyncService.ts</code>
+                        <strong>syncAllWmsInsolation(date)</strong> in <code className="bg-background px-1 rounded">wmsSyncService.ts</code>
                         <ul className="ml-4 mt-1 list-disc">
                           <li>Fetches all active WMS vendors</li>
-                          <li>For each vendor, gets all active devices from <code className="bg-background px-1 rounded">wms_devices</code> table</li>
-                          <li>Creates WMS adapter and authenticates</li>
+                          <li>For each vendor, calls <code className="bg-background px-1 rounded">syncWmsVendorInsolation(vendor, supabase, date)</code></li>
+                          <li>Date parameter: <code className="bg-background px-1 rounded">today</code> for end-of-day cron, <code className="bg-background px-1 rounded">yesterday</code> for morning cron</li>
                         </ul>
                       </li>
                       <li>
-                        <strong>For each device:</strong>
+                        <strong>syncWmsVendorInsolation(vendor, supabase, date)</strong>:
                         <ul className="ml-4 mt-1 list-disc">
-                          <li>Fetches current day&apos;s date (or previous day if running in morning)</li>
-                          <li>Calls <code className="bg-background px-1 rounded">adapter.getInsolationData(deviceId, fromDate, toDate)</code> to get hourly readings</li>
+                          <li>If <code className="bg-background px-1 rounded">date</code> is provided: Syncs that specific date for all devices</li>
+                          <li>If <code className="bg-background px-1 rounded">date</code> is <code className="bg-background px-1 rounded">null</code>: Backfills last 100 days for all devices</li>
+                          <li>Gets all devices for the vendor from <code className="bg-background px-1 rounded">wms_devices</code> table</li>
+                          <li>Creates WMS adapter and authenticates</li>
+                          <li>For each device and each date: Fetches insolation, calculates average, upserts to <code className="bg-background px-1 rounded">insolation_readings</code></li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong>For INTELLO vendor (per-device sync):</strong>
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Vendor API supports per-device insolation fetch only</li>
+                          <li>For each device, calls <code className="bg-background px-1 rounded">adapter.getInsolationData(deviceId, fromDate, toDate)</code></li>
                           <li>Calculates average insolation from hourly IRR values using <code className="bg-background px-1 rounded">calculateAverageInsolation()</code></li>
                           <li>Upserts daily insolation reading into <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
-                          <li>Automatic cleanup: Old readings beyond 100 days are removed (rollover)</li>
                         </ul>
                       </li>
                       <li>
-                        <strong>Backfill Flow (Initial Setup):</strong>
+                        <strong>Manual Sync Flow (100-Day Backfill):</strong>
                         <ul className="ml-4 mt-1 list-disc">
-                          <li>Triggered via <code className="bg-background px-1 rounded">GET /api/cron/backfill-wms-insolation</code> (manual UI button or API call)</li>
-                          <li><code className="bg-background px-1 rounded">backfillAllWmsInsolation()</code> fetches last 100 days of data</li>
-                          <li>Iterates through each day (from 100 days ago to today)</li>
-                          <li>For each day, fetches insolation for all devices of all active WMS vendors</li>
-                          <li>Calculates average insolation from hourly IRR values</li>
-                          <li>Stores all readings in <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
-                          <li>Returns summary with vendor success counts and total readings created/updated</li>
+                          <li>Triggered via <code className="bg-background px-1 rounded">POST /api/wms-vendors/[id]/sync-devices</code> (all devices) or <code className="bg-background px-1 rounded">POST /api/wms-devices/[id]/sync</code> (single device)</li>
+                          <li>Passes <code className="bg-background px-1 rounded">null</code> as date parameter to trigger 100-day backfill</li>
+                          <li>Iterates through last 100 days (from 100 days ago to yesterday, excluding today)</li>
+                          <li>For each day, fetches insolation for device(s) and stores in <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
+                          <li>Returns summary with readings created/updated counts</li>
                         </ul>
+                      </li>
+                      <li>
+                        <strong>Automatic cleanup:</strong> Old readings beyond 100 days are removed (rollover)
                       </li>
                       <li>
                         <strong>Results:</strong> Summary with readings created/updated, devices synced, success/failure counts
@@ -2231,7 +2286,8 @@ Unique Constraints:
 │   │   ├── alerts/              # Alert endpoints
 │   │   ├── cron/                # Cron job endpoints
 │   │   │   ├── sync-wms-sites/  # WMS site sync endpoint
-│   │   │   ├── sync-wms-insolation/  # WMS insolation sync endpoint
+│   │   │   ├── sync-wms-insolation/  # WMS insolation sync endpoint (end of day - today)
+│   │   │   ├── sync-wms-insolation-morning/  # WMS insolation sync endpoint (morning - yesterday)
 │   │   │   └── backfill-wms-insolation/  # WMS insolation backfill endpoint (100 days)
 │   │   ├── dashboard/           # Dashboard data
 │   │   ├── login/               # Authentication
@@ -2365,10 +2421,10 @@ Unique Constraints:
                       <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                         <li><code className="bg-background px-1 rounded">syncAllWmsSites()</code> - Sync sites and devices for all WMS vendors (twice daily)</li>
                         <li><code className="bg-background px-1 rounded">syncWmsVendorSites()</code> - Sync sites and devices for a single WMS vendor (exported for per-vendor sync)</li>
-                        <li><code className="bg-background px-1 rounded">syncWmsVendorDevices()</code> - Sync devices only for a single WMS vendor (re-fetches sites but only updates devices)</li>
-                        <li><code className="bg-background px-1 rounded">syncWmsDevice()</code> - Sync a single WMS device (re-fetches device from vendor API)</li>
-                        <li><code className="bg-background px-1 rounded">syncAllWmsInsolation()</code> - Sync insolation data for all WMS vendors (end of day)</li>
-                        <li><code className="bg-background px-1 rounded">syncWmsVendorInsolation()</code> - Sync insolation data for a single WMS vendor (exported for per-vendor sync)</li>
+                        <li><code className="bg-background px-1 rounded">syncAllWmsInsolation(date)</code> - Sync insolation data for all WMS vendors for a specific date (end of day: today, morning: yesterday)</li>
+                        <li><code className="bg-background px-1 rounded">syncWmsVendorInsolation(vendor, supabase, date)</code> - Sync insolation data for a single WMS vendor. If date is null, backfills last 100 days</li>
+                        <li><code className="bg-background px-1 rounded">syncWmsDeviceInsolation(deviceId, date, supabase)</code> - Sync insolation data for a single device. If date is null, backfills last 100 days</li>
+                        <li><code className="bg-background px-1 rounded">backfillAllWmsInsolation()</code> - Backfill insolation data for last 100 days for all vendors</li>
                         <li><code className="bg-background px-1 rounded">backfillAllWmsInsolation()</code> - Backfill insolation data for last 100 days</li>
                         <li>Site and device sync with upsert logic</li>
                         <li>Insolation calculation (average of hourly IRR values)</li>

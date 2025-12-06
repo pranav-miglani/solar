@@ -87,13 +87,22 @@ app.prepare().then(() => {
           console.log('⏸️ WMS site sync cron is disabled (ENABLE_WMS_SITE_SYNC_CRON=false)')
         }
 
-        // WMS insolation sync cron (runs daily at 10 PM IST)
+        // WMS insolation sync cron (runs daily at 10 PM IST - syncs today's data)
         const enableWmsInsolationSyncCron = process.env.ENABLE_WMS_INSOLATION_SYNC_CRON !== 'false'
         if (enableWmsInsolationSyncCron) {
           const { startWmsInsolationSyncCron } = require('./lib/cron/wmsInsolationSyncCron')
           startWmsInsolationSyncCron()
         } else {
           console.log('⏸️ WMS insolation sync cron is disabled (ENABLE_WMS_INSOLATION_SYNC_CRON=false)')
+        }
+
+        // WMS insolation sync morning cron (runs daily at 6 AM IST - syncs yesterday's data as safety check)
+        const enableWmsInsolationSyncMorningCron = process.env.ENABLE_WMS_INSOLATION_SYNC_MORNING_CRON !== 'false'
+        if (enableWmsInsolationSyncMorningCron) {
+          const { startWmsInsolationSyncMorningCron } = require('./lib/cron/wmsInsolationSyncMorningCron')
+          startWmsInsolationSyncMorningCron()
+        } else {
+          console.log('⏸️ WMS insolation sync morning cron is disabled (ENABLE_WMS_INSOLATION_SYNC_MORNING_CRON=false)')
         }
       } catch (error) {
         console.error('Failed to start cron job(s):', error)

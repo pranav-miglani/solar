@@ -59,9 +59,9 @@ export async function POST(
 
         const supabase = getMainClient()
 
-        // Sync insolation data for this device
-        const today = new Date().toISOString().split("T")[0]
-        const result = await syncWmsDeviceInsolation(parseInt(params.id), today, supabase)
+        // Sync insolation data for this device (backfill last 100 days)
+        // Pass null to trigger 100-day backfill
+        const result = await syncWmsDeviceInsolation(parseInt(params.id), null, supabase)
 
         if (result.success) {
           return NextResponse.json({

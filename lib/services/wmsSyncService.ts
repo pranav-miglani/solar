@@ -354,10 +354,13 @@ export async function syncWmsVendorDevices(
 /**
  * Sync insolation data for a single WMS device
  * For INTELLO, this syncs per-device (vendor supports per-device only)
+ * @param deviceId - Device ID
+ * @param date - Date to sync (YYYY-MM-DD). If null, backfills last 100 days
+ * @param supabase - Supabase client
  */
 export async function syncWmsDeviceInsolation(
   deviceId: number,
-  date: string,
+  date: string | null,
   supabase: any
 ): Promise<{ success: boolean; readingsCreated: number; readingsUpdated: number; error?: string }> {
   const startTime = Date.now()
@@ -368,8 +371,6 @@ export async function syncWmsDeviceInsolation(
   }
 
   try {
-    logger.info(`[WMS Insolation Sync] Starting insolation sync for device ID: ${deviceId}, date: ${date}`)
-    
     // Get device with site and vendor info
     const { data: device, error: deviceError } = await supabase
       .from("wms_devices")
@@ -416,56 +417,85 @@ export async function syncWmsDeviceInsolation(
     adapter.setTokenStorage(vendor.id, supabase)
     await adapter.authenticate()
 
-    // Get insolation data for this device
-    logger.info(`[WMS Insolation Sync] Fetching insolation data for device ${device.vendor_device_id} for date ${date}`)
-    const readings = await adapter.getInsolationData(device.vendor_device_id, date, date)
-
-    if (!readings || readings.length === 0) {
-      logger.warn(`[WMS Insolation Sync] No readings for device ${device.vendor_device_id} on ${date}`)
-      result.success = true
-      return result
-    }
-
-    const averageInsolation = adapter.calculateAverageInsolation(readings)
-    logger.info(`[WMS Insolation Sync] Calculated average insolation: ${averageInsolation.toFixed(2)} W/m² from ${readings.length} readings`)
-
-    // Check if reading already exists
-    const { data: existingReading } = await supabase
-      .from("insolation_readings")
-      .select("id")
-      .eq("wms_device_id", device.id)
-      .eq("reading_date", date)
-      .single()
-
-    const readingData = {
-      wms_device_id: device.id,
-      reading_date: date,
-      insolation_value: averageInsolation,
-      reading_count: readings.length,
-      metadata: {
-        hourly_readings: readings,
-        min_irr: Math.min(...readings.map(r => r.irr)),
-        max_irr: Math.max(...readings.map(r => r.irr)),
-      },
-    }
-
-    if (existingReading) {
-      await supabase
-        .from("insolation_readings")
-        .update(readingData)
-        .eq("id", existingReading.id)
-      result.readingsUpdated++
-      logger.info(`[WMS Insolation Sync] Updated existing reading for device ${device.vendor_device_id} on ${date}`)
+    // Determine dates to sync
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Start of today
+    
+    let datesToSync: string[] = []
+    
+    if (date) {
+      // Single date sync (for cron)
+      datesToSync = [date]
+      logger.info(`[WMS Insolation Sync] Starting insolation sync for device ID: ${deviceId}, date: ${date}`)
     } else {
-      await supabase.from("insolation_readings").insert(readingData)
-      result.readingsCreated++
-      logger.info(`[WMS Insolation Sync] Created new reading for device ${device.vendor_device_id} on ${date}`)
+      // Backfill last 100 days (for manual sync)
+      logger.info(`[WMS Insolation Sync] Starting backfill for device ID: ${deviceId} (last 100 days)`)
+      for (let daysAgo = 1; daysAgo <= 100; daysAgo++) {
+        const targetDate = new Date(today)
+        targetDate.setDate(targetDate.getDate() - daysAgo)
+        datesToSync.push(targetDate.toISOString().split("T")[0])
+      }
+      logger.info(`[WMS Insolation Sync] Will sync ${datesToSync.length} days (from ${datesToSync[datesToSync.length - 1]} to ${datesToSync[0]})`)
+    }
+
+    // Sync each date
+    for (const targetDate of datesToSync) {
+      try {
+        logger.info(`[WMS Insolation Sync] Fetching insolation data for device ${device.vendor_device_id} for date ${targetDate}`)
+        const readings = await adapter.getInsolationData(device.vendor_device_id, targetDate, targetDate)
+
+        if (!readings || readings.length === 0) {
+          logger.warn(`[WMS Insolation Sync] No readings for device ${device.vendor_device_id} on ${targetDate}`)
+          continue
+        }
+
+        const averageInsolation = adapter.calculateAverageInsolation(readings)
+        logger.info(`[WMS Insolation Sync] Calculated average insolation: ${averageInsolation.toFixed(2)} W/m² from ${readings.length} readings for ${targetDate}`)
+
+        // Check if reading already exists
+        const { data: existingReading } = await supabase
+          .from("insolation_readings")
+          .select("id")
+          .eq("wms_device_id", device.id)
+          .eq("reading_date", targetDate)
+          .single()
+
+        const readingData = {
+          wms_device_id: device.id,
+          reading_date: targetDate,
+          insolation_value: averageInsolation,
+          reading_count: readings.length,
+          metadata: {
+            hourly_readings: readings,
+            min_irr: Math.min(...readings.map(r => r.irr)),
+            max_irr: Math.max(...readings.map(r => r.irr)),
+          },
+        }
+
+        if (existingReading) {
+          await supabase
+            .from("insolation_readings")
+            .update(readingData)
+            .eq("id", existingReading.id)
+          result.readingsUpdated++
+          logger.info(`[WMS Insolation Sync] Updated existing reading for device ${device.vendor_device_id} on ${targetDate}`)
+        } else {
+          await supabase.from("insolation_readings").insert(readingData)
+          result.readingsCreated++
+          logger.info(`[WMS Insolation Sync] Created new reading for device ${device.vendor_device_id} on ${targetDate}`)
+        }
+      } catch (dayError: any) {
+        logger.warn(
+          `[WMS Insolation Sync] Error syncing device ${device.vendor_device_id} for ${targetDate}: ${dayError.message}`
+        )
+        // Continue with other days
+      }
     }
 
     result.success = true
     const duration = Date.now() - startTime
     logger.info(
-      `[WMS Insolation Sync] Device ${device.vendor_device_id} (ID: ${deviceId}) insolation synced successfully in ${duration}ms`
+      `[WMS Insolation Sync] Device ${device.vendor_device_id} (ID: ${deviceId}) insolation synced successfully: ${result.readingsCreated + result.readingsUpdated} readings (${result.readingsCreated} created, ${result.readingsUpdated} updated) in ${duration}ms`
     )
   } catch (error: any) {
     logger.error(
@@ -637,12 +667,14 @@ export async function syncWmsDevice(
 /**
  * Sync insolation data for all devices of a WMS vendor
  * Exported for use in per-vendor sync endpoints
- * @param date - Date to sync (YYYY-MM-DD), defaults to yesterday
+ * @param vendor - WMS vendor
+ * @param supabase - Supabase client
+ * @param date - Date to sync (YYYY-MM-DD). If null, backfills last 100 days for all devices
  */
 export async function syncWmsVendorInsolation(
   vendor: any,
   supabase: any,
-  date?: string
+  date: string | null = null
 ): Promise<InsolationSyncResult> {
   const startTime = Date.now()
   const result: InsolationSyncResult = {
@@ -960,7 +992,7 @@ export async function syncAllWmsSites(): Promise<SyncSummary> {
  * Sync insolation data for all WMS vendors
  * @param date - Optional date to sync (YYYY-MM-DD), defaults to yesterday
  */
-export async function syncAllWmsInsolation(date?: string): Promise<InsolationSyncResult[]> {
+export async function syncAllWmsInsolation(date: string): Promise<InsolationSyncResult[]> {
   return MDC.runAsync(
     {
       source: "cron",
@@ -970,7 +1002,7 @@ export async function syncAllWmsInsolation(date?: string): Promise<InsolationSyn
       const supabase = getMainClient()
       const results: InsolationSyncResult[] = []
 
-      logger.info("[WMS Insolation Sync] Starting insolation sync for all WMS vendors")
+      logger.info(`[WMS Insolation Sync] Starting insolation sync for all WMS vendors, date: ${date}`)
 
       // Get all active WMS vendors
       const { data: vendors, error } = await supabase
