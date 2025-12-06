@@ -482,8 +482,8 @@ async function backfillInsolationData(
 export async function syncAllWmsSites(): Promise<SyncSummary> {
   return MDC.runAsync(
     {
-      source: "wms-sync",
-      operation: "sync-sites",
+      source: "cron",
+      operation: "sync-wms-sites",
     },
     async () => {
       const startTime = Date.now()
@@ -554,8 +554,8 @@ export async function syncAllWmsSites(): Promise<SyncSummary> {
 export async function syncAllWmsInsolation(date?: string): Promise<InsolationSyncResult[]> {
   return MDC.runAsync(
     {
-      source: "wms-sync",
-      operation: "sync-insolation",
+      source: "cron",
+      operation: "sync-wms-insolation",
     },
     async () => {
       const supabase = getMainClient()
@@ -600,8 +600,8 @@ export async function syncAllWmsInsolation(date?: string): Promise<InsolationSyn
 export async function backfillAllWmsInsolation(): Promise<InsolationSyncResult[]> {
   return MDC.runAsync(
     {
-      source: "wms-sync",
-      operation: "backfill-insolation",
+      source: "cron",
+      operation: "backfill-wms-insolation",
     },
     async () => {
       const supabase = getMainClient()
