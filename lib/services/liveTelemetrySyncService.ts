@@ -223,7 +223,9 @@ async function syncVendorLiveTelemetry(
             continue
           }
           
-          // Extract live telemetry fields
+          // Extract live telemetry fields ONLY
+          // NOTE: capacity_kw is NOT updated here - it's a fixed property that only changes during plant sync
+          // Only update telemetry fields that change frequently (power, energy, network status, timestamps)
           const metadata = plantData.metadata || {}
           const currentPowerKw = metadata.currentPowerKw ?? null
           const dailyEnergyKwh = metadata.dailyEnergyKwh ?? null
@@ -247,6 +249,8 @@ async function syncVendorLiveTelemetry(
             success: true,
           })
           
+          // Update ONLY telemetry fields - explicitly exclude capacity_kw, name, location, etc.
+          // These are plant properties that only change during plant sync, not live telemetry sync
           allUpdates.push({
             id: plant.id,
             vendorPlantId: plant.vendor_plant_id,
@@ -259,6 +263,7 @@ async function syncVendorLiveTelemetry(
               network_status: networkStatus,
               last_update_time: lastUpdateTime,
               last_refreshed_at: new Date().toISOString(),
+              // Explicitly NOT including: capacity_kw, name, location, org_id, vendor_id, etc.
             },
           })
         }
@@ -323,7 +328,9 @@ async function syncVendorLiveTelemetry(
               }
             }
 
-            // Extract live telemetry fields from plant data
+            // Extract live telemetry fields from plant data ONLY
+            // NOTE: capacity_kw is NOT updated here - it's a fixed property that only changes during plant sync
+            // Only update telemetry fields that change frequently (power, energy, network status, timestamps)
             const metadata = plantData.metadata || {}
             const currentPowerKw = metadata.currentPowerKw ?? null
             const dailyEnergyKwh = metadata.dailyEnergyKwh ?? null
@@ -346,6 +353,8 @@ async function syncVendorLiveTelemetry(
               vendorPlantId: plant.vendor_plant_id,
               success: true,
               data: {
+                // Update ONLY telemetry fields - explicitly exclude capacity_kw, name, location, etc.
+                // These are plant properties that only change during plant sync, not live telemetry sync
                 current_power_kw: currentPowerKw,
                 daily_energy_kwh: dailyEnergyKwh,
                 monthly_energy_mwh: monthlyEnergyMwh,
@@ -354,6 +363,7 @@ async function syncVendorLiveTelemetry(
                 network_status: networkStatus,
                 last_update_time: lastUpdateTime,
                 last_refreshed_at: new Date().toISOString(),
+                // Explicitly NOT including: capacity_kw, name, location, org_id, vendor_id, etc.
               },
             }
           } catch (plantError: any) {
@@ -406,31 +416,38 @@ async function syncVendorLiveTelemetry(
         const updateChunk = allUpdates.slice(j, j + UPDATE_BATCH_SIZE)
         const chunkNumber = Math.floor(j / UPDATE_BATCH_SIZE) + 1
         
-        // Prepare update data array for batch upsert
-        const updateData = updateChunk.map((item) => ({
-          id: item.id,
-          ...item.data,
-        }))
-
         try {
-          // Use upsert with onConflict to update multiple plants in one transaction
-          const { error: batchUpdateError } = await supabase
-            .from("plants")
-            .upsert(updateData, {
-              onConflict: "id",
-            })
+          // Use update() instead of upsert() - we only update existing plants, never create new ones
+          // Live telemetry sync only updates telemetry fields for plants that already exist
+          // Update each plant individually since Supabase doesn't support batch updates with different values per row
+          const updatePromises = updateChunk.map(async (item) => {
+            const { error: updateError } = await supabase
+              .from("plants")
+              .update(item.data) // Only telemetry fields, no org_id/vendor_id
+              .eq("id", item.id)
+            
+            if (updateError) {
+              logger.error(
+                `[LiveTelemetry] Failed to update plant ${item.id} (${item.vendorPlantId}): ${updateError.message}`
+              )
+              return { success: false, plantId: item.id, error: updateError.message }
+            }
+            return { success: true, plantId: item.id }
+          })
 
-          if (batchUpdateError) {
+          const updateResults = await Promise.all(updatePromises)
+          const failedUpdates = updateResults.filter((r) => !r.success)
+          
+          if (failedUpdates.length > 0) {
             logger.error(
-              `[LiveTelemetry] Batch update error (chunk ${chunkNumber}) for vendor ${vendor.name}:`,
-              batchUpdateError.message
+              `[LiveTelemetry] Batch update error (chunk ${chunkNumber}) for vendor ${vendor.name}: ${failedUpdates.length}/${updateChunk.length} plants failed`
             )
             // Mark affected plants as failed
-            updateChunk.forEach((item) => {
-              const result = plantResults.find((r) => r.plantId === item.id)
+            failedUpdates.forEach((failed) => {
+              const result = plantResults.find((r) => r.plantId === failed.plantId)
               if (result) {
                 result.success = false
-                result.error = batchUpdateError.message
+                result.error = (failed as any).error
               }
             })
           } else {
