@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ alerts: [] })
       }
     }
-    // SUPERADMIN and GOVT see all alerts
+    // SUPERADMIN, DEVELOPER, and GOVT see all alerts (no filtering)
 
     const { data: alerts, error } = await query
       .order("created_at", { ascending: false })

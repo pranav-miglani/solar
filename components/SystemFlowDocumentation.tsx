@@ -1387,12 +1387,17 @@ export function SystemFlowDocumentation() {
                         <tr className="border-b">
                           <td className="p-2"><code>last_update_time</code></td>
                           <td className="p-2">TIMESTAMPTZ</td>
-                          <td className="p-2">Last update from vendor (shown as &quot;Last Updated&quot;)</td>
+                          <td className="p-2">Last update from vendor (shown as &quot;Last Updated&quot;). Used to determine plant inactivity - plants with last_update_time older than 3 days are automatically disabled.</td>
                         </tr>
                         <tr className="border-b">
                           <td className="p-2"><code>last_refreshed_at</code></td>
                           <td className="p-2">TIMESTAMPTZ</td>
-                          <td className="p-2">Last refresh in our DB (shown as &quot;Last Refresh&quot;)</td>
+                          <td className="p-2">Last refresh in our DB (shown as &quot;Last Refresh&quot;). Set to current time whenever we sync plant data, regardless of whether vendor has new data.</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code>is_active</code></td>
+                          <td className="p-2">BOOLEAN</td>
+                          <td className="p-2">Indicates if plant is active (true) or disabled (false). Plants are marked inactive if they haven&apos;t received vendor updates (last_update_time) for 3+ days.</td>
                         </tr>
                         <tr className="border-b">
                           <td className="p-2"><code>network_status</code></td>
@@ -1476,6 +1481,9 @@ export function SystemFlowDocumentation() {
                   <div className="bg-muted/50 p-4 rounded-lg space-y-2">
                     <h4 className="font-semibold">alerts</h4>
                     <p className="text-sm text-muted-foreground">System alerts from vendor APIs</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      <strong>Access:</strong> SUPERADMIN, DEVELOPER, and GOVT can see all alerts. ORG users can only see alerts for their organization&apos;s plants.
+                    </p>
                     <table className="w-full text-xs border-collapse mt-2">
                       <thead>
                         <tr className="border-b">
@@ -1560,7 +1568,7 @@ export function SystemFlowDocumentation() {
                   {/* Disabled Plants Table */}
                   <div className="bg-muted/50 p-4 rounded-lg space-y-2">
                     <h4 className="font-semibold">disabled_plants</h4>
-                    <p className="text-sm text-muted-foreground">Plants inactive for 3+ days</p>
+                    <p className="text-sm text-muted-foreground">Plants that haven&apos;t received vendor updates (last_update_time) for 3+ days</p>
                     <table className="w-full text-xs border-collapse mt-2">
                       <thead>
                         <tr className="border-b">
@@ -1591,14 +1599,22 @@ export function SystemFlowDocumentation() {
                           <td className="p-2">FK to vendors</td>
                         </tr>
                         <tr className="border-b">
+                          <td className="p-2"><code>days_since_refresh</code></td>
+                          <td className="p-2">INTEGER</td>
+                          <td className="p-2">Days since last_update_time when plant was disabled</td>
+                        </tr>
+                        <tr className="border-b">
                           <td className="p-2"><code>disabled_at</code></td>
                           <td className="p-2">TIMESTAMPTZ</td>
                           <td className="p-2">When plant was marked as disabled</td>
                         </tr>
                       </tbody>
                     </table>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Note:</strong> Created by function <code>disable_inactive_plants()</code> which runs daily
+                    <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                      <p><strong>Automatic Disabling:</strong> Function <code>disable_inactive_plants()</code> runs daily at 2 AM IST via cron job (<code>lib/cron/disableInactivePlantsCron.js</code>).</p>
+                      <p><strong>Inactivity Criteria:</strong> Plants are disabled based on <code>last_update_time</code> (vendor&apos;s last data update), not <code>last_refreshed_at</code> (our sync time). This ensures we disable plants that haven&apos;t received vendor updates, not just plants we haven&apos;t synced.</p>
+                      <p><strong>Live Telemetry:</strong> Inactive plants continue to receive live telemetry sync until they are deleted by user.</p>
+                      <p><strong>Deletion:</strong> Only disabled plants can be deleted. Only SUPERADMIN and DEVELOPER can delete plants. Plants associated with work orders cannot be deleted.</p>
                     </div>
                   </div>
 
@@ -2269,6 +2285,16 @@ Unique Constraints:
                         <li>Calls: <code className="bg-background px-1 rounded">GET /api/cron/sync-alerts</code></li>
                         <li>Syncs alerts for all active vendors</li>
                         <li>Runs in-process (server.js starts it)</li>
+                      </ul>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">disableInactivePlantsCron.js</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Schedule: Daily at 2 AM IST / 8:30 PM UTC (<code className="bg-background px-1 rounded">30 20 * * *</code>)</li>
+                        <li>Calls: <code className="bg-background px-1 rounded">GET /api/cron/disable-inactive-plants</code></li>
+                        <li>Disables plants that haven&apos;t received vendor updates (last_update_time) for 3+ days</li>
+                        <li>Runs in-process (server.js starts it)</li>
+                        <li>Can be disabled with <code className="bg-background px-1 rounded">ENABLE_DISABLE_INACTIVE_PLANTS_CRON=false</code></li>
                       </ul>
                     </div>
                   </div>
