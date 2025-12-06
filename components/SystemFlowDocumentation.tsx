@@ -2447,6 +2447,31 @@ Unique Constraints:
                         <li>Enable structured logging with context</li>
                       </ul>
                     </div>
+                    <div className="mt-3">
+                      <h4 className="font-medium text-sm mb-1">WMS API Endpoints</h4>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Weather Monitoring System API routes:
+                      </p>
+                      <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><strong>GET /api/wms-vendors</strong> - List WMS vendors (filtered by org for ORG users)</li>
+                        <li><strong>POST /api/wms-vendors</strong> - Create WMS vendor (SUPERADMIN/DEVELOPER only)</li>
+                        <li><strong>GET /api/wms-vendors/[id]</strong> - Get single WMS vendor</li>
+                        <li><strong>PUT /api/wms-vendors/[id]</strong> - Update WMS vendor (SUPERADMIN/DEVELOPER only)</li>
+                        <li><strong>DELETE /api/wms-vendors/[id]</strong> - Delete WMS vendor (SUPERADMIN/DEVELOPER only)</li>
+                        <li><strong>GET /api/cron/sync-wms-sites</strong> - Sync sites for all WMS vendors (cron endpoint, requires CRON_SECRET if configured)</li>
+                        <li><strong>GET /api/cron/sync-wms-insolation</strong> - Sync insolation for all WMS vendors (cron endpoint, requires CRON_SECRET if configured)</li>
+                      </ul>
+                      <div className="bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded-lg border border-yellow-200 dark:border-yellow-900 mt-2">
+                        <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                          <strong>⚠️ Known Issues:</strong>
+                        </p>
+                        <ul className="text-xs text-yellow-800 dark:text-yellow-200 space-y-1 ml-4 list-disc mt-1">
+                          <li><strong>Missing per-vendor sync endpoint:</strong> Currently, <code className="bg-background px-1 rounded">/api/cron/sync-wms-sites</code> syncs all vendors. A per-vendor endpoint like <code className="bg-background px-1 rounded">/api/wms-vendors/[id]/sync-sites</code> (similar to <code className="bg-background px-1 rounded">/api/vendors/[id]/sync-plants</code>) is needed for UI-triggered single-vendor syncs.</li>
+                          <li><strong>Missing data retrieval endpoints:</strong> No endpoints exist to fetch WMS sites, devices, or insolation data for viewing in the UI (e.g., <code className="bg-background px-1 rounded">/api/wms-vendors/[id]/sites</code>, <code className="bg-background px-1 rounded">/api/wms-vendors/[id]/devices</code>, <code className="bg-background px-1 rounded">/api/insolation-readings</code>).</li>
+                          <li><strong>Cron endpoint authentication:</strong> The UI component calls <code className="bg-background px-1 rounded">/api/cron/sync-wms-sites</code> without providing <code className="bg-background px-1 rounded">CRON_SECRET</code>, which may cause authentication failures if the secret is configured.</li>
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
