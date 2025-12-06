@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import Link from "next/link"
+import ExcelJS from "exceljs"
 import {
   Table,
   TableBody,
@@ -242,52 +243,112 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
         body: formData,
       })
 
-      // Check if response is Excel file (based on content-type)
-      const contentType = response.headers.get("content-type")
-      const isExcel = contentType?.includes("spreadsheetml") || contentType?.includes("excel")
-
-      if (isExcel) {
-        // Download the Excel report file
-        const blob = await response.blob()
-        const downloadUrl = window.URL.createObjectURL(blob)
-        const link = document.createElement("a")
-        link.href = downloadUrl
-        
-        // Get filename from Content-Disposition header or use default
-        const contentDisposition = response.headers.get("content-disposition")
-        let filename = `work_orders_import_report_${new Date().toISOString().split('T')[0]}_${Date.now()}.xlsx`
-        if (contentDisposition) {
-          const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i)
-          if (filenameMatch) {
-            filename = filenameMatch[1]
-          }
-        }
-        
-        link.download = filename
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(downloadUrl)
-        
+      if (!response.ok) {
+        const error = await response.json()
+        console.error("Import error:", error.error || "Failed to import work orders")
         setImportLoading(false)
-        setImportDialogOpen(false)
-        setImportFile(null)
-        
-        // Always refresh the list to show any new work orders
-        fetchWorkOrders()
-      } else {
-        // If not Excel, try to parse as JSON (for backward compatibility or error cases)
-        const data = await response.json()
-        if (!response.ok) {
-          // Still download as Excel if possible, otherwise show error
-          console.error("Import error:", data.error || "Failed to import work orders")
-        }
-        setImportLoading(false)
+        return
       }
+
+      const data = await response.json()
+
+      // Generate Excel report from JSON response
+      if (data.results && data.results.length > 0) {
+        await generateErrorExcel(data)
+      }
+      
+      setImportLoading(false)
+      setImportDialogOpen(false)
+      setImportFile(null)
+      
+      // Always refresh the list to show any new work orders
+      fetchWorkOrders()
     } catch (error) {
       console.error("Error importing work orders:", error)
       setImportLoading(false)
     }
+  }
+
+  async function generateErrorExcel(data: any) {
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet("Import Results")
+
+    // Define columns for the report
+    worksheet.columns = [
+      { header: "Row Number", key: "row_number", width: 12 },
+      { header: "Status", key: "status", width: 12 },
+      { header: "Title", key: "title", width: 30 },
+      { header: "Organization ID", key: "org_id", width: 15 },
+      { header: "Organization Name", key: "org_name", width: 30 },
+      { header: "Plant ID", key: "plant_id", width: 12 },
+      { header: "Vendor Plant ID", key: "vendor_plant_id", width: 20 },
+      { header: "Plant Name", key: "plant_name", width: 30 },
+      { header: "Vendor ID", key: "vendor_id", width: 12 },
+      { header: "Vendor Name", key: "vendor_name", width: 25 },
+      { header: "Work Order ID", key: "work_order_id", width: 15 },
+      { header: "Error Message", key: "error_message", width: 50 },
+    ]
+
+    // Style header row
+    worksheet.getRow(1).font = { bold: true }
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    }
+
+    // Add summary row
+    worksheet.addRow({
+      row_number: "SUMMARY",
+      status: "",
+      title: `Total Rows: ${data.summary.totalRows} | Processed: ${data.summary.processed} | Errors: ${data.summary.errors}`,
+      org_id: "",
+      org_name: "",
+      plant_id: "",
+      vendor_plant_id: "",
+      plant_name: "",
+      vendor_id: "",
+      vendor_name: "",
+      work_order_id: "",
+      error_message: "",
+    })
+    worksheet.getRow(2).font = { bold: true }
+
+    // Add data rows
+    for (const result of data.results) {
+      const row = worksheet.addRow(result)
+      
+      // Color code rows: green for success, red for failure
+      if (result.status === "SUCCESS") {
+        row.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFE8F5E9' } // Light green
+        }
+      } else {
+        row.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFFEBEE' } // Light red
+        }
+      }
+    }
+
+    // Generate Excel file buffer
+    const buffer = await workbook.xlsx.writeBuffer()
+
+    // Download the Excel file
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = downloadUrl
+    link.download = `work_orders_import_report_${new Date().toISOString().split('T')[0]}_${Date.now()}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(downloadUrl)
   }
 
   const editingWorkOrder = workOrders.find((wo) => wo.id === editingWorkOrderId)

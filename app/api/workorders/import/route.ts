@@ -713,60 +713,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate Excel report with detailed import results
-    const reportWorkbook = new ExcelJS.Workbook()
-    const reportWorksheet = reportWorkbook.addWorksheet("Import Results")
-
-    // Define columns for the report
-    reportWorksheet.columns = [
-      { header: "Row Number", key: "row_number", width: 12 },
-      { header: "Status", key: "status", width: 12 },
-      { header: "Title", key: "title", width: 30 },
-      { header: "Organization ID", key: "org_id", width: 15 },
-      { header: "Organization Name", key: "org_name", width: 30 },
-      { header: "Plant ID", key: "plant_id", width: 12 },
-      { header: "Vendor Plant ID", key: "vendor_plant_id", width: 20 },
-      { header: "Plant Name", key: "plant_name", width: 30 },
-      { header: "Vendor ID", key: "vendor_id", width: 12 },
-      { header: "Vendor Name", key: "vendor_name", width: 25 },
-      { header: "Work Order ID", key: "work_order_id", width: 15 },
-      { header: "Error Message", key: "error_message", width: 50 },
-    ]
-
-    // Style header row
-    reportWorksheet.getRow(1).font = { bold: true }
-    reportWorksheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFE0E0E0' }
-    }
-
-    // Add summary row
-    reportWorksheet.addRow({
-      row_number: "SUMMARY",
-      status: "",
-      title: `Total Rows: ${rows.length} | Processed: ${totalProcessed} | Errors: ${totalErrors}`,
-      org_id: "",
-      org_name: "",
-      plant_id: "",
-      vendor_plant_id: "",
-      plant_name: "",
-      vendor_id: "",
-      vendor_name: "",
-      work_order_id: "",
-      error_message: "",
-    })
-    reportWorksheet.getRow(2).font = { bold: true }
-
-    // Add data rows - map results back to original rows for complete information
+    // Prepare results data for JSON response
     const allResults: any[] = []
     
-    // Create a map of row numbers to original row data
-    const rowDataMap = new Map<number, ImportRow>()
-    rows.forEach((row, index) => {
-      rowDataMap.set(index + 2, row) // +2 because Excel rows are 1-based and we skip header
-    })
-
     // Process all results - use enriched result data (already includes row, plant, vendor info)
     for (const result of results) {
       allResults.push({
@@ -788,35 +737,14 @@ export async function POST(request: NextRequest) {
     // Sort by row number
     allResults.sort((a, b) => a.row_number - b.row_number)
 
-    // Add data rows to worksheet
-    for (const result of allResults) {
-      const row = reportWorksheet.addRow(result)
-      
-      // Color code rows: green for success, red for failure
-      if (result.status === "SUCCESS") {
-        row.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FFE8F5E9' } // Light green
-        }
-      } else {
-        row.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FFFFEBEE' } // Light red
-        }
-      }
-    }
-
-    // Generate Excel file buffer
-    const reportBuffer = await reportWorkbook.xlsx.writeBuffer()
-
-    // Return Excel file with appropriate headers
-    return new NextResponse(reportBuffer, {
-      headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="work_orders_import_report_${new Date().toISOString().split('T')[0]}_${Date.now()}.xlsx"`,
+    // Return JSON response with import results
+    return NextResponse.json({
+      summary: {
+        totalRows: rows.length,
+        processed: totalProcessed,
+        errors: totalErrors,
       },
+      results: allResults,
     })
   } catch (error: any) {
     console.error("Work orders import error:", error)
