@@ -65,6 +65,7 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
   const [editingVendor, setEditingVendor] = useState<WmsVendor | null>(null)
   const [deletingVendorId, setDeletingVendorId] = useState<number | null>(null)
   const [syncingVendorId, setSyncingVendorId] = useState<number | null>(null)
+  const [backfilling, setBackfilling] = useState(false)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importLoading, setImportLoading] = useState(false)
@@ -295,6 +296,40 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
     }
   }
 
+  async function handleBackfillInsolation() {
+    if (!canManage) return
+    
+    const confirmed = confirm(
+      "This will backfill insolation data for the last 100 days for all active WMS vendors.\n\n" +
+      "This operation may take a long time. Continue?"
+    )
+    
+    if (!confirmed) return
+
+    setBackfilling(true)
+    try {
+      const response = await fetch("/api/cron/backfill-wms-insolation", {
+        method: "GET",
+      })
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        alert(
+          `Backfill completed successfully!\n\n` +
+          `Vendors: ${data.summary?.successful || 0}/${data.summary?.totalVendors || 0} successful\n` +
+          `Total readings: ${data.summary?.totalReadings || 0}`
+        )
+        fetchVendors() // Refresh to update last_insolation_synced_at
+      } else {
+        alert(data.error || "Failed to backfill insolation data")
+      }
+    } catch (error: any) {
+      alert(`Error backfilling insolation: ${error.message}`)
+    } finally {
+      setBackfilling(false)
+    }
+  }
+
   const isReadOnly = accountType === "GOVT" || accountType === "ORG"
   const canManage = accountType === "SUPERADMIN" || accountType === "DEVELOPER"
 
@@ -489,6 +524,14 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
               <Button onClick={() => setImportDialogOpen(true)} variant="outline">
                 <Upload className="h-4 w-4 mr-2" />
                 Import
+              </Button>
+              <Button
+                onClick={handleBackfillInsolation}
+                variant="outline"
+                disabled={backfilling}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${backfilling ? "animate-spin" : ""}`} />
+                Backfill Insolation (100 days)
               </Button>
             </>
           )}

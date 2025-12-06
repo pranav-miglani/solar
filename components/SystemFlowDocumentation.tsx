@@ -2483,6 +2483,7 @@ Unique Constraints:
                         <li><strong>GET /api/insolation-readings</strong> - Fetch insolation data (with filters: deviceId, siteId, vendorId, orgId, startDate, endDate, limit)</li>
                         <li><strong>GET /api/cron/sync-wms-sites</strong> - Sync sites for <strong>all</strong> WMS vendors (cron endpoint, requires CRON_SECRET if configured)</li>
                         <li><strong>GET /api/cron/sync-wms-insolation</strong> - Sync insolation for <strong>all</strong> WMS vendors (cron endpoint, requires CRON_SECRET if configured)</li>
+                        <li><strong>GET /api/cron/backfill-wms-insolation</strong> - Backfill insolation data for last 100 days for all WMS vendors (can be triggered manually by SUPERADMIN/DEVELOPER or via cron)</li>
                       </ul>
                       <div className="bg-blue-50 dark:bg-blue-950/20 p-2 rounded-lg border border-blue-200 dark:border-blue-900 mt-2">
                         <p className="text-xs text-blue-800 dark:text-blue-200">
