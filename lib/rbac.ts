@@ -28,6 +28,10 @@ const ROLE_PERMISSIONS: Record<AccountType, Permission[]> = {
     { resource: "alerts", action: "read" },
     { resource: "alerts", action: "update" },
     { resource: "telemetry", action: "read" },
+    { resource: "wms_vendors", action: "create" },
+    { resource: "wms_vendors", action: "read" },
+    { resource: "wms_vendors", action: "update" },
+    { resource: "wms_vendors", action: "delete" },
   ],
   DEVELOPER: [
     // Same as SUPERADMIN + doc access
@@ -52,6 +56,10 @@ const ROLE_PERMISSIONS: Record<AccountType, Permission[]> = {
     { resource: "alerts", action: "update" },
     { resource: "telemetry", action: "read" },
     { resource: "docs", action: "read" },
+    { resource: "wms_vendors", action: "create" },
+    { resource: "wms_vendors", action: "read" },
+    { resource: "wms_vendors", action: "update" },
+    { resource: "wms_vendors", action: "delete" },
   ],
   GOVT: [
     // Read-only global access
@@ -61,6 +69,7 @@ const ROLE_PERMISSIONS: Record<AccountType, Permission[]> = {
     { resource: "work_orders", action: "read" },
     { resource: "alerts", action: "read" },
     { resource: "telemetry", action: "read" },
+    { resource: "wms_vendors", action: "read" },
   ],
   ORG: [
     // Read-only access to own org data
@@ -70,6 +79,7 @@ const ROLE_PERMISSIONS: Record<AccountType, Permission[]> = {
     { resource: "work_orders", action: "read" },
     { resource: "alerts", action: "read" },
     { resource: "telemetry", action: "read" },
+    { resource: "wms_vendors", action: "read" },
   ],
 }
 

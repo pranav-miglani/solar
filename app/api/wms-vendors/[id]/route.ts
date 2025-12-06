@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getMainClient } from "@/lib/supabase/pooled"
-import { requireAuth } from "@/lib/auth/requireAuth"
-import { checkPermission } from "@/lib/rbac"
+import { requirePermission } from "@/lib/rbac"
 
 /**
  * GET /api/wms-vendors/[id]
@@ -12,7 +11,24 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { account, accountType } = await requireAuth(request)
+    const session = request.cookies.get("session")?.value
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    let sessionData
+    try {
+      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+    } catch {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+    }
+
+    const accountType = sessionData.accountType as string
+    const orgId = sessionData.orgId as number | null
+
+    requirePermission(accountType as any, "wms_vendors", "read")
+
     const vendorId = parseInt(params.id)
 
     if (isNaN(vendorId)) {
@@ -35,8 +51,8 @@ export async function GET(
       .eq("id", vendorId)
 
     // ORG users can only see their own org's vendors
-    if (accountType === "ORG" && account?.orgId) {
-      query = query.eq("org_id", account.orgId)
+    if (accountType === "ORG" && orgId) {
+      query = query.eq("org_id", orgId)
     }
 
     const { data, error } = await query.single()
@@ -69,15 +85,22 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { account, accountType } = await requireAuth(request)
+    const session = request.cookies.get("session")?.value
 
-    // Only SUPERADMIN and DEVELOPER can update WMS vendors
-    if (!checkPermission(accountType, "wms_vendors", "update")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      )
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    let sessionData
+    try {
+      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+    } catch {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+    }
+
+    const accountType = sessionData.accountType as string
+
+    requirePermission(accountType as any, "wms_vendors", "update")
 
     const vendorId = parseInt(params.id)
     if (isNaN(vendorId)) {
@@ -140,15 +163,22 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { account, accountType } = await requireAuth(request)
+    const session = request.cookies.get("session")?.value
 
-    // Only SUPERADMIN and DEVELOPER can delete WMS vendors
-    if (!checkPermission(accountType, "wms_vendors", "delete")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      )
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    let sessionData
+    try {
+      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+    } catch {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+    }
+
+    const accountType = sessionData.accountType as string
+
+    requirePermission(accountType as any, "wms_vendors", "delete")
 
     const vendorId = parseInt(params.id)
     if (isNaN(vendorId)) {

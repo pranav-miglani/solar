@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getMainClient } from "@/lib/supabase/pooled"
-import { requireAuth } from "@/lib/auth/requireAuth"
-import { checkPermission } from "@/lib/rbac"
+import { requirePermission } from "@/lib/rbac"
 
 /**
  * GET /api/wms-vendors
@@ -9,7 +8,23 @@ import { checkPermission } from "@/lib/rbac"
  */
 export async function GET(request: NextRequest) {
   try {
-    const { account, accountType } = await requireAuth(request)
+    const session = request.cookies.get("session")?.value
+
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    let sessionData
+    try {
+      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+    } catch {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+    }
+
+    const accountType = sessionData.accountType as string
+    const orgId = sessionData.orgId as number | null
+
+    requirePermission(accountType as any, "wms_vendors", "read")
 
     const supabase = getMainClient()
     let query = supabase.from("wms_vendors").select(`
@@ -21,8 +36,8 @@ export async function GET(request: NextRequest) {
     `)
 
     // ORG users can only see their own org's vendors
-    if (accountType === "ORG" && account?.orgId) {
-      query = query.eq("org_id", account.orgId)
+    if (accountType === "ORG" && orgId) {
+      query = query.eq("org_id", orgId)
     }
 
     const { data, error } = await query.order("created_at", { ascending: false })
@@ -46,15 +61,22 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { account, accountType } = await requireAuth(request)
+    const session = request.cookies.get("session")?.value
 
-    // Only SUPERADMIN and DEVELOPER can create WMS vendors
-    if (!checkPermission(accountType, "wms_vendors", "create")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      )
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    let sessionData
+    try {
+      sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+    } catch {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+    }
+
+    const accountType = sessionData.accountType as string
+
+    requirePermission(accountType as any, "wms_vendors", "create")
 
     const body = await request.json()
     const { name, vendor_type, credentials, org_id, is_active = true } = body
