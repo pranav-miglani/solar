@@ -376,14 +376,16 @@ export class SolarDmAdapter extends BaseVendorAdapter {
 
       const energy = data.data.energy
 
-      // Parse values from strings like "12.8_kWh", "0_KW"
+      // Parse values from strings like "12.8_kWh", "0_KW", "3_kWp"
       // currDay, currMonth, currYear, total are in kWh format: "12.8_kWh"
       // power is in kW format: "0_KW"
+      // capacity is in kWp format: "3_kWp" (kilowatt-peak, already in kW)
       const dailyEnergyKwh = this.parseSolarDmValue(energy.currDay)
       const monthlyEnergyKwh = this.parseSolarDmValue(energy.currMonth)
       const yearlyEnergyKwh = this.parseSolarDmValue(energy.currYear)
       const totalEnergyKwh = this.parseSolarDmValue(energy.total)
       const currentPowerKw = this.parseSolarDmValue(energy.power)
+      const capacityKw = this.parseSolarDmValue(energy.capacity) || 0 // Parse capacity from "3_kWp" format
 
       // Convert monthly, yearly, and total from kWh to MWh
       const monthlyEnergyMwh = monthlyEnergyKwh !== null ? monthlyEnergyKwh / 1000 : null
@@ -396,6 +398,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
       }
 
       console.log(`[SolarDM] Successfully fetched live telemetry for plant ${vendorPlantId}:`, {
+        capacityKw,
         currentPowerKw,
         dailyEnergyKwh,
         monthlyEnergyMwh,
@@ -404,14 +407,16 @@ export class SolarDmAdapter extends BaseVendorAdapter {
       })
 
       // Construct Plant object from fetched data
-      // Note: capacityKw is set to 0 since we don't fetch it here (only needed for live telemetry sync)
-      // The sync service only uses metadata, so this is acceptable
+      // IMPORTANT: Live telemetry sync service ONLY uses plantData.metadata - it does NOT use capacityKw, name, or location
+      // However, we still extract capacityKw from the metering endpoint response to satisfy the Plant interface requirement
+      // The capacity is available in the metering endpoint as "capacity": "3_kWp" (already in kW)
       return {
         id: vendorPlantId,
         name: plantName || `Plant ${vendorPlantId}`,
-        capacityKw: 0, // Not available from plant info endpoint, but sync service only uses metadata
-        location: undefined, // Not available from plant info endpoint
+        capacityKw, // Extracted from metering endpoint response (e.g., "3_kWp" -> 3)
+        location: undefined, // Not available from plant info endpoint, and not used by live telemetry sync
         metadata: {
+          // Only this metadata is used by live telemetry sync service
           currentPowerKw,
           dailyEnergyKwh,
           monthlyEnergyMwh,
@@ -425,13 +430,15 @@ export class SolarDmAdapter extends BaseVendorAdapter {
       console.error(`[SolarDM] Error fetching live telemetry for plant ${vendorPlantId}:`, error.message)
       // If we have plant name from plant info, return minimal plant object
       // Otherwise return null (plant doesn't exist or both endpoints failed)
+      // Note: capacityKw is required by Plant interface but NOT used by live telemetry sync (only metadata is used)
       if (plantName) {
         return {
           id: vendorPlantId,
           name: plantName,
-          capacityKw: 0,
-          location: undefined,
+          capacityKw: 0, // Required by Plant interface but NOT used by live telemetry sync
+          location: undefined, // Not used by live telemetry sync
           metadata: {
+            // Only this metadata is used by live telemetry sync service
             networkStatus,
             lastUpdateTime,
           },
