@@ -135,11 +135,15 @@ export async function POST(request: NextRequest) {
           capacity_kw: rowData["Capacity (kW)"] ? parseFloat(rowData["Capacity (kW)"]) : undefined,
         }
         
-        // Validate required fields: title, org_id, and either (vendor_id + vendor_plant_id) OR plant_id
-        const hasOption1 = importRow.title && importRow.org_id && importRow.vendor_id && importRow.vendor_plant_id
+        // Validate required fields: title, org_id, and either:
+        // Option 1a: vendor_id + vendor_plant_id (new format)
+        // Option 1b: vendor_type + vendor_plant_id (original format - backward compatible)
+        // Option 2: plant_id (internal ID)
+        const hasOption1a = importRow.title && importRow.org_id && importRow.vendor_id && importRow.vendor_plant_id
+        const hasOption1b = importRow.title && importRow.org_id && importRow.vendor_type && importRow.vendor_plant_id
         const hasOption2 = importRow.title && importRow.org_id && importRow.plant_id
         
-        if (hasOption1 || hasOption2) {
+        if (hasOption1a || hasOption1b || hasOption2) {
           rows.push(importRow)
         }
       }
@@ -208,7 +212,12 @@ export async function POST(request: NextRequest) {
       }
 
       // Separate rows by import format
-      const option1Rows = groupRows.filter(r => r.vendor_id && r.vendor_plant_id) // Option 1: vendor_id + vendor_plant_id
+      // Option 1a: vendor_id + vendor_plant_id (new format)
+      // Option 1b: vendor_type + vendor_plant_id (original format - backward compatible)
+      // Option 2: plant_id (internal ID)
+      const option1aRows = groupRows.filter(r => r.vendor_id && r.vendor_plant_id) // New format: vendor_id + vendor_plant_id
+      const option1bRows = groupRows.filter(r => !r.vendor_id && r.vendor_type && r.vendor_plant_id) // Original format: vendor_type + vendor_plant_id
+      const option1Rows = [...option1aRows, ...option1bRows] // Combined Option 1 rows
       const option2Rows = groupRows.filter(r => r.plant_id) // Option 2: plant_id (internal ID)
       
       // Validate Option 2 rows first (simpler - direct plant lookup)
@@ -246,36 +255,61 @@ export async function POST(request: NextRequest) {
       if (option1Rows.length > 0) {
         const vendorPlantIds = option1Rows.map(r => r.vendor_plant_id!).filter(id => id)
         const vendorTypes = [...new Set(option1Rows.map(r => r.vendor_type).filter(t => t))]
+        const vendorIds = [...new Set(option1Rows.map(r => r.vendor_id).filter(id => id !== undefined && id !== null))] as number[]
         
-        if (vendorTypes.length === 0) {
+        // Build query to get vendors
+        // Option 1a: If vendor_id is provided, use it (new format)
+        // Option 1b: If vendor_type is provided, use it (original format - backward compatible)
+        let vendorsQuery = supabase
+          .from("vendors")
+          .select("id, vendor_type, org_id, name")
+        
+        if (vendorIds.length > 0 && vendorTypes.length > 0) {
+          // Both vendor_id and vendor_type provided - get vendors matching either
+          vendorsQuery = vendorsQuery.or(`id.in.(${vendorIds.join(',')}),vendor_type.in.(${vendorTypes.join(',')})`)
+        } else if (vendorIds.length > 0) {
+          // Only vendor_ids provided (Option 1a - new format)
+          vendorsQuery = vendorsQuery.in("id", vendorIds)
+        } else if (vendorTypes.length > 0) {
+          // Only vendor_types provided (Option 1b - original format)
+          vendorsQuery = vendorsQuery.in("vendor_type", vendorTypes)
+        } else {
+          // Neither provided - this shouldn't happen due to validation, but handle it
           for (const row of option1Rows) {
             results.push(enrichResult({
               rowNumber: rows.indexOf(row) + 2,
               success: false,
-              error: "Vendor Type is required when using Vendor ID + Vendor Plant ID format",
+              error: "Either Vendor ID or Vendor Type must be provided with Vendor Plant ID",
             }, row))
             totalErrors++
           }
-        } else {
-          // Get vendors for the specified vendor types that belong to the same org (or are global vendors with org_id = NULL)
-          const { data: vendorsData, error: vendorsError } = await supabase
-            .from("vendors")
-            .select("id, vendor_type, org_id, name")
-            .in("vendor_type", vendorTypes)
-            .or(`org_id.eq.${firstRow.org_id},org_id.is.null`)
-          
-          if (vendorsError || !vendorsData || vendorsData.length === 0) {
-            for (const row of option1Rows) {
+          continue
+        }
+        
+        // Filter by org (must belong to work order's org or be global)
+        vendorsQuery = vendorsQuery.or(`org_id.eq.${firstRow.org_id},org_id.is.null`)
+        
+        const { data: vendorsData, error: vendorsError } = await vendorsQuery
+        
+        if (vendorsError || !vendorsData || vendorsData.length === 0) {
+          for (const row of option1Rows) {
+            if (row.vendor_id) {
+              results.push(enrichResult({
+                rowNumber: rows.indexOf(row) + 2,
+                success: false,
+                error: `Vendor ID ${row.vendor_id} not found or does not belong to organization ID ${firstRow.org_id}`,
+              }, row))
+            } else {
               results.push(enrichResult({
                 rowNumber: rows.indexOf(row) + 2,
                 success: false,
                 error: `No vendors found for vendor type "${row.vendor_type}" that belong to organization ID ${firstRow.org_id} or are global vendors`,
               }, row))
-              totalErrors++
             }
-          } else {
-            vendors = vendorsData
+            totalErrors++
           }
+        } else {
+          vendors = vendorsData
         }
       }
       

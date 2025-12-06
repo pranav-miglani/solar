@@ -10,14 +10,22 @@ The system supports Excel uploads for three entities: **Work Orders**, **Vendors
 
 ## 1. Work Orders Import (`/api/workorders/import`)
 
-### Two Import Formats Supported
+### Three Import Formats Supported
 
-#### **Format Option 1: Vendor ID + Vendor Plant ID**
+#### **Format Option 1a: Vendor ID + Vendor Plant ID (New Format)**
 | Header Name | Required | Type | Description |
 |------------|----------|------|-------------|
 | **Title** | ✅ Yes | String | Work order title |
 | **Organization ID** | ✅ Yes | Integer | Organization ID for the work order |
 | **Vendor ID** | ✅ Yes | Integer | Vendor ID (must belong to the same organization) |
+| **Vendor Plant ID** | ✅ Yes | String | Vendor-specific plant identifier |
+
+#### **Format Option 1b: Vendor Type + Vendor Plant ID (Original Format - Backward Compatible)**
+| Header Name | Required | Type | Description |
+|------------|----------|------|-------------|
+| **Title** | ✅ Yes | String | Work order title |
+| **Organization ID** | ✅ Yes | Integer | Organization ID for the work order |
+| **Vendor Type** | ✅ Yes | String | Vendor type (SOLARMAN, SUNGROW, OTHER) |
 | **Vendor Plant ID** | ✅ Yes | String | Vendor-specific plant identifier |
 
 #### **Format Option 2: Internal Plant ID (Recommended)**
@@ -27,7 +35,7 @@ The system supports Excel uploads for three entities: **Work Orders**, **Vendors
 | **Organization ID** | ✅ Yes | Integer | Organization ID for the work order |
 | **Plant ID** | ✅ Yes | Integer | Internal plant ID (plants.id from database) |
 
-### Optional Parameters (Both Formats)
+### Optional Parameters (All Formats)
 | Header Name | Type | Description |
 |------------|------|-------------|
 | Work Order ID | Integer | For reference only (not used for updates) |
@@ -36,17 +44,23 @@ The system supports Excel uploads for three entities: **Work Orders**, **Vendors
 | Organization Name | String | For reference only |
 | Plant Name | String | For reference only |
 | Vendor Name | String | For reference only |
-| Vendor Type | String | Optional for Format 1 (validated if provided) |
+| Vendor Type | String | Optional for Format 1a (validated if provided) |
+| Vendor ID | Integer | Optional for Format 1b (validated if provided) |
 | Capacity (kW) | Number | For reference only |
 
 ### Validation Rules
 - Work orders are grouped by `Title` + `Organization ID` combination
 - All plants in a work order must belong to the same organization
-- **Format Option 1:**
+- **Format Option 1a (Vendor ID + Vendor Plant ID):**
   - Vendor ID must exist and belong to the same organization as the work order (or be a global vendor)
   - Vendor Plant ID must exist for the specified Vendor ID
   - If Vendor Type is provided, it must match the vendor's actual type
-- **Format Option 2:**
+- **Format Option 1b (Vendor Type + Vendor Plant ID - Original Format):**
+  - Vendor Type must be valid (SOLARMAN, SUNGROW, OTHER)
+  - At least one vendor of the specified type must exist for the organization (or be a global vendor)
+  - Vendor Plant ID must exist for a vendor of the specified type
+  - If multiple vendors of the same type exist, the system will match based on the plant's vendor_id
+- **Format Option 2 (Plant ID):**
   - Plant ID must exist in the database
   - Plant must belong to the same organization as the work order
 - Plants cannot be in another active work order
@@ -55,12 +69,20 @@ The system supports Excel uploads for three entities: **Work Orders**, **Vendors
 
 ### Example Excel Structures
 
-**Format Option 1 (Vendor ID + Vendor Plant ID):**
+**Format Option 1a (Vendor ID + Vendor Plant ID - New Format):**
 ```
 Title | Organization ID | Vendor ID | Vendor Plant ID | Description | Location
 ------|-----------------|-----------|-----------------|-------------|----------
 WO-001| 1              | 5         | PLANT-123       | Maintenance  | Site A
 WO-001| 1              | 5         | PLANT-456       | Maintenance  | Site A
+```
+
+**Format Option 1b (Vendor Type + Vendor Plant ID - Original Format):**
+```
+Title | Organization ID | Vendor Type | Vendor Plant ID | Description | Location
+------|-----------------|-------------|-----------------|-------------|----------
+WO-001| 1              | SOLARMAN    | PLANT-123       | Maintenance  | Site A
+WO-001| 1              | SOLARMAN    | PLANT-456       | Maintenance  | Site A
 ```
 
 **Format Option 2 (Plant ID - Recommended):**
