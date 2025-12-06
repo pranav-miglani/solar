@@ -211,18 +211,21 @@ const SystemArchitectureDiagram = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Node title="API Routes" color="purple" icon="⚙️" className="min-h-[100px]">
             <div>Next.js API Endpoints</div>
-            <div>/api/vendors, /api/plants, /api/workorders, /api/alerts, /api/cron/*</div>
+            <div>/api/vendors, /api/plants, /api/workorders, /api/alerts, /api/wms-vendors, /api/cron/*</div>
           </Node>
           
           <Node title="Sync Services" color="purple" icon="🔄" className="min-h-[100px]">
             <div>plantSyncService.ts</div>
             <div>liveTelemetrySyncService.ts</div>
             <div>alertSyncService.ts</div>
+            <div>wmsSyncService.ts</div>
           </Node>
           
           <Node title="Vendor Adapters" color="purple" icon="🔌" className="min-h-[100px]">
-            <div>BaseVendorAdapter</div>
+            <div>BaseVendorAdapter (Inverters)</div>
             <div>Solarman, SolarDM, PVBlink, ShineMonitor, Foxesscloud</div>
+            <div className="pt-1 border-t border-purple-500/30">BaseWmsAdapter (WMS)</div>
+            <div>Intello</div>
           </Node>
         </div>
 
@@ -244,14 +247,17 @@ const SystemArchitectureDiagram = () => {
           <Node title="Main Database" color="green" icon="💾" className="min-h-[100px]">
             <div className="font-medium mb-1">Supabase PostgreSQL</div>
             <div className="text-[10px] space-y-0.5">
-              <div><strong>Tables:</strong> accounts, organizations, vendors, plants, work_orders, alerts</div>
+              <div><strong>Tables:</strong> accounts, organizations, vendors, plants, work_orders, alerts, wms_vendors, wms_sites, wms_devices, insolation_readings</div>
               <div><strong>Live Telemetry:</strong> Stored in plants table (current_power_kw, daily_energy_kwh, monthly_energy_mwh, etc.)</div>
+              <div><strong>Insolation:</strong> Stored in insolation_readings (last 100 days, rollover)</div>
             </div>
           </Node>
 
           <Node title="External Vendor APIs" color="red" icon="🌍" className="min-h-[100px]">
             <div>Solarman • SolarDM • ShineMonitor • PVBlink • Foxesscloud</div>
             <div className="text-[10px] italic mt-1">Returns telemetry & plant data</div>
+            <div className="pt-1 border-t border-red-500/30 mt-1">Intello (WMS)</div>
+            <div className="text-[10px] italic">Returns sites, devices & insolation data</div>
           </Node>
         </div>
 
@@ -284,6 +290,20 @@ const SystemArchitectureDiagram = () => {
               <div className="text-[10px] space-y-0.5">
                 <div>Scheduled sync • Vendor alerts</div>
                 <div className="pt-1 border-t border-orange-500/30">→ /api/cron/sync-alerts</div>
+              </div>
+            </Node>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+            <Node title="WMS Site Sync Cron" color="orange" icon="⏰" className="min-h-[90px]">
+              <div className="text-[10px] space-y-0.5">
+                <div>Twice daily • 6 AM & 10 PM IST • Sites & devices</div>
+                <div className="pt-1 border-t border-orange-500/30">→ /api/cron/sync-wms-sites</div>
+              </div>
+            </Node>
+            <Node title="WMS Insolation Sync Cron" color="orange" icon="⏰" className="min-h-[90px]">
+              <div className="text-[10px] space-y-0.5">
+                <div>Daily 10 PM IST • Current day insolation</div>
+                <div className="pt-1 border-t border-orange-500/30">→ /api/cron/sync-wms-insolation</div>
               </div>
             </Node>
           </div>
@@ -2002,6 +2022,169 @@ Unique Constraints:
               </div>
             )}
           </Card>
+
+          {/* WMS Site Sync Flow */}
+          <Card className="overflow-hidden">
+            <FlowSectionHeader flowId="flow-wms-site-sync" flowTitle="WMS Site Sync Flow" icon={RefreshCw} />
+            {expandedSections.has("flow-wms-site-sync") && (
+              <div className="p-6 pt-0 space-y-6 border-t">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Entry Points</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        1. Auto Cron
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Runs twice daily (6 AM and 10 PM IST) via <code className="bg-background px-1 rounded">lib/cron/wmsSiteSyncCron.js</code>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Calls <code className="bg-background px-1 rounded">GET /api/cron/sync-wms-sites</code>
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Database className="h-4 w-4" />
+                        2. External Cron
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        GitHub Actions, cron-job.org, etc.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Calls <code className="bg-background px-1 rounded">GET /api/cron/sync-wms-sites</code> with <code className="bg-background px-1 rounded">CRON_SECRET</code>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Complete Flow</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    <ol className="text-sm text-muted-foreground space-y-3 ml-4 list-decimal">
+                      <li>
+                        <strong>Entry Point:</strong> Cron trigger (twice daily: 6 AM and 10 PM IST)
+                      </li>
+                      <li>
+                        <strong>syncAllWmsSites()</strong> in <code className="bg-background px-1 rounded">wmsSyncService.ts</code>
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Fetches all active WMS vendors from <code className="bg-background px-1 rounded">wms_vendors</code> table</li>
+                          <li>For each vendor, creates WMS adapter (e.g., IntelloAdapter)</li>
+                          <li>Authenticates with WMS vendor API (uses cached token if valid)</li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong>For each WMS vendor:</strong>
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Calls <code className="bg-background px-1 rounded">adapter.listSites()</code> to fetch all sites</li>
+                          <li>For each site:
+                            <ul className="ml-4 mt-1 list-disc">
+                              <li>Upserts site into <code className="bg-background px-1 rounded">wms_sites</code> table</li>
+                              <li>Extracts devices (RTUs) from site response (stored in metadata)</li>
+                              <li>For each device, upserts into <code className="bg-background px-1 rounded">wms_devices</code> table</li>
+                            </ul>
+                          </li>
+                          <li>Updates <code className="bg-background px-1 rounded">last_synced_at</code> timestamp for vendor</li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong>Results:</strong> Summary with sites synced, devices synced, success/failure counts
+                      </li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* WMS Insolation Sync Flow */}
+          <Card className="overflow-hidden">
+            <FlowSectionHeader flowId="flow-wms-insolation-sync" flowTitle="WMS Insolation Sync Flow" icon={Zap} />
+            {expandedSections.has("flow-wms-insolation-sync") && (
+              <div className="p-6 pt-0 space-y-6 border-t">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Entry Points</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        1. Auto Cron
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Runs daily at 10 PM IST via <code className="bg-background px-1 rounded">lib/cron/wmsInsolationSyncCron.js</code>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Calls <code className="bg-background px-1 rounded">GET /api/cron/sync-wms-insolation</code>
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Database className="h-4 w-4" />
+                        2. External Cron / Manual
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        GitHub Actions, cron-job.org, or manual trigger
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Calls <code className="bg-background px-1 rounded">GET /api/cron/sync-wms-insolation</code> with <code className="bg-background px-1 rounded">CRON_SECRET</code>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Complete Flow</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    <ol className="text-sm text-muted-foreground space-y-3 ml-4 list-decimal">
+                      <li>
+                        <strong>Entry Point:</strong> Cron trigger (daily at 10 PM IST) or manual
+                      </li>
+                      <li>
+                        <strong>syncAllWmsInsolation()</strong> in <code className="bg-background px-1 rounded">wmsSyncService.ts</code>
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Fetches all active WMS vendors</li>
+                          <li>For each vendor, gets all active devices from <code className="bg-background px-1 rounded">wms_devices</code> table</li>
+                          <li>Creates WMS adapter and authenticates</li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong>For each device:</strong>
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Fetches current day&apos;s date (or previous day if running in morning)</li>
+                          <li>Calls <code className="bg-background px-1 rounded">adapter.getInsolationData(deviceId, fromDate, toDate)</code> to get hourly readings</li>
+                          <li>Calculates average insolation from hourly IRR values using <code className="bg-background px-1 rounded">calculateAverageInsolation()</code></li>
+                          <li>Upserts daily insolation reading into <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
+                          <li>Automatic cleanup: Old readings beyond 100 days are removed (rollover)</li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong>Backfill Flow (Initial Setup):</strong>
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li><code className="bg-background px-1 rounded">backfillAllWmsInsolation()</code> fetches last 100 days of data</li>
+                          <li>Iterates through each day (from 100 days ago to today)</li>
+                          <li>For each day, fetches insolation for all devices</li>
+                          <li>Stores all readings in <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong>Results:</strong> Summary with readings created/updated, devices synced, success/failure counts
+                      </li>
+                    </ol>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
+                  <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📊 Insolation Calculation</h4>
+                  <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 ml-4 list-disc">
+                    <li>Insolation is calculated as the <strong>average of all hourly IRR values</strong> for a given day</li>
+                    <li>Only non-zero, non-null IRR values are included in the calculation</li>
+                    <li>Stored in <code className="bg-background px-1 rounded">insolation_readings</code> table with <code className="bg-background px-1 rounded">date</code> and <code className="bg-background px-1 rounded">device_id</code></li>
+                    <li>100-day rollover: Old readings are automatically deleted when new ones are added</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+          </Card>
         </TabsContent>
 
         {/* Code Tab */}
@@ -2020,6 +2203,8 @@ Unique Constraints:
 │   │   ├── accounts/            # Account management
 │   │   ├── alerts/              # Alert endpoints
 │   │   ├── cron/                # Cron job endpoints
+│   │   │   ├── sync-wms-sites/  # WMS site sync endpoint
+│   │   │   └── sync-wms-insolation/  # WMS insolation sync endpoint
 │   │   ├── dashboard/           # Dashboard data
 │   │   ├── login/               # Authentication
 │   │   ├── orgs/                # Organization management
@@ -2027,6 +2212,8 @@ Unique Constraints:
 │   │   ├── vendors/             # Vendor management & sync
 │   │   │   ├── export/          # Excel export endpoint
 │   │   │   └── import/          # Excel import endpoint
+│   │   ├── wms-vendors/         # WMS vendor management
+│   │   │   └── [id]/            # WMS vendor CRUD operations
 │   │   ├── accounts/            # Account management
 │   │   │   ├── export/          # Excel export endpoint
 │   │   │   └── import/          # Excel import endpoint
@@ -2044,8 +2231,9 @@ Unique Constraints:
 │   ├── services/                # Business logic services
 │   │   ├── plantSyncService.ts  # Plant sync orchestration (twice daily)
 │   │   ├── alertSyncService.ts  # Alert sync orchestration
-│   │   └── liveTelemetrySyncService.ts  # Live telemetry sync (15/30/45 min intervals)
-│   ├── vendors/                 # Vendor adapter system
+│   │   ├── liveTelemetrySyncService.ts  # Live telemetry sync (15/30/45 min intervals)
+│   │   └── wmsSyncService.ts    # WMS site/device sync and insolation sync
+│   ├── vendors/                 # Inverter vendor adapter system
 │   │   ├── baseVendorAdapter.ts # Abstract base class (includes listPlant method)
 │   │   ├── solarmanAdapter.ts   # Solarman implementation
 │   │   ├── solarDmAdapter.ts   # SolarDM implementation
@@ -2053,10 +2241,15 @@ Unique Constraints:
 │   │   ├── shineMonitorAdapter.ts  # ShineMonitor implementation
 │   │   ├── foxesscloudAdapter.ts   # Foxesscloud implementation
 │   │   └── vendorManager.ts     # Factory pattern
+│   ├── wms/                     # Weather Monitoring System adapters
+│   │   ├── baseWmsAdapter.ts    # Abstract base class for WMS vendors
+│   │   └── intelloAdapter.ts    # Intello WMS implementation
 │   ├── cron/                    # Cron job definitions
 │   │   ├── plantSyncCron.js    # Plant sync scheduler (checks morning/evening times)
 │   │   ├── liveTelemetrySyncCron.js  # Live telemetry sync scheduler
-│   │   └── alertSyncCron.js     # Alert sync scheduler
+│   │   ├── alertSyncCron.js     # Alert sync scheduler
+│   │   ├── wmsSiteSyncCron.js   # WMS site sync scheduler (twice daily)
+│   │   └── wmsInsolationSyncCron.js  # WMS insolation sync scheduler (daily)
 │   ├── supabase/                # Database clients
 │   │   ├── pooled.ts            # Connection pooling
 │   │   ├── client.ts            # Client-side client
@@ -2124,6 +2317,19 @@ Unique Constraints:
                         <li>Alert deduplication by vendor_alert_id</li>
                       </ul>
                     </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">lib/services/wmsSyncService.ts</h4>
+                      <p className="text-xs text-muted-foreground mb-2">Weather Monitoring System synchronization service</p>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><code className="bg-background px-1 rounded">syncAllWmsSites()</code> - Sync sites and devices for all WMS vendors (twice daily)</li>
+                        <li><code className="bg-background px-1 rounded">syncAllWmsInsolation()</code> - Sync insolation data for all WMS vendors (end of day)</li>
+                        <li><code className="bg-background px-1 rounded">backfillAllWmsInsolation()</code> - Backfill insolation data for last 100 days</li>
+                        <li>Site and device sync with upsert logic</li>
+                        <li>Insolation calculation (average of hourly IRR values)</li>
+                        <li>100-day rollover storage (automatic cleanup of old readings)</li>
+                        <li>Token caching in database (similar to inverter vendors)</li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
 
@@ -2131,7 +2337,7 @@ Unique Constraints:
                   <h3 className="font-semibold text-lg">Vendor Adapter System</h3>
                   <div className="bg-muted/50 p-4 rounded-lg space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      Pluggable architecture using adapter pattern. All adapters extend <code className="bg-background px-1 rounded">BaseVendorAdapter</code>.
+                      Pluggable architecture using adapter pattern. Inverter vendors extend <code className="bg-background px-1 rounded">BaseVendorAdapter</code>. WMS vendors extend <code className="bg-background px-1 rounded">BaseWmsAdapter</code>.
                     </p>
                     <div className="space-y-2">
                       <div>
@@ -2162,6 +2368,40 @@ Unique Constraints:
                           <li>Singleton adapter instances (reused across requests)</li>
                           <li>Handles adapter creation and configuration</li>
                         </ul>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t">
+                      <h4 className="font-medium text-sm mb-2">WMS Adapter System (lib/wms/)</h4>
+                      <div className="space-y-2">
+                        <div>
+                          <h5 className="font-medium text-xs mb-1">BaseWmsAdapter (lib/wms/baseWmsAdapter.ts)</h5>
+                          <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                            <li>Abstract base class for WMS vendor adapters</li>
+                            <li>API base URL from environment variables (e.g., INTELLO_API_BASE_URL)</li>
+                            <li>Token storage interface (setTokenStorage)</li>
+                            <li>HTTP client with connection pooling</li>
+                            <li>Average insolation calculation from hourly readings</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h5 className="font-medium text-xs mb-1">Required Methods (all WMS adapters must implement)</h5>
+                          <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                            <li><code className="bg-background px-1 rounded">authenticate()</code> - Returns access token</li>
+                            <li><code className="bg-background px-1 rounded">listSites()</code> - Returns all sites from WMS vendor</li>
+                            <li><code className="bg-background px-1 rounded">getInsolationData(deviceId, fromDate, toDate)</code> - Returns hourly insolation readings</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h5 className="font-medium text-xs mb-1">IntelloAdapter (lib/wms/intelloAdapter.ts)</h5>
+                          <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                            <li>Intello WMS vendor implementation</li>
+                            <li>Authentication: POST /api/intello/authenticate (email, password_hash)</li>
+                            <li>Sites: GET /api/intello/user/v1/sites</li>
+                            <li>Insolation: GET /api/intello/rtu/v1/data (with date range and RTU ID)</li>
+                            <li>Extracts devices (RTUs) from site response</li>
+                            <li>Calculates average insolation from hourly IRR values</li>
+                          </ul>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2302,6 +2542,32 @@ Unique Constraints:
                         <li>Disables plants that haven&apos;t received vendor updates (last_update_time) for 3+ days</li>
                         <li>Runs in-process (server.js starts it)</li>
                         <li>Can be disabled with <code className="bg-background px-1 rounded">ENABLE_DISABLE_INACTIVE_PLANTS_CRON=false</code></li>
+                      </ul>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">wmsSiteSyncCron.js</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Schedule: Twice daily at 6 AM and 10 PM IST (<code className="bg-background px-1 rounded">0 6,22 * * *</code>)</li>
+                        <li>Calls: <code className="bg-background px-1 rounded">GET /api/cron/sync-wms-sites</code></li>
+                        <li>Syncs sites and devices from all active WMS vendors</li>
+                        <li>Checks for new sites and updates existing ones</li>
+                        <li>Extracts devices (RTUs) from site responses</li>
+                        <li>Uses <code className="bg-background px-1 rounded">CRON_SECRET</code> for security (if configured)</li>
+                        <li>Runs in-process (server.js starts it)</li>
+                        <li>Can be disabled with <code className="bg-background px-1 rounded">ENABLE_WMS_SITE_SYNC_CRON=false</code></li>
+                      </ul>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">wmsInsolationSyncCron.js</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Schedule: Daily at 10 PM IST (<code className="bg-background px-1 rounded">0 22 * * *</code>)</li>
+                        <li>Calls: <code className="bg-background px-1 rounded">GET /api/cron/sync-wms-insolation</code></li>
+                        <li>Syncs insolation data for current day for all active WMS vendors</li>
+                        <li>Fetches hourly insolation readings and calculates daily average</li>
+                        <li>Stores in <code className="bg-background px-1 rounded">insolation_readings</code> table (100-day rollover)</li>
+                        <li>Uses <code className="bg-background px-1 rounded">CRON_SECRET</code> for security (if configured)</li>
+                        <li>Runs in-process (server.js starts it)</li>
+                        <li>Can be disabled with <code className="bg-background px-1 rounded">ENABLE_WMS_INSOLATION_SYNC_CRON=false</code></li>
                       </ul>
                     </div>
                   </div>
@@ -2472,6 +2738,12 @@ Unique Constraints:
                           <td className="p-2">✅ Yes (if using ShineMonitor)</td>
                           <td className="p-2">-</td>
                         </tr>
+                        <tr className="border-b bg-blue-50 dark:bg-blue-950/10">
+                          <td className="p-2"><code className="bg-background px-1 rounded">INTELLO_API_BASE_URL</code></td>
+                          <td className="p-2">Intello WMS API base URL (Weather Monitoring System)</td>
+                          <td className="p-2">✅ Yes (if using Intello WMS)</td>
+                          <td className="p-2">https://portal.intellotechsolutions.co.in:5000</td>
+                        </tr>
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">SYNC_WINDOW_START</code></td>
                           <td className="p-2">Global restricted sync window start (HH:mm IST) - <strong>Deprecated</strong> (use per-vendor config)</td>
@@ -2505,6 +2777,18 @@ Unique Constraints:
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_LIVE_TELEMETRY_SYNC_CRON</code></td>
                           <td className="p-2">Enable in-process live telemetry sync cron (true/false)</td>
+                          <td className="p-2">⚠️ Optional</td>
+                          <td className="p-2">true</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_WMS_SITE_SYNC_CRON</code></td>
+                          <td className="p-2">Enable in-process WMS site sync cron (true/false)</td>
+                          <td className="p-2">⚠️ Optional</td>
+                          <td className="p-2">true</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_WMS_INSOLATION_SYNC_CRON</code></td>
+                          <td className="p-2">Enable in-process WMS insolation sync cron (true/false)</td>
                           <td className="p-2">⚠️ Optional</td>
                           <td className="p-2">true</td>
                         </tr>
