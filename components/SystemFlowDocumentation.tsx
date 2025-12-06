@@ -682,7 +682,8 @@ export function SystemFlowDocumentation() {
                           <li><code className="bg-background px-1 rounded">liveTelemetrySyncCron.js</code> - Runs every 15 min, filters vendors by telemetry_sync_interval</li>
                           <li><code className="bg-background px-1 rounded">alertSyncCron.js</code> - Alert sync scheduler</li>
                           <li><code className="bg-background px-1 rounded">wmsSiteSyncCron.js</code> - WMS site sync (runs twice daily at 6 AM and 10 PM IST)</li>
-                          <li><code className="bg-background px-1 rounded">wmsInsolationSyncCron.js</code> - WMS insolation sync (runs daily at 10 PM IST)</li>
+                          <li><code className="bg-background px-1 rounded">wmsInsolationSyncCron.js</code> - WMS insolation sync (runs daily at 10 PM IST, syncs today&apos;s data)</li>
+                          <li><code className="bg-background px-1 rounded">wmsInsolationSyncMorningCron.js</code> - WMS insolation sync (runs daily at 6 AM IST, syncs yesterday&apos;s data as safety check)</li>
                           <li>Morning cron (00:15 AM) - Historical aggregate updates</li>
                         </ul>
                       </div>
