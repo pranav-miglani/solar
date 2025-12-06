@@ -2213,7 +2213,14 @@ Unique Constraints:
 │   │   │   ├── export/          # Excel export endpoint
 │   │   │   └── import/          # Excel import endpoint
 │   │   ├── wms-vendors/         # WMS vendor management
-│   │   │   └── [id]/            # WMS vendor CRUD operations
+│   │   │   ├── [id]/            # WMS vendor CRUD operations
+│   │   │   │   ├── sites/      # Fetch sites for a vendor
+│   │   │   │   ├── devices/    # Fetch devices for a vendor
+│   │   │   │   ├── sync-sites/ # Per-vendor site sync
+│   │   │   │   └── sync-insolation/ # Per-vendor insolation sync
+│   │   ├── wms-sites/           # WMS sites listing (with filters)
+│   │   ├── wms-devices/         # WMS devices listing (with filters)
+│   │   └── insolation-readings/ # Insolation data retrieval
 │   │   ├── accounts/            # Account management
 │   │   │   ├── export/          # Excel export endpoint
 │   │   │   └── import/          # Excel import endpoint
@@ -2223,6 +2230,13 @@ Unique Constraints:
 │   ├── auth/                     # Auth pages
 │   ├── dashboard/                # Dashboard page
 │   ├── superadmin/               # Super admin pages
+│   ├── wms/                      # Weather Monitoring System pages
+│   │   ├── vendors/[id]/        # WMS vendor detail page
+│   │   │   └── sites/           # Sites list page
+│   │   ├── sites/[id]/          # Sites detail
+│   │   │   └── devices/         # Devices list page
+│   │   └── devices/[id]/        # Devices detail
+│   │       └── insolation/      # Insolation data/chart page
 │   └── workorders/               # Work order pages
 ├── components/                   # React components
 │   ├── ui/                      # shadcn/ui components
@@ -2322,7 +2336,9 @@ Unique Constraints:
                       <p className="text-xs text-muted-foreground mb-2">Weather Monitoring System synchronization service</p>
                       <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                         <li><code className="bg-background px-1 rounded">syncAllWmsSites()</code> - Sync sites and devices for all WMS vendors (twice daily)</li>
+                        <li><code className="bg-background px-1 rounded">syncWmsVendorSites()</code> - Sync sites and devices for a single WMS vendor (exported for per-vendor sync)</li>
                         <li><code className="bg-background px-1 rounded">syncAllWmsInsolation()</code> - Sync insolation data for all WMS vendors (end of day)</li>
+                        <li><code className="bg-background px-1 rounded">syncWmsVendorInsolation()</code> - Sync insolation data for a single WMS vendor (exported for per-vendor sync)</li>
                         <li><code className="bg-background px-1 rounded">backfillAllWmsInsolation()</code> - Backfill insolation data for last 100 days</li>
                         <li>Site and device sync with upsert logic</li>
                         <li>Insolation calculation (average of hourly IRR values)</li>
@@ -2460,6 +2476,11 @@ Unique Constraints:
                         <li><strong>DELETE /api/wms-vendors/[id]</strong> - Delete WMS vendor (SUPERADMIN/DEVELOPER only)</li>
                         <li><strong>POST /api/wms-vendors/[id]/sync-sites</strong> - Sync sites for a specific WMS vendor (user-triggered, SUPERADMIN/DEVELOPER only)</li>
                         <li><strong>POST /api/wms-vendors/[id]/sync-insolation</strong> - Sync insolation for a specific WMS vendor (user-triggered, SUPERADMIN/DEVELOPER only)</li>
+                        <li><strong>GET /api/wms-vendors/[id]/sites</strong> - Fetch sites for a specific WMS vendor</li>
+                        <li><strong>GET /api/wms-vendors/[id]/devices</strong> - Fetch devices for a specific WMS vendor</li>
+                        <li><strong>GET /api/wms-sites</strong> - List all WMS sites (with optional filters: vendorId, orgId)</li>
+                        <li><strong>GET /api/wms-devices</strong> - List all WMS devices (with optional filters: vendorId, siteId, orgId)</li>
+                        <li><strong>GET /api/insolation-readings</strong> - Fetch insolation data (with filters: deviceId, siteId, vendorId, orgId, startDate, endDate, limit)</li>
                         <li><strong>GET /api/cron/sync-wms-sites</strong> - Sync sites for <strong>all</strong> WMS vendors (cron endpoint, requires CRON_SECRET if configured)</li>
                         <li><strong>GET /api/cron/sync-wms-insolation</strong> - Sync insolation for <strong>all</strong> WMS vendors (cron endpoint, requires CRON_SECRET if configured)</li>
                       </ul>
@@ -2468,13 +2489,34 @@ Unique Constraints:
                           <strong>📝 Note:</strong> Per-vendor sync endpoints (<code className="bg-background px-1 rounded">/api/wms-vendors/[id]/sync-sites</code>, <code className="bg-background px-1 rounded">/api/wms-vendors/[id]/sync-insolation</code>) are used for UI-triggered syncs of a single vendor. Cron endpoints (<code className="bg-background px-1 rounded">/api/cron/sync-wms-sites</code>, <code className="bg-background px-1 rounded">/api/cron/sync-wms-insolation</code>) sync all active vendors and are called by scheduled cron jobs.
                         </p>
                       </div>
-                      <div className="bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded-lg border border-yellow-200 dark:border-yellow-900 mt-2">
-                        <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                          <strong>⚠️ Missing Data Retrieval Endpoints:</strong>
-                        </p>
-                        <ul className="text-xs text-yellow-800 dark:text-yellow-200 space-y-1 ml-4 list-disc mt-1">
-                          <li>No endpoints exist to fetch WMS sites, devices, or insolation data for viewing in the UI (e.g., <code className="bg-background px-1 rounded">/api/wms-vendors/[id]/sites</code>, <code className="bg-background px-1 rounded">/api/wms-vendors/[id]/devices</code>, <code className="bg-background px-1 rounded">/api/insolation-readings</code>).</li>
+                    </div>
+                    <div className="mt-3">
+                      <h4 className="font-medium text-sm mb-1">WMS UI Pages & Components</h4>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Weather Monitoring System user interface:
+                      </p>
+                      <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><strong>/wms</strong> - WMS vendors list page (WmsVendorsTable component)</li>
+                        <li><strong>/wms/vendors/[id]</strong> - WMS vendor detail page (WmsVendorDetailView component)</li>
+                        <li><strong>/wms/vendors/[id]/sites</strong> - Sites list page (WmsSitesListView component)</li>
+                        <li><strong>/wms/sites/[id]/devices</strong> - Devices list page (WmsDevicesListView component)</li>
+                        <li><strong>/wms/devices/[id]/insolation</strong> - Insolation data/chart page (WmsInsolationView component)</li>
+                      </ul>
+                      <div className="mt-2">
+                        <h5 className="font-medium text-xs mb-1">Components:</h5>
+                        <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li><code className="bg-background px-1 rounded">WmsVendorsTable</code> - Main vendors table with CRUD, sync buttons, and navigation</li>
+                          <li><code className="bg-background px-1 rounded">WmsVendorDetailView</code> - Vendor details with stats, site/device counts, and sync button</li>
+                          <li><code className="bg-background px-1 rounded">WmsSitesListView</code> - Sites table with device counts and navigation to devices</li>
+                          <li><code className="bg-background px-1 rounded">WmsDevicesListView</code> - Devices table with navigation to insolation data</li>
+                          <li><code className="bg-background px-1 rounded">WmsInsolationView</code> - Insolation chart with date range filters (7/30/100 days)</li>
+                          <li><code className="bg-background px-1 rounded">InsolationChart</code> - Reusable chart component for visualizing insolation data (similar to TelemetryChart)</li>
                         </ul>
+                      </div>
+                      <div className="bg-green-50 dark:bg-green-950/20 p-2 rounded-lg border border-green-200 dark:border-green-900 mt-2">
+                        <p className="text-xs text-green-800 dark:text-green-200">
+                          <strong>✅ Navigation Flow:</strong> Vendors → Sites → Devices → Insolation. All pages include proper authentication, RBAC checks, and error handling.
+                        </p>
                       </div>
                     </div>
                   </div>
