@@ -57,7 +57,6 @@ You are an expert full-stack engineer continuing development on **Solar Informat
 - `work_orders` - Static work orders (no status field)
 - `work_order_plants` - Junction table (plant can only be in ONE active WO)
 - `alerts` - System alerts
-- `work_order_plant_eff` - Efficiency metrics
 
 **Telemetry DB (Separate Instance)**:
 - `telemetry_readings` - 24h retention, indexed for fast queries

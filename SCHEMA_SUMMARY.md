@@ -39,7 +39,7 @@ This document describes the complete database schema for WOMS (Work Order Manage
 - **Relationships:**
   - `org_id` → `organizations.id` (required)
   - `vendor_id` → `vendors.id` (required)
-  - Referenced by: `work_order_plants.plant_id`, `alerts.plant_id`, `work_order_plant_eff.plant_id`
+  - Referenced by: `work_order_plants.plant_id`, `alerts.plant_id`
 - **Constraints:**
   - Unique: `(vendor_id, vendor_plant_id)` - prevents duplicate plants from same vendor
 
@@ -47,7 +47,7 @@ This document describes the complete database schema for WOMS (Work Order Manage
 - Static work orders (no status field per requirements)
 - **Relationships:**
   - `created_by` → `accounts.id`
-  - Referenced by: `work_order_plants.work_order_id`, `work_order_plant_eff.work_order_id`
+  - Referenced by: `work_order_plants.work_order_id`
 
 #### 6. **work_order_plants**
 - Junction table: Work Orders ↔ Plants
@@ -61,12 +61,6 @@ This document describes the complete database schema for WOMS (Work Order Manage
 #### 7. **alerts**
 - System alerts from vendors
 - **Relationships:**
-  - `plant_id` → `plants.id`
-
-#### 8. **work_order_plant_eff**
-- Efficiency metrics for plants in work orders
-- **Relationships:**
-  - `work_order_id` → `work_orders.id`
   - `plant_id` → `plants.id`
 
 ## Key Business Rules

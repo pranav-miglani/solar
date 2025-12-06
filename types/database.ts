@@ -268,44 +268,6 @@ export interface Database {
           created_at?: string
         }
       }
-      work_order_plant_eff: {
-        Row: {
-          id: number
-          work_order_id: number
-          plant_id: number
-          recorded_at: string
-          actual_gen: number
-          expected_gen: number
-          pr: number
-          efficiency_pct: number
-          category: string
-          created_at: string
-        }
-        Insert: {
-          id?: number
-          work_order_id: number
-          plant_id: number
-          recorded_at?: string
-          actual_gen: number
-          expected_gen: number
-          pr: number
-          efficiency_pct: number
-          category: string
-          created_at?: string
-        }
-        Update: {
-          id?: number
-          work_order_id?: number
-          plant_id?: number
-          recorded_at?: string
-          actual_gen?: number
-          expected_gen?: number
-          pr?: number
-          efficiency_pct?: number
-          category?: string
-          created_at?: string
-        }
-      }
     }
   }
 }

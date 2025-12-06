@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { ExternalLink, Plus, Pencil, Trash2, Download, Upload } from "lucide-react"
+import { ExternalLink, Plus, Pencil, Trash2, Download, Upload, Trash } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -74,6 +74,8 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importLoading, setImportLoading] = useState(false)
+  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false)
+  const [deletingAll, setDeletingAll] = useState(false)
 
   const isSuperAdmin = accountType === "SUPERADMIN" || accountType === "DEVELOPER"
   const canEdit = isSuperAdmin
@@ -351,6 +353,37 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
     window.URL.revokeObjectURL(downloadUrl)
   }
 
+  async function handleDeleteAll() {
+    if (!orgId || !canDelete) return
+
+    setDeletingAll(true)
+    try {
+      const response = await fetch(`/api/workorders/org/${orgId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        alert(error.error || "Failed to delete all work orders")
+        setDeletingAll(false)
+        return
+      }
+
+      const data = await response.json()
+      alert(data.message || `Successfully deleted ${data.deletedCount} work order(s)`)
+      
+      setDeleteAllDialogOpen(false)
+      setDeletingAll(false)
+      
+      // Refresh the list
+      fetchWorkOrders()
+    } catch (error) {
+      console.error("Error deleting all work orders:", error)
+      alert("Failed to delete all work orders")
+      setDeletingAll(false)
+    }
+  }
+
   const editingWorkOrder = workOrders.find((wo) => wo.id === editingWorkOrderId)
   const editingWorkOrderOrgName = editingWorkOrder?.work_order_plants?.[0]?.plants?.organizations?.name
 
@@ -385,6 +418,57 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
                 Export Excel
               </Button>
             </motion.div>
+            {orgId && canDelete && (
+              <AlertDialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <motion.div 
+                    whileHover={{ scale: 1.05 }} 
+                    whileTap={{ scale: 0.95 }}
+                    className="w-full sm:w-auto"
+                  >
+                    <Button 
+                      size="lg"
+                      variant="destructive"
+                      className="w-full sm:w-auto transition-all duration-200"
+                    >
+                      <Trash className="h-5 w-5 mr-2" />
+                      Delete All Work Orders
+                    </Button>
+                  </motion.div>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete All Work Orders</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete all work orders for{" "}
+                      <strong>{organizationName || `organization ID ${orgId}`}</strong>?
+                      <br />
+                      <br />
+                      This action cannot be undone. All work orders and their plant associations will be permanently deleted.
+                      {workOrders.length > 0 && (
+                        <>
+                          <br />
+                          <br />
+                          <strong className="text-destructive">
+                            {workOrders.length} work order(s) will be deleted.
+                          </strong>
+                        </>
+                      )}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deletingAll}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteAll}
+                      disabled={deletingAll}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {deletingAll ? "Deleting..." : "Delete All"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
               <DialogTrigger asChild>
                 <motion.div 

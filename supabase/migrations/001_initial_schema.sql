@@ -26,9 +26,6 @@ BEGIN
     DROP TRIGGER IF EXISTS update_alerts_updated_at ON alerts;
   END IF;
   
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'work_order_plant_eff') THEN
-    DROP TRIGGER IF EXISTS update_work_order_plant_eff_updated_at ON work_order_plant_eff;
-  END IF;
   
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'work_orders') THEN
     DROP TRIGGER IF EXISTS update_work_orders_updated_at ON work_orders;
@@ -56,7 +53,6 @@ END $$;
 
 -- Drop tables (CASCADE to handle foreign key dependencies)
 -- Order matters: drop dependent tables first
-DROP TABLE IF EXISTS work_order_plant_eff CASCADE;
 DROP TABLE IF EXISTS alerts CASCADE;
 DROP TABLE IF EXISTS work_order_plants CASCADE;
 DROP TABLE IF EXISTS work_orders CASCADE;
@@ -221,20 +217,6 @@ WHERE is_active = true;
 --   008_initial_alert_schema.sql
 -- This keeps the core initial schema focused on accounts/orgs/vendors/plants/work orders.
 
--- Work Order Plant Efficiency table
-CREATE TABLE work_order_plant_eff (
-  id SERIAL PRIMARY KEY,
-  work_order_id INTEGER NOT NULL REFERENCES work_orders(id) ON DELETE CASCADE,
-  plant_id INTEGER NOT NULL REFERENCES plants(id) ON DELETE CASCADE,
-  recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  actual_gen NUMERIC(10, 2) NOT NULL,
-  expected_gen NUMERIC(10, 2) NOT NULL,
-  pr NUMERIC(5, 4) NOT NULL,
-  efficiency_pct NUMERIC(5, 2) NOT NULL,
-  category TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 -- Indexes for performance
 CREATE INDEX idx_accounts_email ON accounts(email);
 CREATE INDEX idx_accounts_org_id ON accounts(org_id);
@@ -251,8 +233,6 @@ CREATE INDEX idx_work_orders_location ON work_orders(location) WHERE location IS
 CREATE INDEX idx_work_orders_created_by ON work_orders(created_by) WHERE created_by IS NOT NULL;
 CREATE INDEX idx_work_order_plants_work_order_id ON work_order_plants(work_order_id);
 CREATE INDEX idx_work_order_plants_plant_id ON work_order_plants(plant_id);
-CREATE INDEX idx_work_order_plant_eff_work_order_id ON work_order_plant_eff(work_order_id);
-CREATE INDEX idx_work_order_plant_eff_plant_id ON work_order_plant_eff(plant_id);
 
 -- Updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -296,14 +276,14 @@ BEGIN
   WHERE table_schema = 'public'
     AND table_name IN (
       'accounts', 'organizations', 'vendors', 'plants',
-      'work_orders', 'work_order_plants', 'work_order_plant_eff'
+      'work_orders', 'work_order_plants'
     );
   
-  IF table_count < 7 THEN
-    RAISE EXCEPTION 'Not all core tables were created. Expected 7, found %', table_count;
+  IF table_count < 6 THEN
+    RAISE EXCEPTION 'Not all core tables were created. Expected 6, found %', table_count;
   END IF;
   
-  RAISE NOTICE '✅ Core tables created successfully (accounts, organizations, vendors, plants, work_orders, work_order_plants, work_order_plant_eff)';
+  RAISE NOTICE '✅ Core tables created successfully (accounts, organizations, vendors, plants, work_orders, work_order_plants)';
   
   -- Verify production metrics columns exist in plants table
   IF NOT EXISTS (

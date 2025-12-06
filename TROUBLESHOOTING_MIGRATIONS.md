@@ -56,7 +56,7 @@ FROM information_schema.tables
 WHERE table_schema = 'public' 
   AND table_name IN (
     'accounts', 'organizations', 'vendors', 'plants',
-    'work_orders', 'work_order_plants', 'alerts', 'work_order_plant_eff'
+    'work_orders', 'work_order_plants', 'alerts'
   )
 ORDER BY table_name;
 ```
@@ -103,7 +103,6 @@ If the full migration fails, try running it in sections:
    - work_orders
    - work_order_plants
    - **alerts** ← Check this one specifically
-   - work_order_plant_eff
 4. **Indexes**
 5. **Triggers**
 
@@ -155,7 +154,6 @@ CREATE TRIGGER update_alerts_updated_at BEFORE UPDATE ON alerts
 5. work_orders
 6. work_order_plants
 7. **alerts** (depends on plants)
-8. work_order_plant_eff
 
 #### Issue: "type 'alert_severity' does not exist"
 
@@ -187,7 +185,7 @@ FROM information_schema.tables
 WHERE table_schema = 'public'
   AND table_name IN (
     'accounts', 'organizations', 'vendors', 'plants',
-    'work_orders', 'work_order_plants', 'alerts', 'work_order_plant_eff'
+    'work_orders', 'work_order_plants', 'alerts'
   );
 -- Should return: 8
 

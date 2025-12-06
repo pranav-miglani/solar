@@ -349,7 +349,7 @@ FROM information_schema.tables
 WHERE table_schema = 'public' 
   AND table_name IN (
     'accounts', 'organizations', 'vendors', 'plants',
-    'work_orders', 'work_order_plants', 'alerts', 'work_order_plant_eff'
+    'work_orders', 'work_order_plants', 'alerts'
   );
 ```
 

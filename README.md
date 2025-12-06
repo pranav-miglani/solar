@@ -419,22 +419,6 @@ System alerts from vendor APIs.
 | `updated_at` | TIMESTAMPTZ | Last update timestamp |
 | `resolved_at` | TIMESTAMPTZ | Resolution timestamp (nullable) |
 
-#### `work_order_plant_eff`
-Efficiency metrics for work order plants.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | SERIAL | Primary key |
-| `work_order_id` | INTEGER | Foreign key to work_orders |
-| `plant_id` | INTEGER | Foreign key to plants |
-| `recorded_at` | TIMESTAMPTZ | Recording timestamp |
-| `actual_gen` | NUMERIC(10,2) | Actual generation (MWh) |
-| `expected_gen` | NUMERIC(10,2) | Expected generation (MWh) |
-| `pr` | NUMERIC(5,4) | Performance ratio |
-| `efficiency_pct` | NUMERIC(5,2) | Efficiency percentage |
-| `category` | TEXT | Category (Healthy, Suboptimal, Critical) |
-| `created_at` | TIMESTAMPTZ | Creation timestamp |
-
 ### Telemetry Database (Separate Instance)
 
 #### `telemetry_15m`

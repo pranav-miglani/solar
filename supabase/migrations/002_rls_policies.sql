@@ -40,9 +40,6 @@ BEGIN
   DROP POLICY IF EXISTS "Govt can view all alerts" ON alerts;
   DROP POLICY IF EXISTS "Org accounts can view alerts for their plants" ON alerts;
   
-  DROP POLICY IF EXISTS "Superadmins can view all efficiency data" ON work_order_plant_eff;
-  DROP POLICY IF EXISTS "Govt can view all efficiency data" ON work_order_plant_eff;
-  DROP POLICY IF EXISTS "Org accounts can view efficiency for their plants" ON work_order_plant_eff;
 EXCEPTION
   WHEN OTHERS THEN 
     RAISE NOTICE 'Error dropping policies (this is OK if they don''t exist): %', SQLERRM;
@@ -88,9 +85,6 @@ BEGIN
     ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
   END IF;
   
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'work_order_plant_eff') THEN
-    ALTER TABLE work_order_plant_eff ENABLE ROW LEVEL SECURITY;
-  END IF;
 EXCEPTION
   WHEN OTHERS THEN 
     RAISE EXCEPTION 'Error enabling RLS. Ensure tables exist (run 001_initial_schema.sql first): %', SQLERRM;
@@ -301,33 +295,6 @@ EXCEPTION
     RAISE EXCEPTION 'Error creating alerts policies: %', SQLERRM;
 END $$;
 
--- Work Order Plant Efficiency policies
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'work_order_plant_eff') THEN
-    CREATE POLICY "Superadmins can view all efficiency data"
-      ON work_order_plant_eff FOR SELECT
-      USING (get_account_type(auth.uid()::uuid) = 'SUPERADMIN');
-
-    CREATE POLICY "Govt can view all efficiency data"
-      ON work_order_plant_eff FOR SELECT
-      USING (get_account_type(auth.uid()::uuid) = 'GOVT');
-
-    CREATE POLICY "Org accounts can view efficiency for their plants"
-      ON work_order_plant_eff FOR SELECT
-      USING (
-        get_account_type(auth.uid()::uuid) = 'ORG' AND
-        EXISTS (
-          SELECT 1 FROM plants p
-          WHERE p.id = work_order_plant_eff.plant_id
-          AND p.org_id = get_account_org_id(auth.uid()::uuid)
-        )
-      );
-  END IF;
-EXCEPTION
-  WHEN OTHERS THEN 
-    RAISE EXCEPTION 'Error creating work_order_plant_eff policies: %', SQLERRM;
-END $$;
 
 -- ============================================
 -- VERIFY POLICIES CREATED
@@ -341,7 +308,7 @@ BEGIN
   WHERE schemaname = 'public'
     AND tablename IN (
       'accounts', 'organizations', 'vendors', 'plants',
-      'work_orders', 'work_order_plants', 'alerts', 'work_order_plant_eff'
+      'work_orders', 'work_order_plants', 'alerts'
     );
   
   RAISE NOTICE '✅ Created % RLS policies', policy_count;

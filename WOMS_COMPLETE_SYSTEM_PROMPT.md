@@ -135,17 +135,6 @@ Build a production-ready **Solar Information System (SIS)** for managing solar p
 - `added_at` (TIMESTAMPTZ)
 - **Unique constraint**: (work_order_id, plant_id)
 - **Unique index**: one active work order per plant (is_active = true)
-
-#### `work_order_plant_eff`
-- `id` (SERIAL, primary key)
-- `work_order_id` (INTEGER, FK to work_orders)
-- `plant_id` (INTEGER, FK to plants)
-- `recorded_at` (TIMESTAMPTZ)
-- `actual_gen` (NUMERIC(10, 2))
-- `expected_gen` (NUMERIC(10, 2))
-- `pr` (NUMERIC(5, 4))
-- `efficiency_pct` (NUMERIC(5, 2))
-- `category` (TEXT)
 - `created_at` (TIMESTAMPTZ)
 
 ### Telemetry Database (Separate Instance)
