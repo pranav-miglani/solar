@@ -212,13 +212,12 @@ export async function POST(request: NextRequest) {
       }
 
       // Separate rows by import format
-      // Option 1a: vendor_id + vendor_plant_id (new format)
-      // Option 1b: vendor_type + vendor_plant_id (original format - backward compatible)
-      // Option 2: plant_id (internal ID)
-      const option1aRows = groupRows.filter(r => r.vendor_id && r.vendor_plant_id) // New format: vendor_id + vendor_plant_id
-      const option1bRows = groupRows.filter(r => !r.vendor_id && r.vendor_type && r.vendor_plant_id) // Original format: vendor_type + vendor_plant_id
+      // Priority: Option 2 (Plant ID) > Option 1a (Vendor ID) > Option 1b (Vendor Type)
+      // This ensures downloaded files (which have all fields) use the most direct method (Plant ID)
+      const option2Rows = groupRows.filter(r => r.plant_id) // Option 2: plant_id (internal ID) - highest priority
+      const option1aRows = groupRows.filter(r => !r.plant_id && r.vendor_id && r.vendor_plant_id) // Option 1a: vendor_id + vendor_plant_id (exclude if plant_id exists)
+      const option1bRows = groupRows.filter(r => !r.plant_id && !r.vendor_id && r.vendor_type && r.vendor_plant_id) // Option 1b: vendor_type + vendor_plant_id (exclude if plant_id or vendor_id exists)
       const option1Rows = [...option1aRows, ...option1bRows] // Combined Option 1 rows
-      const option2Rows = groupRows.filter(r => r.plant_id) // Option 2: plant_id (internal ID)
       
       // Validate Option 2 rows first (simpler - direct plant lookup)
       let option2Plants: any[] = []
