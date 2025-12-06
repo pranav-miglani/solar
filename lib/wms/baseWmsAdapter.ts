@@ -132,8 +132,19 @@ export abstract class BaseWmsAdapter {
   ): Promise<Response> {
     const token = await this.authenticate()
     const url = `${this.getApiBaseUrl()}${endpoint}`
+    
+    // Import logger dynamically to avoid circular dependencies
+    const { logger } = await import("@/lib/context/logger")
+    const method = (options.method || "GET").toUpperCase()
+    
+    logger.info(`[BaseWmsAdapter] Making authenticated API call: ${method} ${url}`)
+    if (options.body) {
+      logger.info(`[BaseWmsAdapter] Request body: ${typeof options.body === 'string' ? options.body : JSON.stringify(options.body)}`)
+    }
 
-    return pooledFetch(url, {
+    logger.info(`[BaseWmsAdapter] Using token: ${token.substring(0, 20)}... (truncated for security)`)
+    const requestStartTime = Date.now()
+    const response = await pooledFetch(url, {
       ...options,
       headers: {
         ...options.headers,
@@ -141,6 +152,11 @@ export abstract class BaseWmsAdapter {
         "Content-Type": "application/json",
       },
     })
+
+    const requestDuration = Date.now() - requestStartTime
+    logger.info(`[BaseWmsAdapter] API call completed: ${response.status} ${response.statusText} (${requestDuration}ms)`)
+
+    return response
   }
 }
 

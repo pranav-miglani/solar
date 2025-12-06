@@ -34,6 +34,9 @@ export class IntelloAdapter extends BaseWmsAdapter {
 
     // Check for cached token in database
     if (this.vendorId && this.supabaseClient) {
+      const { logger } = await import("@/lib/context/logger")
+      logger.info(`[IntelloAdapter] Checking for cached token for vendor ID: ${this.vendorId}`)
+      
       const { data: vendor } = await this.supabaseClient
         .from("wms_vendors")
         .select("access_token, token_expires_at")
@@ -46,14 +49,26 @@ export class IntelloAdapter extends BaseWmsAdapter {
         
         // Token is valid if it expires more than 5 minutes from now
         if (expiresAt > new Date(now.getTime() + 5 * 60 * 1000)) {
+          logger.info(`[IntelloAdapter] Using cached token (expires at: ${expiresAt.toISOString()})`)
           return vendor.access_token
+        } else {
+          logger.info(`[IntelloAdapter] Cached token expired (expires at: ${expiresAt.toISOString()}), fetching new token`)
         }
+      } else {
+        logger.info(`[IntelloAdapter] No cached token found, fetching new token`)
       }
     }
 
     // Fetch new token
     const apiBaseUrl = this.getApiBaseUrl()
-    const response = await fetch(`${apiBaseUrl}/api/intello/authenticate`, {
+    const authUrl = `${apiBaseUrl}/api/intello/authenticate`
+    const { logger } = await import("@/lib/context/logger")
+    
+    logger.info(`[IntelloAdapter] Calling authentication API: POST ${authUrl}`)
+    logger.info(`[IntelloAdapter] Request body: { username: "${email}", password: "***" }`)
+    
+    const requestStartTime = Date.now()
+    const response = await fetch(authUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -64,8 +79,12 @@ export class IntelloAdapter extends BaseWmsAdapter {
       }),
     })
 
+    const requestDuration = Date.now() - requestStartTime
+    logger.info(`[IntelloAdapter] Authentication API response: ${response.status} ${response.statusText} (${requestDuration}ms)`)
+
     if (!response.ok) {
       const errorText = await response.text()
+      logger.error(`[IntelloAdapter] Authentication API failed: ${response.status} ${errorText}`)
       throw new Error(`Intello authentication failed: ${response.status} ${errorText}`)
     }
 
@@ -74,12 +93,16 @@ export class IntelloAdapter extends BaseWmsAdapter {
     const expirationTime = data.expirationTime as number // seconds
 
     if (!token) {
+      logger.error(`[IntelloAdapter] No token in authentication response: ${JSON.stringify(data)}`)
       throw new Error("Intello authentication failed: no token in response")
     }
+
+    logger.info(`[IntelloAdapter] Authentication successful. Token expiration: ${expirationTime}s`)
 
     // Cache token in database
     if (this.vendorId && this.supabaseClient) {
       const expiresAt = new Date(Date.now() + expirationTime * 1000)
+      logger.info(`[IntelloAdapter] Caching token in database (expires at: ${expiresAt.toISOString()})`)
       await this.supabaseClient
         .from("wms_vendors")
         .update({
@@ -91,6 +114,7 @@ export class IntelloAdapter extends BaseWmsAdapter {
           },
         })
         .eq("id", this.vendorId)
+      logger.info(`[IntelloAdapter] Token cached successfully`)
     }
 
     return token
@@ -100,16 +124,28 @@ export class IntelloAdapter extends BaseWmsAdapter {
    * List all sites from Intello API
    */
   async listSites(): Promise<WmsSite[]> {
+    const { logger } = await import("@/lib/context/logger")
+    const apiBaseUrl = this.getApiBaseUrl()
+    const sitesUrl = `${apiBaseUrl}/api/intello/user/v1/sites`
+    
+    logger.info(`[IntelloAdapter] Calling list sites API: GET ${sitesUrl}`)
+    const requestStartTime = Date.now()
+    
     const response = await this.fetchWithAuth("/api/intello/user/v1/sites")
+
+    const requestDuration = Date.now() - requestStartTime
+    logger.info(`[IntelloAdapter] List sites API response: ${response.status} ${response.statusText} (${requestDuration}ms)`)
 
     if (!response.ok) {
       const errorText = await response.text()
+      logger.error(`[IntelloAdapter] List sites API failed: ${response.status} ${errorText}`)
       throw new Error(`Failed to fetch Intello sites: ${response.status} ${errorText}`)
     }
 
     const sites = await response.json() as any[]
+    logger.info(`[IntelloAdapter] Parsed ${sites.length} sites from API response`)
 
-    return sites.map((site) => ({
+    const mappedSites = sites.map((site) => ({
       vendorSiteId: String(site.id),
       siteName: site.siteName || "",
       address: site.address,
@@ -126,6 +162,16 @@ export class IntelloAdapter extends BaseWmsAdapter {
         rtuList: site.rtuList || [], // Store RTU list in metadata
       },
     }))
+
+    // Log device counts per site
+    mappedSites.forEach((site) => {
+      const deviceCount = site.metadata?.rtuList?.length || 0
+      logger.info(
+        `[IntelloAdapter] Site ${site.vendorSiteId} (${site.siteName}): ${deviceCount} devices`
+      )
+    })
+
+    return mappedSites
   }
 
   /**
@@ -139,26 +185,45 @@ export class IntelloAdapter extends BaseWmsAdapter {
     fromDate: string,
     toDate: string
   ): Promise<InsolationReading[]> {
-    const response = await this.fetchWithAuth(
-      `/api/intello/rtu/v1/data?fromDate=${fromDate}&toDate=${toDate}&mode=Daily&resultType=site&rtuid=${deviceId}`
-    )
+    const { logger } = await import("@/lib/context/logger")
+    const apiBaseUrl = this.getApiBaseUrl()
+    const insolationUrl = `/api/intello/rtu/v1/data?fromDate=${fromDate}&toDate=${toDate}&mode=Daily&resultType=site&rtuid=${deviceId}`
+    const fullUrl = `${apiBaseUrl}${insolationUrl}`
+    
+    logger.info(`[IntelloAdapter] Calling insolation data API: GET ${fullUrl}`)
+    logger.info(`[IntelloAdapter] Request params: deviceId=${deviceId}, fromDate=${fromDate}, toDate=${toDate}`)
+    const requestStartTime = Date.now()
+    
+    const response = await this.fetchWithAuth(insolationUrl)
+
+    const requestDuration = Date.now() - requestStartTime
+    logger.info(`[IntelloAdapter] Insolation data API response: ${response.status} ${response.statusText} (${requestDuration}ms)`)
 
     if (!response.ok) {
       const errorText = await response.text()
+      logger.error(`[IntelloAdapter] Insolation data API failed: ${response.status} ${errorText}`)
       throw new Error(
         `Failed to fetch Intello insolation data: ${response.status} ${errorText}`
       )
     }
 
     const readings = await response.json() as any[]
+    logger.info(`[IntelloAdapter] Parsed ${readings.length} insolation readings from API response`)
 
-    return readings.map((reading) => ({
+    const mappedReadings = readings.map((reading) => ({
       deviceId: reading.id || deviceId,
       date: reading.date || fromDate,
       hour: reading.hour || "00:00:00",
       irr: reading.irr || 0,
       generation: reading.generation,
     }))
+
+    if (mappedReadings.length > 0) {
+      const avgIrr = mappedReadings.reduce((sum, r) => sum + (r.irr || 0), 0) / mappedReadings.length
+      logger.info(`[IntelloAdapter] Average IRR: ${avgIrr.toFixed(2)} W/m² (from ${mappedReadings.length} readings)`)
+    }
+
+    return mappedReadings
   }
 
   /**
