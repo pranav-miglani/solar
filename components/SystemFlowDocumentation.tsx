@@ -1661,7 +1661,7 @@ Unique Constraints:
                     <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
                       <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">✅ Cleanup Completed</h4>
                       <div className="mt-3 text-xs text-blue-700 dark:text-blue-300">
-                        <strong>Note:</strong> Separate telemetry database has been removed. All telemetry is stored in main database (live metrics in <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">plants</code> table) or fetched on-demand from vendor APIs (historical graphs). The <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">work_order_plant_eff</code> table and efficiency endpoint have been removed as PR calculations are not part of the current system.
+                        <strong>Note:</strong> Separate telemetry database has been removed. All telemetry is stored in main database (live metrics in <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">plants</code> table) or fetched on-demand from vendor APIs (historical graphs). The <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">work_order_plant_eff</code> table has been completely removed from the schema (not just dropped via migration) as PR (Performance Ratio) calculations are not part of the current system. All references to this table have been removed from the codebase, including schema definitions, RLS policies, type definitions, and documentation.
                       </div>
                     </div>
                   </div>
@@ -4615,10 +4615,11 @@ const lastUpdateTime = station.lastUpdateTime
                           <strong>✅ Completed:</strong> The following cleanup has been done:
                         </p>
                         <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                          <li><code className="bg-background px-1 rounded">work_order_plant_eff</code> table - Dropped (migration 026)</li>
-                          <li>Efficiency endpoint (<code className="bg-background px-1 rounded">/api/workorders/[id]/efficiency</code>) - Removed</li>
-                          <li>Efficiency UI components (<code className="bg-background px-1 rounded">EfficiencyBadge</code>, <code className="bg-background px-1 rounded">EfficiencySummary</code>) - Removed</li>
-                          <li>Efficiency permissions from RBAC - Removed</li>
+                          <li><code className="bg-background px-1 rounded">work_order_plant_eff</code> table - Completely removed from schema (table definition, indexes, RLS policies, type definitions, and all documentation references removed)</li>
+                          <li>Efficiency endpoint (<code className="bg-background px-1 rounded">/api/workorders/[id]/efficiency</code>) - Removed (never existed in current codebase)</li>
+                          <li>Efficiency UI components (<code className="bg-background px-1 rounded">EfficiencyBadge</code>, <code className="bg-background px-1 rounded">EfficiencySummary</code>) - Removed (never existed in current codebase)</li>
+                          <li>Efficiency permissions from RBAC - Removed (never existed in current codebase)</li>
+                          <li>All references to <code className="bg-background px-1 rounded">work_order_plant_eff</code> removed from: schema migrations, RLS policies, TypeScript types, API route comments, and all documentation files</li>
                           <li>Telemetry database environment variables (TELEMETRY_SUPABASE_*) - Deprecated (separate telemetry database removed, all telemetry stored in main DB or fetched on-demand from vendor APIs)</li>
                         </ul>
                         <p className="text-sm text-muted-foreground mb-2">

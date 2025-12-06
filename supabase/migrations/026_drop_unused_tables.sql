@@ -1,17 +1,22 @@
 -- ============================================
--- DROP UNUSED TABLES
+-- DROP UNUSED TABLES (HISTORICAL REFERENCE)
 -- ============================================
--- This migration removes tables that are not being used in the system:
--- 1. work_order_plant_eff - Performance ratio calculations not implemented
---    (Table exists but is never populated, only read by deprecated efficiency endpoint)
-
--- Drop work_order_plant_eff table and related objects
-DROP TABLE IF EXISTS work_order_plant_eff CASCADE;
-
--- Drop related indexes if they exist
-DROP INDEX IF EXISTS idx_work_order_plant_eff_work_order_id;
-DROP INDEX IF EXISTS idx_work_order_plant_eff_plant_id;
-
--- Note: The /api/workorders/[id]/efficiency endpoint should be removed or deprecated
--- as it reads from this table which is no longer available.
+-- NOTE: This migration is kept for historical reference only.
+-- The work_order_plant_eff table has been completely removed from the initial schema
+-- (001_initial_schema.sql) and all references have been removed from the codebase.
+--
+-- This migration would have been used to drop the table if it existed in older installations,
+-- but new installations will never have this table as it's not created in the initial schema.
+--
+-- Removed from codebase:
+-- - Table definition removed from 001_initial_schema.sql
+-- - Indexes removed from 001_initial_schema.sql
+-- - RLS policies removed from 002_rls_policies.sql
+-- - TypeScript types removed from types/database.ts
+-- - All documentation references removed
+--
+-- If you have an older installation with this table, run this migration to clean it up:
+-- DROP TABLE IF EXISTS work_order_plant_eff CASCADE;
+-- DROP INDEX IF EXISTS idx_work_order_plant_eff_work_order_id;
+-- DROP INDEX IF EXISTS idx_work_order_plant_eff_plant_id;
 

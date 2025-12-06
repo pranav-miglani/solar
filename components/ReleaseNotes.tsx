@@ -288,8 +288,7 @@ export function ReleaseNotes() {
               This provides faster detection of inactive plants and more responsive system behavior.
             </li>
             <li>
-              <strong>Unused Tables Removed:</strong> Dropped deprecated <code className="bg-muted px-1 rounded">work_order_plant_eff</code> table and unused telemetry database tables via migration <code className="bg-muted px-1 rounded">026_drop_unused_tables.sql</code>.
-              Removed all references to PR (Performance Ratio) calculations from the codebase.
+              <strong>Unused Tables Removed:</strong> Completely removed <code className="bg-muted px-1 rounded">work_order_plant_eff</code> table from the schema. The table definition, indexes, RLS policies, TypeScript type definitions, and all documentation references have been removed from the codebase. This table was never populated and PR (Performance Ratio) calculations are not part of the current system. Migration <code className="bg-muted px-1 rounded">026_drop_unused_tables.sql</code> remains for historical reference but the table is no longer created in the initial schema.
             </li>
             <li>
               <strong>RLS Security Fix:</strong> Added migration <code className="bg-muted px-1 rounded">028_enable_rls_disabled_plants.sql</code> to enable Row Level Security on <code className="bg-muted px-1 rounded">disabled_plants</code> table with proper access policies for all roles.
