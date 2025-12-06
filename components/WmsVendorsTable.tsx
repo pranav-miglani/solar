@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
-import { Plus, Edit, Trash2, RefreshCw, CloudSun, Building2 } from "lucide-react"
+import { Plus, Edit, Trash2, RefreshCw, CloudSun, Building2, Download, Upload } from "lucide-react"
 import { motion } from "framer-motion"
 import { Switch } from "@/components/ui/switch"
 
@@ -65,6 +65,10 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
   const [editingVendor, setEditingVendor] = useState<WmsVendor | null>(null)
   const [deletingVendorId, setDeletingVendorId] = useState<number | null>(null)
   const [syncingVendorId, setSyncingVendorId] = useState<number | null>(null)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importResult, setImportResult] = useState<any>(null)
 
   const [formData, setFormData] = useState({
     name: "",
@@ -225,6 +229,69 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
       alert(`Error syncing sites: ${error.message}`)
     } finally {
       setSyncingVendorId(null)
+    }
+  }
+
+  async function handleExport() {
+    if (!canManage) return
+    try {
+      const response = await fetch("/api/wms-vendors/export")
+      
+      if (!response.ok) {
+        const error = await response.json()
+        alert(error.error || "Failed to export WMS vendors")
+        return
+      }
+
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = downloadUrl
+      link.download = `wms_vendors_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+    } catch (error) {
+      console.error("Error exporting WMS vendors:", error)
+      alert("Failed to export WMS vendors")
+    }
+  }
+
+  async function handleImport() {
+    if (!canManage || !importFile) return
+    
+    setImportLoading(true)
+    setImportResult(null)
+    
+    try {
+      const formData = new FormData()
+      formData.append("file", importFile)
+
+      const response = await fetch("/api/wms-vendors/import", {
+        method: "POST",
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || "Failed to import WMS vendors")
+        setImportLoading(false)
+        return
+      }
+
+      setImportResult(data)
+      setImportLoading(false)
+      
+      // Refresh the list if any were processed
+      if (data.summary && data.summary.successful > 0) {
+        fetchVendors()
+      }
+    } catch (error) {
+      console.error("Error importing WMS vendors:", error)
+      alert("Failed to import WMS vendors")
+      setImportLoading(false)
     }
   }
 
@@ -410,10 +477,20 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
             Get started by adding a weather monitoring system vendor.
           </p>
           {canManage && (
-            <Button onClick={() => openDialog()}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add WMS Vendor
-            </Button>
+            <>
+              <Button onClick={() => openDialog()}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add WMS Vendor
+              </Button>
+              <Button onClick={handleExport} variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              <Button onClick={() => setImportDialogOpen(true)} variant="outline">
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </Button>
+            </>
           )}
         </Card>
       ) : (
@@ -521,6 +598,71 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
             </TableBody>
           </Table>
         </Card>
+      )}
+
+      {/* Import Dialog */}
+      {canManage && (
+        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Import WMS Vendors</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="import-file">Select Excel File</Label>
+                <Input
+                  id="import-file"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                  className="mt-1"
+                />
+              </div>
+              {importResult && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <h4 className="font-medium mb-2">Import Results</h4>
+                  <p className="text-sm">
+                    Total: {importResult.summary?.total || 0} | 
+                    Successful: {importResult.summary?.successful || 0} | 
+                    Failed: {importResult.summary?.failed || 0}
+                  </p>
+                  {importResult.results && importResult.results.length > 0 && (
+                    <div className="mt-2 max-h-40 overflow-y-auto">
+                      {importResult.results.map((result: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className={`text-xs p-1 ${
+                            result.success ? "text-green-600" : "text-red-600"
+                          }`}
+                        >
+                          Row {result.rowNumber}: {result.success ? "✓" : "✗"} {result.error || "Success"}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setImportDialogOpen(false)
+                    setImportFile(null)
+                    setImportResult(null)
+                  }}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={handleImport}
+                  disabled={!importFile || importLoading}
+                >
+                  {importLoading ? "Importing..." : "Import"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )
