@@ -63,12 +63,6 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
       // API returns { vendor: {...} }, extract the vendor object
       const vendor = vendorData.vendor || vendorData
       setVendor(vendor)
-      
-      // Debug: Log to see what we're getting
-      console.log("Vendor data from API:", vendor)
-      console.log("Organization:", vendor?.organizations)
-      console.log("Org ID:", vendor?.org_id)
-      console.log("Vendor Type:", vendor?.vendor_type)
 
       if (sitesResponse.ok) {
         const sitesData = await sitesResponse.json()
@@ -168,7 +162,7 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
           </CardHeader>
           <CardContent>
             <Badge variant="outline" className="text-lg">
-              {vendor.vendor_type}
+              {vendor.vendor_type || "N/A"}
             </Badge>
           </CardContent>
         </Card>
