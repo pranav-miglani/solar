@@ -1,0 +1,508 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Card } from "@/components/ui/card"
+import { Plus, Edit, Trash2, RefreshCw, CloudSun, Building2 } from "lucide-react"
+import { motion } from "framer-motion"
+import { Switch } from "@/components/ui/switch"
+
+interface WmsVendor {
+  id: number
+  name: string
+  vendor_type: string
+  org_id: number
+  is_active: boolean
+  last_sites_synced_at: string | null
+  last_insolation_synced_at: string | null
+  organizations?: {
+    id: number
+    name: string
+  }
+}
+
+interface Organization {
+  id: number
+  name: string
+}
+
+interface WmsVendorsTableProps {
+  accountType: "SUPERADMIN" | "DEVELOPER" | "ORG" | "GOVT"
+}
+
+export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
+  const [vendors, setVendors] = useState<WmsVendor[]>([])
+  const [orgs, setOrgs] = useState<Organization[]>([])
+  const [loading, setLoading] = useState(true)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingVendor, setEditingVendor] = useState<WmsVendor | null>(null)
+  const [deletingVendorId, setDeletingVendorId] = useState<number | null>(null)
+  const [syncingVendorId, setSyncingVendorId] = useState<number | null>(null)
+
+  const [formData, setFormData] = useState({
+    name: "",
+    vendor_type: "INTELLO",
+    org_id: "",
+    email: "",
+    password_hash: "",
+    is_active: true,
+  })
+
+  useEffect(() => {
+    fetchVendors()
+    fetchOrgs()
+  }, [])
+
+  async function fetchVendors() {
+    try {
+      setLoading(true)
+      const response = await fetch("/api/wms-vendors")
+      const data = await response.json()
+      if (data.vendors) {
+        setVendors(data.vendors)
+      }
+    } catch (error) {
+      console.error("Error fetching WMS vendors:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function fetchOrgs() {
+    try {
+      const response = await fetch("/api/orgs")
+      const data = await response.json()
+      if (data.organizations) {
+        setOrgs(data.organizations)
+      }
+    } catch (error) {
+      console.error("Error fetching organizations:", error)
+    }
+  }
+
+  function openDialog(vendor?: WmsVendor) {
+    if (vendor) {
+      setEditingVendor(vendor)
+      setFormData({
+        name: vendor.name,
+        vendor_type: vendor.vendor_type || "INTELLO",
+        org_id: vendor.org_id?.toString() || "",
+        email: "", // Credentials are not returned for security
+        password_hash: "", // Credentials are not returned for security
+        is_active: vendor.is_active,
+      })
+    } else {
+      setEditingVendor(null)
+      setFormData({
+        name: "",
+        vendor_type: "INTELLO",
+        org_id: "",
+        email: "",
+        password_hash: "",
+        is_active: true,
+      })
+    }
+    setDialogOpen(true)
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+
+    if (!formData.org_id) {
+      alert("Please select an organization")
+      return
+    }
+
+    if (!formData.email || !formData.password_hash) {
+      alert("Please provide email and password hash for INTELLO")
+      return
+    }
+
+    // Build credentials for INTELLO
+    const credentials = {
+      email: formData.email,
+      password_hash: formData.password_hash,
+    }
+
+    const url = editingVendor
+      ? `/api/wms-vendors/${editingVendor.id}`
+      : "/api/wms-vendors"
+    const method = editingVendor ? "PUT" : "POST"
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          vendor_type: formData.vendor_type,
+          org_id: parseInt(formData.org_id),
+          credentials,
+          is_active: formData.is_active,
+        }),
+      })
+
+      if (response.ok) {
+        setDialogOpen(false)
+        fetchVendors()
+      } else {
+        const error = await response.json()
+        alert(error.error || "Failed to save WMS vendor")
+      }
+    } catch (error: any) {
+      alert(`Error saving WMS vendor: ${error.message}`)
+    }
+  }
+
+  async function handleDelete(id: number) {
+    if (!confirm("Are you sure you want to delete this WMS vendor?")) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/wms-vendors/${id}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        fetchVendors()
+        setDeletingVendorId(null)
+      } else {
+        const error = await response.json()
+        alert(error.error || "Failed to delete WMS vendor")
+      }
+    } catch (error: any) {
+      alert(`Error deleting WMS vendor: ${error.message}`)
+    }
+  }
+
+  async function handleSyncSites(vendorId: number) {
+    setSyncingVendorId(vendorId)
+    try {
+      const response = await fetch(`/api/cron/sync-wms-sites`, {
+        method: "GET",
+      })
+      const data = await response.json()
+
+      if (response.ok) {
+        alert(`Site sync completed for WMS vendor.\nSites synced: ${data.summary?.totalSitesSynced || 0}`)
+        fetchVendors()
+      } else {
+        alert(data.error || "Failed to sync sites")
+      }
+    } catch (error: any) {
+      alert(`Error syncing sites: ${error.message}`)
+    } finally {
+      setSyncingVendorId(null)
+    }
+  }
+
+  const isReadOnly = accountType === "GOVT" || accountType === "ORG"
+  const canManage = accountType === "SUPERADMIN" || accountType === "DEVELOPER"
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading WMS vendors...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border">
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          {canManage && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button
+                    onClick={() => openDialog()}
+                    className="w-full sm:w-auto transition-all duration-200 hover:scale-105 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white shadow-lg hover:shadow-xl"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add WMS Vendor
+                  </Button>
+                </motion.div>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                    {editingVendor ? "Edit WMS Vendor" : "Add WMS Vendor"}
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="name">Name *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
+                      required
+                      className="mt-1"
+                      placeholder="e.g., Intello WMS - Production"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="vendor_type">Vendor Type *</Label>
+                    <Select
+                      value={formData.vendor_type}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, vendor_type: value })
+                      }
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="INTELLO">Intello</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Currently only INTELLO is supported
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="org_id">Organization *</Label>
+                    {orgs.length === 0 ? (
+                      <div className="text-sm text-muted-foreground p-2 border rounded mt-1">
+                        No organizations available. Please create an organization first.
+                      </div>
+                    ) : (
+                      <Select
+                        value={formData.org_id}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, org_id: value })
+                        }
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select organization" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {orgs.map((org) => (
+                            <SelectItem key={org.id} value={org.id.toString()}>
+                              {org.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  {/* INTELLO Credentials */}
+                  {formData.vendor_type === "INTELLO" && (
+                    <>
+                      <div>
+                        <Label htmlFor="email">Email *</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) =>
+                            setFormData({ ...formData, email: e.target.value })
+                          }
+                          required
+                          className="mt-1"
+                          placeholder="gigasolarltd@gmail.com"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Email address used for Intello authentication
+                        </p>
+                      </div>
+                      <div>
+                        <Label htmlFor="password_hash">Password (256 Hash) *</Label>
+                        <Input
+                          id="password_hash"
+                          type="password"
+                          value={formData.password_hash}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              password_hash: e.target.value,
+                            })
+                          }
+                          required
+                          className="mt-1"
+                          placeholder="57645be3bd2f938cdbd5b26dc8b0d50c19fdbe9e81a9db4612a83a8e40ab1c18"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          SHA-256 hash of the password for Intello authentication
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="is_active"
+                      checked={formData.is_active}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, is_active: checked })
+                      }
+                    />
+                    <Label htmlFor="is_active" className="cursor-pointer">
+                      Active
+                    </Label>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit">
+                      {editingVendor ? "Update" : "Create"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+      </div>
+
+      {vendors.length === 0 ? (
+        <Card className="p-8 text-center">
+          <CloudSun className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No WMS Vendors</h3>
+          <p className="text-muted-foreground mb-4">
+            Get started by adding a weather monitoring system vendor.
+          </p>
+          {canManage && (
+            <Button onClick={() => openDialog()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add WMS Vendor
+            </Button>
+          )}
+        </Card>
+      ) : (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Vendor Type</TableHead>
+                <TableHead>Organization</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Last Sites Sync</TableHead>
+                <TableHead>Last Insolation Sync</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {vendors.map((vendor) => (
+                <TableRow key={vendor.id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <CloudSun className="h-4 w-4 text-primary" />
+                      {vendor.name}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{vendor.vendor_type}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      {vendor.organizations?.name || `Org ID: ${vendor.org_id}`}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={vendor.is_active ? "default" : "secondary"}>
+                      {vendor.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {vendor.last_sites_synced_at
+                      ? new Date(vendor.last_sites_synced_at).toLocaleString()
+                      : "Never"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {vendor.last_insolation_synced_at
+                      ? new Date(vendor.last_insolation_synced_at).toLocaleString()
+                      : "Never"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      {canManage && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSyncSites(vendor.id)}
+                            disabled={syncingVendorId === vendor.id}
+                          >
+                            <RefreshCw
+                              className={`h-4 w-4 mr-2 ${
+                                syncingVendorId === vendor.id ? "animate-spin" : ""
+                              }`}
+                            />
+                            Sync Sites
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openDialog(vendor)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setDeletingVendorId(vendor.id)
+                              handleDelete(vendor.id)
+                            }}
+                            disabled={deletingVendorId === vendor.id}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+    </div>
+  )
+}
+

@@ -111,14 +111,16 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, credentials, is_active } = body
+    const { name, vendor_type, credentials, org_id, is_active } = body
 
     const supabase = getMainClient()
 
     // Build update object
     const updateData: any = {}
     if (name !== undefined) updateData.name = name
+    if (vendor_type !== undefined) updateData.vendor_type = vendor_type
     if (credentials !== undefined) updateData.credentials = credentials
+    if (org_id !== undefined) updateData.org_id = org_id
     if (is_active !== undefined) updateData.is_active = is_active
 
     if (Object.keys(updateData).length === 0) {
