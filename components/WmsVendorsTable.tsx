@@ -103,9 +103,9 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
     try {
       const response = await fetch("/api/orgs")
       const data = await response.json()
-      if (data.organizations) {
-        setOrgs(data.organizations)
-      }
+      // API returns { orgs: [...] } - same organizations used for plant vendors
+      // Organizations are shared between plant vendors and WMS vendors
+      setOrgs(data.orgs || [])
     } catch (error) {
       console.error("Error fetching organizations:", error)
     }
