@@ -39,6 +39,7 @@ BEGIN
       p.network_status,
       p.vendor_created_date,
       p.start_operating_time,
+      p.created_at,
       -- Calculate days since last vendor update
       CASE 
         WHEN p.last_update_time IS NOT NULL THEN
