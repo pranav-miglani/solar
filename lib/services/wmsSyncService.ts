@@ -466,7 +466,7 @@ export async function syncWmsDeviceInsolation(
           insolation_value: dailyInsolation,
           reading_count: readings.length,
           metadata: {
-            hourly_readings: readings,
+            all_readings: readings, // All time-series readings used for integration
             min_irr: Math.min(...readings.map(r => r.irr)),
             max_irr: Math.max(...readings.map(r => r.irr)),
           },
@@ -754,7 +754,7 @@ export async function syncWmsVendorInsolation(
           insolation_value: dailyInsolation,
           reading_count: readings.length,
           metadata: {
-            hourly_readings: readings,
+            all_readings: readings, // All time-series readings used for integration
             min_irr: Math.min(...readings.map(r => r.irr)),
             max_irr: Math.max(...readings.map(r => r.irr)),
           },

@@ -89,25 +89,28 @@ export abstract class BaseWmsAdapter {
   ): Promise<InsolationReading[]>
 
   /**
-   * Calculate daily insolation from hourly readings
+   * Calculate daily insolation from all readings
    * Calculates the area under the IRR vs time curve (integral of power over time)
    * Returns energy in kWh/m²
    * 
    * Uses trapezoidal rule for numerical integration:
-   * - Calculates actual time intervals from timestamps
+   * - Uses ALL readings provided (no filtering by interval)
+   * - Calculates actual time intervals from timestamps between consecutive readings
    * - Integrates IRR (W/m²) over time to get energy (kWh/m²)
+   * - Handles variable time intervals (e.g., 10-minute, hourly, or any interval)
    */
   calculateDailyInsolation(readings: InsolationReading[]): number {
     if (!readings || readings.length === 0) {
       return 0
     }
 
+    // Filter only invalid readings (null or negative), keep all valid readings regardless of interval
     const validReadings = readings.filter(r => r.irr != null && r.irr >= 0)
     if (validReadings.length === 0) {
       return 0
     }
 
-    // Sort readings by timestamp to ensure correct order
+    // Sort readings by timestamp to ensure correct order for integration
     const sortedReadings = [...validReadings].sort((a, b) => {
       const timeA = this.parseTimestamp(a.date, a.hour)
       const timeB = this.parseTimestamp(b.date, b.hour)
@@ -115,11 +118,13 @@ export abstract class BaseWmsAdapter {
     })
 
     if (sortedReadings.length === 1) {
-      // Single reading: assume 1 hour interval
-      return (sortedReadings[0].irr * 1.0) / 1000 // kWh/m²
+      // Single reading: cannot calculate area under curve, return 0
+      // (Need at least 2 points to define an area)
+      return 0
     }
 
     // Use trapezoidal rule for numerical integration
+    // This uses ALL consecutive readings to calculate the area under the curve
     let totalEnergyWh = 0
 
     for (let i = 0; i < sortedReadings.length - 1; i++) {
@@ -129,15 +134,16 @@ export abstract class BaseWmsAdapter {
       const timeCurrent = this.parseTimestamp(current.date, current.hour)
       const timeNext = this.parseTimestamp(next.date, next.hour)
 
-      // Calculate time interval in hours
+      // Calculate actual time interval in hours between consecutive readings
       const timeIntervalHours = (timeNext.getTime() - timeCurrent.getTime()) / (1000 * 60 * 60)
 
       if (timeIntervalHours <= 0) {
-        // Skip if timestamps are invalid or same
+        // Skip if timestamps are invalid or same (duplicate readings)
         continue
       }
 
-      // Trapezoidal rule: average of two values × time interval
+      // Trapezoidal rule: average of two consecutive IRR values × time interval
+      // This calculates the area of each trapezoid between consecutive readings
       const avgIrr = (current.irr + next.irr) / 2
       const energyWh = avgIrr * timeIntervalHours
       totalEnergyWh += energyWh
