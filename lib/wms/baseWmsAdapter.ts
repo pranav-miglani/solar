@@ -43,12 +43,12 @@ export interface InsolationReading {
 
 /**
  * WMS Vendor Config
+ * Note: apiBaseUrl is not included - it's read from environment variables (e.g., INTELLO_API_BASE_URL)
  */
 export interface WmsVendorConfig {
   id: number
   name: string
   vendorType: 'INTELLO' | string
-  apiBaseUrl?: string
   credentials: Record<string, any>
   isActive: boolean
   orgId: number
@@ -107,19 +107,15 @@ export abstract class BaseWmsAdapter {
   }
 
   protected getApiBaseUrl(): string {
-    // Check config first, then fall back to vendor-specific env vars
-    if (this.config.apiBaseUrl) {
-      return this.config.apiBaseUrl
-    }
-    
     // Get vendor-specific base URL from environment variables
+    // e.g., INTELLO_API_BASE_URL for INTELLO vendor type
     const vendorType = this.config.vendorType.toUpperCase()
     const envVarName = `${vendorType}_API_BASE_URL`
     const baseUrl = process.env[envVarName]
     
     if (!baseUrl) {
       throw new Error(
-        `API base URL not configured. Please set ${envVarName} environment variable or provide apiBaseUrl in config.`
+        `API base URL not configured. Please set ${envVarName} environment variable.`
       )
     }
     
