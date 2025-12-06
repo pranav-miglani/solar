@@ -2483,7 +2483,7 @@ Unique Constraints:
                             <li>API base URL from environment variables (e.g., INTELLO_API_BASE_URL)</li>
                             <li>Token storage interface (setTokenStorage)</li>
                             <li>HTTP client with connection pooling</li>
-                            <li>Average insolation calculation from hourly readings</li>
+                            <li>Daily insolation calculation from hourly readings (area under IRR vs time curve in kWh/m²)</li>
                           </ul>
                         </div>
                         <div>
@@ -2502,7 +2502,7 @@ Unique Constraints:
                             <li>Sites: GET /api/intello/user/v1/sites</li>
                             <li>Insolation: GET /api/intello/rtu/v1/data (with date range and RTU ID)</li>
                             <li>Extracts devices (RTUs) from site response</li>
-                            <li>Calculates average insolation from hourly IRR values</li>
+                            <li>Calculates daily insolation (area under IRR vs time curve) in kWh/m² using trapezoidal rule for numerical integration</li>
                           </ul>
                         </div>
                       </div>

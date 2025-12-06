@@ -395,17 +395,17 @@ CREATE TABLE insolation_readings (
   id SERIAL PRIMARY KEY,
   wms_device_id INTEGER NOT NULL REFERENCES wms_devices(id) ON DELETE CASCADE,
   reading_date DATE NOT NULL, -- Date of the reading
-  insolation_value NUMERIC(10, 3) NOT NULL, -- Average insolation (IRR) for the day in W/m²
-  reading_count INTEGER NOT NULL DEFAULT 0, -- Number of readings used to calculate average
+  insolation_value NUMERIC(10, 3) NOT NULL, -- Daily insolation (energy) in kWh/m², calculated as area under IRR vs time curve
+  reading_count INTEGER NOT NULL DEFAULT 0, -- Number of hourly readings used to calculate the daily insolation (integral)
   metadata JSONB DEFAULT '{}', -- Additional data (hourly breakdown, min, max, etc.)
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(wms_device_id, reading_date)
 );
 
-COMMENT ON TABLE insolation_readings IS 'Daily insolation readings for WMS devices. Stores last 100 days in rollover fashion.';
-COMMENT ON COLUMN insolation_readings.insolation_value IS 'Average insolation (IRR) for the day in W/m², calculated from hourly readings';
-COMMENT ON COLUMN insolation_readings.reading_count IS 'Number of hourly readings used to calculate the daily average';
+COMMENT ON TABLE insolation_readings IS 'Daily insolation readings for WMS devices. Stores last 100 days in rollover fashion. Insolation is calculated as area under IRR vs time curve (integral) in kWh/m².';
+COMMENT ON COLUMN insolation_readings.insolation_value IS 'Daily insolation (energy) in kWh/m², calculated as area under IRR vs time curve using trapezoidal rule for numerical integration';
+COMMENT ON COLUMN insolation_readings.reading_count IS 'Number of hourly readings used to calculate the daily insolation (integral)';
 
 -- ============================================
 -- INDEXES
