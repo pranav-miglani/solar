@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getMainClient } from "@/lib/supabase/pooled"
-import { syncWmsVendorDevices } from "@/lib/services/wmsSyncService"
+import { syncWmsVendorInsolation } from "@/lib/services/wmsSyncService"
 import { requirePermission } from "@/lib/rbac"
 import MDC from "@/lib/context/mdc"
 import { logger } from "@/lib/context/logger"
 import { randomUUID } from "crypto"
 
 /**
- * API endpoint to sync devices for a specific WMS vendor
- * Re-fetches sites from vendor API and updates devices without updating sites
+ * API endpoint to sync insolation data for all devices of a specific WMS vendor
+ * Syncs insolation data (not device metadata)
  */
 
 export const dynamic = 'force-dynamic'
@@ -54,7 +54,7 @@ export async function POST(
             orgId: sessionData.orgId,
           },
           () => {
-            logger.info(`Syncing devices for WMS vendor ${params.id}`)
+            logger.info(`Syncing insolation data for all devices of WMS vendor ${params.id}`)
           }
         )
 
@@ -74,20 +74,22 @@ export async function POST(
           )
         }
 
-        // Sync devices
-        const result = await syncWmsVendorDevices(vendor, supabase)
+        // Sync insolation data for all devices
+        // For INTELLO, this will sync per device (vendor supports per-device only)
+        const today = new Date().toISOString().split("T")[0]
+        const result = await syncWmsVendorInsolation(vendor, supabase, today)
 
         if (result.success) {
           return NextResponse.json({
             success: true,
-            message: `Devices synced successfully: ${result.devicesSynced} devices (${result.devicesCreated} created, ${result.devicesUpdated} updated)`,
+            message: `Insolation data synced successfully: ${result.devicesSynced} devices, ${result.readingsCreated + result.readingsUpdated} readings (${result.readingsCreated} created, ${result.readingsUpdated} updated)`,
             result,
           })
         } else {
           return NextResponse.json(
             {
               success: false,
-              error: result.error || "Failed to sync devices",
+              error: result.error || "Failed to sync insolation data",
               result,
             },
             { status: 500 }

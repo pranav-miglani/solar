@@ -243,15 +243,16 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
 
       if (response.ok && data.success) {
         alert(
-          `Device sync completed for ${data.result?.wmsVendorName || "WMS vendor"}.\n` +
-          `Devices synced: ${data.result?.devicesSynced || 0} (${data.result?.devicesCreated || 0} created, ${data.result?.devicesUpdated || 0} updated)`
+          `Insolation sync completed for ${data.result?.wmsVendorName || "WMS vendor"}.\n` +
+          `Devices synced: ${data.result?.devicesSynced || 0}\n` +
+          `Readings: ${data.result?.readingsCreated + data.result?.readingsUpdated || 0} (${data.result?.readingsCreated || 0} created, ${data.result?.readingsUpdated || 0} updated)`
         )
         fetchVendors()
       } else {
-        alert(data.error || "Failed to sync devices")
+        alert(data.error || "Failed to sync insolation data")
       }
     } catch (error: any) {
-      alert(`Error syncing devices: ${error.message}`)
+      alert(`Error syncing insolation data: ${error.message}`)
     } finally {
       setSyncingVendorId(null)
     }
@@ -630,26 +631,28 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
                             size="sm"
                             onClick={() => handleSyncSites(vendor.id)}
                             disabled={syncingVendorId === vendor.id}
-                            title="Sync sites and devices from vendor API"
+                            title="Sync sites and devices metadata from vendor API"
                           >
                             <RefreshCw
-                              className={`h-4 w-4 ${
+                              className={`h-4 w-4 mr-1 ${
                                 syncingVendorId === vendor.id ? "animate-spin" : ""
                               }`}
                             />
+                            Sites
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleSyncDevices(vendor.id)}
                             disabled={syncingVendorId === vendor.id}
-                            title="Sync devices only (re-fetch from vendor API without updating sites)"
+                            title="Sync insolation data for all devices (per-device for INTELLO)"
                           >
                             <RefreshCw
-                              className={`h-4 w-4 ${
+                              className={`h-4 w-4 mr-1 ${
                                 syncingVendorId === vendor.id ? "animate-spin" : ""
                               }`}
                             />
+                            Devices
                           </Button>
                           <Button
                             variant="outline"

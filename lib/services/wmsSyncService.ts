@@ -352,7 +352,135 @@ export async function syncWmsVendorDevices(
 }
 
 /**
- * Sync a single device by re-fetching its site and updating the device
+ * Sync insolation data for a single WMS device
+ * For INTELLO, this syncs per-device (vendor supports per-device only)
+ */
+export async function syncWmsDeviceInsolation(
+  deviceId: number,
+  date: string,
+  supabase: any
+): Promise<{ success: boolean; readingsCreated: number; readingsUpdated: number; error?: string }> {
+  const startTime = Date.now()
+  const result = {
+    success: false,
+    readingsCreated: 0,
+    readingsUpdated: 0,
+  }
+
+  try {
+    logger.info(`[WMS Insolation Sync] Starting insolation sync for device ID: ${deviceId}, date: ${date}`)
+    
+    // Get device with site and vendor info
+    const { data: device, error: deviceError } = await supabase
+      .from("wms_devices")
+      .select(
+        `
+        id,
+        vendor_device_id,
+        wms_site_id,
+        wms_sites!inner (
+          id,
+          vendor_site_id,
+          wms_vendor_id,
+          wms_vendors!inner (
+            id,
+            name,
+            vendor_type,
+            org_id,
+            credentials,
+            is_active
+          )
+        )
+      `
+      )
+      .eq("id", deviceId)
+      .single()
+
+    if (deviceError || !device) {
+      logger.error(`[WMS Insolation Sync] Device ${deviceId} not found in database`, { deviceError })
+      throw new Error("Device not found")
+    }
+
+    logger.info(
+      `[WMS Insolation Sync] Found device: ${device.vendor_device_id} (DB ID: ${device.id}), Site: ${device.wms_sites.vendor_site_id}`
+    )
+
+    const vendor = device.wms_sites.wms_vendors
+
+    if (!vendor.is_active) {
+      throw new Error(`Vendor ${vendor.name} is not active`)
+    }
+
+    // Create adapter and authenticate
+    const adapter = getWmsAdapter(vendor)
+    adapter.setTokenStorage(vendor.id, supabase)
+    await adapter.authenticate()
+
+    // Get insolation data for this device
+    logger.info(`[WMS Insolation Sync] Fetching insolation data for device ${device.vendor_device_id} for date ${date}`)
+    const readings = await adapter.getInsolationData(device.vendor_device_id, date, date)
+
+    if (!readings || readings.length === 0) {
+      logger.warn(`[WMS Insolation Sync] No readings for device ${device.vendor_device_id} on ${date}`)
+      result.success = true
+      return result
+    }
+
+    const averageInsolation = adapter.calculateAverageInsolation(readings)
+    logger.info(`[WMS Insolation Sync] Calculated average insolation: ${averageInsolation.toFixed(2)} W/m² from ${readings.length} readings`)
+
+    // Check if reading already exists
+    const { data: existingReading } = await supabase
+      .from("insolation_readings")
+      .select("id")
+      .eq("wms_device_id", device.id)
+      .eq("reading_date", date)
+      .single()
+
+    const readingData = {
+      wms_device_id: device.id,
+      reading_date: date,
+      insolation_value: averageInsolation,
+      reading_count: readings.length,
+      metadata: {
+        hourly_readings: readings,
+        min_irr: Math.min(...readings.map(r => r.irr)),
+        max_irr: Math.max(...readings.map(r => r.irr)),
+      },
+    }
+
+    if (existingReading) {
+      await supabase
+        .from("insolation_readings")
+        .update(readingData)
+        .eq("id", existingReading.id)
+      result.readingsUpdated++
+      logger.info(`[WMS Insolation Sync] Updated existing reading for device ${device.vendor_device_id} on ${date}`)
+    } else {
+      await supabase.from("insolation_readings").insert(readingData)
+      result.readingsCreated++
+      logger.info(`[WMS Insolation Sync] Created new reading for device ${device.vendor_device_id} on ${date}`)
+    }
+
+    result.success = true
+    const duration = Date.now() - startTime
+    logger.info(
+      `[WMS Insolation Sync] Device ${device.vendor_device_id} (ID: ${deviceId}) insolation synced successfully in ${duration}ms`
+    )
+  } catch (error: any) {
+    logger.error(
+      `[WMS Insolation Sync] Error syncing insolation for device ${deviceId}: ${error.message}`,
+      { error, deviceId, date }
+    )
+    return { ...result, error: error.message }
+  }
+
+  return result
+}
+
+/**
+ * Sync a single device by re-fetching its site and updating the device metadata
+ * NOTE: This is for device metadata sync, not insolation. Use syncWmsDeviceInsolation() for insolation.
  */
 export async function syncWmsDevice(
   deviceId: number,

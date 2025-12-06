@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getMainClient } from "@/lib/supabase/pooled"
-import { syncWmsDevice } from "@/lib/services/wmsSyncService"
+import { syncWmsDeviceInsolation } from "@/lib/services/wmsSyncService"
 import { requirePermission } from "@/lib/rbac"
 import MDC from "@/lib/context/mdc"
 import { logger } from "@/lib/context/logger"
 import { randomUUID } from "crypto"
 
 /**
- * API endpoint to sync a single WMS device
- * Re-fetches the device's site from vendor API and updates the device
+ * API endpoint to sync insolation data for a single WMS device
+ * Syncs insolation data (not device metadata)
  */
 
 export const dynamic = 'force-dynamic'
@@ -53,26 +53,27 @@ export async function POST(
             orgId: sessionData.orgId,
           },
           () => {
-            logger.info(`Syncing WMS device ${params.id}`)
+            logger.info(`Syncing insolation data for WMS device ${params.id}`)
           }
         )
 
         const supabase = getMainClient()
 
-        // Sync device
-        const result = await syncWmsDevice(parseInt(params.id), supabase)
+        // Sync insolation data for this device
+        const today = new Date().toISOString().split("T")[0]
+        const result = await syncWmsDeviceInsolation(parseInt(params.id), today, supabase)
 
         if (result.success) {
           return NextResponse.json({
             success: true,
-            message: "Device synced successfully",
+            message: `Insolation data synced successfully: ${result.readingsCreated + result.readingsUpdated} readings (${result.readingsCreated} created, ${result.readingsUpdated} updated)`,
             result,
           })
         } else {
           return NextResponse.json(
             {
               success: false,
-              error: result.error || "Failed to sync device",
+              error: result.error || "Failed to sync insolation data",
               result,
             },
             { status: 500 }

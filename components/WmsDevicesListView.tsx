@@ -84,13 +84,16 @@ export function WmsDevicesListView({ siteId }: { siteId: string }) {
       const data = await response.json()
 
       if (response.ok && data.success) {
-        alert("Device synced successfully")
+        alert(
+          `Insolation data synced successfully.\n` +
+          `Readings: ${data.result?.readingsCreated + data.result?.readingsUpdated || 0} (${data.result?.readingsCreated || 0} created, ${data.result?.readingsUpdated || 0} updated)`
+        )
         fetchData() // Refresh device list
       } else {
-        alert(data.error || "Failed to sync device")
+        alert(data.error || "Failed to sync insolation data")
       }
     } catch (error: any) {
-      alert(`Error syncing device: ${error.message}`)
+      alert(`Error syncing insolation data: ${error.message}`)
     } finally {
       setSyncingDeviceId(null)
     }
