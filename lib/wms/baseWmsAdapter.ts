@@ -89,10 +89,15 @@ export abstract class BaseWmsAdapter {
   ): Promise<InsolationReading[]>
 
   /**
-   * Calculate average insolation from hourly readings
-   * Default implementation: average of all non-zero IRR values
+   * Calculate daily insolation from hourly readings
+   * Calculates the area under the IRR vs time curve (integral of power over time)
+   * Returns energy in kWh/m²
+   * 
+   * Uses trapezoidal rule for numerical integration:
+   * - Calculates actual time intervals from timestamps
+   * - Integrates IRR (W/m²) over time to get energy (kWh/m²)
    */
-  calculateAverageInsolation(readings: InsolationReading[]): number {
+  calculateDailyInsolation(readings: InsolationReading[]): number {
     if (!readings || readings.length === 0) {
       return 0
     }
@@ -102,8 +107,81 @@ export abstract class BaseWmsAdapter {
       return 0
     }
 
-    const sum = validReadings.reduce((acc, r) => acc + r.irr, 0)
-    return sum / validReadings.length
+    // Sort readings by timestamp to ensure correct order
+    const sortedReadings = [...validReadings].sort((a, b) => {
+      const timeA = this.parseTimestamp(a.date, a.hour)
+      const timeB = this.parseTimestamp(b.date, b.hour)
+      return timeA.getTime() - timeB.getTime()
+    })
+
+    if (sortedReadings.length === 1) {
+      // Single reading: assume 1 hour interval
+      return (sortedReadings[0].irr * 1.0) / 1000 // kWh/m²
+    }
+
+    // Use trapezoidal rule for numerical integration
+    let totalEnergyWh = 0
+
+    for (let i = 0; i < sortedReadings.length - 1; i++) {
+      const current = sortedReadings[i]
+      const next = sortedReadings[i + 1]
+
+      const timeCurrent = this.parseTimestamp(current.date, current.hour)
+      const timeNext = this.parseTimestamp(next.date, next.hour)
+
+      // Calculate time interval in hours
+      const timeIntervalHours = (timeNext.getTime() - timeCurrent.getTime()) / (1000 * 60 * 60)
+
+      if (timeIntervalHours <= 0) {
+        // Skip if timestamps are invalid or same
+        continue
+      }
+
+      // Trapezoidal rule: average of two values × time interval
+      const avgIrr = (current.irr + next.irr) / 2
+      const energyWh = avgIrr * timeIntervalHours
+      totalEnergyWh += energyWh
+    }
+
+    // Convert Wh/m² to kWh/m²
+    return totalEnergyWh / 1000
+  }
+
+  /**
+   * Parse timestamp from date and hour strings
+   * @param date - ISO date string (YYYY-MM-DD) or datetime string
+   * @param hour - Time string (HH:mm:ss or HH:mm)
+   * @returns Date object
+   */
+  private parseTimestamp(date: string, hour: string): Date {
+    try {
+      // If date already contains time, parse it directly
+      if (date.includes('T') || date.includes(' ')) {
+        return new Date(date)
+      }
+
+      // Combine date and hour
+      const dateTimeStr = `${date} ${hour}`
+      const parsed = new Date(dateTimeStr)
+      
+      if (isNaN(parsed.getTime())) {
+        // Fallback: try ISO format
+        return new Date(date)
+      }
+      
+      return parsed
+    } catch (error) {
+      // Fallback to current date if parsing fails
+      return new Date()
+    }
+  }
+
+  /**
+   * @deprecated Use calculateDailyInsolation() instead
+   * Kept for backward compatibility
+   */
+  calculateAverageInsolation(readings: InsolationReading[]): number {
+    return this.calculateDailyInsolation(readings)
   }
 
   protected getApiBaseUrl(): string {

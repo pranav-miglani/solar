@@ -449,8 +449,8 @@ export async function syncWmsDeviceInsolation(
           continue
         }
 
-        const averageInsolation = adapter.calculateAverageInsolation(readings)
-        logger.info(`[WMS Insolation Sync] Calculated average insolation: ${averageInsolation.toFixed(2)} W/m² from ${readings.length} readings for ${targetDate}`)
+        const dailyInsolation = adapter.calculateDailyInsolation(readings)
+        logger.info(`[WMS Insolation Sync] Calculated daily insolation: ${dailyInsolation.toFixed(4)} kWh/m² from ${readings.length} readings for ${targetDate}`)
 
         // Check if reading already exists
         const { data: existingReading } = await supabase
@@ -463,7 +463,7 @@ export async function syncWmsDeviceInsolation(
         const readingData = {
           wms_device_id: device.id,
           reading_date: targetDate,
-          insolation_value: averageInsolation,
+          insolation_value: dailyInsolation,
           reading_count: readings.length,
           metadata: {
             hourly_readings: readings,
@@ -737,8 +737,8 @@ export async function syncWmsVendorInsolation(
           continue
         }
 
-        // Calculate average insolation
-        const averageInsolation = adapter.calculateAverageInsolation(readings)
+        // Calculate daily insolation (area under curve, in kWh/m²)
+        const dailyInsolation = adapter.calculateDailyInsolation(readings)
 
         // Upsert insolation reading
         const { data: existingReading } = await supabase
@@ -751,7 +751,7 @@ export async function syncWmsVendorInsolation(
         const readingData = {
           wms_device_id: device.id,
           reading_date: targetDate,
-          insolation_value: averageInsolation,
+          insolation_value: dailyInsolation,
           reading_count: readings.length,
           metadata: {
             hourly_readings: readings,
@@ -863,7 +863,7 @@ async function backfillInsolationData(
             continue
           }
 
-          const averageInsolation = adapter.calculateAverageInsolation(readings)
+          const dailyInsolation = adapter.calculateDailyInsolation(readings)
 
           const { data: existingReading } = await supabase
             .from("insolation_readings")
@@ -875,7 +875,7 @@ async function backfillInsolationData(
           const readingData = {
             wms_device_id: device.id,
             reading_date: dateStr,
-            insolation_value: averageInsolation,
+            insolation_value: dailyInsolation,
             reading_count: readings.length,
             metadata: {
               hourly_readings: readings,

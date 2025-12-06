@@ -219,8 +219,8 @@ export class IntelloAdapter extends BaseWmsAdapter {
     }))
 
     if (mappedReadings.length > 0) {
-      const avgIrr = mappedReadings.reduce((sum, r) => sum + (r.irr || 0), 0) / mappedReadings.length
-      logger.info(`[IntelloAdapter] Average IRR: ${avgIrr.toFixed(2)} W/m² (from ${mappedReadings.length} readings)`)
+      const dailyInsolation = this.calculateDailyInsolation(mappedReadings)
+      logger.info(`[IntelloAdapter] Daily insolation: ${dailyInsolation.toFixed(4)} kWh/m² (from ${mappedReadings.length} readings)`)
     }
 
     return mappedReadings

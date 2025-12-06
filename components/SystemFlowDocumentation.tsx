@@ -2232,7 +2232,7 @@ Unique Constraints:
                         <ul className="ml-4 mt-1 list-disc">
                           <li>Vendor API supports per-device insolation fetch only</li>
                           <li>For each device, calls <code className="bg-background px-1 rounded">adapter.getInsolationData(deviceId, fromDate, toDate)</code></li>
-                          <li>Calculates average insolation from hourly IRR values using <code className="bg-background px-1 rounded">calculateAverageInsolation()</code></li>
+                          <li>Calculates daily insolation (area under IRR vs time curve) in kWh/m² using <code className="bg-background px-1 rounded">calculateDailyInsolation()</code> - uses trapezoidal rule for numerical integration</li>
                           <li>Upserts daily insolation reading into <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
                         </ul>
                       </li>
