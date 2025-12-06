@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -56,6 +57,7 @@ interface WmsVendorsTableProps {
 }
 
 export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
+  const router = useRouter()
   const [vendors, setVendors] = useState<WmsVendor[]>([])
   const [orgs, setOrgs] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
@@ -463,6 +465,20 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/wms/vendors/${vendor.id}/sites`)}
+                      >
+                        View Sites
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/wms/vendors/${vendor.id}`)}
+                      >
+                        Details
+                      </Button>
                       {canManage && (
                         <>
                           <Button
