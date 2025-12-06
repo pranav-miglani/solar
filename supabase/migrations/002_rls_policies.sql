@@ -275,6 +275,10 @@ BEGIN
       ON alerts FOR ALL
       USING (get_account_type(auth.uid()::uuid) = 'SUPERADMIN');
 
+    CREATE POLICY "Developers can manage all alerts"
+      ON alerts FOR ALL
+      USING (get_account_type(auth.uid()::uuid) = 'DEVELOPER');
+
     CREATE POLICY "Govt can view all alerts"
       ON alerts FOR SELECT
       USING (get_account_type(auth.uid()::uuid) = 'GOVT');

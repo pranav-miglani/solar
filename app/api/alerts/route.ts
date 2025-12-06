@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getMainClient } from "@/lib/supabase/pooled"
+import { requirePermission } from "@/lib/rbac"
 
 // For alerts API, we need to bypass RLS
 
@@ -23,6 +24,9 @@ export async function GET(request: NextRequest) {
 
     const accountType = sessionData.accountType
     const orgId = sessionData.orgId
+
+    // Check permission - DEVELOPER, SUPERADMIN, GOVT, and ORG can read alerts
+    requirePermission(accountType as any, "alerts", "read")
 
     const url = new URL(request.url)
     const plantIdParam = url.searchParams.get("plantId")
