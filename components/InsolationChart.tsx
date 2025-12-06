@@ -99,19 +99,19 @@ export function InsolationChart({
             {statistics.averageInsolation !== undefined && (
               <div>
                 <span className="text-muted-foreground">Avg: </span>
-                <span className="font-medium">{statistics.averageInsolation.toFixed(2)} W/m²</span>
+                <span className="font-medium">{statistics.averageInsolation.toFixed(2)} kWh/m²</span>
               </div>
             )}
             {statistics.minInsolation !== undefined && (
               <div>
                 <span className="text-muted-foreground">Min: </span>
-                <span className="font-medium">{statistics.minInsolation.toFixed(2)} W/m²</span>
+                <span className="font-medium">{statistics.minInsolation.toFixed(2)} kWh/m²</span>
               </div>
             )}
             {statistics.maxInsolation !== undefined && (
               <div>
                 <span className="text-muted-foreground">Max: </span>
-                <span className="font-medium">{statistics.maxInsolation.toFixed(2)} W/m²</span>
+                <span className="font-medium">{statistics.maxInsolation.toFixed(2)} kWh/m²</span>
               </div>
             )}
           </div>
@@ -133,7 +133,7 @@ export function InsolationChart({
               height={80}
             />
             <YAxis
-              label={{ value: "Insolation (W/m²)", angle: -90, position: "insideLeft" }}
+              label={{ value: "Insolation (kWh/m²)", angle: -90, position: "insideLeft" }}
               tick={{ fontSize: 12 }}
             />
             <Tooltip
@@ -144,7 +144,7 @@ export function InsolationChart({
                     <div className="bg-background border rounded-lg p-3 shadow-lg">
                       <p className="font-medium">{data.date}</p>
                       <p className="text-sm text-muted-foreground">
-                        Insolation: <span className="font-medium text-foreground">{data.insolation} W/m²</span>
+                        Insolation: <span className="font-medium text-foreground">{data.insolation} kWh/m²</span>
                       </p>
                     </div>
                   )
@@ -160,7 +160,7 @@ export function InsolationChart({
               fill="#fbbf24"
               fillOpacity={0.6}
               strokeWidth={2}
-              name="Insolation (W/m²)"
+              name="Insolation (kWh/m²)"
             />
           </AreaChart>
         ) : (
@@ -177,7 +177,7 @@ export function InsolationChart({
               height={80}
             />
             <YAxis
-              label={{ value: "Insolation (W/m²)", angle: -90, position: "insideLeft" }}
+              label={{ value: "Insolation (kWh/m²)", angle: -90, position: "insideLeft" }}
               tick={{ fontSize: 12 }}
             />
             <Tooltip
@@ -188,7 +188,7 @@ export function InsolationChart({
                     <div className="bg-background border rounded-lg p-3 shadow-lg">
                       <p className="font-medium">{data.date}</p>
                       <p className="text-sm text-muted-foreground">
-                        Insolation: <span className="font-medium text-foreground">{data.insolation} W/m²</span>
+                        Insolation: <span className="font-medium text-foreground">{data.insolation} kWh/m²</span>
                       </p>
                     </div>
                   )
@@ -202,7 +202,7 @@ export function InsolationChart({
               dataKey="insolation"
               stroke="#f59e0b"
               strokeWidth={2}
-              name="Insolation (W/m²)"
+              name="Insolation (kWh/m²)"
             />
           </LineChart>
         )}
