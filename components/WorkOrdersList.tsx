@@ -73,7 +73,6 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importLoading, setImportLoading] = useState(false)
-  const [importResult, setImportResult] = useState<any>(null)
 
   const isSuperAdmin = accountType === "SUPERADMIN" || accountType === "DEVELOPER"
   const canEdit = isSuperAdmin
@@ -233,7 +232,6 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
     if (!canExportImport || !importFile) return
     
     setImportLoading(true)
-    setImportResult(null)
     
     try {
       const formData = new FormData()
@@ -244,24 +242,50 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
         body: formData,
       })
 
-      const data = await response.json()
+      // Check if response is Excel file (based on content-type)
+      const contentType = response.headers.get("content-type")
+      const isExcel = contentType?.includes("spreadsheetml") || contentType?.includes("excel")
 
-      if (!response.ok) {
-        alert(data.error || "Failed to import work orders")
+      if (isExcel) {
+        // Download the Excel report file
+        const blob = await response.blob()
+        const downloadUrl = window.URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = downloadUrl
+        
+        // Get filename from Content-Disposition header or use default
+        const contentDisposition = response.headers.get("content-disposition")
+        let filename = `work_orders_import_report_${new Date().toISOString().split('T')[0]}_${Date.now()}.xlsx`
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i)
+          if (filenameMatch) {
+            filename = filenameMatch[1]
+          }
+        }
+        
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(downloadUrl)
+        
         setImportLoading(false)
-        return
-      }
-
-      setImportResult(data)
-      setImportLoading(false)
-      
-      // Refresh the list if any were processed
-      if (data.summary.processed > 0) {
+        setImportDialogOpen(false)
+        setImportFile(null)
+        
+        // Always refresh the list to show any new work orders
         fetchWorkOrders()
+      } else {
+        // If not Excel, try to parse as JSON (for backward compatibility or error cases)
+        const data = await response.json()
+        if (!response.ok) {
+          // Still download as Excel if possible, otherwise show error
+          console.error("Import error:", data.error || "Failed to import work orders")
+        }
+        setImportLoading(false)
       }
     } catch (error) {
       console.error("Error importing work orders:", error)
-      alert("Failed to import work orders")
       setImportLoading(false)
     }
   }
@@ -359,34 +383,11 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
                       <strong>Note:</strong> Plants are identified by Vendor Plant ID and Vendor Type combination. Vendor Plant ID is unique per vendor type. Plant Name is optional and not used for matching (names can be duplicate).
                     </p>
                   </div>
-                  {importResult && (
-                    <div className={`p-4 rounded-lg border ${
-                      importResult.summary.errors > 0 
-                        ? "bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900"
-                        : "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
-                    }`}>
-                      <h4 className="font-semibold mb-2">Import Results:</h4>
-                      <div className="text-sm space-y-1">
-                        <p><strong>Total Rows:</strong> {importResult.summary.totalRows}</p>
-                        <p className="text-green-700 dark:text-green-300"><strong>Processed:</strong> {importResult.summary.processed}</p>
-                        <p className="text-yellow-700 dark:text-yellow-300"><strong>Errors:</strong> {importResult.summary.errors}</p>
-                      </div>
-                      {importResult.results && importResult.results.length > 0 && (
-                        <div className="mt-4">
-                          <h5 className="font-medium mb-2">Error Details (first 10):</h5>
-                          <div className="max-h-40 overflow-y-auto space-y-1 text-xs">
-                            {importResult.results
-                              .filter((r: any) => !r.success)
-                              .slice(0, 10)
-                              .map((r: any, idx: number) => (
-                                <div key={idx} className="p-2 bg-white dark:bg-background rounded border">
-                                  <p><strong>Row {r.rowNumber}:</strong> {r.error}</p>
-                                  {r.plantId && <p className="text-muted-foreground">Plant ID: {r.plantId}</p>}
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      )}
+                  {importLoading && (
+                    <div className="p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        Processing import... The Excel report will be downloaded automatically when complete.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -396,8 +397,8 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
                     onClick={() => {
                       setImportDialogOpen(false)
                       setImportFile(null)
-                      setImportResult(null)
                     }}
+                    disabled={importLoading}
                   >
                     Close
                   </Button>

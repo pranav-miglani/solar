@@ -260,7 +260,7 @@ export async function POST(request: NextRequest) {
         // Option 1a: If vendor_id is provided, use it (new format)
         // Option 1b: If vendor_type is provided, use it (original format - backward compatible)
         let vendorsQuery = supabase
-          .from("vendors")
+        .from("vendors")
           .select("id, vendor_type, org_id, name")
         
         if (vendorIds.length > 0 && vendorTypes.length > 0) {
@@ -276,15 +276,15 @@ export async function POST(request: NextRequest) {
           // Neither provided - this shouldn't happen due to validation, but handle it
           for (const row of option1Rows) {
             results.push(enrichResult({
-              rowNumber: rows.indexOf(row) + 2,
-              success: false,
+            rowNumber: rows.indexOf(row) + 2,
+            success: false,
               error: "Either Vendor ID or Vendor Type must be provided with Vendor Plant ID",
             }, row))
-            totalErrors++
-          }
-          continue
+          totalErrors++
         }
-        
+        continue
+      }
+      
         // Filter by org (must belong to work order's org or be global)
         vendorsQuery = vendorsQuery.or(`org_id.eq.${firstRow.org_id},org_id.is.null`)
         
@@ -355,20 +355,20 @@ export async function POST(request: NextRequest) {
           vendorTypeToVendors.get(vendor.vendor_type)!.push(vendor)
         }
         vendorIdToVendor = new Map(vendors.map(v => [v.id, v]))
-        
+      
         // Get all plants with matching vendor_plant_ids and vendor_ids (Option 1)
         const vendorPlantIds = option1Rows.map(r => r.vendor_plant_id!).filter(id => id)
         const vendorIds = vendors.map(v => v.id)
         
         if (vendorPlantIds.length > 0 && vendorIds.length > 0) {
-          const { data: plants, error: plantsError } = await supabase
-            .from("plants")
-            .select("id, org_id, vendor_id, vendor_plant_id, name")
-            .in("vendor_plant_id", vendorPlantIds)
-            .in("vendor_id", vendorIds)
+      const { data: plants, error: plantsError } = await supabase
+        .from("plants")
+        .select("id, org_id, vendor_id, vendor_plant_id, name")
+        .in("vendor_plant_id", vendorPlantIds)
+        .in("vendor_id", vendorIds)
             .eq("org_id", firstRow.org_id) // Ensure plants belong to the work order's org
-          
-          if (plantsError) {
+
+      if (plantsError) {
             for (const row of option1Rows) {
               results.push(enrichResult({
                 rowNumber: rows.indexOf(row) + 2,
@@ -398,9 +398,9 @@ export async function POST(request: NextRequest) {
             error: `Plant ID ${row.plant_id} not found or does not belong to organization ID ${firstRow.org_id}`,
           }, row))
           totalErrors++
-          continue
-        }
-        
+        continue
+      }
+
         // Get vendor for this plant
         const vendor = vendorIdToVendor.get(plant.vendor_id) || vendors.find((v: any) => v.id === plant.vendor_id)
         
