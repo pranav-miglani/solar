@@ -204,13 +204,17 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
   async function handleSyncSites(vendorId: number) {
     setSyncingVendorId(vendorId)
     try {
-      const response = await fetch(`/api/cron/sync-wms-sites`, {
-        method: "GET",
+      const response = await fetch(`/api/wms-vendors/${vendorId}/sync-sites`, {
+        method: "POST",
       })
       const data = await response.json()
 
-      if (response.ok) {
-        alert(`Site sync completed for WMS vendor.\nSites synced: ${data.summary?.totalSitesSynced || 0}`)
+      if (response.ok && data.success) {
+        alert(
+          `Site sync completed for ${data.result?.wmsVendorName || "WMS vendor"}.\n` +
+          `Sites synced: ${data.result?.sitesSynced || 0} (${data.result?.sitesCreated || 0} created, ${data.result?.sitesUpdated || 0} updated)\n` +
+          `Devices synced: ${data.result?.devicesSynced || 0} (${data.result?.devicesCreated || 0} created, ${data.result?.devicesUpdated || 0} updated)`
+        )
         fetchVendors()
       } else {
         alert(data.error || "Failed to sync sites")

@@ -68,8 +68,9 @@ function getWmsAdapter(vendor: any): IntelloAdapter {
 
 /**
  * Sync sites and devices for a single WMS vendor
+ * Exported for use in per-vendor sync endpoints
  */
-async function syncWmsVendorSites(
+export async function syncWmsVendorSites(
   vendor: any,
   supabase: any
 ): Promise<SiteSyncResult> {
@@ -228,9 +229,10 @@ async function syncWmsVendorSites(
 
 /**
  * Sync insolation data for all devices of a WMS vendor
+ * Exported for use in per-vendor sync endpoints
  * @param date - Date to sync (YYYY-MM-DD), defaults to yesterday
  */
-async function syncWmsVendorInsolation(
+export async function syncWmsVendorInsolation(
   vendor: any,
   supabase: any,
   date?: string
