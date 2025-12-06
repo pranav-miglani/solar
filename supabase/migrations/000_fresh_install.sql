@@ -78,6 +78,7 @@ DROP TYPE IF EXISTS alert_status CASCADE;
 DROP TYPE IF EXISTS alert_severity CASCADE;
 DROP TYPE IF EXISTS work_order_priority CASCADE;
 DROP TYPE IF EXISTS vendor_type CASCADE;
+DROP TYPE IF EXISTS wms_vendor_type CASCADE;
 DROP TYPE IF EXISTS account_type CASCADE;
 
 -- ============================================
@@ -90,6 +91,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Create ENUM types (with all values)
 CREATE TYPE account_type AS ENUM ('SUPERADMIN', 'ORG', 'GOVT', 'DEVELOPER');
 CREATE TYPE vendor_type AS ENUM ('SOLARMAN', 'SUNGROW', 'OTHER', 'SOLARDM', 'PVBLINK', 'SHINEMONITOR', 'FOXESSCLOUD');
+CREATE TYPE wms_vendor_type AS ENUM ('INTELLO');
 CREATE TYPE work_order_priority AS ENUM ('LOW', 'MEDIUM', 'HIGH');
 CREATE TYPE alert_severity AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 CREATE TYPE alert_status AS ENUM ('ACTIVE', 'RESOLVED', 'ACKNOWLEDGED');
@@ -316,6 +318,96 @@ COMMENT ON COLUMN disabled_plants.disabled_at IS 'Timestamp when the plant was m
 COMMENT ON COLUMN disabled_plants.days_since_refresh IS 'Number of days since last_update_time (vendor''s last data update) when plant was disabled.';
 
 -- ============================================
+-- WEATHER MONITORING SYSTEM (WMS) TABLES
+-- ============================================
+
+-- WMS Vendors table (similar to vendors but for weather monitoring)
+CREATE TABLE wms_vendors (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  vendor_type wms_vendor_type NOT NULL,
+  credentials JSONB NOT NULL, -- Stores email, password_hash, etc.
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  -- Token storage for WMS vendor API authentication
+  access_token TEXT, -- Cached access token from vendor API
+  refresh_token TEXT, -- Refresh token for token renewal (if supported)
+  token_expires_at TIMESTAMPTZ, -- Token expiration timestamp
+  token_metadata JSONB DEFAULT '{}', -- Additional token metadata
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  last_sites_synced_at TIMESTAMPTZ, -- Last time sites were synced
+  last_insolation_synced_at TIMESTAMPTZ, -- Last time insolation data was synced
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE wms_vendors IS 'Weather Monitoring System vendors (separate from inverter vendors). Manages sites and devices for insolation data.';
+COMMENT ON COLUMN wms_vendors.credentials IS 'Vendor-specific credentials (e.g., email, password_hash for INTELLO)';
+COMMENT ON COLUMN wms_vendors.access_token IS 'Cached access token from WMS vendor API';
+COMMENT ON COLUMN wms_vendors.last_sites_synced_at IS 'Last time sites were synced from this vendor';
+COMMENT ON COLUMN wms_vendors.last_insolation_synced_at IS 'Last time insolation data was synced for this vendor';
+
+-- WMS Sites table
+CREATE TABLE wms_sites (
+  id SERIAL PRIMARY KEY,
+  wms_vendor_id INTEGER NOT NULL REFERENCES wms_vendors(id) ON DELETE CASCADE,
+  org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  vendor_site_id TEXT NOT NULL, -- Vendor-specific site identifier
+  site_name TEXT NOT NULL,
+  address TEXT,
+  latitude NUMERIC(10, 7),
+  longitude NUMERIC(10, 7),
+  location TEXT,
+  elevation NUMERIC(10, 2),
+  status TEXT, -- e.g., PARTIALLY_ACTIVE, ACTIVE, INACTIVE
+  panel_count INTEGER,
+  panel_wattage NUMERIC(10, 2),
+  created_date DATE,
+  installer_type TEXT, -- e.g., RESIDENTIAL, COMMERCIAL
+  metadata JSONB DEFAULT '{}', -- Additional vendor-specific site data
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(wms_vendor_id, vendor_site_id)
+);
+
+COMMENT ON TABLE wms_sites IS 'Weather monitoring sites from WMS vendors. Each site can have multiple devices.';
+COMMENT ON COLUMN wms_sites.vendor_site_id IS 'Vendor-specific site identifier (unique per vendor)';
+COMMENT ON COLUMN wms_sites.metadata IS 'Additional vendor-specific site data (e.g., panelCount, panelWattage, etc.)';
+
+-- WMS Devices table
+CREATE TABLE wms_devices (
+  id SERIAL PRIMARY KEY,
+  wms_site_id INTEGER NOT NULL REFERENCES wms_sites(id) ON DELETE CASCADE,
+  vendor_device_id TEXT NOT NULL, -- Vendor-specific device identifier (e.g., RTU2495)
+  device_name TEXT,
+  mac_address TEXT,
+  serial_no TEXT,
+  metadata JSONB DEFAULT '{}', -- Additional vendor-specific device data
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(wms_site_id, vendor_device_id)
+);
+
+COMMENT ON TABLE wms_devices IS 'Devices within WMS sites. Each device measures insolation.';
+COMMENT ON COLUMN wms_devices.vendor_device_id IS 'Vendor-specific device identifier (e.g., RTU ID for INTELLO)';
+
+-- Insolation Readings table (stores last 100 days in rollover fashion)
+CREATE TABLE insolation_readings (
+  id SERIAL PRIMARY KEY,
+  wms_device_id INTEGER NOT NULL REFERENCES wms_devices(id) ON DELETE CASCADE,
+  reading_date DATE NOT NULL, -- Date of the reading
+  insolation_value NUMERIC(10, 3) NOT NULL, -- Average insolation (IRR) for the day in W/m²
+  reading_count INTEGER NOT NULL DEFAULT 0, -- Number of readings used to calculate average
+  metadata JSONB DEFAULT '{}', -- Additional data (hourly breakdown, min, max, etc.)
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(wms_device_id, reading_date)
+);
+
+COMMENT ON TABLE insolation_readings IS 'Daily insolation readings for WMS devices. Stores last 100 days in rollover fashion.';
+COMMENT ON COLUMN insolation_readings.insolation_value IS 'Average insolation (IRR) for the day in W/m², calculated from hourly readings';
+COMMENT ON COLUMN insolation_readings.reading_count IS 'Number of hourly readings used to calculate the daily average';
+
+-- ============================================
 -- INDEXES
 -- ============================================
 
@@ -359,6 +451,18 @@ CREATE INDEX idx_disabled_plants_plant_id ON disabled_plants(plant_id);
 CREATE INDEX idx_disabled_plants_org_id ON disabled_plants(org_id);
 CREATE INDEX idx_disabled_plants_vendor_id ON disabled_plants(vendor_id);
 CREATE INDEX idx_disabled_plants_disabled_at ON disabled_plants(disabled_at);
+
+-- WMS indexes
+CREATE INDEX idx_wms_vendors_org_id ON wms_vendors(org_id);
+CREATE INDEX idx_wms_vendors_token_expires_at ON wms_vendors(token_expires_at) WHERE token_expires_at IS NOT NULL;
+CREATE INDEX idx_wms_sites_wms_vendor_id ON wms_sites(wms_vendor_id);
+CREATE INDEX idx_wms_sites_org_id ON wms_sites(org_id);
+CREATE INDEX idx_wms_sites_vendor_site_id ON wms_sites(vendor_site_id);
+CREATE INDEX idx_wms_devices_wms_site_id ON wms_devices(wms_site_id);
+CREATE INDEX idx_wms_devices_vendor_device_id ON wms_devices(vendor_device_id);
+CREATE INDEX idx_insolation_readings_wms_device_id ON insolation_readings(wms_device_id);
+CREATE INDEX idx_insolation_readings_reading_date ON insolation_readings(reading_date DESC);
+CREATE INDEX idx_insolation_readings_device_date ON insolation_readings(wms_device_id, reading_date DESC);
 
 -- ============================================
 -- FUNCTIONS
@@ -516,6 +620,25 @@ $$;
 
 COMMENT ON FUNCTION should_disable_plant(TIMESTAMPTZ, TIMESTAMPTZ) IS 'Helper function to check if a plant should be disabled based on last_update_time (vendor''s last data update) and created_at timestamps. Returns true if plant should be disabled (3+ days since last vendor update).';
 
+-- Function to clean up old insolation readings (keep only last 100 days)
+CREATE OR REPLACE FUNCTION cleanup_old_insolation_readings()
+RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  deleted_count INTEGER;
+BEGIN
+  -- Delete readings older than 100 days
+  DELETE FROM insolation_readings
+  WHERE reading_date < CURRENT_DATE - INTERVAL '100 days';
+  
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  RETURN deleted_count;
+END;
+$$;
+
+COMMENT ON FUNCTION cleanup_old_insolation_readings() IS 'Cleans up insolation readings older than 100 days to maintain rollover storage. Returns count of deleted records.';
+
 -- RLS Helper functions
 CREATE OR REPLACE FUNCTION get_account_type(account_id UUID)
 RETURNS account_type AS $$
@@ -561,6 +684,18 @@ CREATE TRIGGER update_alerts_updated_at BEFORE UPDATE ON alerts
 CREATE TRIGGER update_disabled_plants_updated_at BEFORE UPDATE ON disabled_plants
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_wms_vendors_updated_at BEFORE UPDATE ON wms_vendors
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_wms_sites_updated_at BEFORE UPDATE ON wms_sites
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_wms_devices_updated_at BEFORE UPDATE ON wms_devices
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_insolation_readings_updated_at BEFORE UPDATE ON insolation_readings
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- ============================================
 -- ROW LEVEL SECURITY (RLS)
 -- ============================================
@@ -574,6 +709,10 @@ ALTER TABLE work_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE work_order_plants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE disabled_plants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wms_vendors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wms_sites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wms_devices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE insolation_readings ENABLE ROW LEVEL SECURITY;
 
 -- Accounts policies
 CREATE POLICY "Accounts can view their own record"
@@ -742,6 +881,95 @@ CREATE POLICY "Org accounts can view disabled plants in their org"
     get_account_org_id(auth.uid()::uuid) = org_id
   );
 
+-- WMS Vendors policies
+CREATE POLICY "Superadmins can manage all wms_vendors"
+  ON wms_vendors FOR ALL
+  USING (get_account_type(auth.uid()::uuid) = 'SUPERADMIN');
+
+CREATE POLICY "Developers can manage all wms_vendors"
+  ON wms_vendors FOR ALL
+  USING (get_account_type(auth.uid()::uuid) = 'DEVELOPER');
+
+CREATE POLICY "Govt can view all wms_vendors"
+  ON wms_vendors FOR SELECT
+  USING (get_account_type(auth.uid()::uuid) = 'GOVT');
+
+CREATE POLICY "Org accounts can view wms_vendors in their org"
+  ON wms_vendors FOR SELECT
+  USING (
+    get_account_type(auth.uid()::uuid) = 'ORG' AND
+    get_account_org_id(auth.uid()::uuid) = org_id
+  );
+
+-- WMS Sites policies
+CREATE POLICY "Superadmins can manage all wms_sites"
+  ON wms_sites FOR ALL
+  USING (get_account_type(auth.uid()::uuid) = 'SUPERADMIN');
+
+CREATE POLICY "Developers can manage all wms_sites"
+  ON wms_sites FOR ALL
+  USING (get_account_type(auth.uid()::uuid) = 'DEVELOPER');
+
+CREATE POLICY "Govt can view all wms_sites"
+  ON wms_sites FOR SELECT
+  USING (get_account_type(auth.uid()::uuid) = 'GOVT');
+
+CREATE POLICY "Org accounts can view wms_sites in their org"
+  ON wms_sites FOR SELECT
+  USING (
+    get_account_type(auth.uid()::uuid) = 'ORG' AND
+    get_account_org_id(auth.uid()::uuid) = org_id
+  );
+
+-- WMS Devices policies
+CREATE POLICY "Superadmins can manage all wms_devices"
+  ON wms_devices FOR ALL
+  USING (get_account_type(auth.uid()::uuid) = 'SUPERADMIN');
+
+CREATE POLICY "Developers can manage all wms_devices"
+  ON wms_devices FOR ALL
+  USING (get_account_type(auth.uid()::uuid) = 'DEVELOPER');
+
+CREATE POLICY "Govt can view all wms_devices"
+  ON wms_devices FOR SELECT
+  USING (get_account_type(auth.uid()::uuid) = 'GOVT');
+
+CREATE POLICY "Org accounts can view wms_devices in their org"
+  ON wms_devices FOR SELECT
+  USING (
+    get_account_type(auth.uid()::uuid) = 'ORG' AND
+    EXISTS (
+      SELECT 1 FROM wms_sites s
+      WHERE s.id = wms_devices.wms_site_id
+      AND s.org_id = get_account_org_id(auth.uid()::uuid)
+    )
+  );
+
+-- Insolation Readings policies
+CREATE POLICY "Superadmins can manage all insolation_readings"
+  ON insolation_readings FOR ALL
+  USING (get_account_type(auth.uid()::uuid) = 'SUPERADMIN');
+
+CREATE POLICY "Developers can manage all insolation_readings"
+  ON insolation_readings FOR ALL
+  USING (get_account_type(auth.uid()::uuid) = 'DEVELOPER');
+
+CREATE POLICY "Govt can view all insolation_readings"
+  ON insolation_readings FOR SELECT
+  USING (get_account_type(auth.uid()::uuid) = 'GOVT');
+
+CREATE POLICY "Org accounts can view insolation_readings in their org"
+  ON insolation_readings FOR SELECT
+  USING (
+    get_account_type(auth.uid()::uuid) = 'ORG' AND
+    EXISTS (
+      SELECT 1 FROM wms_devices d
+      JOIN wms_sites s ON s.id = d.wms_site_id
+      WHERE d.id = insolation_readings.wms_device_id
+      AND s.org_id = get_account_org_id(auth.uid()::uuid)
+    )
+  );
+
 -- ============================================
 -- VERIFY SCHEMA CREATION
 -- ============================================
@@ -757,14 +985,15 @@ BEGIN
   WHERE table_schema = 'public'
     AND table_name IN (
       'accounts', 'organizations', 'vendors', 'plants',
-      'work_orders', 'work_order_plants', 'alerts', 'disabled_plants'
+      'work_orders', 'work_order_plants', 'alerts', 'disabled_plants',
+      'wms_vendors', 'wms_sites', 'wms_devices', 'insolation_readings'
     );
   
-  IF table_count < 8 THEN
-    RAISE EXCEPTION 'Not all core tables were created. Expected 8, found %', table_count;
+  IF table_count < 12 THEN
+    RAISE EXCEPTION 'Not all core tables were created. Expected 12, found %', table_count;
   END IF;
   
-  RAISE NOTICE '✅ Core tables created successfully (accounts, organizations, vendors, plants, work_orders, work_order_plants, alerts, disabled_plants)';
+  RAISE NOTICE '✅ Core tables created successfully (accounts, organizations, vendors, plants, work_orders, work_order_plants, alerts, disabled_plants, wms_vendors, wms_sites, wms_devices, insolation_readings)';
   
   -- Verify RLS policies
   SELECT COUNT(*) INTO policy_count
@@ -772,7 +1001,8 @@ BEGIN
   WHERE schemaname = 'public'
     AND tablename IN (
       'accounts', 'organizations', 'vendors', 'plants',
-      'work_orders', 'work_order_plants', 'alerts', 'disabled_plants'
+      'work_orders', 'work_order_plants', 'alerts', 'disabled_plants',
+      'wms_vendors', 'wms_sites', 'wms_devices', 'insolation_readings'
     );
   
   RAISE NOTICE '✅ Created % RLS policies', policy_count;

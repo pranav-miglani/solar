@@ -77,6 +77,24 @@ app.prepare().then(() => {
         } else {
           console.log('⏸️ Disable inactive plants cron is disabled (ENABLE_DISABLE_INACTIVE_PLANTS_CRON=false)')
         }
+
+        // WMS site sync cron (runs twice daily at 6 AM and 10 PM IST)
+        const enableWmsSiteSyncCron = process.env.ENABLE_WMS_SITE_SYNC_CRON !== 'false'
+        if (enableWmsSiteSyncCron) {
+          const { startWmsSiteSyncCron } = require('./lib/cron/wmsSiteSyncCron')
+          startWmsSiteSyncCron()
+        } else {
+          console.log('⏸️ WMS site sync cron is disabled (ENABLE_WMS_SITE_SYNC_CRON=false)')
+        }
+
+        // WMS insolation sync cron (runs daily at 10 PM IST)
+        const enableWmsInsolationSyncCron = process.env.ENABLE_WMS_INSOLATION_SYNC_CRON !== 'false'
+        if (enableWmsInsolationSyncCron) {
+          const { startWmsInsolationSyncCron } = require('./lib/cron/wmsInsolationSyncCron')
+          startWmsInsolationSyncCron()
+        } else {
+          console.log('⏸️ WMS insolation sync cron is disabled (ENABLE_WMS_INSOLATION_SYNC_CRON=false)')
+        }
       } catch (error) {
         console.error('Failed to start cron job(s):', error)
       }

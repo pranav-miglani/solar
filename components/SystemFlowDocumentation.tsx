@@ -606,10 +606,14 @@ export function SystemFlowDocumentation() {
                         <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                           <li><code className="bg-background px-1 rounded">accounts</code> - User accounts with RBAC</li>
                           <li><code className="bg-background px-1 rounded">organizations</code> - Organization-level settings</li>
-                          <li><code className="bg-background px-1 rounded">vendors</code> - Vendor configurations</li>
+                          <li><code className="bg-background px-1 rounded">vendors</code> - Inverter vendor configurations</li>
                           <li><code className="bg-background px-1 rounded">plants</code> - Plant metadata and production metrics</li>
                           <li><code className="bg-background px-1 rounded">work_orders</code> - Work order management</li>
                           <li><code className="bg-background px-1 rounded">alerts</code> - Vendor alerts</li>
+                          <li><code className="bg-background px-1 rounded">wms_vendors</code> - Weather Monitoring System vendor configurations</li>
+                          <li><code className="bg-background px-1 rounded">wms_sites</code> - WMS sites (locations with weather monitoring devices)</li>
+                          <li><code className="bg-background px-1 rounded">wms_devices</code> - WMS devices (RTUs, sensors) within sites</li>
+                          <li><code className="bg-background px-1 rounded">insolation_readings</code> - Daily insolation data (last 100 days, rollover)</li>
                         </ul>
                       </div>
                       <div>
@@ -642,6 +646,7 @@ export function SystemFlowDocumentation() {
                           <li><code className="bg-background px-1 rounded">alertSyncService.ts</code> - Alert synchronization</li>
                           <li><code className="bg-background px-1 rounded">liveTelemetrySyncService.ts</code> - Live telemetry sync (15/30/45 min intervals, LIST_PLANTS or PER_PLANT mode)</li>
                           <li><code className="bg-background px-1 rounded">telemetrySyncService.ts</code> - Historical telemetry (graphs) synchronization</li>
+                          <li><code className="bg-background px-1 rounded">wmsSyncService.ts</code> - WMS site/device sync and insolation data sync</li>
                         </ul>
                       </div>
                       <div>
@@ -650,6 +655,8 @@ export function SystemFlowDocumentation() {
                           <li><code className="bg-background px-1 rounded">plantSyncCron.js</code> - Runs every 15 min, checks morning/evening times (twice daily sync)</li>
                           <li><code className="bg-background px-1 rounded">liveTelemetrySyncCron.js</code> - Runs every 15 min, filters vendors by telemetry_sync_interval</li>
                           <li><code className="bg-background px-1 rounded">alertSyncCron.js</code> - Alert sync scheduler</li>
+                          <li><code className="bg-background px-1 rounded">wmsSiteSyncCron.js</code> - WMS site sync (runs twice daily at 6 AM and 10 PM IST)</li>
+                          <li><code className="bg-background px-1 rounded">wmsInsolationSyncCron.js</code> - WMS insolation sync (runs daily at 10 PM IST)</li>
                           <li>Morning cron (00:15 AM) - Historical aggregate updates</li>
                         </ul>
                       </div>

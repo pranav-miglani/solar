@@ -16,6 +16,7 @@ import {
   RefreshCw,
   BookOpen,
   BookMarked,
+  CloudSun,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -99,6 +100,12 @@ export function DashboardSidebar() {
       title: "Alerts",
       href: "/alerts",
       icon: AlertTriangle,
+      roles: ["SUPERADMIN", "DEVELOPER", "ORG", "GOVT"],
+    },
+    {
+      title: "Weather Monitoring",
+      href: "/wms",
+      icon: CloudSun,
       roles: ["SUPERADMIN", "DEVELOPER", "ORG", "GOVT"],
     },
   ]
