@@ -9,7 +9,7 @@
 COMMENT ON COLUMN insolation_readings.insolation_value IS 'Daily insolation (energy) in kWh/m², calculated as area under IRR vs time curve using trapezoidal rule for numerical integration';
 
 -- Update column comment for reading_count
-COMMENT ON COLUMN insolation_readings.reading_count IS 'Number of hourly readings used to calculate the daily insolation (integral)';
+COMMENT ON COLUMN insolation_readings.reading_count IS 'Number of time-series readings used to calculate the daily insolation (integral)';
 
 -- Update table comment if needed
 COMMENT ON TABLE insolation_readings IS 'Daily insolation readings for WMS devices. Stores last 100 days in rollover fashion. Insolation is calculated as area under IRR vs time curve (integral) in kWh/m².';

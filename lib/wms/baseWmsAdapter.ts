@@ -31,12 +31,13 @@ export interface WmsDevice {
 }
 
 /**
- * Insolation reading interface (hourly data from vendor)
+ * Insolation reading interface (time-series data from vendor)
+ * Can be at any interval (e.g., 10-minute, hourly, etc.)
  */
 export interface InsolationReading {
   deviceId: string
   date: string // ISO date string
-  hour: string // HH:mm:ss format
+  hour: string // HH:mm:ss format (or any time format)
   irr: number // Insolation value in W/m²
   generation?: number // Optional generation value
 }
