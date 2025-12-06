@@ -435,7 +435,7 @@ async function syncVendorLiveTelemetry(
             }
             
             const { error: updateError } = await supabase
-              .from("plants")
+            .from("plants")
               .update(updateData) // Only telemetry fields, explicitly constructed
               .eq("id", item.id)
             

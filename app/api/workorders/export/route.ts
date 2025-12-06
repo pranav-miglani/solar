@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     const workbook = new ExcelJS.Workbook()
     const worksheet = workbook.addWorksheet("Work Orders")
 
-    // Define columns - Vendor Plant ID and Plant Name are primary identifiers
+    // Define columns - Include Plant ID (internal ID) for easier re-import
     worksheet.columns = [
       { header: "Work Order ID", key: "work_order_id", width: 15 },
       { header: "Title", key: "title", width: 30 },
@@ -87,6 +87,7 @@ export async function GET(request: NextRequest) {
       { header: "Location", key: "location", width: 30 },
       { header: "Organization ID", key: "org_id", width: 15 },
       { header: "Organization Name", key: "org_name", width: 30 },
+      { header: "Plant ID", key: "plant_id", width: 15 },
       { header: "Vendor Plant ID", key: "vendor_plant_id", width: 20 },
       { header: "Plant Name", key: "plant_name", width: 30 },
       { header: "Vendor ID", key: "vendor_id", width: 15 },
@@ -120,6 +121,7 @@ export async function GET(request: NextRequest) {
             location: workOrder.location || "",
             org_id: workOrder.org_id,
             org_name: orgName,
+            plant_id: "",
             vendor_plant_id: "",
             plant_name: "",
             vendor_id: "",
@@ -142,6 +144,7 @@ export async function GET(request: NextRequest) {
               location: workOrder.location || "",
               org_id: workOrder.org_id,
               org_name: orgName,
+              plant_id: plant?.id || "",
               vendor_plant_id: plant?.vendor_plant_id || "",
               plant_name: plant?.name || "",
               vendor_id: vendor?.id || "",

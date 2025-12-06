@@ -13,11 +13,15 @@ interface ImportRow {
   location?: string
   org_id: number
   org_name?: string
-  vendor_plant_id: string
-  vendor_type: string
-  plant_name?: string
+  // Option 1: Use vendor_id + vendor_plant_id
+  vendor_plant_id?: string
+  vendor_type?: string
   vendor_id?: number
   vendor_name?: string
+  // Option 2: Use internal plant ID (plants.id)
+  plant_id?: number
+  // Optional fields for validation/reference
+  plant_name?: string
   capacity_kw?: number
 }
 
@@ -26,6 +30,15 @@ interface ImportResult {
   workOrderId?: number
   success: boolean
   error?: string
+  // Additional details for report
+  title?: string
+  orgId?: number
+  orgName?: string
+  plantId?: number
+  vendorPlantId?: string
+  plantName?: string
+  vendorId?: number
+  vendorName?: string
 }
 
 export async function POST(request: NextRequest) {
@@ -100,6 +113,9 @@ export async function POST(request: NextRequest) {
         })
         
         // Map to ImportRow structure
+        // Support two formats:
+        // Option 1: title, orgId, vendorId, Vendor Plant Id
+        // Option 2: title, orgId, Plant ID (internal plant ID)
         const importRow: ImportRow = {
           work_order_id: rowData["Work Order ID"] ? parseInt(rowData["Work Order ID"]) : undefined,
           title: rowData["Title"]?.toString() || "",
@@ -107,16 +123,23 @@ export async function POST(request: NextRequest) {
           location: rowData["Location"]?.toString() || "",
           org_id: rowData["Organization ID"] ? parseInt(rowData["Organization ID"]) : 0,
           org_name: rowData["Organization Name"]?.toString() || "",
-          vendor_plant_id: rowData["Vendor Plant ID"]?.toString() || "",
-          vendor_type: rowData["Vendor Type"]?.toString() || "",
-          plant_name: rowData["Plant Name"]?.toString() || "",
+          // Option 1 fields
+          vendor_plant_id: rowData["Vendor Plant ID"]?.toString() || rowData["Vendor Plant Id"]?.toString() || undefined,
+          vendor_type: rowData["Vendor Type"]?.toString() || undefined,
           vendor_id: rowData["Vendor ID"] ? parseInt(rowData["Vendor ID"]) : undefined,
-          vendor_name: rowData["Vendor Name"]?.toString() || "",
+          vendor_name: rowData["Vendor Name"]?.toString() || undefined,
+          // Option 2 field
+          plant_id: rowData["Plant ID"] ? parseInt(rowData["Plant ID"]) : rowData["Plant Id"] ? parseInt(rowData["Plant Id"]) : undefined,
+          // Optional fields
+          plant_name: rowData["Plant Name"]?.toString() || undefined,
           capacity_kw: rowData["Capacity (kW)"] ? parseFloat(rowData["Capacity (kW)"]) : undefined,
         }
         
-        // Only add rows with required fields: title, org_id, vendor_plant_id, vendor_type
-        if (importRow.title && importRow.org_id && importRow.vendor_plant_id && importRow.vendor_type) {
+        // Validate required fields: title, org_id, and either (vendor_id + vendor_plant_id) OR plant_id
+        const hasOption1 = importRow.title && importRow.org_id && importRow.vendor_id && importRow.vendor_plant_id
+        const hasOption2 = importRow.title && importRow.org_id && importRow.plant_id
+        
+        if (hasOption1 || hasOption2) {
           rows.push(importRow)
         }
       }
@@ -146,6 +169,21 @@ export async function POST(request: NextRequest) {
     let totalProcessed = 0
     let totalErrors = 0
 
+    // Helper function to enrich result with row data
+    const enrichResult = (result: ImportResult, row?: ImportRow, plant?: any, vendor?: any): ImportResult => {
+      return {
+        ...result,
+        title: result.title || row?.title,
+        orgId: result.orgId || row?.org_id,
+        orgName: result.orgName || row?.org_name,
+        plantId: result.plantId || plant?.id || row?.plant_id,
+        vendorPlantId: result.vendorPlantId || plant?.vendor_plant_id || row?.vendor_plant_id,
+        plantName: result.plantName || plant?.name || row?.plant_name,
+        vendorId: result.vendorId || vendor?.id || row?.vendor_id,
+        vendorName: result.vendorName || vendor?.name || row?.vendor_name,
+      }
+    }
+
     // Process each work order group
     for (const [key, groupRows] of workOrderGroups.entries()) {
       const firstRow = groupRows[0]
@@ -159,81 +197,280 @@ export async function POST(request: NextRequest) {
 
       if (orgError || !org) {
         for (const row of groupRows) {
-          results.push({
+          results.push(enrichResult({
             rowNumber: rows.indexOf(row) + 2, // +2 for header row and 1-based index
             success: false,
             error: `Organization ID ${firstRow.org_id} not found`,
-          })
+          }, row))
           totalErrors++
         }
         continue
       }
 
-      // Validate all plants exist and belong to the same org
-      // Look up plants by vendor_plant_id and vendor_type (vendor_plant_id is unique per vendor_type)
-      const vendorPlantIds = groupRows.map(r => r.vendor_plant_id)
-      const vendorTypes = [...new Set(groupRows.map(r => r.vendor_type))]
+      // Separate rows by import format
+      const option1Rows = groupRows.filter(r => r.vendor_id && r.vendor_plant_id) // Option 1: vendor_id + vendor_plant_id
+      const option2Rows = groupRows.filter(r => r.plant_id) // Option 2: plant_id (internal ID)
       
-      // Get vendors for the specified vendor types
-      const { data: vendors, error: vendorsError } = await supabase
-        .from("vendors")
-        .select("id, vendor_type")
-        .in("vendor_type", vendorTypes)
-      
-      if (vendorsError || !vendors || vendors.length === 0) {
-        for (const row of groupRows) {
-          results.push({
-            rowNumber: rows.indexOf(row) + 2,
-            success: false,
-            error: `Vendor type "${row.vendor_type}" not found`,
-          })
-          totalErrors++
+      // Validate Option 2 rows first (simpler - direct plant lookup)
+      let option2Plants: any[] = []
+      if (option2Rows.length > 0) {
+        const plantIds = option2Rows.map(r => r.plant_id!).filter(id => id > 0)
+        if (plantIds.length > 0) {
+          const { data: plants, error: plantsError } = await supabase
+            .from("plants")
+            .select("id, org_id, vendor_id, vendor_plant_id, name")
+            .in("id", plantIds)
+            .eq("org_id", firstRow.org_id) // Ensure plants belong to the work order's org
+          
+          if (plantsError) {
+            for (const row of option2Rows) {
+              results.push(enrichResult({
+                rowNumber: rows.indexOf(row) + 2,
+                success: false,
+                error: "Failed to validate plants",
+              }, row))
+              totalErrors++
+            }
+          } else {
+            option2Plants = plants || []
+          }
         }
-        continue
       }
       
-      // Create map of vendor_type to vendor_id
-      const vendorTypeToId = new Map(vendors.map(v => [v.vendor_type, v.id]))
+      // Validate Option 1 rows (vendor_id + vendor_plant_id)
+      let option1Plants: any[] = []
+      let vendors: any[] = []
+      let vendorTypeToVendors = new Map<string, any[]>()
+      let vendorIdToVendor = new Map<number, any>()
       
-      // Get all plants with matching vendor_plant_ids and vendor_ids
-      const vendorIds = Array.from(vendorTypeToId.values())
-      const { data: plants, error: plantsError } = await supabase
-        .from("plants")
-        .select("id, org_id, vendor_id, vendor_plant_id, name")
-        .in("vendor_plant_id", vendorPlantIds)
-        .in("vendor_id", vendorIds)
-
-      if (plantsError) {
-        for (const row of groupRows) {
-          results.push({
-            rowNumber: rows.indexOf(row) + 2,
-            success: false,
-            error: "Failed to validate plants",
-          })
-          totalErrors++
+      if (option1Rows.length > 0) {
+        const vendorPlantIds = option1Rows.map(r => r.vendor_plant_id!).filter(id => id)
+        const vendorTypes = [...new Set(option1Rows.map(r => r.vendor_type).filter(t => t))]
+        
+        if (vendorTypes.length === 0) {
+          for (const row of option1Rows) {
+            results.push(enrichResult({
+              rowNumber: rows.indexOf(row) + 2,
+              success: false,
+              error: "Vendor Type is required when using Vendor ID + Vendor Plant ID format",
+            }, row))
+            totalErrors++
+          }
+        } else {
+          // Get vendors for the specified vendor types that belong to the same org (or are global vendors with org_id = NULL)
+          const { data: vendorsData, error: vendorsError } = await supabase
+            .from("vendors")
+            .select("id, vendor_type, org_id, name")
+            .in("vendor_type", vendorTypes)
+            .or(`org_id.eq.${firstRow.org_id},org_id.is.null`)
+          
+          if (vendorsError || !vendorsData || vendorsData.length === 0) {
+            for (const row of option1Rows) {
+              results.push(enrichResult({
+                rowNumber: rows.indexOf(row) + 2,
+                success: false,
+                error: `No vendors found for vendor type "${row.vendor_type}" that belong to organization ID ${firstRow.org_id} or are global vendors`,
+              }, row))
+              totalErrors++
+            }
+          } else {
+            vendors = vendorsData
+          }
         }
-        continue
+      }
+      
+      // If vendor_id is provided in Excel (Option 1), validate it matches vendor_type and org
+      for (const row of option1Rows) {
+        if (row.vendor_id) {
+          const vendor = vendors.find(v => v.id === row.vendor_id)
+          if (!vendor) {
+            results.push(enrichResult({
+              rowNumber: rows.indexOf(row) + 2,
+              success: false,
+              error: `Vendor ID ${row.vendor_id} not found or does not belong to organization ID ${firstRow.org_id}`,
+            }, row, undefined, { id: row.vendor_id }))
+            totalErrors++
+            continue
+          }
+          if (row.vendor_type && vendor.vendor_type !== row.vendor_type) {
+            results.push(enrichResult({
+              rowNumber: rows.indexOf(row) + 2,
+              success: false,
+              error: `Vendor ID ${row.vendor_id} (${vendor.name}) has vendor type "${vendor.vendor_type}" but row specifies "${row.vendor_type}"`,
+            }, row, undefined, vendor))
+            totalErrors++
+            continue
+          }
+          if (vendor.org_id !== null && vendor.org_id !== firstRow.org_id) {
+            results.push(enrichResult({
+              rowNumber: rows.indexOf(row) + 2,
+              success: false,
+              error: `Vendor ID ${row.vendor_id} (${vendor.name}) belongs to organization ID ${vendor.org_id} but work order is for organization ID ${firstRow.org_id}`,
+            }, row, undefined, vendor))
+            totalErrors++
+            continue
+          }
+        }
+      }
+      
+      // Create maps for Option 1 processing
+      if (vendors.length > 0) {
+        for (const vendor of vendors) {
+          if (!vendorTypeToVendors.has(vendor.vendor_type)) {
+            vendorTypeToVendors.set(vendor.vendor_type, [])
+          }
+          vendorTypeToVendors.get(vendor.vendor_type)!.push(vendor)
+        }
+        vendorIdToVendor = new Map(vendors.map(v => [v.id, v]))
+        
+        // Get all plants with matching vendor_plant_ids and vendor_ids (Option 1)
+        const vendorPlantIds = option1Rows.map(r => r.vendor_plant_id!).filter(id => id)
+        const vendorIds = vendors.map(v => v.id)
+        
+        if (vendorPlantIds.length > 0 && vendorIds.length > 0) {
+          const { data: plants, error: plantsError } = await supabase
+            .from("plants")
+            .select("id, org_id, vendor_id, vendor_plant_id, name")
+            .in("vendor_plant_id", vendorPlantIds)
+            .in("vendor_id", vendorIds)
+            .eq("org_id", firstRow.org_id) // Ensure plants belong to the work order's org
+          
+          if (plantsError) {
+            for (const row of option1Rows) {
+              results.push(enrichResult({
+                rowNumber: rows.indexOf(row) + 2,
+                success: false,
+                error: "Failed to validate plants",
+              }, row))
+              totalErrors++
+            }
+          } else {
+            option1Plants = plants || []
+          }
+        }
       }
 
-      // Match plants by vendor_plant_id and vendor_type (vendor_plant_id is unique per vendor_type)
-      const matchedPlants: Array<{ row: ImportRow; plant: any }> = []
+      // Match plants - handle both Option 1 (vendor_id + vendor_plant_id) and Option 2 (plant_id)
+      const matchedPlants: Array<{ row: ImportRow; plant: any; vendor: any }> = []
       const unmatchedRows: ImportRow[] = []
 
-      for (const row of groupRows) {
-        const vendorId = vendorTypeToId.get(row.vendor_type)
-        if (!vendorId) {
+      // Process Option 2 rows (plant_id - simpler, direct lookup)
+      for (const row of option2Rows) {
+        const plant = option2Plants.find((p: any) => p.id === row.plant_id)
+        
+        if (!plant) {
+          results.push(enrichResult({
+            rowNumber: rows.indexOf(row) + 2,
+            success: false,
+            error: `Plant ID ${row.plant_id} not found or does not belong to organization ID ${firstRow.org_id}`,
+          }, row))
+          totalErrors++
+          continue
+        }
+        
+        // Get vendor for this plant
+        const vendor = vendorIdToVendor.get(plant.vendor_id) || vendors.find((v: any) => v.id === plant.vendor_id)
+        
+        if (!vendor) {
+          // Fetch vendor if not already loaded
+          const { data: vendorData } = await supabase
+            .from("vendors")
+            .select("id, name, vendor_type, org_id")
+            .eq("id", plant.vendor_id)
+            .single()
+          
+          if (vendorData) {
+            matchedPlants.push({ row, plant, vendor: vendorData })
+          } else {
+            results.push(enrichResult({
+              rowNumber: rows.indexOf(row) + 2,
+              success: false,
+              error: `Vendor for plant ID ${row.plant_id} not found`,
+            }, row, plant))
+            totalErrors++
+          }
+        } else {
+          matchedPlants.push({ row, plant, vendor })
+        }
+      }
+
+      // Process Option 1 rows (vendor_id + vendor_plant_id)
+      for (const row of option1Rows) {
+        let vendor: any = null
+        
+        // If vendor_id is specified, use it directly
+        if (row.vendor_id) {
+          vendor = vendorIdToVendor.get(row.vendor_id)
+          if (!vendor) {
+            unmatchedRows.push(row)
+            continue
+          }
+        } else if (row.vendor_type) {
+          // Otherwise, find vendor by vendor_type
+          const vendorsOfType = vendorTypeToVendors.get(row.vendor_type)
+          if (!vendorsOfType || vendorsOfType.length === 0) {
+            unmatchedRows.push(row)
+            continue
+          }
+          
+          // If only one vendor of this type, use it
+          if (vendorsOfType.length === 1) {
+            vendor = vendorsOfType[0]
+          } else {
+            // Multiple vendors of same type - we'll need to match by plant's vendor_id
+            // Try to find plant first, then get its vendor
+            const potentialPlant = option1Plants.find(
+              (p: any) => p.vendor_plant_id === row.vendor_plant_id
+            )
+            if (potentialPlant) {
+              vendor = vendorIdToVendor.get(potentialPlant.vendor_id)
+            } else {
+              // Can't determine which vendor without finding the plant first
+              unmatchedRows.push(row)
+              continue
+            }
+          }
+        } else {
           unmatchedRows.push(row)
           continue
         }
         
-        const plant = plants?.find(
+        if (!vendor) {
+          unmatchedRows.push(row)
+          continue
+        }
+        
+        // Verify vendor belongs to correct org (or is global)
+        if (vendor.org_id !== null && vendor.org_id !== firstRow.org_id) {
+          results.push(enrichResult({
+            rowNumber: rows.indexOf(row) + 2,
+            success: false,
+            error: `Vendor "${vendor.name}" (ID: ${vendor.id}) belongs to organization ID ${vendor.org_id} but work order is for organization ID ${firstRow.org_id}`,
+          }, row, undefined, vendor))
+          totalErrors++
+          continue
+        }
+        
+        // Find plant by vendor_plant_id and vendor_id
+        const plant = option1Plants.find(
           (p: any) => 
             p.vendor_plant_id === row.vendor_plant_id && 
-            p.vendor_id === vendorId
+            p.vendor_id === vendor.id
         )
         
         if (plant) {
-          matchedPlants.push({ row, plant })
+          // Verify plant's vendor belongs to correct org
+          if (plant.org_id !== firstRow.org_id) {
+            results.push(enrichResult({
+              rowNumber: rows.indexOf(row) + 2,
+              success: false,
+              error: `Plant "${plant.name}" (Vendor Plant ID: ${row.vendor_plant_id}) belongs to organization ID ${plant.org_id} but work order is for organization ID ${firstRow.org_id}`,
+            }, row, plant, vendor))
+            totalErrors++
+            continue
+          }
+          
+          matchedPlants.push({ row, plant, vendor })
         } else {
           unmatchedRows.push(row)
         }
@@ -241,19 +478,38 @@ export async function POST(request: NextRequest) {
 
       if (unmatchedRows.length > 0) {
         for (const row of unmatchedRows) {
-          const vendorId = vendorTypeToId.get(row.vendor_type)
-          if (!vendorId) {
-            results.push({
+          if (row.plant_id) {
+            // Option 2 row that failed - already handled above
+            results.push(enrichResult({
               rowNumber: rows.indexOf(row) + 2,
               success: false,
-              error: `Vendor type "${row.vendor_type}" not found`,
-            })
+              error: `Plant ID ${row.plant_id} not found or does not belong to organization ID ${firstRow.org_id}`,
+            }, row))
+          } else if (row.vendor_type) {
+            // Option 1 row that failed
+            const vendorsOfType = vendorTypeToVendors.get(row.vendor_type)
+            if (!vendorsOfType || vendorsOfType.length === 0) {
+              results.push(enrichResult({
+                rowNumber: rows.indexOf(row) + 2,
+                success: false,
+                error: `Vendor type "${row.vendor_type}" not found for organization ID ${firstRow.org_id} or as a global vendor`,
+              }, row))
+            } else {
+              // Vendor type exists but plant not found
+              const vendorNames = vendorsOfType.map((v: any) => v.name).join(", ")
+              results.push(enrichResult({
+                rowNumber: rows.indexOf(row) + 2,
+                success: false,
+                error: `Plant not found: Vendor Plant ID "${row.vendor_plant_id || 'N/A'}" for vendor type "${row.vendor_type}" (vendors: ${vendorNames})`,
+              }, row, undefined, vendorsOfType[0]))
+            }
           } else {
-            results.push({
+            // Missing required fields
+            results.push(enrichResult({
               rowNumber: rows.indexOf(row) + 2,
               success: false,
-              error: `Plant not found: Vendor Plant ID "${row.vendor_plant_id}" for vendor type "${row.vendor_type}"`,
-            })
+              error: "Missing required fields: either (Plant ID) or (Vendor ID + Vendor Plant ID) must be provided",
+            }, row))
           }
           totalErrors++
         }
@@ -265,16 +521,31 @@ export async function POST(request: NextRequest) {
 
       const plantIds = matchedPlants.map(mp => mp.plant.id)
       const validatedPlants = matchedPlants.map(mp => mp.plant)
+      const validatedVendors = matchedPlants.map(mp => mp.vendor)
 
-      // Check that all plants belong to the same org
+      // Verify all plants belong to the same org (already checked during matching, but double-check)
       const plantOrgIds = [...new Set(validatedPlants.map(p => p.org_id))]
       if (plantOrgIds.length > 1 || plantOrgIds[0] !== firstRow.org_id) {
         for (const matched of matchedPlants) {
-          results.push({
+          results.push(enrichResult({
             rowNumber: rows.indexOf(matched.row) + 2,
             success: false,
             error: "All plants must belong to the same organization as the work order",
-          })
+          }, matched.row, matched.plant, matched.vendor))
+          totalErrors++
+        }
+        continue
+      }
+
+      // Verify all vendors belong to the same org (or are global vendors)
+      const vendorOrgIds = [...new Set(validatedVendors.map(v => v.org_id).filter(id => id !== null))]
+      if (vendorOrgIds.length > 1 || (vendorOrgIds.length === 1 && vendorOrgIds[0] !== firstRow.org_id)) {
+        for (const matched of matchedPlants) {
+          results.push(enrichResult({
+            rowNumber: rows.indexOf(matched.row) + 2,
+            success: false,
+            error: `Vendor "${matched.vendor.name}" belongs to organization ID ${matched.vendor.org_id} but work order is for organization ID ${firstRow.org_id}`,
+          }, matched.row, matched.plant, matched.vendor))
           totalErrors++
         }
         continue
@@ -293,12 +564,12 @@ export async function POST(request: NextRequest) {
         // Note: We haven't matched plants yet, so we can't use matchedPlants here
         // But we can still report the error for all rows
         for (const row of groupRows) {
-          results.push({
+          results.push(enrichResult({
             rowNumber: rows.indexOf(row) + 2,
             workOrderId: existingWorkOrder.id,
             success: false,
             error: "Work order already exists (no updates allowed)",
-          })
+          }, row))
           totalErrors++
         }
         continue
@@ -318,11 +589,11 @@ export async function POST(request: NextRequest) {
       if (plantsInOtherWorkOrders.size > 0) {
         for (const matched of matchedPlants) {
           if (plantsInOtherWorkOrders.has(matched.plant.id)) {
-            results.push({
+            results.push(enrichResult({
               rowNumber: rows.indexOf(matched.row) + 2,
               success: false,
-              error: `Plant (Vendor Plant ID: ${matched.row.vendor_plant_id}, Vendor Type: ${matched.row.vendor_type}) is already mapped to work order ${plantsInOtherWorkOrders.get(matched.plant.id)}`,
-            })
+              error: `Plant (Vendor Plant ID: ${matched.row.vendor_plant_id || matched.plant.vendor_plant_id}, Vendor Type: ${matched.row.vendor_type || matched.vendor.vendor_type}) is already mapped to work order ${plantsInOtherWorkOrders.get(matched.plant.id)}`,
+            }, matched.row, matched.plant, matched.vendor))
             totalErrors++
           }
         }
@@ -346,11 +617,11 @@ export async function POST(request: NextRequest) {
 
         if (woError || !newWorkOrder) {
           for (const matched of matchedPlants) {
-            results.push({
+            results.push(enrichResult({
               rowNumber: rows.indexOf(matched.row) + 2,
               success: false,
               error: `Failed to create work order: ${woError?.message || "Unknown error"}`,
-            })
+            }, matched.row, matched.plant, matched.vendor))
             totalErrors++
           }
           continue
@@ -369,12 +640,12 @@ export async function POST(request: NextRequest) {
 
         if (plantError) {
           for (const matched of matchedPlants) {
-            results.push({
+            results.push(enrichResult({
               rowNumber: rows.indexOf(matched.row) + 2,
               workOrderId: newWorkOrder.id,
               success: false,
               error: `Failed to create plant mapping: ${plantError.message}`,
-            })
+            }, matched.row, matched.plant, matched.vendor))
             totalErrors++
           }
           continue
@@ -386,6 +657,14 @@ export async function POST(request: NextRequest) {
             rowNumber: rows.indexOf(matched.row) + 2,
             workOrderId: newWorkOrder.id,
             success: true,
+            title: matched.row.title,
+            orgId: matched.row.org_id,
+            orgName: matched.row.org_name,
+            plantId: matched.plant.id,
+            vendorPlantId: matched.plant.vendor_plant_id,
+            plantName: matched.plant.name,
+            vendorId: matched.vendor.id,
+            vendorName: matched.vendor.name,
           })
           totalProcessed++
         }
@@ -401,15 +680,110 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      message: "Import complete",
-      summary: {
-        totalRows: rows.length,
-        processed: totalProcessed,
-        errors: totalErrors,
+    // Generate Excel report with detailed import results
+    const reportWorkbook = new ExcelJS.Workbook()
+    const reportWorksheet = reportWorkbook.addWorksheet("Import Results")
+
+    // Define columns for the report
+    reportWorksheet.columns = [
+      { header: "Row Number", key: "row_number", width: 12 },
+      { header: "Status", key: "status", width: 12 },
+      { header: "Title", key: "title", width: 30 },
+      { header: "Organization ID", key: "org_id", width: 15 },
+      { header: "Organization Name", key: "org_name", width: 30 },
+      { header: "Plant ID", key: "plant_id", width: 12 },
+      { header: "Vendor Plant ID", key: "vendor_plant_id", width: 20 },
+      { header: "Plant Name", key: "plant_name", width: 30 },
+      { header: "Vendor ID", key: "vendor_id", width: 12 },
+      { header: "Vendor Name", key: "vendor_name", width: 25 },
+      { header: "Work Order ID", key: "work_order_id", width: 15 },
+      { header: "Error Message", key: "error_message", width: 50 },
+    ]
+
+    // Style header row
+    reportWorksheet.getRow(1).font = { bold: true }
+    reportWorksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    }
+
+    // Add summary row
+    reportWorksheet.addRow({
+      row_number: "SUMMARY",
+      status: "",
+      title: `Total Rows: ${rows.length} | Processed: ${totalProcessed} | Errors: ${totalErrors}`,
+      org_id: "",
+      org_name: "",
+      plant_id: "",
+      vendor_plant_id: "",
+      plant_name: "",
+      vendor_id: "",
+      vendor_name: "",
+      work_order_id: "",
+      error_message: "",
+    })
+    reportWorksheet.getRow(2).font = { bold: true }
+
+    // Add data rows - map results back to original rows for complete information
+    const allResults: any[] = []
+    
+    // Create a map of row numbers to original row data
+    const rowDataMap = new Map<number, ImportRow>()
+    rows.forEach((row, index) => {
+      rowDataMap.set(index + 2, row) // +2 because Excel rows are 1-based and we skip header
+    })
+
+    // Process all results - use enriched result data (already includes row, plant, vendor info)
+    for (const result of results) {
+      allResults.push({
+        row_number: result.rowNumber,
+        status: result.success ? "SUCCESS" : "FAILED",
+        title: result.title || "",
+        org_id: result.orgId || "",
+        org_name: result.orgName || "",
+        plant_id: result.plantId || "",
+        vendor_plant_id: result.vendorPlantId || "",
+        plant_name: result.plantName || "",
+        vendor_id: result.vendorId || "",
+        vendor_name: result.vendorName || "",
+        work_order_id: result.workOrderId || "",
+        error_message: result.error || "",
+      })
+    }
+
+    // Sort by row number
+    allResults.sort((a, b) => a.row_number - b.row_number)
+
+    // Add data rows to worksheet
+    for (const result of allResults) {
+      const row = reportWorksheet.addRow(result)
+      
+      // Color code rows: green for success, red for failure
+      if (result.status === "SUCCESS") {
+        row.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFE8F5E9' } // Light green
+        }
+      } else {
+        row.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFFEBEE' } // Light red
+        }
+      }
+    }
+
+    // Generate Excel file buffer
+    const reportBuffer = await reportWorkbook.xlsx.writeBuffer()
+
+    // Return Excel file with appropriate headers
+    return new NextResponse(reportBuffer, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="work_orders_import_report_${new Date().toISOString().split('T')[0]}_${Date.now()}.xlsx"`,
       },
-      results: results.slice(0, 100), // Limit to first 100 results for response size
-      note: "Existing work orders and plant mappings were not updated. Only new work orders were created.",
     })
   } catch (error: any) {
     console.error("Work orders import error:", error)
