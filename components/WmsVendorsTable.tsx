@@ -614,7 +614,7 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
                         size="sm"
                         onClick={() => router.push(`/wms/vendors/${vendor.id}/sites`)}
                       >
-                        View Sites
+                        Sites
                       </Button>
                       <Button
                         variant="outline"
@@ -630,13 +630,13 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
                             size="sm"
                             onClick={() => handleSyncSites(vendor.id)}
                             disabled={syncingVendorId === vendor.id}
+                            title="Sync sites and devices from vendor API"
                           >
                             <RefreshCw
-                              className={`h-4 w-4 mr-2 ${
+                              className={`h-4 w-4 ${
                                 syncingVendorId === vendor.id ? "animate-spin" : ""
                               }`}
                             />
-                            Sync Sites
                           </Button>
                           <Button
                             variant="outline"
@@ -646,11 +646,10 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
                             title="Sync devices only (re-fetch from vendor API without updating sites)"
                           >
                             <RefreshCw
-                              className={`h-4 w-4 mr-2 ${
+                              className={`h-4 w-4 ${
                                 syncingVendorId === vendor.id ? "animate-spin" : ""
                               }`}
                             />
-                            Sync Devices
                           </Button>
                           <Button
                             variant="outline"
