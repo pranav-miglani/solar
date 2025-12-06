@@ -2120,13 +2120,37 @@ Unique Constraints:
                     <div className="bg-muted/50 p-4 rounded-lg">
                       <h4 className="font-medium mb-2 flex items-center gap-2">
                         <Database className="h-4 w-4" />
-                        2. External Cron / Manual
+                        2. External Cron / Manual (API)
                       </h4>
                       <p className="text-sm text-muted-foreground mb-2">
-                        GitHub Actions, cron-job.org, or manual trigger
+                        GitHub Actions, cron-job.org, or manual API call
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Calls <code className="bg-background px-1 rounded">GET /api/cron/sync-wms-insolation</code> with <code className="bg-background px-1 rounded">CRON_SECRET</code>
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Database className="h-4 w-4" />
+                        3. Manual Trigger (UI - Per Vendor)
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Per-vendor sync via UI button (SUPERADMIN/DEVELOPER only)
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Calls <code className="bg-background px-1 rounded">POST /api/wms-vendors/[id]/sync-insolation</code>
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Database className="h-4 w-4" />
+                        4. Backfill Trigger (100 Days)
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Manual trigger via UI button or API (SUPERADMIN/DEVELOPER only)
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Calls <code className="bg-background px-1 rounded">GET /api/cron/backfill-wms-insolation</code> to backfill last 100 days of insolation data
                       </p>
                     </div>
                   </div>
@@ -2160,10 +2184,13 @@ Unique Constraints:
                       <li>
                         <strong>Backfill Flow (Initial Setup):</strong>
                         <ul className="ml-4 mt-1 list-disc">
+                          <li>Triggered via <code className="bg-background px-1 rounded">GET /api/cron/backfill-wms-insolation</code> (manual UI button or API call)</li>
                           <li><code className="bg-background px-1 rounded">backfillAllWmsInsolation()</code> fetches last 100 days of data</li>
                           <li>Iterates through each day (from 100 days ago to today)</li>
-                          <li>For each day, fetches insolation for all devices</li>
+                          <li>For each day, fetches insolation for all devices of all active WMS vendors</li>
+                          <li>Calculates average insolation from hourly IRR values</li>
                           <li>Stores all readings in <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
+                          <li>Returns summary with vendor success counts and total readings created/updated</li>
                         </ul>
                       </li>
                       <li>
