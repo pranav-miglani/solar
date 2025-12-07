@@ -227,7 +227,7 @@ export class ScadaAdapter extends BaseWmsAdapter {
             // Note: LOC_CODE is used for insolation API calls, so we use it as vendor_device_id
             devices: [{
               vendorDeviceId: String(item.LOC_CODE), // LOC_CODE = vendor_device_id (used for API calls)
-              deviceName: item.LOC_CODE, // LOC_CODE = device_name
+              deviceName: String(item.USER_ID), // USER_ID = device_name
               macAddress: item.PASSWORD, // PASSWORD = mac_address
               serialNo: String(item.USER_ID), // USER_ID stored as serial_no
               metadata: {
@@ -248,7 +248,7 @@ export class ScadaAdapter extends BaseWmsAdapter {
         }
         site.metadata.devices.push({
           vendorDeviceId: String(item.LOC_CODE), // LOC_CODE = vendor_device_id
-          deviceName: item.LOC_CODE,
+          deviceName: String(item.USER_ID), // USER_ID = device_name
           macAddress: item.PASSWORD,
           serialNo: String(item.USER_ID), // USER_ID stored as serial_no
           metadata: {
