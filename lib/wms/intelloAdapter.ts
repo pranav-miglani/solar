@@ -1,6 +1,7 @@
 import { BaseWmsAdapter, type WmsSite, type WmsDevice, type InsolationReading } from "./baseWmsAdapter"
 import type { WmsVendorConfig } from "./baseWmsAdapter"
 import { getMainClient } from "@/lib/supabase/pooled"
+import { logger } from "@/lib/context/logger"
 
 /**
  * Intello WMS Vendor Adapter
@@ -34,7 +35,6 @@ export class IntelloAdapter extends BaseWmsAdapter {
 
     // Check for cached token in database
     if (this.vendorId && this.supabaseClient) {
-      const { logger } = await import("@/lib/context/logger")
       logger.info(`[IntelloAdapter] Checking for cached token for vendor ID: ${this.vendorId}`)
       
       const { data: vendor } = await this.supabaseClient
@@ -62,7 +62,6 @@ export class IntelloAdapter extends BaseWmsAdapter {
     // Fetch new token
     const apiBaseUrl = this.getApiBaseUrl()
     const authUrl = `${apiBaseUrl}/api/intello/authenticate`
-    const { logger } = await import("@/lib/context/logger")
     
     logger.info(`[IntelloAdapter] Calling authentication API: POST ${authUrl}`)
     logger.info(`[IntelloAdapter] Request body: { username: "${email}", password: "***" }`)
@@ -124,7 +123,6 @@ export class IntelloAdapter extends BaseWmsAdapter {
    * List all sites from Intello API
    */
   async listSites(): Promise<WmsSite[]> {
-    const { logger } = await import("@/lib/context/logger")
     const apiBaseUrl = this.getApiBaseUrl()
     const sitesUrl = `${apiBaseUrl}/api/intello/user/v1/sites`
     
@@ -187,7 +185,6 @@ export class IntelloAdapter extends BaseWmsAdapter {
     toDate: string,
     deviceName?: string
   ): Promise<InsolationReading[]> {
-    const { logger } = await import("@/lib/context/logger")
     const apiBaseUrl = this.getApiBaseUrl()
     const insolationUrl = `/api/intello/rtu/v1/data?fromDate=${fromDate}&toDate=${toDate}&mode=Daily&resultType=site&rtuid=${deviceId}`
     const fullUrl = `${apiBaseUrl}${insolationUrl}`

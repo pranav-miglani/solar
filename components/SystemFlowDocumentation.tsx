@@ -2222,30 +2222,39 @@ Unique Constraints:
                         <ul className="ml-4 mt-1 list-disc">
                           <li>If <code className="bg-background px-1 rounded">date</code> is provided: Syncs that specific date for all devices</li>
                           <li>If <code className="bg-background px-1 rounded">date</code> is <code className="bg-background px-1 rounded">null</code>: Backfills last 100 days for all devices</li>
-                          <li>Gets all devices for the vendor from <code className="bg-background px-1 rounded">wms_devices</code> table</li>
+                          <li>Gets all devices for the vendor from <code className="bg-background px-1 rounded">wms_devices</code> table (includes <code className="bg-background px-1 rounded">device_name</code> for vendor-specific identifiers)</li>
                           <li>Creates WMS adapter and authenticates</li>
-                          <li>For each device and each date: Fetches insolation, calculates average, upserts to <code className="bg-background px-1 rounded">insolation_readings</code></li>
+                          <li>For each device: Calls <code className="bg-background px-1 rounded">syncWmsDeviceInsolation(deviceId, date)</code></li>
                         </ul>
                       </li>
                       <li>
-                        <strong>For INTELLO vendor (per-device sync):</strong>
+                        <strong>syncWmsDeviceInsolation(deviceId, date)</strong> - Generic vendor-agnostic sync:
                         <ul className="ml-4 mt-1 list-disc">
-                          <li>Vendor API supports per-device insolation fetch only</li>
-                          <li>For each device, calls <code className="bg-background px-1 rounded">adapter.getInsolationData(deviceId, fromDate, toDate)</code></li>
-                          <li>Calculates daily insolation (area under IRR vs time curve) in kWh/m² using <code className="bg-background px-1 rounded">calculateDailyInsolation()</code> - uses left endpoint method: Σ [IRR_i × Δt_i] / 1000</li>
-                          <li>Upserts daily insolation reading into <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
+                          <li>If <code className="bg-background px-1 rounded">date</code> is provided: Syncs that specific date</li>
+                          <li>If <code className="bg-background px-1 rounded">date</code> is <code className="bg-background px-1 rounded">null</code>: Backfills last 100 days (from 100 days ago to yesterday, excluding today)</li>
+                          <li>For backfill: <strong>Intelligently tries date range first</strong> (efficient for vendors like SCADA that support it)</li>
+                          <li>If date range returns multiple days: Groups readings by date and processes each day</li>
+                          <li>If date range returns single day or empty: <strong>Falls back to per-day calls</strong> (for vendors like INTELLO that require per-day fetching)</li>
+                          <li>For each day: Calls <code className="bg-background px-1 rounded">adapter.getInsolationData(deviceId, fromDate, toDate, deviceName)</code></li>
+                          <li>Uses <code className="bg-background px-1 rounded">processDailyInsolationReading()</code> helper to calculate and store insolation (centralized logic)</li>
                         </ul>
                       </li>
                       <li>
-                        <strong>For SCADA vendor (date range sync):</strong>
+                        <strong>processDailyInsolationReading()</strong> - Centralized helper function:
                         <ul className="ml-4 mt-1 list-disc">
-                          <li>Vendor API supports date range insolation fetch (single call for multiple days)</li>
-                          <li>For 100-day backfill: Single API call with date range (fromDate to toDate covering 100 days)</li>
-                          <li>For daily sync: API call with same date for both fromDate and toDate</li>
-                          <li>API returns daily aggregated values already in kWh/m² (no integration needed)</li>
-                          <li>Uses <code className="bg-background px-1 rounded">calculateDailyInsolation()</code> which returns the pre-aggregated value directly for SCADA</li>
-                          <li>Upserts daily insolation reading into <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
-                          <li>Device identifier: Uses LOC_CODE (stored as vendor_device_id) for API calls</li>
+                          <li>Calculates daily insolation using <code className="bg-background px-1 rounded">adapter.calculateDailyInsolation(readings)</code></li>
+                          <li>For INTELLO: Uses left endpoint method (Σ [IRR_i × Δt_i] / 1000) to calculate area under IRR vs time curve in kWh/m²</li>
+                          <li>For SCADA: Returns pre-aggregated daily value directly (already in kWh/m²)</li>
+                          <li>Upserts reading to <code className="bg-background px-1 rounded">insolation_readings</code> table with metadata (all_readings, min_irr, max_irr)</li>
+                          <li>Updates result counters (readingsCreated, readingsUpdated)</li>
+                        </ul>
+                      </li>
+                      <li>
+                        <strong>Vendor-Specific Behavior (Handled by Adapters):</strong>
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li><strong>INTELLO:</strong> API requires per-day calls. <code className="bg-background px-1 rounded">getInsolationData()</code> accepts date range but typically returns single day. Falls back to per-day iteration for backfill.</li>
+                          <li><strong>SCADA:</strong> API supports date range efficiently. Single call can return multiple days. <code className="bg-background px-1 rounded">getInsolationData()</code> uses LOC_CODE (vendor_device_id) and USER_ID (device_name) for API calls. Returns pre-aggregated daily kWh/m² values.</li>
+                          <li>Sync service is <strong>vendor-agnostic</strong> - automatically detects and uses the most efficient method per vendor</li>
                         </ul>
                       </li>
                       <li>
@@ -2253,9 +2262,8 @@ Unique Constraints:
                         <ul className="ml-4 mt-1 list-disc">
                           <li>Triggered via <code className="bg-background px-1 rounded">POST /api/wms-vendors/[id]/sync-devices</code> (all devices) or <code className="bg-background px-1 rounded">POST /api/wms-devices/[id]/sync</code> (single device)</li>
                           <li>Passes <code className="bg-background px-1 rounded">null</code> as date parameter to trigger 100-day backfill</li>
-                          <li><strong>INTELLO:</strong> Iterates through last 100 days (from 100 days ago to yesterday, excluding today), fetches insolation per day for each device</li>
-                          <li><strong>SCADA:</strong> Single API call with date range covering last 100 days (from 100 days ago to yesterday, excluding today), processes all returned daily values</li>
-                          <li>For each day, stores insolation in <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
+                          <li><strong>Generic flow:</strong> Tries date range fetch first (from 100 days ago to yesterday). If successful with multiple days, processes all. Otherwise falls back to per-day iteration.</li>
+                          <li>For each day, stores insolation in <code className="bg-background px-1 rounded">insolation_readings</code> table using <code className="bg-background px-1 rounded">processDailyInsolationReading()</code></li>
                           <li>Returns summary with readings created/updated counts</li>
                         </ul>
                       </li>
@@ -2272,9 +2280,12 @@ Unique Constraints:
                 <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
                   <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📊 Insolation Calculation</h4>
                   <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 ml-4 list-disc">
-                    <li>Insolation is calculated as the <strong>average of all hourly IRR values</strong> for a given day</li>
-                    <li>Only non-zero, non-null IRR values are included in the calculation</li>
-                    <li>Stored in <code className="bg-background px-1 rounded">insolation_readings</code> table with <code className="bg-background px-1 rounded">date</code> and <code className="bg-background px-1 rounded">device_id</code></li>
+                    <li>Insolation is calculated as the <strong>area under the IRR vs time curve</strong> (energy integration), not a simple average</li>
+                    <li><strong>For INTELLO:</strong> Uses left endpoint method: Σ [IRR_i × Δt_i] / 1000 where IRR_i is the IRR value at the start of each time interval Δt_i (in hours). Result is in kWh/m²</li>
+                    <li><strong>For SCADA:</strong> API returns pre-aggregated daily values already in kWh/m² (no calculation needed)</li>
+                    <li>All time-series readings are used (not just hourly) - dynamically calculates time intervals between readings</li>
+                    <li>Stored in <code className="bg-background px-1 rounded">insolation_readings</code> table with <code className="bg-background px-1 rounded">reading_date</code> and <code className="bg-background px-1 rounded">wms_device_id</code></li>
+                    <li>Metadata includes: <code className="bg-background px-1 rounded">all_readings</code> (all time-series data), <code className="bg-background px-1 rounded">min_irr</code>, <code className="bg-background px-1 rounded">max_irr</code></li>
                     <li>100-day rollover: Old readings are automatically deleted when new ones are added</li>
                   </ul>
                 </div>
@@ -2438,11 +2449,12 @@ Unique Constraints:
                         <li><code className="bg-background px-1 rounded">syncWmsVendorSites()</code> - Sync sites and devices for a single WMS vendor (exported for per-vendor sync)</li>
                         <li><code className="bg-background px-1 rounded">syncAllWmsInsolation(date)</code> - Sync insolation data for all WMS vendors for a specific date (end of day: today, morning: yesterday)</li>
                         <li><code className="bg-background px-1 rounded">syncWmsVendorInsolation(vendor, supabase, date)</code> - Sync insolation data for a single WMS vendor. If date is null, backfills last 100 days</li>
-                        <li><code className="bg-background px-1 rounded">syncWmsDeviceInsolation(deviceId, date, supabase)</code> - Sync insolation data for a single device. If date is null, backfills last 100 days</li>
+                        <li><code className="bg-background px-1 rounded">syncWmsDeviceInsolation(deviceId, date)</code> - Generic vendor-agnostic sync for a single device. If date is null, backfills last 100 days. Intelligently tries date range first, falls back to per-day if needed</li>
+                        <li><code className="bg-background px-1 rounded">processDailyInsolationReading()</code> - Centralized helper function that calculates daily insolation (using adapter.calculateDailyInsolation) and upserts to database</li>
                         <li><code className="bg-background px-1 rounded">backfillAllWmsInsolation()</code> - Backfill insolation data for last 100 days for all vendors</li>
-                        <li><code className="bg-background px-1 rounded">backfillAllWmsInsolation()</code> - Backfill insolation data for last 100 days</li>
                         <li>Site and device sync with upsert logic</li>
-                        <li>Insolation calculation (average of hourly IRR values)</li>
+                        <li>Vendor-agnostic insolation sync (automatically detects date range support, falls back to per-day)</li>
+                        <li>Insolation calculation: Area under IRR vs time curve (left endpoint method: Σ [IRR_i × Δt_i] / 1000) in kWh/m²</li>
                         <li>100-day rollover storage (automatic cleanup of old readings)</li>
                         <li>Token caching in database (similar to inverter vendors)</li>
                       </ul>
@@ -2752,12 +2764,26 @@ Unique Constraints:
                       <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                         <li>Schedule: Daily at 10 PM IST (<code className="bg-background px-1 rounded">0 22 * * *</code>)</li>
                         <li>Calls: <code className="bg-background px-1 rounded">GET /api/cron/sync-wms-insolation</code></li>
-                        <li>Syncs insolation data for current day for all active WMS vendors</li>
-                        <li>Fetches hourly insolation readings and calculates daily average</li>
+                        <li>Syncs insolation data for <strong>current day</strong> for all active WMS vendors</li>
+                        <li>Fetches time-series insolation readings and calculates daily energy (area under curve) in kWh/m²</li>
+                        <li>Uses vendor-agnostic sync service that intelligently tries date range first, falls back to per-day if needed</li>
                         <li>Stores in <code className="bg-background px-1 rounded">insolation_readings</code> table (100-day rollover)</li>
                         <li>Uses <code className="bg-background px-1 rounded">CRON_SECRET</code> for security (if configured)</li>
                         <li>Runs in-process (server.js starts it)</li>
                         <li>Can be disabled with <code className="bg-background px-1 rounded">ENABLE_WMS_INSOLATION_SYNC_CRON=false</code></li>
+                      </ul>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">wmsInsolationSyncMorningCron.js</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Schedule: Daily at 6 AM IST (<code className="bg-background px-1 rounded">0 6 * * *</code>)</li>
+                        <li>Calls: <code className="bg-background px-1 rounded">GET /api/cron/sync-wms-insolation-morning</code></li>
+                        <li>Syncs insolation data for <strong>yesterday</strong> for all active WMS vendors (safety check)</li>
+                        <li>Overrides any data synced by end-of-day cron for yesterday (ensures accuracy)</li>
+                        <li>Uses same vendor-agnostic sync service as end-of-day cron</li>
+                        <li>Stores in <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
+                        <li>Uses <code className="bg-background px-1 rounded">CRON_SECRET</code> for security (if configured)</li>
+                        <li>Runs in-process (server.js starts it)</li>
                       </ul>
                     </div>
                   </div>

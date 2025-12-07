@@ -1,4 +1,5 @@
 import { pooledFetch } from "@/lib/vendors/httpClient"
+import { logger } from "@/lib/context/logger"
 
 /**
  * WMS Site interface
@@ -232,7 +233,6 @@ export abstract class BaseWmsAdapter {
     const url = `${this.getApiBaseUrl()}${endpoint}`
     
     // Import logger dynamically to avoid circular dependencies
-    const { logger } = await import("@/lib/context/logger")
     const method = (options.method || "GET").toUpperCase()
     
     logger.info(`[BaseWmsAdapter] Making authenticated API call: ${method} ${url}`)

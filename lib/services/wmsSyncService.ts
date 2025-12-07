@@ -450,6 +450,7 @@ export async function syncWmsDeviceInsolation(
         `
         id,
         vendor_device_id,
+        device_name,
         wms_site_id,
         wms_sites!inner (
           id,
@@ -475,7 +476,7 @@ export async function syncWmsDeviceInsolation(
     }
 
     logger.info(
-      `[WMS Insolation Sync] Found device: ${device.vendor_device_id} (DB ID: ${device.id}), Site: ${device.wms_sites.vendor_site_id}`
+      `[WMS Insolation Sync] Found device: ${device.vendor_device_id} (DB ID: ${device.id}), Site: ${device.wms_sites.vendor_site_id}, Device Name: ${device.device_name || 'N/A'}, Vendor Type: ${device.wms_sites.wms_vendors.vendor_type}`
     )
 
     const vendor = device.wms_sites.wms_vendors
@@ -498,13 +499,15 @@ export async function syncWmsDeviceInsolation(
       logger.info(`[WMS Insolation Sync] Starting insolation sync for device ID: ${deviceId}, date: ${date}`)
       
       try {
-        logger.info(`[WMS Insolation Sync] Fetching insolation data for device ${device.vendor_device_id} for date ${date}`)
+        logger.info(`[WMS Insolation Sync] Fetching insolation data for device ${device.vendor_device_id} (device_name: ${device.device_name || 'N/A'}) for date ${date}`)
+        logger.info(`[WMS Insolation Sync] Calling adapter.getInsolationData(deviceId=${device.vendor_device_id}, fromDate=${date}, toDate=${date}, deviceName=${device.device_name || 'undefined'})`)
         const readings = await adapter.getInsolationData(
           device.vendor_device_id,
           date,
           date,
           device.device_name
         )
+        logger.info(`[WMS Insolation Sync] Received ${readings?.length || 0} readings from adapter`)
 
         if (!readings || readings.length === 0) {
           logger.warn(`[WMS Insolation Sync] No readings for device ${device.vendor_device_id} on ${date}`)
@@ -569,13 +572,15 @@ export async function syncWmsDeviceInsolation(
       try {
         // Try date range fetch first (efficient for vendors that support it like SCADA)
         // If adapter returns multiple days, process them; otherwise fall back to per-day
-        logger.info(`[WMS Insolation Sync] Attempting date range fetch for device ${device.vendor_device_id} from ${fromDate} to ${toDate}`)
+        logger.info(`[WMS Insolation Sync] Attempting date range fetch for device ${device.vendor_device_id} (device_name: ${device.device_name || 'N/A'}) from ${fromDate} to ${toDate}`)
+        logger.info(`[WMS Insolation Sync] Calling adapter.getInsolationData(deviceId=${device.vendor_device_id}, fromDate=${fromDate}, toDate=${toDate}, deviceName=${device.device_name || 'undefined'})`)
         const allReadings = await adapter.getInsolationData(
           device.vendor_device_id,
           fromDate,
           toDate,
           device.device_name
         )
+        logger.info(`[WMS Insolation Sync] Received ${allReadings?.length || 0} total readings from date range fetch`)
         
         // Check if we got multiple days of data (date range response) or single day
         const uniqueDates = new Set(allReadings.map((r: InsolationReading) => r.date))
@@ -616,13 +621,15 @@ export async function syncWmsDeviceInsolation(
           
           for (const targetDate of datesToSync) {
             try {
-              logger.info(`[WMS Insolation Sync] Fetching insolation data for device ${device.vendor_device_id} for date ${targetDate}`)
+              logger.info(`[WMS Insolation Sync] Fetching insolation data for device ${device.vendor_device_id} (device_name: ${device.device_name || 'N/A'}) for date ${targetDate}`)
+              logger.info(`[WMS Insolation Sync] Calling adapter.getInsolationData(deviceId=${device.vendor_device_id}, fromDate=${targetDate}, toDate=${targetDate}, deviceName=${device.device_name || 'undefined'})`)
               const readings = await adapter.getInsolationData(
                 device.vendor_device_id,
                 targetDate,
                 targetDate,
                 device.device_name
               )
+              logger.info(`[WMS Insolation Sync] Received ${readings?.length || 0} readings for date ${targetDate}`)
 
               if (!readings || readings.length === 0) {
                 logger.warn(`[WMS Insolation Sync] No readings for device ${device.vendor_device_id} on ${targetDate}`)
@@ -886,13 +893,16 @@ export async function syncWmsVendorInsolation(
     // Sync insolation for each device
     for (const device of devices) {
       try {
+        logger.info(`[WMS Insolation Sync] Syncing device ${device.vendor_device_id} (device_name: ${device.device_name || 'N/A'}) for date ${targetDate}`)
         // Fetch insolation data from vendor
+        logger.info(`[WMS Insolation Sync] Calling adapter.getInsolationData(deviceId=${device.vendor_device_id}, fromDate=${targetDate}, toDate=${targetDate}, deviceName=${device.device_name || 'undefined'})`)
         const readings = await adapter.getInsolationData(
           device.vendor_device_id,
           targetDate,
           targetDate,
           device.device_name
         )
+        logger.info(`[WMS Insolation Sync] Received ${readings?.length || 0} readings for device ${device.vendor_device_id}`)
 
         if (!readings || readings.length === 0) {
           logger.warn(
@@ -993,12 +1003,15 @@ async function backfillInsolationData(
 
       for (const device of devices) {
         try {
+          logger.info(`[WMS Backfill] Syncing device ${device.vendor_device_id} (device_name: ${device.device_name || 'N/A'}) for date ${dateStr}`)
+          logger.info(`[WMS Backfill] Calling adapter.getInsolationData(deviceId=${device.vendor_device_id}, fromDate=${dateStr}, toDate=${dateStr}, deviceName=${device.device_name || 'undefined'})`)
           const readings = await adapter.getInsolationData(
             device.vendor_device_id,
             dateStr,
             dateStr,
             device.device_name
           )
+          logger.info(`[WMS Backfill] Received ${readings?.length || 0} readings for device ${device.vendor_device_id} on ${dateStr}`)
 
           if (!readings || readings.length === 0) {
             continue

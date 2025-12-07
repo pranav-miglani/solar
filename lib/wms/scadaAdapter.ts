@@ -1,6 +1,7 @@
 import { BaseWmsAdapter, type WmsSite, type WmsDevice, type InsolationReading } from "./baseWmsAdapter"
 import type { WmsVendorConfig } from "./baseWmsAdapter"
 import { getMainClient } from "@/lib/supabase/pooled"
+import { logger } from "@/lib/context/logger"
 
 /**
  * SCADA WMS Vendor Adapter
@@ -38,7 +39,6 @@ export class ScadaAdapter extends BaseWmsAdapter {
 
     // Check for cached SS_KEY in database
     if (this.vendorId && this.supabaseClient) {
-      const { logger } = await import("@/lib/context/logger")
       logger.info(`[ScadaAdapter] Checking for cached SS_KEY for vendor ID: ${this.vendorId}`)
       
       const { data: vendor } = await this.supabaseClient
@@ -59,7 +59,6 @@ export class ScadaAdapter extends BaseWmsAdapter {
     // Fetch new SS_KEY
     const apiBaseUrl = this.getApiBaseUrl()
     const authUrl = `${apiBaseUrl}/api/CMN_07_Super/SLogin`
-    const { logger } = await import("@/lib/context/logger")
     
     logger.info(`[ScadaAdapter] Calling authentication API: POST ${authUrl}`)
     logger.info(`[ScadaAdapter] Request params: LOGIN_ID=${loginId}, USER_NAME=${userName}, USER_TYPE=${userType}`)
@@ -136,7 +135,6 @@ export class ScadaAdapter extends BaseWmsAdapter {
 
     const apiBaseUrl = this.getApiBaseUrl()
     const sitesUrl = `${apiBaseUrl}/api/CMN_07_Super/POST_USER_SUM_LIST_WMS`
-    const { logger } = await import("@/lib/context/logger")
     
     logger.info(`[ScadaAdapter] Calling list sites API: POST ${sitesUrl}`)
     logger.info(`[ScadaAdapter] Request params: LOGIN_ID=${loginId}`)
@@ -279,15 +277,19 @@ export class ScadaAdapter extends BaseWmsAdapter {
     toDate: string,
     deviceName?: string
   ): Promise<InsolationReading[]> {
+    logger.info(`[ScadaAdapter] getInsolationData called with: deviceId=${deviceId}, fromDate=${fromDate}, toDate=${toDate}, deviceName=${deviceName || 'undefined'}`)
+    
     const ssKey = await this.authenticate()
     
     if (!deviceName) {
+      logger.error(`[ScadaAdapter] Missing deviceName parameter. deviceId=${deviceId}, fromDate=${fromDate}, toDate=${toDate}`)
       throw new Error("SCADA insolation data requires deviceName (USER_ID) parameter")
     }
+    
+    logger.info(`[ScadaAdapter] deviceName validated: ${deviceName}`)
 
     const apiBaseUrl = this.getApiBaseUrl()
     const insolationUrl = `${apiBaseUrl}/api/CMN_02/WM_DASH`
-    const { logger } = await import("@/lib/context/logger")
     
     logger.info(`[ScadaAdapter] Calling insolation data API: POST ${insolationUrl}`)
     logger.info(`[ScadaAdapter] Request params: LOC_CODE=${deviceId}, LOGIN_ID=${deviceName} (from deviceName), DT1=${fromDate}, DT2=${toDate}`)
