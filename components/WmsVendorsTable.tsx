@@ -451,11 +451,9 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="INTELLO">Intello</SelectItem>
+                        <SelectItem value="SCADA">SCADA</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Currently only INTELLO is supported
-                    </p>
                   </div>
 
                   <div>
