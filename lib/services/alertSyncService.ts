@@ -965,8 +965,7 @@ export async function syncAllAlerts(): Promise<AlertSyncSummary> {
       organizations (
         id,
         name,
-        auto_sync_enabled,
-        sync_interval_minutes
+        auto_sync_enabled
       )
     `
     )
@@ -1010,12 +1009,46 @@ export async function syncAllAlerts(): Promise<AlertSyncSummary> {
     }
   }
 
-  const solarmanCount = supportedVendors.filter((v: any) => v.vendor_type === "SOLARMAN").length
-  const solardmCount = supportedVendors.filter((v: any) => v.vendor_type === "SOLARDM").length
-  logger.info(`Processing ${supportedVendors.length} vendor(s) for alert sync (${solarmanCount} SOLARMAN, ${solardmCount} SOLARDM)`)
+  // Filter vendors by org-level auto_sync_enabled
+  const vendorsToSync = supportedVendors.filter((vendor: any) => {
+    const org = vendor.organizations
+    if (!org) {
+      logger.warn(`⚠️ Organization not found for vendor ${vendor.id} (${vendor.name}), skipping alert sync`)
+      return false
+    }
+
+    // Check if auto-sync is enabled for the organization
+    if (!org.auto_sync_enabled) {
+      logger.info(
+        `⏭️ Skipping alert sync for vendor ${vendor.id} (${vendor.name}): ` +
+        `auto_sync_enabled=false for org ${org.id} (${org.name})`
+      )
+      return false
+    }
+
+    return true
+  })
+
+  if (vendorsToSync.length === 0) {
+    logger.info("No vendors to sync (all orgs have auto_sync_enabled=false or missing org)")
+    return {
+      totalVendors: supportedVendors.length,
+      successful: 0,
+      failed: 0,
+      totalAlertsSynced: 0,
+      totalAlertsCreated: 0,
+      totalAlertsUpdated: 0,
+      results: [],
+      duration: Date.now() - startTime,
+    }
+  }
+
+  const solarmanCount = vendorsToSync.filter((v: any) => v.vendor_type === "SOLARMAN").length
+  const solardmCount = vendorsToSync.filter((v: any) => v.vendor_type === "SOLARDM").length
+  logger.info(`Processing ${vendorsToSync.length} vendor(s) for alert sync (${solarmanCount} SOLARMAN, ${solardmCount} SOLARDM)`)
 
   const results = await Promise.all(
-    supportedVendors.map((vendor: any) =>
+    vendorsToSync.map((vendor: any) =>
       MDC.withContextAsync(
         {
           vendorId: vendor.id,
@@ -1053,7 +1086,7 @@ export async function syncAllAlerts(): Promise<AlertSyncSummary> {
   const totalAlertsUpdated = results.reduce((sum, r) => sum + r.updated, 0)
 
   const summary: AlertSyncSummary = {
-    totalVendors: supportedVendors.length,
+    totalVendors: vendorsToSync.length,
     successful,
     failed,
     totalAlertsSynced,
@@ -1087,8 +1120,7 @@ export async function syncAlertsForVendor(vendorId: number): Promise<AlertSyncRe
       organizations (
         id,
         name,
-        auto_sync_enabled,
-        sync_interval_minutes
+        auto_sync_enabled
       )
     `
     )
@@ -1097,6 +1129,27 @@ export async function syncAlertsForVendor(vendorId: number): Promise<AlertSyncRe
 
   if (error || !vendor) {
     throw new Error(`Vendor ${vendorId} not found for alert sync`)
+  }
+
+  // Check org-level auto_sync_enabled
+  const org = vendor.organizations
+  if (!org) {
+    throw new Error(`Organization not found for vendor ${vendorId}`)
+  }
+
+  if (!org.auto_sync_enabled) {
+    return {
+      vendorId: vendor.id,
+      vendorName: vendor.name,
+      orgId: vendor.org_id,
+      orgName: org.name,
+      success: true,
+      synced: 0,
+      created: 0,
+      updated: 0,
+      total: 0,
+      error: `Alert sync disabled for organization ${org.name} (auto_sync_enabled=false)`,
+    }
   }
 
   if (!vendor.is_active) {

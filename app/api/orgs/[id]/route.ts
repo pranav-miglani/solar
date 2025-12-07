@@ -83,27 +83,15 @@ export async function PUT(
     requirePermission(accountType as any, "organizations", "update")
 
     const body = await request.json()
-    const { auto_sync_enabled, sync_interval_minutes } = body
-
-    // Validate sync_interval_minutes
-    if (sync_interval_minutes !== undefined) {
-      if (typeof sync_interval_minutes !== "number" || sync_interval_minutes < 1 || sync_interval_minutes > 1440) {
-        return NextResponse.json(
-          { error: "sync_interval_minutes must be between 1 and 1440 (24 hours)" },
-          { status: 400 }
-        )
-      }
-    }
+    const { auto_sync_enabled } = body
 
     const supabase = getMainClient()
 
     // Update organization sync settings
+    // Note: sync_interval_minutes removed - telemetry sync uses vendor-level telemetry_sync_interval
     const updateData: any = {}
     if (auto_sync_enabled !== undefined) {
       updateData.auto_sync_enabled = Boolean(auto_sync_enabled)
-    }
-    if (sync_interval_minutes !== undefined) {
-      updateData.sync_interval_minutes = sync_interval_minutes
     }
 
     const { data, error } = await supabase

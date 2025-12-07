@@ -1153,11 +1153,19 @@ export async function syncAllWmsSites(): Promise<SyncSummary> {
 
       logger.info("[WMS Sync] Starting site sync for all WMS vendors")
 
-      // Get all active WMS vendors
+      // Get all active WMS vendors with their organization sync settings
       const { data: vendors, error } = await supabase
         .from("wms_vendors")
-        .select("*")
+        .select(`
+          *,
+          organizations (
+            id,
+            name,
+            auto_sync_enabled
+          )
+        `)
         .eq("is_active", true)
+        .not("org_id", "is", null)
 
       if (error) {
         throw error
@@ -1176,10 +1184,42 @@ export async function syncAllWmsSites(): Promise<SyncSummary> {
         }
       }
 
-      logger.info(`[WMS Sync] Found ${vendors.length} active WMS vendors`)
+      // Filter vendors by org-level auto_sync_enabled
+      const vendorsToSync = vendors.filter((vendor: any) => {
+        const org = vendor.organizations
+        if (!org) {
+          logger.warn(`⚠️ Organization not found for WMS vendor ${vendor.id} (${vendor.name}), skipping`)
+          return false
+        }
+
+        if (!org.auto_sync_enabled) {
+          logger.info(
+            `⏭️ Skipping WMS site sync for vendor ${vendor.id} (${vendor.name}): ` +
+            `auto_sync_enabled=false for org ${org.id} (${org.name})`
+          )
+          return false
+        }
+
+        return true
+      })
+
+      if (vendorsToSync.length === 0) {
+        logger.info("[WMS Sync] No vendors to sync (all orgs have auto_sync_enabled=false or missing org)")
+        return {
+          totalVendors: vendors.length,
+          successful: 0,
+          failed: 0,
+          totalSitesSynced: 0,
+          totalDevicesSynced: 0,
+          results: [],
+          duration: Date.now() - startTime,
+        }
+      }
+
+      logger.info(`[WMS Sync] Found ${vendorsToSync.length} active WMS vendors to sync (filtered from ${vendors.length} total)`)
 
       // Sync each vendor
-      for (const vendor of vendors) {
+      for (const vendor of vendorsToSync) {
         const result = await syncWmsVendorSites(vendor, supabase)
         results.push(result)
       }
@@ -1190,7 +1230,7 @@ export async function syncAllWmsSites(): Promise<SyncSummary> {
       const totalDevicesSynced = results.reduce((sum, r) => sum + r.devicesSynced, 0)
 
       const summary: SyncSummary = {
-        totalVendors: vendors.length,
+        totalVendors: vendorsToSync.length,
         successful,
         failed,
         totalSitesSynced,
@@ -1200,7 +1240,7 @@ export async function syncAllWmsSites(): Promise<SyncSummary> {
       }
 
       logger.info(
-        `[WMS Sync] Complete: ${successful}/${vendors.length} vendors successful, ${totalSitesSynced} sites, ${totalDevicesSynced} devices synced in ${summary.duration}ms`
+        `[WMS Sync] Complete: ${successful}/${vendorsToSync.length} vendors successful, ${totalSitesSynced} sites, ${totalDevicesSynced} devices synced in ${summary.duration}ms`
       )
 
       return summary
@@ -1224,14 +1264,51 @@ export async function syncAllWmsInsolation(date: string): Promise<InsolationSync
 
       logger.info(`[WMS Insolation Sync] Starting insolation sync for all WMS vendors, date: ${date}`)
 
-      // Get all active WMS vendors
+      // Get all active WMS vendors with their organization sync settings
       const { data: vendors, error } = await supabase
         .from("wms_vendors")
-        .select("*")
+        .select(`
+          *,
+          organizations (
+            id,
+            name,
+            auto_sync_enabled
+          )
+        `)
         .eq("is_active", true)
+        .not("org_id", "is", null)
 
       if (error) {
         throw error
+      }
+
+      if (!vendors || vendors.length === 0) {
+        logger.info("[WMS Insolation Sync] No active WMS vendors found")
+        return []
+      }
+
+      // Filter vendors by org-level auto_sync_enabled
+      const vendorsToSync = vendors.filter((vendor: any) => {
+        const org = vendor.organizations
+        if (!org) {
+          logger.warn(`⚠️ Organization not found for WMS vendor ${vendor.id} (${vendor.name}), skipping insolation sync`)
+          return false
+        }
+
+        if (!org.auto_sync_enabled) {
+          logger.info(
+            `⏭️ Skipping WMS insolation sync for vendor ${vendor.id} (${vendor.name}): ` +
+            `auto_sync_enabled=false for org ${org.id} (${org.name})`
+          )
+          return false
+        }
+
+        return true
+      })
+
+      if (vendorsToSync.length === 0) {
+        logger.info("[WMS Insolation Sync] No vendors to sync (all orgs have auto_sync_enabled=false or missing org)")
+        return []
       }
 
       if (!vendors || vendors.length === 0) {
@@ -1270,11 +1347,19 @@ export async function backfillAllWmsInsolation(): Promise<InsolationSyncResult[]
 
       logger.info("[WMS Backfill] Starting insolation backfill for all WMS vendors")
 
-      // Get all active WMS vendors
+      // Get all active WMS vendors with their organization sync settings
       const { data: vendors, error } = await supabase
         .from("wms_vendors")
-        .select("*")
+        .select(`
+          *,
+          organizations (
+            id,
+            name,
+            auto_sync_enabled
+          )
+        `)
         .eq("is_active", true)
+        .not("org_id", "is", null)
 
       if (error) {
         throw error

@@ -539,11 +539,19 @@ export async function syncAllLiveTelemetry(): Promise<LiveTelemetrySummary> {
       try {
         const supabase = getMainClient()
 
-        // Get all active vendors
+        // Get all active vendors with their organization sync settings
         const { data: vendors, error: vendorsError } = await supabase
           .from("vendors")
-          .select("*")
+          .select(`
+            *,
+            organizations (
+              id,
+              name,
+              auto_sync_enabled
+            )
+          `)
           .eq("is_active", true)
+          .not("org_id", "is", null)
 
         if (vendorsError) {
           throw new Error(`Failed to fetch vendors: ${vendorsError.message}`)
@@ -554,8 +562,24 @@ export async function syncAllLiveTelemetry(): Promise<LiveTelemetrySummary> {
           return summary
         }
 
-        // Filter vendors by their telemetry sync interval
+        // Filter vendors by org-level auto_sync_enabled and telemetry sync interval
         const vendorsToSync = vendors.filter((vendor) => {
+          // Check org-level auto_sync_enabled first
+          const org = vendor.organizations
+          if (!org) {
+            logger.warn(`⚠️ Organization not found for vendor ${vendor.id} (${vendor.name}), skipping telemetry sync`)
+            return false
+          }
+
+          if (!org.auto_sync_enabled) {
+            logger.info(
+              `⏭️ Skipping telemetry sync for vendor ${vendor.id} (${vendor.name}): ` +
+              `auto_sync_enabled=false for org ${org.id} (${org.name})`
+            )
+            return false
+          }
+
+          // Then check if it's time to sync based on telemetry_sync_interval
           const shouldSync = shouldSyncVendorTelemetry(vendor)
           if (!shouldSync) {
             const now = new Date()

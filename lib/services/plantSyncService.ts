@@ -130,8 +130,7 @@ async function syncVendorPlants(
               isActive: vendor.is_active,
               plantSyncMode,
               perPlantSyncIntervalMinutes: vendor.per_plant_sync_interval_minutes ?? 15,
-              plantListSyncMorningIst: vendor.plant_list_sync_morning_ist || undefined,
-              plantListSyncEveningIst: vendor.plant_list_sync_evening_ist || undefined,
+              plantSyncTimeIst: vendor.plant_sync_time_ist || "02:00",
             }
 
     const adapter = VendorManager.getAdapter(vendorConfig)
@@ -425,8 +424,8 @@ async function syncVendorPlants(
 }
 
 /**
- * Check if a vendor's plant sync should run based on configured morning/evening times.
- * Plant sync runs only twice a day to fetch new plants.
+ * Check if a vendor's plant sync should run based on configured daily sync time.
+ * Plant sync runs once daily at the configured time to fetch new plants.
  * Uses Asia/Kolkata timezone.
  */
 function shouldRunPlantSync(vendor: any): boolean {
@@ -441,76 +440,30 @@ function shouldRunPlantSync(vendor: any): boolean {
   const currentHour = parseInt(kolkataTime.find((part) => part.type === "hour")?.value || "0")
   const currentMinute = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
 
-  const morningSyncTime = vendor.plant_list_sync_morning_ist || "06:00"
-  const eveningSyncTime = vendor.plant_list_sync_evening_ist || "23:00"
-
-  const [morningHour, morningMin] = morningSyncTime.split(":").map(Number)
-  const [eveningHour, eveningMin] = eveningSyncTime.split(":").map(Number)
+  // Get configured sync time (default: 02:00 IST)
+  const syncTime = vendor.plant_sync_time_ist || "02:00"
+  const [syncHour, syncMin] = syncTime.split(":").map(Number)
 
   // Allow a small window around the configured time (e.g., +/- 5 minutes)
   const SYNC_WINDOW_BUFFER_MINUTES = 5
 
-  const isNearMorningSync =
-    currentHour === morningHour &&
-    currentMinute >= morningMin - SYNC_WINDOW_BUFFER_MINUTES &&
-    currentMinute <= morningMin + SYNC_WINDOW_BUFFER_MINUTES
+  const isNearSyncTime =
+    currentHour === syncHour &&
+    currentMinute >= syncMin - SYNC_WINDOW_BUFFER_MINUTES &&
+    currentMinute <= syncMin + SYNC_WINDOW_BUFFER_MINUTES
 
-  const isNearEveningSync =
-    currentHour === eveningHour &&
-    currentMinute >= eveningMin - SYNC_WINDOW_BUFFER_MINUTES &&
-    currentMinute <= eveningMin + SYNC_WINDOW_BUFFER_MINUTES
-
-  if (isNearMorningSync) {
-    logger.info(`[PlantSync] Vendor ${vendor.name} is scheduled for morning plant sync at ${morningSyncTime} IST.`)
-  }
-  if (isNearEveningSync) {
-    logger.info(`[PlantSync] Vendor ${vendor.name} is scheduled for evening plant sync at ${eveningSyncTime} IST.`)
+  if (isNearSyncTime) {
+    logger.info(`[PlantSync] Vendor ${vendor.name} is scheduled for daily plant sync at ${syncTime} IST.`)
   }
 
-  return isNearMorningSync || isNearEveningSync
+  return isNearSyncTime
 }
 
-/**
- * Check if an organization should be synced based on clock time and interval
- * Sync runs at fixed clock times: if interval is 15, syncs at :00, :15, :30, :45
- * Uses Asia/Kolkata timezone to match the cron schedule
- */
-function shouldSyncOrg(org: any): boolean {
-  if (!org.auto_sync_enabled) {
-    return false
-  }
-
-  const intervalMinutes = org.sync_interval_minutes || 15
-  
-  // Get current time in Asia/Kolkata timezone (matching cron schedule)
-  const now = new Date()
-  const kolkataTime = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Kolkata",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(now)
-  
-  const currentMinute = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
-  
-  // Calculate which intervals have passed in this hour
-  // For 15-minute interval: sync at 0, 15, 30, 45
-  // For 30-minute interval: sync at 0, 30
-  // For 60-minute interval: sync at 0
-  const currentInterval = Math.floor(currentMinute / intervalMinutes)
-  
-  // Check if current minute matches an interval boundary
-  const expectedMinute = currentInterval * intervalMinutes
-  return currentMinute === expectedMinute
-}
 
 /**
  * Sync plants for all active vendors across all organizations
  * Only syncs organizations that have auto_sync_enabled = true
- * and whose sync interval matches the current clock time
- */
-/**
- * Sync plants for all active vendors across all organizations
+ * Plant sync runs once daily at vendor-configured time (default: 02:00 IST)
  * Uses MAIN CLIENT - plants are stored in the main database
  */
 export async function syncAllPlants(): Promise<SyncSummary> {
@@ -530,8 +483,7 @@ export async function syncAllPlants(): Promise<SyncSummary> {
       organizations (
         id,
         name,
-        auto_sync_enabled,
-        sync_interval_minutes
+        auto_sync_enabled
       )
     `)
     .eq("is_active", true)

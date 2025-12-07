@@ -44,6 +44,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Switch } from "@/components/ui/switch"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Loader2, Factory, Plus, Pencil, Trash2, RefreshCw, Building2, CheckCircle2, XCircle, Settings, Clock, Zap, AlertCircle, Download, Upload } from "lucide-react"
 import type { AccountType } from "@/lib/rbac"
 
@@ -62,8 +68,7 @@ interface Vendor {
   org_id?: number
   plant_sync_mode?: 'LIST_PLANTS' | 'PER_PLANT'
   per_plant_sync_interval_minutes?: number
-  plant_list_sync_morning_ist?: string | null
-  plant_list_sync_evening_ist?: string | null
+  plant_sync_time_ist?: string | null
   telemetry_sync_mode?: 'LIST_PLANTS' | 'PER_PLANT'
   telemetry_sync_interval?: number
   organizations?: {
@@ -111,20 +116,16 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
   const [importResult, setImportResult] = useState<any>(null)
   const [syncSettings, setSyncSettings] = useState<{
     enabled: boolean
-    interval: number
     plant_sync_mode: 'LIST_PLANTS' | 'PER_PLANT'
     per_plant_sync_interval_minutes: number
-    plant_list_sync_morning_ist: string
-    plant_list_sync_evening_ist: string
+    plant_sync_time_ist: string
     telemetry_sync_mode: 'LIST_PLANTS' | 'PER_PLANT'
     telemetry_sync_interval: number
   }>({
     enabled: true,
-    interval: 15,
     plant_sync_mode: 'LIST_PLANTS',
     per_plant_sync_interval_minutes: 15,
-    plant_list_sync_morning_ist: "06:00",
-    plant_list_sync_evening_ist: "23:00",
+    plant_sync_time_ist: "02:00",
     telemetry_sync_mode: 'LIST_PLANTS',
     telemetry_sync_interval: 15,
   })
@@ -153,8 +154,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     // Plant sync configuration
     plant_sync_mode: "LIST_PLANTS" as 'LIST_PLANTS' | 'PER_PLANT',
     per_plant_sync_interval_minutes: 15,
-    plant_list_sync_morning_ist: "06:00",
-    plant_list_sync_evening_ist: "23:00",
+    plant_sync_time_ist: "02:00",
   })
 
   useEffect(() => {
@@ -189,11 +189,9 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
 
       setSyncSettings({
         enabled: vendor.organizations.auto_sync_enabled ?? true,
-        interval: vendor.organizations.sync_interval_minutes ?? 15,
         plant_sync_mode: inferredMode,
         per_plant_sync_interval_minutes: vendor.per_plant_sync_interval_minutes ?? 15,
-        plant_list_sync_morning_ist: vendor.plant_list_sync_morning_ist || "06:00",
-        plant_list_sync_evening_ist: vendor.plant_list_sync_evening_ist || "23:00",
+        plant_sync_time_ist: vendor.plant_sync_time_ist || "02:00",
         telemetry_sync_mode: (vendor.telemetry_sync_mode as 'LIST_PLANTS' | 'PER_PLANT') || 'LIST_PLANTS',
         telemetry_sync_interval: vendor.telemetry_sync_interval ?? 15,
       })
@@ -201,11 +199,9 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     } else {
       setSyncSettings({
         enabled: true,
-        interval: 15,
         plant_sync_mode: "LIST_PLANTS",
         per_plant_sync_interval_minutes: 15,
-        plant_list_sync_morning_ist: "06:00",
-        plant_list_sync_evening_ist: "23:00",
+        plant_sync_time_ist: "02:00",
         telemetry_sync_mode: "LIST_PLANTS",
         telemetry_sync_interval: 15,
       })
@@ -221,12 +217,12 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     
     try {
       // First, update organization-level auto-sync settings.
+      // Note: sync_interval_minutes removed - telemetry sync uses vendor-level telemetry_sync_interval
       const orgResponse = await fetch(`/api/orgs/${selectedOrgForSync.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           auto_sync_enabled: syncSettings.enabled,
-          sync_interval_minutes: syncSettings.interval,
         }),
       })
 
@@ -252,8 +248,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
               org_id: vendor.org_id,
               plant_sync_mode: syncSettings.plant_sync_mode,
               per_plant_sync_interval_minutes: syncSettings.per_plant_sync_interval_minutes,
-              plant_list_sync_morning_ist: syncSettings.plant_list_sync_morning_ist,
-              plant_list_sync_evening_ist: syncSettings.plant_list_sync_evening_ist,
+              plant_sync_time_ist: syncSettings.plant_sync_time_ist,
               telemetry_sync_mode: syncSettings.telemetry_sync_mode,
               telemetry_sync_interval: syncSettings.telemetry_sync_interval,
             }),
@@ -311,10 +306,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
             : "PER_PLANT"),
         per_plant_sync_interval_minutes:
           vendor.per_plant_sync_interval_minutes ?? 15,
-        plant_list_sync_morning_ist:
-          vendor.plant_list_sync_morning_ist || "06:00",
-        plant_list_sync_evening_ist:
-          vendor.plant_list_sync_evening_ist || "23:00",
+        plant_sync_time_ist:
+          vendor.plant_sync_time_ist || "02:00",
       })
     } else {
       setEditingVendor(null)
@@ -343,8 +336,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
          // Plant sync configuration (defaults for new vendor)
         plant_sync_mode: "LIST_PLANTS",
         per_plant_sync_interval_minutes: 15,
-        plant_list_sync_morning_ist: "06:00",
-        plant_list_sync_evening_ist: "23:00",
+        plant_sync_time_ist: "02:00",
       })
     }
     setDialogOpen(true)
@@ -411,8 +403,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         is_active: formData.is_active,
         plant_sync_mode: formData.plant_sync_mode,
         per_plant_sync_interval_minutes: formData.per_plant_sync_interval_minutes,
-        plant_list_sync_morning_ist: formData.plant_list_sync_morning_ist,
-        plant_list_sync_evening_ist: formData.plant_list_sync_evening_ist,
+        plant_sync_time_ist: formData.plant_sync_time_ist,
         telemetry_sync_mode: 'LIST_PLANTS', // Default to efficient mode
         telemetry_sync_interval: 15, // Default to 15 minutes
       }),
@@ -1176,46 +1167,68 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                           </motion.div>
                         )}
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => handleSyncPlants(vendor.id)}
-                            disabled={syncingVendorId === vendor.id || !vendor.org_id}
-                            className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50"
-                          >
-                            {syncingVendorId === vendor.id ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                Syncing...
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="h-4 w-4 mr-1" />
-                                Plants
-                              </>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => handleSyncPlants(vendor.id)}
+                                  disabled={syncingVendorId === vendor.id || !vendor.org_id || !vendor.organizations?.auto_sync_enabled}
+                                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50"
+                                >
+                                  {syncingVendorId === vendor.id ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                      Syncing...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <RefreshCw className="h-4 w-4 mr-1" />
+                                      Plants
+                                    </>
+                                  )}
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            {!vendor.organizations?.auto_sync_enabled && (
+                              <TooltipContent>
+                                <p>Sync is disabled for this organization. Enable sync in Sync Settings to proceed.</p>
+                              </TooltipContent>
                             )}
-                          </Button>
+                          </Tooltip>
                         </motion.div>
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSyncAlerts(vendor.id)}
-                            disabled={syncingAlertsVendorId === vendor.id}
-                            className="transition-all duration-200 hover:scale-110 bg-gradient-to-r from-amber-500/90 to-rose-500/90 text-white shadow-md hover:shadow-lg disabled:opacity-60"
-                          >
-                            {syncingAlertsVendorId === vendor.id ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                Alerts...
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="h-4 w-4 mr-1" />
-                                Alerts
-                              </>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleSyncAlerts(vendor.id)}
+                                  disabled={syncingAlertsVendorId === vendor.id || !vendor.organizations?.auto_sync_enabled}
+                                  className="transition-all duration-200 hover:scale-110 bg-gradient-to-r from-amber-500/90 to-rose-500/90 text-white shadow-md hover:shadow-lg disabled:opacity-60"
+                                >
+                                  {syncingAlertsVendorId === vendor.id ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                      Alerts...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <RefreshCw className="h-4 w-4 mr-1" />
+                                      Alerts
+                                    </>
+                                  )}
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            {!vendor.organizations?.auto_sync_enabled && (
+                              <TooltipContent>
+                                <p>Sync is disabled for this organization. Enable sync in Sync Settings to proceed.</p>
+                              </TooltipContent>
                             )}
-                          </Button>
+                          </Tooltip>
                         </motion.div>
                         <AlertDialog open={deletingVendorId === vendor.id} onOpenChange={(open: boolean) => !open && setDeletingVendorId(null)}>
                           <AlertDialogTrigger asChild>
@@ -1329,44 +1342,66 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                         <Pencil className="h-4 w-4 mr-2" />
                         Edit
                       </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleSyncPlants(vendor.id)}
-                        disabled={syncingVendorId === vendor.id || !vendor.org_id}
-                        className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white disabled:opacity-50"
-                      >
-                        {syncingVendorId === vendor.id ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Syncing...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Plants
-                          </>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="w-full">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleSyncPlants(vendor.id)}
+                              disabled={syncingVendorId === vendor.id || !vendor.org_id || !vendor.organizations?.auto_sync_enabled}
+                              className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white disabled:opacity-50"
+                            >
+                              {syncingVendorId === vendor.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Syncing...
+                                </>
+                              ) : (
+                                <>
+                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                  Plants
+                                </>
+                              )}
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!vendor.organizations?.auto_sync_enabled && (
+                          <TooltipContent>
+                            <p>Sync is disabled for this organization. Enable sync in Sync Settings to proceed.</p>
+                          </TooltipContent>
                         )}
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleSyncAlerts(vendor.id)}
-                        disabled={syncingAlertsVendorId === vendor.id}
-                        className="w-full bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white disabled:opacity-60"
-                      >
-                        {syncingAlertsVendorId === vendor.id ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Alerts...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Alerts
-                          </>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="w-full">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleSyncAlerts(vendor.id)}
+                              disabled={syncingAlertsVendorId === vendor.id || !vendor.organizations?.auto_sync_enabled}
+                              className="w-full bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white disabled:opacity-60"
+                            >
+                              {syncingAlertsVendorId === vendor.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Alerts...
+                                </>
+                              ) : (
+                                <>
+                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                  Alerts
+                                </>
+                              )}
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!vendor.organizations?.auto_sync_enabled && (
+                          <TooltipContent>
+                            <p>Sync is disabled for this organization. Enable sync in Sync Settings to proceed.</p>
+                          </TooltipContent>
                         )}
-                      </Button>
+                      </Tooltip>
                       {vendor.organizations && (
                         <Button
                           variant="outline"
@@ -1474,7 +1509,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       )}
 
       {/* Sync Settings Dialog */}
-      <Dialog open={syncSettingsDialogOpen} onOpenChange={setSyncSettingsDialogOpen}>
+      <TooltipProvider>
+        <Dialog open={syncSettingsDialogOpen} onOpenChange={setSyncSettingsDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">
@@ -1501,50 +1537,31 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                 <div className="space-y-1">
                   <Label className="text-sm font-semibold text-blue-900 dark:text-blue-100 flex items-center gap-2">
                     <RefreshCw className="h-4 w-4" />
-                    Plant Sync (Twice Daily)
+                    Plant Sync (Once Daily)
                   </Label>
                   <p className="text-xs text-blue-800 dark:text-blue-200">
-                    Plant sync runs <strong>twice daily</strong> (morning and evening) to fetch newly added plants from the vendor.
+                    Plant sync runs <strong>once daily</strong> at the configured time to fetch newly added plants from the vendor.
                     Manual/force sync is always available on request.
                   </p>
                 </div>
                   <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="w-32 text-xs text-blue-800 dark:text-blue-200">
-                      Morning Sync
+                      Plant Sync Time
                     </span>
                     <Input
                       type="time"
-                      value={syncSettings.plant_list_sync_morning_ist}
+                      value={syncSettings.plant_sync_time_ist}
                       onChange={(e) =>
                         setSyncSettings((prev) => ({
                           ...prev,
-                          plant_list_sync_morning_ist: e.target.value,
+                          plant_sync_time_ist: e.target.value,
                         }))
                       }
                       className="h-8 w-28"
                     />
                     <span className="text-xs text-blue-700 dark:text-blue-300">
-                      IST (Default: 06:00)
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-32 text-xs text-blue-800 dark:text-blue-200">
-                      Evening Sync
-                    </span>
-                    <Input
-                      type="time"
-                      value={syncSettings.plant_list_sync_evening_ist}
-                      onChange={(e) =>
-                        setSyncSettings((prev) => ({
-                          ...prev,
-                          plant_list_sync_evening_ist: e.target.value,
-                        }))
-                      }
-                      className="h-8 w-28"
-                    />
-                    <span className="text-xs text-blue-700 dark:text-blue-300">
-                      IST (Default: 23:00)
+                      IST (Default: 02:00)
                     </span>
                   </div>
                 </div>
@@ -1644,7 +1661,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                   </Label>
                 </div>
                 <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                  <strong>8:00 PM - 5:00 AM IST:</strong> All sync operations (plant sync and telemetry sync) are automatically skipped during this time window.
+                  <strong>8:00 PM - 5:00 AM IST:</strong> Telemetry sync operations are automatically skipped during this time window.
+                  Plant sync is not restricted and can run at any time (including 2 AM).
                   This prevents unnecessary API calls during off-peak hours.
                 </p>
               </div>
@@ -1667,8 +1685,9 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
               </div>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      </TooltipProvider>
     </div>
   )
 }

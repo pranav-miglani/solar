@@ -15,8 +15,7 @@ export interface VendorConfig {
   // but services (e.g. plantSyncService) can branch behavior based on it.
   plantSyncMode?: PlantSyncMode
   perPlantSyncIntervalMinutes?: number
-  plantListSyncMorningIst?: string
-  plantListSyncEveningIst?: string
+  plantSyncTimeIst?: string // Daily plant sync time in IST (default: "02:00")
 }
 
 export interface Plant {

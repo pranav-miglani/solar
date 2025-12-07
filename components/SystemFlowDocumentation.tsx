@@ -275,7 +275,7 @@ const SystemArchitectureDiagram = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Node title="Plant Sync Cron" color="orange" icon="⏰" className="min-h-[90px]">
               <div className="text-[10px] space-y-0.5">
-                <div>Every 15 min • Checks morning/evening • Twice daily</div>
+                <div>Every 15 min • Checks daily sync time • Once daily</div>
                 <div className="pt-1 border-t border-orange-500/30">→ /api/cron/sync-plants</div>
               </div>
             </Node>
@@ -350,14 +350,12 @@ const PlantSyncMermaidDiagram = () => {
     if (svg) return
 
     const diagramDefinition = `flowchart TD
-    A["Cron Trigger<br/>Every 15 min<br/>(checks timing)"] --> D{"Check Restricted<br/>Window<br/>8 PM - 5 AM IST"}
-    B["Manual Sync<br/>UI Button"] --> D
-    C["Twice Daily<br/>Morning/Evening<br/>Configurable"] --> D
-    D -->|"Not in window"| E["syncAllPlants()<br/>plantSyncService.ts"]
-    D -->|"In window"| F["Skip Sync"]
+    A["Cron Trigger<br/>Every 15 min<br/>(checks timing)"] --> E["syncAllPlants()<br/>plantSyncService.ts"]
+    B["Manual Sync<br/>UI Button<br/>(if org sync enabled)"] --> E
+    C["Once Daily<br/>Vendor-Configured Time<br/>Default: 02:00 IST"] --> E
     E --> G["Filter Organizations<br/>auto_sync_enabled = true"]
-    G --> H["For Each Vendor<br/>Check shouldRunPlantSync()<br/>Morning/Evening times"]
-    H --> I{"Time matches<br/>morning/evening?"}
+    G --> H["For Each Vendor<br/>Check shouldRunPlantSync()<br/>Daily sync time"]
+    H --> I{"Time matches<br/>daily sync time?"}
     I -->|"Yes"| J["Authenticate<br/>Call listPlants()<br/>Upsert to DB<br/>Batch size: 100"]
     I -->|"No"| K["Skip Sync<br/>(not sync time)"]
     J --> L["Results<br/>Success/Failure counts<br/>Plants synced/created/updated<br/>Fetches newly added plants"]
@@ -666,7 +664,7 @@ export function SystemFlowDocumentation() {
                       <div>
                         <h4 className="font-medium mb-2">Sync Services</h4>
                         <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                          <li><code className="bg-background px-1 rounded">plantSyncService.ts</code> - Plant synchronization (twice daily: morning/evening)</li>
+                          <li><code className="bg-background px-1 rounded">plantSyncService.ts</code> - Plant synchronization (once daily at configured time, default: 02:00 IST)</li>
                           <li><code className="bg-background px-1 rounded">alertSyncService.ts</code> - Alert synchronization</li>
                           <li><code className="bg-background px-1 rounded">liveTelemetrySyncService.ts</code> - Live telemetry sync (15/30/45 min intervals, LIST_PLANTS or PER_PLANT mode)</li>
                           <li><code className="bg-background px-1 rounded">telemetrySyncService.ts</code> - Historical telemetry (graphs) synchronization</li>
@@ -676,7 +674,7 @@ export function SystemFlowDocumentation() {
                       <div>
                         <h4 className="font-medium mb-2">Cron Jobs</h4>
                         <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                          <li><code className="bg-background px-1 rounded">plantSyncCron.js</code> - Runs every 15 min, checks morning/evening times (twice daily sync)</li>
+                          <li><code className="bg-background px-1 rounded">plantSyncCron.js</code> - Runs every 15 min, checks vendor-configured daily sync time (once daily sync)</li>
                           <li><code className="bg-background px-1 rounded">liveTelemetrySyncCron.js</code> - Runs every 15 min, filters vendors by telemetry_sync_interval</li>
                           <li><code className="bg-background px-1 rounded">alertSyncCron.js</code> - Alert sync scheduler</li>
                           <li><code className="bg-background px-1 rounded">wmsSiteSyncCron.js</code> - WMS site sync (runs twice daily at 6 AM and 10 PM IST)</li>
@@ -706,11 +704,7 @@ export function SystemFlowDocumentation() {
                     <div className="bg-muted/50 p-4 rounded-lg space-y-2">
                       <div>
                         <code className="bg-background px-2 py-1 rounded text-sm font-mono">auto_sync_enabled</code>
-                        <p className="text-sm text-muted-foreground mt-1">Boolean - Enable/disable auto-sync for the organization</p>
-                      </div>
-                      <div>
-                        <code className="bg-background px-2 py-1 rounded text-sm font-mono">sync_interval_minutes</code>
-                        <p className="text-sm text-muted-foreground mt-1">Integer (1-1440) - Base sync cadence, typically 15 minutes. Sync runs at fixed clock times (e.g., :00, :15, :30, :45 for 15-min intervals)</p>
+                        <p className="text-sm text-muted-foreground mt-1">Boolean (default: true) - When disabled, all sync operations (plant, telemetry, alerts, WMS) are skipped for this organization. Used for payment issues or maintenance.</p>
                       </div>
                     </div>
                   </div>
@@ -725,16 +719,12 @@ export function SystemFlowDocumentation() {
                         <p className="text-sm text-muted-foreground mt-1">Enum: LIST_PLANTS | PER_PLANT - Determines sync strategy</p>
                       </div>
                       <div>
+                        <code className="bg-background px-2 py-1 rounded text-sm font-mono">plant_sync_time_ist</code>
+                        <p className="text-sm text-muted-foreground mt-1">TIME (default: 02:00) - Daily plant sync time in IST. Plant sync runs once daily at this configured time.</p>
+                      </div>
+                      <div>
                         <code className="bg-background px-2 py-1 rounded text-sm font-mono">per_plant_sync_interval_minutes</code>
                         <p className="text-sm text-muted-foreground mt-1">Integer (default: 15) - Reserved for future per-plant telemetry cron</p>
-                      </div>
-                      <div>
-                        <code className="bg-background px-2 py-1 rounded text-sm font-mono">plant_list_sync_morning_ist</code>
-                        <p className="text-sm text-muted-foreground mt-1">TIME (default: 06:00) - Morning listPlants time for PER_PLANT vendors</p>
-                      </div>
-                      <div>
-                        <code className="bg-background px-2 py-1 rounded text-sm font-mono">plant_list_sync_evening_ist</code>
-                        <p className="text-sm text-muted-foreground mt-1">TIME (default: 23:00) - Evening plant sync time (IST)</p>
                       </div>
                       <div>
                         <code className="bg-background px-2 py-1 rounded text-sm font-mono">telemetry_sync_mode</code>
@@ -750,7 +740,8 @@ export function SystemFlowDocumentation() {
                 <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-900">
                   <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">Restricted Sync Window</h4>
                   <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    <strong>8:00 PM - 5:00 AM IST:</strong> All sync operations (plant sync and telemetry sync) are automatically skipped during this time window.
+                    <strong>8:00 PM - 5:00 AM IST:</strong> Telemetry sync operations are automatically skipped during this time window.
+                    <strong>Plant sync is NOT restricted</strong> and can run at any time (including 2 AM).
                     This prevents unnecessary API calls during off-peak hours. Currently configured via environment variables 
                     <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">SYNC_WINDOW_START</code> (default: 20:00 IST) 
                     and <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">SYNC_WINDOW_END</code> (default: 05:00 IST).
@@ -850,7 +841,7 @@ export function SystemFlowDocumentation() {
                         </ul>
                       </li>
                       <li><strong>Interval-Based Sync:</strong> Cron runs every 15 minutes, but only syncs vendors whose <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">telemetry_sync_interval</code> matches the current time (e.g., 15 min syncs at :00, :15, :30, :45)</li>
-                      <li><strong>listPlant() Usage in Plant Sync:</strong> During plant sync (twice daily), if live telemetry is not available in <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">listPlants()</code> response, 
+                      <li><strong>listPlant() Usage in Plant Sync:</strong> During plant sync (once daily), if live telemetry is not available in <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">listPlants()</code> response, 
                       optionally enriches each plant by calling <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">adapter.listPlant(vendorPlantId)</code> (configurable via <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">ENABLE_PER_PLANT_LIVE_TELEMETRY</code> env var, default: enabled). 
                       This happens in batches of 20 plants in parallel.</li>
                     </ol>
@@ -875,7 +866,7 @@ export function SystemFlowDocumentation() {
                       <strong>Default for:</strong> Solarman, ShineMonitor, Foxesscloud
                     </p>
                     <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2 ml-4 list-disc">
-                      <li>Plant sync runs <strong>twice daily</strong> (morning and evening) to fetch newly added plants</li>
+                      <li>Plant sync runs <strong>once daily</strong> at vendor-configured time (default: 02:00 IST) to fetch newly added plants</li>
                       <li>At sync time, calls <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">adapter.listPlants()</code></li>
                       <li>Upserts plants into <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">plants</code> table with topology and metrics</li>
                       <li>Production metrics (daily/monthly/yearly/total) come from plant list API</li>
@@ -1236,12 +1227,7 @@ export function SystemFlowDocumentation() {
                         <tr className="border-b">
                           <td className="p-2"><code>auto_sync_enabled</code></td>
                           <td className="p-2">BOOLEAN</td>
-                          <td className="p-2">Enable auto-sync (default: true)</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-2"><code>sync_interval_minutes</code></td>
-                          <td className="p-2">INTEGER</td>
-                          <td className="p-2">Sync interval 1-1440 min (default: 15). Sync runs at fixed clock times.</td>
+                          <td className="p-2">When disabled, all sync operations (plant, telemetry, alerts, WMS) are skipped for this organization. Used for payment issues or maintenance. (default: true)</td>
                         </tr>
                       </tbody>
                     </table>
@@ -1309,14 +1295,9 @@ export function SystemFlowDocumentation() {
                           <td className="p-2">Interval for PER_PLANT mode (default: 15)</td>
                         </tr>
                         <tr className="border-b">
-                          <td className="p-2"><code>plant_list_sync_morning_ist</code></td>
+                          <td className="p-2"><code>plant_sync_time_ist</code></td>
                           <td className="p-2">TIME</td>
-                          <td className="p-2">Morning listPlants sync time (default: 06:00)</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="p-2"><code>plant_list_sync_evening_ist</code></td>
-                          <td className="p-2">TIME</td>
-                          <td className="p-2">Evening plant sync time (default: 23:00 IST)</td>
+                          <td className="p-2">Daily plant sync time in IST (default: 02:00). Plant sync runs once daily at this configured time.</td>
                         </tr>
                         <tr className="border-b">
                           <td className="p-2"><code>telemetry_sync_mode</code></td>
@@ -1886,9 +1867,10 @@ Unique Constraints:
                           <li>Filters by <code className="bg-background px-1 rounded">auto_sync_enabled = true</code></li>
                           <li>For each vendor, checks <code className="bg-background px-1 rounded">shouldRunPlantSync()</code>:
                             <ul className="ml-4 mt-1 list-disc">
-                              <li>Checks if current time is within 15 minutes of morning or evening sync time</li>
-                              <li>Uses <code className="bg-background px-1 rounded">plant_list_sync_morning_ist</code> and <code className="bg-background px-1 rounded">plant_list_sync_evening_ist</code></li>
-                              <li>Plant sync runs <strong>twice daily</strong> to fetch newly added plants</li>
+                              <li>Checks if current time is within 15 minutes of vendor-configured daily sync time</li>
+                              <li>Uses <code className="bg-background px-1 rounded">plant_sync_time_ist</code> (default: 02:00 IST)</li>
+                              <li>Plant sync runs <strong>once daily</strong> to fetch newly added plants</li>
+                              <li>Plant sync is NOT restricted by the sync window (can run at 2 AM)</li>
                             </ul>
                           </li>
                         </ul>
@@ -2017,11 +1999,11 @@ Unique Constraints:
                   <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">⚠️ Important Notes</h4>
                   <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1 ml-4 list-disc">
                     <li>Live telemetry sync is <strong>separate from plant sync</strong> - runs at different intervals</li>
-                    <li>Plant sync runs twice daily to fetch newly added plants</li>
+                    <li>Plant sync runs once daily at vendor-configured time (default: 02:00 IST) to fetch newly added plants</li>
                     <li>Live telemetry sync runs at configurable intervals (15/30/45 min) to update real-time metrics</li>
                     <li>LIST_PLANTS mode is more efficient (single API call) but requires vendor support</li>
                     <li>PER_PLANT mode is costly (one call per plant) but works for all vendors</li>
-                    <li>All syncs respect the restricted time window (8 PM - 5 AM IST)</li>
+                    <li>Telemetry sync respects the restricted time window (8 PM - 5 AM IST). Plant sync is NOT restricted.</li>
                   </ul>
                 </div>
               </div>
@@ -2322,7 +2304,7 @@ Unique Constraints:
 │   └── *.tsx                    # Feature components
 ├── lib/                          # Core libraries
 │   ├── services/                # Business logic services
-│   │   ├── plantSyncService.ts  # Plant sync orchestration (twice daily)
+│   │   ├── plantSyncService.ts  # Plant sync orchestration (once daily)
 │   │   ├── alertSyncService.ts  # Alert sync orchestration
 │   │   ├── liveTelemetrySyncService.ts  # Live telemetry sync (15/30/45 min intervals)
 │   │   └── wmsSyncService.ts    # WMS site/device sync and insolation sync
@@ -2339,7 +2321,7 @@ Unique Constraints:
 │   │   ├── intelloAdapter.ts    # Intello WMS implementation
 │   │   └── scadaAdapter.ts      # SCADA WMS implementation
 │   ├── cron/                    # Cron job definitions
-│   │   ├── plantSyncCron.js    # Plant sync scheduler (checks morning/evening times)
+│   │   ├── plantSyncCron.js    # Plant sync scheduler (checks vendor-configured daily time)
 │   │   ├── liveTelemetrySyncCron.js  # Live telemetry sync scheduler
 │   │   ├── alertSyncCron.js     # Alert sync scheduler
 │   │   ├── wmsSiteSyncCron.js   # WMS site sync scheduler (twice daily)
@@ -2371,11 +2353,11 @@ Unique Constraints:
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="bg-muted/50 p-4 rounded-lg">
                       <h4 className="font-medium mb-2">lib/services/plantSyncService.ts</h4>
-                      <p className="text-xs text-muted-foreground mb-2">Main plant synchronization service (twice daily)</p>
+                      <p className="text-xs text-muted-foreground mb-2">Main plant synchronization service (once daily)</p>
                       <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                         <li><code className="bg-background px-1 rounded">syncAllPlants()</code> - Main entry point, orchestrates all vendor syncs</li>
                         <li><code className="bg-background px-1 rounded">syncVendorPlants()</code> - Per-vendor sync logic</li>
-                        <li><code className="bg-background px-1 rounded">shouldRunPlantSync()</code> - Checks if current time matches morning/evening sync times</li>
+                        <li><code className="bg-background px-1 rounded">shouldRunPlantSync()</code> - Checks if current time matches vendor-configured daily sync time</li>
                         <li><code className="bg-background px-1 rounded">validateAndRefreshToken()</code> - Token validation and refresh</li>
                         <li>Batch upserts (100 plants per batch) for performance</li>
                         <li>Unit conversions (W→kW, kWh→MWh) during normalization</li>
@@ -2694,9 +2676,9 @@ Unique Constraints:
                       <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                         <li>Schedule: Every 15 minutes (<code className="bg-background px-1 rounded">*/15 * * * *</code>)</li>
                         <li>Calls: <code className="bg-background px-1 rounded">GET /api/cron/sync-plants</code></li>
-                        <li>Checks restricted window (8 PM - 5 AM IST by default)</li>
-                        <li>Service checks morning/evening times - plant sync runs <strong>twice daily</strong></li>
-                        <li>Skips sync if in restricted window or not at sync time</li>
+                        <li>Service checks vendor-configured daily sync time - plant sync runs <strong>once daily</strong></li>
+                        <li>Plant sync is NOT restricted by the sync window (can run at 2 AM)</li>
+                        <li>Skips sync if not at configured sync time</li>
                         <li>Uses <code className="bg-background px-1 rounded">CRON_SECRET</code> for security (if configured)</li>
                         <li>Runs in-process (server.js starts it)</li>
                       </ul>
