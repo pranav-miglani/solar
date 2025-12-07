@@ -34,13 +34,14 @@ export interface WmsDevice {
 /**
  * Insolation reading interface (time-series data from vendor)
  * Can be at any interval (e.g., 10-minute, hourly, etc.)
+ * For vendors with pre-calculated daily values (INTELLO, SCADA), irr is not used
  */
 export interface InsolationReading {
   deviceId: string
   date: string // ISO date string
   hour: string // HH:mm:ss format (or any time format)
-  irr: number // Insolation value in W/m²
-  generation?: number // Optional generation value
+  irr?: number // Optional: Insolation value in W/m² (not used for pre-calculated daily values)
+  generation?: number // Optional: Pre-calculated daily insolation in kWh/m² (used for INTELLO, SCADA)
 }
 
 /**
@@ -119,9 +120,34 @@ export abstract class BaseWmsAdapter {
       return 0
     }
 
-    // Filter only invalid readings (null or negative), keep all valid readings regardless of interval
-    const validReadings = readings.filter(r => r.irr != null && r.irr >= 0)
+    // Check if readings have pre-calculated generation values (for INTELLO, SCADA)
+    const hasPreCalculated = readings.some(r => (r as any).generation != null)
+    if (hasPreCalculated) {
+      // For pre-calculated values, use generation field directly
+      const validReadings = readings.filter(r => (r as any).generation != null && (r as any).generation >= 0)
+      if (validReadings.length === 0) {
+        return 0
+      }
+      // Return the generation value (already in kWh/m²)
+      return (validReadings[0] as any).generation
+    }
+
+    // For time-series readings with irr values, use integration method
+    // Filter invalid readings: null, NaN, negative, or unreasonably large (>2000 W/m²)
+    const validReadings = readings.filter(r => {
+      if (r.irr == null) return false
+      if (isNaN(r.irr) || !isFinite(r.irr)) return false
+      if (r.irr < 0) return false
+      if (r.irr > 2000) {
+        // Log warning for unusually high values but don't filter (could be valid in extreme conditions)
+        logger.warn(`[BaseWmsAdapter] Unusually high IRR value detected: ${r.irr} W/m² (device: ${r.deviceId}, date: ${r.date})`)
+        return true // Keep it but log warning
+      }
+      return true
+    })
+    
     if (validReadings.length === 0) {
+      logger.warn(`[BaseWmsAdapter] No valid readings after filtering (total: ${readings.length})`)
       return 0
     }
 
@@ -142,26 +168,58 @@ export abstract class BaseWmsAdapter {
     // This uses ALL consecutive readings to calculate the area under the curve
     // Uses the first IRR value (IRR_i) for each interval
     let totalEnergyWh = 0
+    let skippedReadings = 0
 
     for (let i = 0; i < sortedReadings.length - 1; i++) {
       const current = sortedReadings[i]
       const next = sortedReadings[i + 1]
 
-      const timeCurrent = this.parseTimestamp(current.date, current.hour)
-      const timeNext = this.parseTimestamp(next.date, next.hour)
+      try {
+        const timeCurrent = this.parseTimestamp(current.date, current.hour)
+        const timeNext = this.parseTimestamp(next.date, next.hour)
 
-      // Calculate actual time interval in hours between consecutive readings
-      const timeIntervalHours = (timeNext.getTime() - timeCurrent.getTime()) / (1000 * 60 * 60)
+        // Calculate actual time interval in hours between consecutive readings
+        const timeIntervalHours = (timeNext.getTime() - timeCurrent.getTime()) / (1000 * 60 * 60)
 
-      if (timeIntervalHours <= 0) {
-        // Skip if timestamps are invalid or same (duplicate readings)
+        if (timeIntervalHours <= 0) {
+          // Skip if timestamps are invalid or same (duplicate readings)
+          skippedReadings++
+          continue
+        }
+
+        // Validate time interval is reasonable (not more than 24 hours for consecutive readings)
+        if (timeIntervalHours > 24) {
+          logger.warn(`[BaseWmsAdapter] Unusually large time interval: ${timeIntervalHours} hours between readings (device: ${current.deviceId})`)
+          skippedReadings++
+          continue
+        }
+
+        // Use the first IRR value (IRR_i) for each interval × time interval
+        // Formula: Σ [IRR_i × Δt_i] / 1000
+        if (current.irr == null) {
+          skippedReadings++
+          continue
+        }
+        const energyWh = current.irr * timeIntervalHours
+        
+        // Validate calculated energy is reasonable
+        if (isNaN(energyWh) || !isFinite(energyWh)) {
+          logger.warn(`[BaseWmsAdapter] Invalid energy calculation: ${energyWh} Wh/m² (IRR: ${current.irr}, interval: ${timeIntervalHours}h)`)
+          skippedReadings++
+          continue
+        }
+
+        totalEnergyWh += energyWh
+      } catch (error) {
+        // Skip reading if timestamp parsing fails
+        skippedReadings++
+        logger.warn(`[BaseWmsAdapter] Skipping reading due to timestamp parsing error: ${error}`)
         continue
       }
+    }
 
-      // Use the first IRR value (IRR_i) for each interval × time interval
-      // Formula: Σ [IRR_i × Δt_i] / 1000
-      const energyWh = current.irr * timeIntervalHours
-      totalEnergyWh += energyWh
+    if (skippedReadings > 0) {
+      logger.info(`[BaseWmsAdapter] Skipped ${skippedReadings} invalid readings out of ${sortedReadings.length} total`)
     }
 
     // Convert Wh/m² to kWh/m²

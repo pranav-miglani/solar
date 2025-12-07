@@ -58,16 +58,52 @@ async function processDailyInsolationReading(
   adapter: BaseWmsAdapter,
   result: { readingsCreated: number; readingsUpdated: number }
 ): Promise<void> {
+  // Validate readings before processing
+  if (!readings || readings.length === 0) {
+    logger.warn(`[WMS Insolation Sync] No readings provided for device ${device.vendor_device_id} on ${targetDate}`)
+    return
+  }
+
   const dailyInsolation = adapter.calculateDailyInsolation(readings)
+  
+  // Validate calculated insolation value
+  if (isNaN(dailyInsolation) || !isFinite(dailyInsolation)) {
+    logger.error(`[WMS Insolation Sync] Invalid insolation value (NaN/Infinity) for device ${device.vendor_device_id} on ${targetDate}: ${dailyInsolation}`)
+    return
+  }
+
+  // Validate reasonable range (0-15 kWh/m² is typical max for a day)
+  if (dailyInsolation < 0) {
+    logger.warn(`[WMS Insolation Sync] Negative insolation value for device ${device.vendor_device_id} on ${targetDate}: ${dailyInsolation} kWh/m². Setting to 0.`)
+    // Set to 0 instead of storing negative value
+    return
+  }
+
+  if (dailyInsolation > 15) {
+    logger.warn(`[WMS Insolation Sync] Unusually high insolation value for device ${device.vendor_device_id} on ${targetDate}: ${dailyInsolation} kWh/m². Storing anyway but flagged.`)
+    // Store but log warning - could be valid in some locations
+  }
+
   logger.info(`[WMS Insolation Sync] Calculated daily insolation: ${dailyInsolation.toFixed(4)} kWh/m² from ${readings.length} readings for ${targetDate}`)
 
-  // Check if reading already exists
-  const { data: existingReading } = await supabase
+  // Check if reading already exists (use maybeSingle to handle not found gracefully)
+  const { data: existingReading, error: checkError } = await supabase
     .from("insolation_readings")
     .select("id")
     .eq("wms_device_id", device.id)
     .eq("reading_date", targetDate)
-    .single()
+    .maybeSingle()
+
+  if (checkError && checkError.code !== "PGRST116") {
+    // PGRST116 = not found, which is OK
+    logger.error(`[WMS Insolation Sync] Error checking for existing reading: ${checkError.message}`, { error: checkError })
+    throw checkError
+  }
+
+  // Calculate min/max IRR with validation (only if irr values exist)
+  const validIrrs = readings.map((r: InsolationReading) => r.irr).filter((irr): irr is number => irr != null && isFinite(irr) && irr >= 0)
+  const minIrr = validIrrs.length > 0 ? Math.min(...validIrrs) : null
+  const maxIrr = validIrrs.length > 0 ? Math.max(...validIrrs) : null
 
   const readingData = {
     wms_device_id: device.id,
@@ -76,8 +112,8 @@ async function processDailyInsolationReading(
     reading_count: readings.length,
     metadata: {
       all_readings: readings,
-      min_irr: Math.min(...readings.map((r: InsolationReading) => r.irr)),
-      max_irr: Math.max(...readings.map((r: InsolationReading) => r.irr)),
+      min_irr: minIrr,
+      max_irr: maxIrr,
     },
   }
 
@@ -147,12 +183,16 @@ export async function syncWmsVendorSites(
   }
 
   try {
-    // Get organization name
-    const { data: org } = await supabase
+    // Get organization name (use maybeSingle to handle not found gracefully)
+    const { data: org, error: orgError } = await supabase
       .from("organizations")
       .select("name")
       .eq("id", vendor.org_id)
-      .single()
+      .maybeSingle()
+
+    if (orgError && orgError.code !== "PGRST116") {
+      logger.warn(`[WMS Sync] Error fetching organization ${vendor.org_id}: ${orgError.message}`)
+    }
 
     result.orgName = org?.name
 
@@ -169,16 +209,17 @@ export async function syncWmsVendorSites(
 
     // Sync each site
     for (const site of sites) {
-      // Upsert site
+      // Upsert site (use maybeSingle to handle not found gracefully)
       const { data: existingSite, error: siteError } = await supabase
         .from("wms_sites")
         .select("id")
         .eq("wms_vendor_id", vendor.id)
         .eq("vendor_site_id", site.vendorSiteId)
-        .single()
+        .maybeSingle()
 
       if (siteError && siteError.code !== "PGRST116") {
         // PGRST116 = not found, which is OK
+        logger.error(`[WMS Sync] Error checking for existing site: ${siteError.message}`, { error: siteError })
         throw siteError
       }
 
@@ -213,13 +254,18 @@ export async function syncWmsVendorSites(
         result.sitesCreated++
       }
 
-      // Get site ID for device sync
-      const { data: syncedSite } = await supabase
+      // Get site ID for device sync (use maybeSingle to handle not found gracefully)
+      const { data: syncedSite, error: syncedSiteError } = await supabase
         .from("wms_sites")
         .select("id")
         .eq("wms_vendor_id", vendor.id)
         .eq("vendor_site_id", site.vendorSiteId)
-        .single()
+        .maybeSingle()
+
+      if (syncedSiteError && syncedSiteError.code !== "PGRST116") {
+        logger.error(`[WMS Sync] Error fetching synced site: ${syncedSiteError.message}`, { error: syncedSiteError })
+        continue
+      }
 
       if (!syncedSite) {
         logger.warn(`[WMS Sync] Site not found after sync: ${site.vendorSiteId}`)
@@ -247,13 +293,18 @@ export async function syncWmsVendorSites(
       result.devicesSynced += devices.length
 
       for (const device of devices) {
-        // Upsert device
-        const { data: existingDevice } = await supabase
+        // Upsert device (use maybeSingle to handle not found gracefully)
+        const { data: existingDevice, error: deviceCheckError } = await supabase
           .from("wms_devices")
           .select("id")
           .eq("wms_site_id", syncedSite.id)
           .eq("vendor_device_id", device.vendorDeviceId)
-          .single()
+          .maybeSingle()
+
+        if (deviceCheckError && deviceCheckError.code !== "PGRST116") {
+          logger.error(`[WMS Sync] Error checking for existing device: ${deviceCheckError.message}`, { error: deviceCheckError })
+          continue
+        }
 
         const deviceData = {
           wms_site_id: syncedSite.id,
@@ -322,12 +373,16 @@ export async function syncWmsVendorDevices(
   }
 
   try {
-    // Get organization name
-    const { data: org } = await supabase
+    // Get organization name (use maybeSingle to handle not found gracefully)
+    const { data: org, error: orgError } = await supabase
       .from("organizations")
       .select("name")
       .eq("id", vendor.org_id)
-      .single()
+      .maybeSingle()
+
+    if (orgError && orgError.code !== "PGRST116") {
+      logger.warn(`[WMS Insolation Sync] Error fetching organization ${vendor.org_id}: ${orgError.message}`)
+    }
 
     result.orgName = org?.name
 
@@ -376,13 +431,18 @@ export async function syncWmsVendorDevices(
         result.devicesSynced += devices.length
 
         for (const device of devices) {
-          // Upsert device
-          const { data: existingDevice } = await supabase
+          // Upsert device (use maybeSingle to handle not found gracefully)
+          const { data: existingDevice, error: deviceCheckError } = await supabase
             .from("wms_devices")
             .select("id")
             .eq("wms_site_id", siteId)
             .eq("vendor_device_id", device.vendorDeviceId)
-            .single()
+            .maybeSingle()
+
+          if (deviceCheckError && deviceCheckError.code !== "PGRST116") {
+            logger.error(`[WMS Sync] Error checking for existing device: ${deviceCheckError.message}`, { error: deviceCheckError })
+            continue
+          }
 
           const deviceData = {
             wms_site_id: siteId,
@@ -443,7 +503,7 @@ export async function syncWmsDeviceInsolation(
   }
 
   try {
-    // Get device with site and vendor info
+    // Get device with site and vendor info (use single() here as device must exist)
     const { data: device, error: deviceError } = await supabase
       .from("wms_devices")
       .select(
@@ -472,7 +532,7 @@ export async function syncWmsDeviceInsolation(
 
     if (deviceError || !device) {
       logger.error(`[WMS Insolation Sync] Device ${deviceId} not found in database`, { deviceError })
-      throw new Error("Device not found")
+      throw new Error(`Device not found: ${deviceId}`)
     }
 
     logger.info(
@@ -515,13 +575,18 @@ export async function syncWmsDeviceInsolation(
           const dailyInsolation = adapter.calculateDailyInsolation(readings)
           logger.info(`[WMS Insolation Sync] Calculated daily insolation: ${dailyInsolation.toFixed(4)} kWh/m² from ${readings.length} readings for ${date}`)
 
-          // Check if reading already exists
-          const { data: existingReading } = await supabase
+          // Check if reading already exists (use maybeSingle to handle not found gracefully)
+          const { data: existingReading, error: readingCheckError } = await supabase
             .from("insolation_readings")
             .select("id")
             .eq("wms_device_id", device.id)
             .eq("reading_date", date)
-            .single()
+            .maybeSingle()
+
+          if (readingCheckError && readingCheckError.code !== "PGRST116") {
+            logger.error(`[WMS Insolation Sync] Error checking for existing reading: ${readingCheckError.message}`, { error: readingCheckError })
+            throw readingCheckError
+          }
 
           const readingData = {
             wms_device_id: device.id,
@@ -530,8 +595,8 @@ export async function syncWmsDeviceInsolation(
             reading_count: readings.length,
             metadata: {
               all_readings: readings,
-              min_irr: Math.min(...readings.map((r: InsolationReading) => r.irr)),
-              max_irr: Math.max(...readings.map((r: InsolationReading) => r.irr)),
+              min_irr: readings.some(r => r.irr != null) ? Math.min(...readings.map((r: InsolationReading) => r.irr).filter((irr): irr is number => irr != null)) : null,
+              max_irr: readings.some(r => r.irr != null) ? Math.max(...readings.map((r: InsolationReading) => r.irr).filter((irr): irr is number => irr != null)) : null,
             },
           }
 
@@ -610,7 +675,8 @@ export async function syncWmsDeviceInsolation(
             )
           }
         } else {
-          // Single day or empty - fall back to per-day calls for better compatibility
+          // Single day or empty - fall back to per-day calls
+          // For INTELLO, API only supports single day per call, so we iterate through dates
           logger.info(`[WMS Insolation Sync] Date range returned single day or empty, falling back to per-day calls`)
           const datesToSync: string[] = []
           for (let daysAgo = 1; daysAgo <= 100; daysAgo++) {

@@ -331,8 +331,8 @@ export class ScadaAdapter extends BaseWmsAdapter {
             .update({ access_token: null })
             .eq("id", this.vendorId)
         }
-        // Retry with fresh authentication
-        return this.getInsolationData(deviceId, fromDate, toDate)
+        // Retry with fresh authentication (must pass deviceName parameter)
+        return this.getInsolationData(deviceId, fromDate, toDate, deviceName)
       }
       
       throw new Error(`Failed to fetch SCADA insolation data: ${response.status} ${errorText}`)
@@ -363,13 +363,12 @@ export class ScadaAdapter extends BaseWmsAdapter {
         const insolationKwh = parseFloat(item["Solar Insolation"]) || 0
         
         // Store the daily kWh/m² value
-        // Note: irr field expects W/m², but for SCADA we store kWh/m² directly
+        // irr field is not used for pre-calculated values
         // The calculateDailyInsolation method will handle this correctly
         return {
           deviceId,
           date: isoDate,
           hour: "00:00:00", // Daily reading, use midnight
-          irr: insolationKwh, // Store kWh/m² directly (will be handled in calculateDailyInsolation)
           generation: insolationKwh, // Store original kWh/m² value
         } as InsolationReading & { generation?: number }
       }

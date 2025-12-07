@@ -173,10 +173,27 @@ export class IntelloAdapter extends BaseWmsAdapter {
   }
 
   /**
+   * Get report API base URL from environment variable
+   * Separate from main API base URL for insolation report endpoint
+   */
+  private getReportApiBaseUrl(): string {
+    const reportBaseUrl = process.env.INTELLO_REPORT_API_BASE_URL
+    
+    if (!reportBaseUrl) {
+      throw new Error(
+        `Report API base URL not configured. Please set INTELLO_REPORT_API_BASE_URL environment variable.`
+      )
+    }
+    
+    return reportBaseUrl
+  }
+
+  /**
    * Get insolation data for a specific device
-   * @param deviceId - RTU ID (e.g., "RTU2495")
-   * @param fromDate - Start date (YYYY-MM-DD)
-   * @param toDate - End date (YYYY-MM-DD)
+   * Uses new API endpoint that returns pre-calculated daily insolation
+   * @param deviceId - RTU ID (e.g., "RTU2684")
+   * @param fromDate - Start date (YYYY-MM-DD) - API only supports single day per call
+   * @param toDate - End date (YYYY-MM-DD) - should match fromDate for this API
    * @param deviceName - Optional device name (not used for INTELLO, kept for interface consistency)
    */
   async getInsolationData(
@@ -185,15 +202,28 @@ export class IntelloAdapter extends BaseWmsAdapter {
     toDate: string,
     deviceName?: string
   ): Promise<InsolationReading[]> {
-    const apiBaseUrl = this.getApiBaseUrl()
-    const insolationUrl = `/api/intello/rtu/v1/data?fromDate=${fromDate}&toDate=${toDate}&mode=Daily&resultType=site&rtuid=${deviceId}`
-    const fullUrl = `${apiBaseUrl}${insolationUrl}`
+    const reportApiBaseUrl = this.getReportApiBaseUrl()
+    
+    // New API endpoint: /report?fromDate=YYYY-MM-DD&mode=Daily&resultType=ZDGLOSS&rtuid={rtuid}
+    // Note: API only supports single day per call, so we use fromDate
+    // Uses separate report API base URL (INTELLO_REPORT_API_BASE_URL)
+    const insolationUrl = `/report?fromDate=${fromDate}&mode=Daily&resultType=ZDGLOSS&rtuid=${deviceId}`
+    const fullUrl = `${reportApiBaseUrl}${insolationUrl}`
     
     logger.info(`[IntelloAdapter] Calling insolation data API: GET ${fullUrl}`)
     logger.info(`[IntelloAdapter] Request params: deviceId=${deviceId}, fromDate=${fromDate}, toDate=${toDate}`)
     const requestStartTime = Date.now()
     
-    const response = await this.fetchWithAuth(insolationUrl)
+    // Use report API base URL for this endpoint (not the main API base URL)
+    // Need to make direct fetch call since fetchWithAuth uses main API base URL
+    const token = await this.authenticate()
+    const response = await fetch(fullUrl, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    })
 
     const requestDuration = Date.now() - requestStartTime
     logger.info(`[IntelloAdapter] Insolation data API response: ${response.status} ${response.statusText} (${requestDuration}ms)`)
@@ -206,23 +236,86 @@ export class IntelloAdapter extends BaseWmsAdapter {
       )
     }
 
-    const readings = await response.json() as any[]
-    logger.info(`[IntelloAdapter] Parsed ${readings.length} insolation readings from API response`)
+    const result = await response.json() as any
+    logger.info(`[IntelloAdapter] Received insolation API response for date: ${result.date || fromDate}`)
 
-    const mappedReadings = readings.map((reading) => ({
-      deviceId: reading.id || deviceId,
-      date: reading.date || fromDate,
-      hour: reading.hour || "00:00:00",
-      irr: reading.irr || 0,
-      generation: reading.generation,
-    }))
-
-    if (mappedReadings.length > 0) {
-      const dailyInsolation = this.calculateDailyInsolation(mappedReadings)
-      logger.info(`[IntelloAdapter] Daily insolation: ${dailyInsolation.toFixed(4)} kWh/m² (from ${mappedReadings.length} readings)`)
+    // Parse dailyReport JSON string
+    let insolationValue = 0
+    let parsedDailyReport: any[] = []
+    
+    if (result.dailyReport) {
+      try {
+        parsedDailyReport = JSON.parse(result.dailyReport)
+        if (Array.isArray(parsedDailyReport) && parsedDailyReport.length > 0) {
+          // Extract insolation from first item in dailyReport array
+          insolationValue = parsedDailyReport[0]?.insolation || 0
+          logger.info(`[IntelloAdapter] Extracted insolation: ${insolationValue} kWh/m² from dailyReport`)
+        } else {
+          logger.warn(`[IntelloAdapter] dailyReport is empty or not an array: ${result.dailyReport}`)
+        }
+      } catch (parseError: any) {
+        logger.error(`[IntelloAdapter] Failed to parse dailyReport JSON: ${parseError.message}`, { dailyReport: result.dailyReport })
+        throw new Error(`Failed to parse dailyReport: ${parseError.message}`)
+      }
+    } else {
+      logger.warn(`[IntelloAdapter] No dailyReport in response: ${JSON.stringify(result)}`)
     }
 
+    // Return as InsolationReading format for consistency
+    // Since API returns pre-calculated daily value, we create a single reading entry
+    // The date comes from response.date or falls back to fromDate
+    const responseDate = result.date || fromDate
+    
+    // Store insolation in kWh/m² directly in the generation field (similar to SCADA)
+    // irr field is not used for pre-calculated values
+    const mappedReadings: InsolationReading[] = [{
+      deviceId: deviceId,
+      date: responseDate,
+      hour: "00:00:00", // Daily aggregated value, no specific hour
+      generation: insolationValue, // Store kWh/m² directly (will be used by calculateDailyInsolation)
+    } as InsolationReading & { generation?: number }]
+
+    logger.info(`[IntelloAdapter] Mapped insolation: ${insolationValue} kWh/m² for device ${deviceId} on ${responseDate}`)
+
     return mappedReadings
+  }
+
+  /**
+   * Calculate daily insolation from readings
+   * For INTELLO, the API now returns pre-calculated daily insolation in kWh/m²
+   * This method extracts the pre-calculated value directly (similar to SCADA)
+   */
+  calculateDailyInsolation(readings: InsolationReading[]): number {
+    if (!readings || readings.length === 0) {
+      return 0
+    }
+
+    // INTELLO API now returns pre-calculated daily insolation
+    // The insolation value is stored in the generation field (kWh/m²)
+    const hasGeneration = readings.some(r => (r as any).generation != null)
+    
+    if (hasGeneration) {
+      // Use the generation field which contains kWh/m² directly
+      const validReadings = readings.filter(r => (r as any).generation != null && (r as any).generation >= 0)
+      if (validReadings.length === 0) {
+        return 0
+      }
+      
+      // For a single day, return the value directly
+      if (validReadings.length === 1) {
+        const insolationKwh = (validReadings[0] as any).generation
+        logger.info(`[IntelloAdapter] Using pre-calculated insolation: ${insolationKwh} kWh/m²`)
+        return insolationKwh
+      }
+      
+      // If multiple readings (shouldn't happen for daily), average them
+      const sum = validReadings.reduce((acc, r) => acc + ((r as any).generation || 0), 0)
+      return sum / validReadings.length
+    }
+
+    // Fallback to base class calculation if generation field not available
+    logger.warn(`[IntelloAdapter] No generation field found, using base calculation`)
+    return super.calculateDailyInsolation(readings)
   }
 
   /**
