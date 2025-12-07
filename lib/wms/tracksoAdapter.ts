@@ -381,6 +381,8 @@ export class TracksoAdapter extends BaseWmsAdapter {
       },
     }
 
+    logger.info(`[TracksoAdapter] Request body: ${JSON.stringify(requestBody, null, 2)}`)
+
     const requestStartTime = Date.now()
     const response = await fetch(insolationUrl, {
       method: "POST",
@@ -419,6 +421,8 @@ export class TracksoAdapter extends BaseWmsAdapter {
     }
 
     const result = await response.json() as any
+    logger.info(`[TracksoAdapter] Response body: ${JSON.stringify(result, null, 2)}`)
+    
     const resultData = result.result?.result as any[]
 
     if (!resultData || resultData.length === 0) {
