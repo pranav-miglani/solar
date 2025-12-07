@@ -13,6 +13,7 @@ import {
   MapPin,
   Calendar,
   ExternalLink,
+  Loader2,
 } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
@@ -40,15 +41,20 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     fetchVendorData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendorId])
 
-  async function fetchVendorData() {
+  async function fetchVendorData(showRefreshing = false) {
     try {
-      setLoading(true)
+      if (showRefreshing) {
+        setRefreshing(true)
+      } else {
+        setLoading(true)
+      }
       const [vendorResponse, sitesResponse, devicesResponse] = await Promise.all([
         fetch(`/api/wms-vendors/${vendorId}`),
         fetch(`/api/wms-vendors/${vendorId}/sites`),
@@ -77,6 +83,7 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
       setError(err.message || "Failed to load vendor data")
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -89,8 +96,10 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
       const data = await response.json()
 
       if (response.ok && data.success) {
+        // Refresh data immediately after successful sync
+        await fetchVendorData(true)
+        // Show success message
         alert(`Sites synced successfully: ${data.result?.sitesSynced || 0} sites, ${data.result?.devicesSynced || 0} devices`)
-        fetchVendorData()
       } else {
         alert(data.error || "Failed to sync sites")
       }
@@ -145,11 +154,21 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
         </div>
         <Button
           onClick={handleSyncSites}
-          disabled={syncing}
+          disabled={syncing || refreshing}
           variant="outline"
+          className="min-w-[120px]"
         >
-          <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-          Sync Sites
+          {syncing || refreshing ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {syncing ? "Syncing..." : "Refreshing..."}
+            </>
+          ) : (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Sync Sites
+            </>
+          )}
         </Button>
       </div>
 
@@ -196,14 +215,15 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={refreshing ? "opacity-75 transition-opacity" : ""}>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               Sites
+              {refreshing && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{sitesCount}</div>
+            <div className="text-2xl font-bold">{refreshing ? "..." : sitesCount}</div>
             <Link
               href={`/wms/vendors/${vendorId}/sites`}
               className="text-sm text-primary hover:underline flex items-center gap-1 mt-2"
@@ -213,48 +233,59 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={refreshing ? "opacity-75 transition-opacity" : ""}>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               Devices
+              {refreshing && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{devicesCount}</div>
+            <div className="text-2xl font-bold">{refreshing ? "..." : devicesCount}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={refreshing ? "opacity-75 transition-opacity" : ""}>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               Last Sites Sync
+              {refreshing && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">
-                {vendor.last_sites_synced_at
-                  ? format(new Date(vendor.last_sites_synced_at), "PPp")
-                  : "Never"}
+                {refreshing ? (
+                  <span className="text-muted-foreground italic">Updating...</span>
+                ) : vendor.last_sites_synced_at ? (
+                  format(new Date(vendor.last_sites_synced_at), "PPp")
+                ) : (
+                  "Never"
+                )}
               </span>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={refreshing ? "opacity-75 transition-opacity" : ""}>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               Last Insolation Sync
+              {refreshing && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">
-                {vendor.last_insolation_synced_at
-                  ? format(new Date(vendor.last_insolation_synced_at), "PPp")
-                  : "Never"}
+                {refreshing ? (
+                  <span className="text-muted-foreground italic">Updating...</span>
+                ) : vendor.last_insolation_synced_at ? (
+                  format(new Date(vendor.last_insolation_synced_at), "PPp")
+                ) : (
+                  "Never"
+                )}
               </span>
             </div>
           </CardContent>

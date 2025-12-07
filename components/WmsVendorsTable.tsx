@@ -751,9 +751,12 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
               {vendors.map((vendor) => (
                 <TableRow key={vendor.id}>
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
+                    <div 
+                      className="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => router.push(`/wms/vendors/${vendor.id}`)}
+                    >
                       <CloudSun className="h-4 w-4 text-primary" />
-                      {vendor.name}
+                      <span className="hover:underline">{vendor.name}</span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -788,13 +791,6 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
                         onClick={() => router.push(`/wms/vendors/${vendor.id}/sites`)}
                       >
                         Sites
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push(`/wms/vendors/${vendor.id}`)}
-                      >
-                        Details
                       </Button>
                       {canManage && (
                         <>
