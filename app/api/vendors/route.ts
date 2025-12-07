@@ -130,8 +130,7 @@ export async function POST(request: NextRequest) {
         org_id,
         plant_sync_mode,
         per_plant_sync_interval_minutes,
-        plant_list_sync_morning_ist,
-        plant_list_sync_evening_ist,
+        plant_sync_time_ist,
         telemetry_sync_mode,
         telemetry_sync_interval,
       } = body
@@ -166,8 +165,7 @@ export async function POST(request: NextRequest) {
           org_id,
           plant_sync_mode: plant_sync_mode || null,
           per_plant_sync_interval_minutes: per_plant_sync_interval_minutes ?? 15,
-          plant_list_sync_morning_ist: plant_list_sync_morning_ist || null,
-          plant_list_sync_evening_ist: plant_list_sync_evening_ist || null,
+          plant_sync_time_ist: plant_sync_time_ist || '02:00',
           telemetry_sync_mode: telemetry_sync_mode || 'LIST_PLANTS',
           telemetry_sync_interval: telemetry_sync_interval ?? 15,
         })

@@ -15,8 +15,7 @@ interface ImportRow {
   credentials: string // JSON string
   plant_sync_mode?: string
   per_plant_sync_interval_minutes?: number
-  plant_list_sync_morning_ist?: string
-  plant_list_sync_evening_ist?: string
+  plant_sync_time_ist?: string
   telemetry_sync_mode?: string
   telemetry_sync_interval?: number
 }
@@ -114,8 +113,7 @@ export async function POST(request: NextRequest) {
           credentials: rowData["Credentials (JSON)"]?.toString() || "{}",
           plant_sync_mode: rowData["Plant Sync Mode"]?.toString() || undefined,
           per_plant_sync_interval_minutes: rowData["Per Plant Sync Interval (minutes)"] ? parseInt(rowData["Per Plant Sync Interval (minutes)"]) : undefined,
-          plant_list_sync_morning_ist: rowData["Plant List Sync Morning (IST)"]?.toString() || undefined,
-          plant_list_sync_evening_ist: rowData["Plant List Sync Evening (IST)"]?.toString() || undefined,
+          plant_sync_time_ist: rowData["Plant Sync Time (IST)"]?.toString() || undefined,
           telemetry_sync_mode: rowData["Telemetry Sync Mode"]?.toString() || undefined,
           telemetry_sync_interval: rowData["Telemetry Sync Interval (minutes)"] ? parseInt(rowData["Telemetry Sync Interval (minutes)"]) : undefined,
         }
@@ -226,8 +224,7 @@ export async function POST(request: NextRequest) {
             org_id: row.org_id,
             plant_sync_mode: row.plant_sync_mode || null,
             per_plant_sync_interval_minutes: row.per_plant_sync_interval_minutes ?? 15,
-            plant_list_sync_morning_ist: row.plant_list_sync_morning_ist || null,
-            plant_list_sync_evening_ist: row.plant_list_sync_evening_ist || null,
+            plant_sync_time_ist: row.plant_sync_time_ist || '02:00',
             telemetry_sync_mode: row.telemetry_sync_mode || 'LIST_PLANTS',
             telemetry_sync_interval: row.telemetry_sync_interval ?? 15,
           })

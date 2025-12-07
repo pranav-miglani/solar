@@ -78,8 +78,7 @@ export async function PUT(
       org_id,
       plant_sync_mode,
       per_plant_sync_interval_minutes,
-      plant_list_sync_morning_ist,
-      plant_list_sync_evening_ist,
+      plant_sync_time_ist,
       telemetry_sync_mode,
       telemetry_sync_interval,
     } = body
@@ -104,11 +103,8 @@ export async function PUT(
     if (per_plant_sync_interval_minutes !== undefined) {
       updateData.per_plant_sync_interval_minutes = per_plant_sync_interval_minutes
     }
-    if (plant_list_sync_morning_ist !== undefined) {
-      updateData.plant_list_sync_morning_ist = plant_list_sync_morning_ist
-    }
-    if (plant_list_sync_evening_ist !== undefined) {
-      updateData.plant_list_sync_evening_ist = plant_list_sync_evening_ist
+    if (plant_sync_time_ist !== undefined) {
+      updateData.plant_sync_time_ist = plant_sync_time_ist
     }
     if (telemetry_sync_mode !== undefined) {
       updateData.telemetry_sync_mode = telemetry_sync_mode

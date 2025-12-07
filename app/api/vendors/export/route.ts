@@ -50,8 +50,7 @@ export async function GET(request: NextRequest) {
         org_id,
         plant_sync_mode,
         per_plant_sync_interval_minutes,
-        plant_list_sync_morning_ist,
-        plant_list_sync_evening_ist,
+        plant_sync_time_ist,
         telemetry_sync_mode,
         telemetry_sync_interval,
         organizations(id, name)
@@ -88,8 +87,7 @@ export async function GET(request: NextRequest) {
       { header: "Credentials (JSON)", key: "credentials", width: 50 },
       { header: "Plant Sync Mode", key: "plant_sync_mode", width: 20 },
       { header: "Per Plant Sync Interval (minutes)", key: "per_plant_sync_interval_minutes", width: 30 },
-      { header: "Plant List Sync Morning (IST)", key: "plant_list_sync_morning_ist", width: 25 },
-      { header: "Plant List Sync Evening (IST)", key: "plant_list_sync_evening_ist", width: 25 },
+      { header: "Plant Sync Time (IST)", key: "plant_sync_time_ist", width: 25 },
       { header: "Telemetry Sync Mode", key: "telemetry_sync_mode", width: 20 },
       { header: "Telemetry Sync Interval (minutes)", key: "telemetry_sync_interval", width: 30 },
     ]
@@ -117,8 +115,7 @@ export async function GET(request: NextRequest) {
           credentials: JSON.stringify(vendor.credentials),
           plant_sync_mode: vendor.plant_sync_mode || "",
           per_plant_sync_interval_minutes: vendor.per_plant_sync_interval_minutes || "",
-          plant_list_sync_morning_ist: vendor.plant_list_sync_morning_ist || "",
-          plant_list_sync_evening_ist: vendor.plant_list_sync_evening_ist || "",
+          plant_sync_time_ist: vendor.plant_sync_time_ist || "",
           telemetry_sync_mode: vendor.telemetry_sync_mode || "",
           telemetry_sync_interval: vendor.telemetry_sync_interval || "",
         })

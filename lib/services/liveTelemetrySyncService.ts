@@ -163,8 +163,7 @@ async function syncVendorLiveTelemetry(
       isActive: vendor.is_active,
       plantSyncMode: vendor.plant_sync_mode,
       perPlantSyncIntervalMinutes: vendor.per_plant_sync_interval_minutes,
-      plantListSyncMorningIst: vendor.plant_list_sync_morning_ist,
-      plantListSyncEveningIst: vendor.plant_list_sync_evening_ist,
+      plantSyncTimeIst: vendor.plant_sync_time_ist || "02:00",
     }
 
     const adapter = VendorManager.getAdapter(vendorConfig)

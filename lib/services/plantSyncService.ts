@@ -547,13 +547,12 @@ export async function syncAllPlants(): Promise<SyncSummary> {
         }).formatToParts(now)
         const currentHour = parseInt(kolkataTime.find((part) => part.type === "hour")?.value || "0")
         const currentMinute = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
-        const morningTime = vendor.plant_list_sync_morning_ist || '06:00'
-        const eveningTime = vendor.plant_list_sync_evening_ist || '23:00'
+        const syncTime = vendor.plant_sync_time_ist || '02:00'
         
         logger.info(
           `⏭️ Skipping plant sync for vendor ${vendor.id} (${vendor.name}): ` +
           `current IST time=${currentHour}:${currentMinute.toString().padStart(2, "0")}, ` +
-          `not near morning (${morningTime}) or evening (${eveningTime}) sync times`
+          `not at configured sync time (${syncTime})`
         )
         skippedVendors.add(vendor.id)
       }
