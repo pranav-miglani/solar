@@ -536,7 +536,6 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
           end_time: endTimeDate ? endTimeDate.toISOString() : null,
           grid_down_seconds: gridDownSeconds,
           grid_down_benefit_kwh: gridDownBenefitKwh,
-          metadata: raw,
         }
 
         if (existing) {
@@ -875,7 +874,6 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
         end_time: endTimeDate ? endTimeDate.toISOString() : null,
         grid_down_seconds: gridDownSeconds,
         grid_down_benefit_kwh: gridDownBenefitKwh,
-        metadata: raw,
       }
 
       if (existing) {

@@ -56,20 +56,15 @@ type AlertRecord = {
   end_time: string | null
   grid_down_seconds: number | null
   grid_down_benefit_kwh: number | null
-  metadata: Record<string, any> | null
   plants: AlertPlant
 }
 
 const BATCH_SIZE = 200
 
-function getTimezone(metadata: Record<string, any> | null): string {
-  if (!metadata) return "Asia/Calcutta"
-  return (
-    metadata.timezone ||
-    metadata.timeZone ||
-    metadata.time_zone ||
-    "Asia/Calcutta"
-  )
+// All alerts use Asia/Calcutta timezone (confirmed by analysis)
+// No need to read from metadata anymore
+function getTimezone(): string {
+  return "Asia/Calcutta"
 }
 
 function normalizeCapacityKw(input: AlertPlant): number | null {
@@ -101,7 +96,6 @@ async function backfillGridDowntime() {
           end_time,
           grid_down_seconds,
           grid_down_benefit_kwh,
-          metadata,
           plants:plant_id (
             capacity_kw
           )
@@ -126,7 +120,7 @@ async function backfillGridDowntime() {
       const start = alert.alert_time ? new Date(alert.alert_time) : null
       const end = alert.end_time ? new Date(alert.end_time) : null
       const capacityKw = normalizeCapacityKw(alert.plants)
-      const timezone = getTimezone(alert.metadata)
+      const timezone = getTimezone()
 
       const updates: Record<string, any> = {}
 

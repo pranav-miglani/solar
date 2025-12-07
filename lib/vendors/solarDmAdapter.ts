@@ -1338,7 +1338,6 @@ async listPlants(): Promise<Plant[]> {
       plantId: rawData.plantId || "",
       timestamp: new Date(rawData.timestamp || Date.now()),
       generationPowerKw: rawData.generationPowerKw || 0,
-      metadata: rawData,
     }
   }
 
@@ -1349,9 +1348,9 @@ async listPlants(): Promise<Plant[]> {
     // Map SolarDM faultLevel to severity
     // faultLevel: 1=HIGH, 2=MEDIUM, 3=LOW, 4=CRITICAL (assuming similar to Solarman)
     const severityMap: Record<number,  "HIGH" | "MEDIUM" | "LOW" | "CRITICAL"> = {
-      1: "LOW",
+      1: "HIGH",
       2: "MEDIUM",
-      3: "HIGH",
+      3: "LOW",
       4: "CRITICAL",
     }
     
@@ -1362,7 +1361,6 @@ async listPlants(): Promise<Plant[]> {
       title: rawData.faultInfo || "Alert",
       description: "No Mains Voltage",
       severity,
-      metadata: rawData,
     }
   }
 }

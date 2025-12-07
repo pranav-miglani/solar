@@ -47,7 +47,6 @@ export interface Alert {
   title: string
   description?: string
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
-  metadata?: Record<string, any>
 }
 
 export interface RealtimeData {

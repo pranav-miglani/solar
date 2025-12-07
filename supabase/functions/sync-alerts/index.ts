@@ -151,7 +151,6 @@ serve(async (req) => {
               description: alert.message,
               severity,
               status: "ACTIVE",
-              metadata: alert,
             })
           }
 

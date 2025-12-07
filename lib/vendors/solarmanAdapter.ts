@@ -1547,13 +1547,6 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       title: rawData.alertName || "Alert",
       description: rawData.description || rawData.addr || "",
       severity,
-      metadata: {
-        ...rawData,
-        code: rawData.code,
-        level: rawData.level,
-        influence: rawData.influence,
-        alertTime: rawData.alertTime,
-      },
     }
   }
 

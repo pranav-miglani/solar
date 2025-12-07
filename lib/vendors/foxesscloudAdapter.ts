@@ -303,7 +303,6 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       plantId: rawData.plantId || "",
       timestamp: new Date(rawData.timestamp || Date.now()),
       generationPowerKw: rawData.generationPowerKw || 0,
-      metadata: rawData,
     }
   }
 
@@ -318,7 +317,6 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       title: rawData.title || "Alert",
       description: rawData.description || null,
       severity: "MEDIUM",
-      metadata: rawData,
     }
   }
 }
