@@ -32,7 +32,8 @@ export default async function AlertsVendorPlantsPage({ params }: PageProps) {
   }
 
   const accountType = sessionData.accountType as string
-  if (accountType !== "SUPERADMIN" && accountType !== "GOVT") {
+  // SUPERADMIN, DEVELOPER, and GOVT can access vendor alerts
+  if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER" && accountType !== "GOVT") {
     redirect("/dashboard")
   }
 
@@ -97,7 +98,7 @@ export default async function AlertsVendorPlantsPage({ params }: PageProps) {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-base md:text-lg">{vendor.name}</span>
-              {accountType === "SUPERADMIN" && (
+              {(accountType === "SUPERADMIN" || accountType === "DEVELOPER") && (
                 <Badge variant="outline" className="text-[10px] md:text-xs">
                   {vendor.vendor_type}
                 </Badge>

@@ -45,7 +45,8 @@ export default async function PlantAlertsPage({ params, searchParams }: PageProp
   }
 
   const accountType = sessionData.accountType as string
-  if (accountType !== "SUPERADMIN" && accountType !== "GOVT") {
+  // SUPERADMIN, DEVELOPER, and GOVT can access plant alerts
+  if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER" && accountType !== "GOVT") {
     redirect("/dashboard")
   }
 
@@ -97,7 +98,7 @@ export default async function PlantAlertsPage({ params, searchParams }: PageProp
             </h1>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
               Vendor: {vendor.name}
-              {accountType === "SUPERADMIN" && ` (${vendor.vendor_type})`} · Vendor plant ID:{" "}
+              {(accountType === "SUPERADMIN" || accountType === "DEVELOPER") && ` (${vendor.vendor_type})`} · Vendor plant ID:{" "}
               {plant.vendor_plant_id}
             </p>
           </div>
