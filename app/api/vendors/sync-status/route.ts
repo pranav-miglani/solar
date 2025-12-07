@@ -44,7 +44,6 @@ export const dynamic = 'force-dynamic'
  *         id: number,
  *         name: string,
  *         auto_sync_enabled: boolean | null,
- *         sync_interval_minutes: number | null
  *       } | null
  *     }
  *   ]
@@ -201,10 +200,9 @@ export async function GET(request: NextRequest) {
        * 
        * Fields selected:
        * - Vendor info: id, name, vendor_type, is_active, last_synced_at, created_at
-       * - Organization info: id, name, auto_sync_enabled, sync_interval_minutes
+       * - Organization info: id, name, auto_sync_enabled
        * 
-       * The sync_interval_minutes tells us how often the organization's vendors
-       * should be synced (e.g., 15 = every 15 minutes at :00, :15, :30, :45)
+       * Note: sync_interval_minutes was removed. Telemetry sync uses vendor-level telemetry_sync_interval.
        */
       const { data: vendors, error } = await supabase
         .from("vendors")
@@ -219,8 +217,7 @@ export async function GET(request: NextRequest) {
           organizations (
             id,
             name,
-            auto_sync_enabled,
-            sync_interval_minutes
+            auto_sync_enabled
           )
         `)
         .order("name")

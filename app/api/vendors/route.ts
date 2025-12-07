@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       const [vendorsResult, orgsResult] = await Promise.all([
         supabase
           .from("vendors")
-          .select("*, organizations(id, name, auto_sync_enabled, sync_interval_minutes)")
+          .select("*, organizations(id, name, auto_sync_enabled)")
           .order("name"),
         supabase
           .from("organizations")
