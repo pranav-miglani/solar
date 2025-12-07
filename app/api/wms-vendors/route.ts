@@ -89,19 +89,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate vendor type
-    if (vendor_type !== "INTELLO") {
+    if (vendor_type !== "INTELLO" && vendor_type !== "SCADA") {
       return NextResponse.json(
         { error: `Unsupported WMS vendor type: ${vendor_type}` },
         { status: 400 }
       )
     }
 
-    // Validate credentials for INTELLO
-    if (!credentials.email || !credentials.password_hash) {
-      return NextResponse.json(
-        { error: "INTELLO requires email and password_hash in credentials" },
-        { status: 400 }
-      )
+    // Validate credentials based on vendor type
+    if (vendor_type === "INTELLO") {
+      if (!credentials.email || !credentials.password_hash) {
+        return NextResponse.json(
+          { error: "INTELLO requires email and password_hash in credentials" },
+          { status: 400 }
+        )
+      }
+    } else if (vendor_type === "SCADA") {
+      if (!credentials.loginId || !credentials.password || !credentials.userName || !credentials.userType) {
+        return NextResponse.json(
+          { error: "SCADA requires loginId, password, userName, and userType in credentials" },
+          { status: 400 }
+        )
+      }
     }
 
     const supabase = getMainClient()

@@ -1,5 +1,6 @@
 import { IntelloAdapter } from "@/lib/wms/intelloAdapter"
-import type { WmsVendorConfig, WmsSite, WmsDevice } from "@/lib/wms/baseWmsAdapter"
+import { ScadaAdapter } from "@/lib/wms/scadaAdapter"
+import type { WmsVendorConfig, WmsSite, WmsDevice, BaseWmsAdapter, InsolationReading } from "@/lib/wms/baseWmsAdapter"
 import MDC from "@/lib/context/mdc"
 import { logger } from "@/lib/context/logger"
 import { getMainClient } from "@/lib/supabase/pooled"
@@ -48,7 +49,7 @@ interface SyncSummary {
 /**
  * Get WMS adapter instance for a vendor
  */
-function getWmsAdapter(vendor: any): IntelloAdapter {
+function getWmsAdapter(vendor: any): BaseWmsAdapter {
   const config: WmsVendorConfig = {
     id: vendor.id,
     name: vendor.name,
@@ -59,8 +60,16 @@ function getWmsAdapter(vendor: any): IntelloAdapter {
   }
 
   switch (vendor.vendor_type) {
-    case "INTELLO":
-      return new IntelloAdapter(config)
+    case "INTELLO": {
+      const adapter = new IntelloAdapter(config)
+      adapter.setTokenStorage(vendor.id, getMainClient())
+      return adapter
+    }
+    case "SCADA": {
+      const adapter = new ScadaAdapter(config)
+      adapter.setTokenStorage(vendor.id, getMainClient())
+      return adapter
+    }
     default:
       throw new Error(`Unsupported WMS vendor type: ${vendor.vendor_type}`)
   }
@@ -169,38 +178,52 @@ export async function syncWmsVendorSites(
       }
 
       // Extract and sync devices
+      let devices: WmsDevice[] = []
+      
       if (adapter instanceof IntelloAdapter) {
-        const devices = adapter.extractDevicesFromSite(site)
-        result.devicesSynced += devices.length
+        devices = adapter.extractDevicesFromSite(site)
+      } else if (adapter instanceof ScadaAdapter) {
+        // SCADA devices are stored in site.metadata.devices
+        if (site.metadata?.devices && Array.isArray(site.metadata.devices)) {
+          devices = site.metadata.devices.map((d: any) => ({
+            vendorDeviceId: d.vendorDeviceId,
+            deviceName: d.deviceName,
+            macAddress: d.macAddress,
+            serialNo: d.serialNo,
+            metadata: d.metadata || {},
+          }))
+        }
+      }
+      
+      result.devicesSynced += devices.length
 
-        for (const device of devices) {
-          // Upsert device
-          const { data: existingDevice } = await supabase
+      for (const device of devices) {
+        // Upsert device
+        const { data: existingDevice } = await supabase
+          .from("wms_devices")
+          .select("id")
+          .eq("wms_site_id", syncedSite.id)
+          .eq("vendor_device_id", device.vendorDeviceId)
+          .single()
+
+        const deviceData = {
+          wms_site_id: syncedSite.id,
+          vendor_device_id: device.vendorDeviceId,
+          device_name: device.deviceName,
+          mac_address: device.macAddress,
+          serial_no: device.serialNo,
+          metadata: device.metadata || {},
+        }
+
+        if (existingDevice) {
+          await supabase
             .from("wms_devices")
-            .select("id")
-            .eq("wms_site_id", syncedSite.id)
-            .eq("vendor_device_id", device.vendorDeviceId)
-            .single()
-
-          const deviceData = {
-            wms_site_id: syncedSite.id,
-            vendor_device_id: device.vendorDeviceId,
-            device_name: device.deviceName,
-            mac_address: device.macAddress,
-            serial_no: device.serialNo,
-            metadata: device.metadata || {},
-          }
-
-          if (existingDevice) {
-            await supabase
-              .from("wms_devices")
-              .update(deviceData)
-              .eq("id", existingDevice.id)
-            result.devicesUpdated++
-          } else {
-            await supabase.from("wms_devices").insert(deviceData)
-            result.devicesCreated++
-          }
+            .update(deviceData)
+            .eq("id", existingDevice.id)
+          result.devicesUpdated++
+        } else {
+          await supabase.from("wms_devices").insert(deviceData)
+          result.devicesCreated++
         }
       }
     }
@@ -421,74 +444,200 @@ export async function syncWmsDeviceInsolation(
     const today = new Date()
     today.setHours(0, 0, 0, 0) // Start of today
     
-    let datesToSync: string[] = []
+    const isScada = vendor.vendor_type === "SCADA"
     
     if (date) {
       // Single date sync (for cron)
-      datesToSync = [date]
       logger.info(`[WMS Insolation Sync] Starting insolation sync for device ID: ${deviceId}, date: ${date}`)
+      
+      try {
+        logger.info(`[WMS Insolation Sync] Fetching insolation data for device ${device.vendor_device_id} for date ${date}`)
+        const readings = await adapter.getInsolationData(device.vendor_device_id, date, date)
+
+        if (!readings || readings.length === 0) {
+          logger.warn(`[WMS Insolation Sync] No readings for device ${device.vendor_device_id} on ${date}`)
+        } else {
+          const dailyInsolation = adapter.calculateDailyInsolation(readings)
+          logger.info(`[WMS Insolation Sync] Calculated daily insolation: ${dailyInsolation.toFixed(4)} kWh/m² from ${readings.length} readings for ${date}`)
+
+          // Check if reading already exists
+          const { data: existingReading } = await supabase
+            .from("insolation_readings")
+            .select("id")
+            .eq("wms_device_id", device.id)
+            .eq("reading_date", date)
+            .single()
+
+          const readingData = {
+            wms_device_id: device.id,
+            reading_date: date,
+            insolation_value: dailyInsolation,
+            reading_count: readings.length,
+            metadata: {
+              all_readings: readings,
+              min_irr: Math.min(...readings.map(r => r.irr)),
+              max_irr: Math.max(...readings.map(r => r.irr)),
+            },
+          }
+
+          if (existingReading) {
+            await supabase
+              .from("insolation_readings")
+              .update(readingData)
+              .eq("id", existingReading.id)
+            result.readingsUpdated++
+            logger.info(`[WMS Insolation Sync] Updated existing reading for device ${device.vendor_device_id} on ${date}`)
+          } else {
+            await supabase.from("insolation_readings").insert(readingData)
+            result.readingsCreated++
+            logger.info(`[WMS Insolation Sync] Created new reading for device ${device.vendor_device_id} on ${date}`)
+          }
+        }
+      } catch (dayError: any) {
+        logger.error(
+          `[WMS Insolation Sync] Error syncing device ${device.vendor_device_id} for ${date}: ${dayError.message}`,
+          { error: dayError }
+        )
+        throw dayError
+      }
     } else {
       // Backfill last 100 days (for manual sync)
       logger.info(`[WMS Insolation Sync] Starting backfill for device ID: ${deviceId} (last 100 days)`)
-      for (let daysAgo = 1; daysAgo <= 100; daysAgo++) {
-        const targetDate = new Date(today)
-        targetDate.setDate(targetDate.getDate() - daysAgo)
-        datesToSync.push(targetDate.toISOString().split("T")[0])
-      }
-      logger.info(`[WMS Insolation Sync] Will sync ${datesToSync.length} days (from ${datesToSync[datesToSync.length - 1]} to ${datesToSync[0]})`)
-    }
+      
+      const endDate = new Date(today)
+      endDate.setDate(endDate.getDate() - 1) // Yesterday (exclude today)
+      const startDate = new Date(endDate)
+      startDate.setDate(startDate.getDate() - 99) // 100 days ago (excluding today)
+      
+      const fromDate = startDate.toISOString().split("T")[0]
+      const toDate = endDate.toISOString().split("T")[0]
+      
+      logger.info(`[WMS Insolation Sync] Will sync from ${fromDate} to ${toDate} (100 days)`)
 
-    // Sync each date
-    for (const targetDate of datesToSync) {
       try {
-        logger.info(`[WMS Insolation Sync] Fetching insolation data for device ${device.vendor_device_id} for date ${targetDate}`)
-        const readings = await adapter.getInsolationData(device.vendor_device_id, targetDate, targetDate)
+        // For SCADA, call API once with date range
+        // For other vendors, we might need per-day calls (handled by adapter)
+        if (isScada) {
+          logger.info(`[WMS Insolation Sync] Fetching SCADA insolation data for device ${device.vendor_device_id} from ${fromDate} to ${toDate}`)
+          const allReadings = await adapter.getInsolationData(device.vendor_device_id, fromDate, toDate)
+          
+          // Group readings by date and process each day
+          const readingsByDate = new Map<string, InsolationReading[]>()
+          for (const reading of allReadings) {
+            const dateKey = reading.date
+            if (!readingsByDate.has(dateKey)) {
+              readingsByDate.set(dateKey, [])
+            }
+            readingsByDate.get(dateKey)!.push(reading)
+          }
+          
+          logger.info(`[WMS Insolation Sync] Processing ${readingsByDate.size} days of readings`)
+          
+          for (const [targetDate, readings] of readingsByDate.entries()) {
+            if (readings.length === 0) continue
+            
+            const dailyInsolation = adapter.calculateDailyInsolation(readings)
+            logger.info(`[WMS Insolation Sync] Calculated daily insolation: ${dailyInsolation.toFixed(4)} kWh/m² from ${readings.length} readings for ${targetDate}`)
 
-        if (!readings || readings.length === 0) {
-          logger.warn(`[WMS Insolation Sync] No readings for device ${device.vendor_device_id} on ${targetDate}`)
-          continue
-        }
+            // Check if reading already exists
+            const { data: existingReading } = await supabase
+              .from("insolation_readings")
+              .select("id")
+              .eq("wms_device_id", device.id)
+              .eq("reading_date", targetDate)
+              .single()
 
-        const dailyInsolation = adapter.calculateDailyInsolation(readings)
-        logger.info(`[WMS Insolation Sync] Calculated daily insolation: ${dailyInsolation.toFixed(4)} kWh/m² from ${readings.length} readings for ${targetDate}`)
+            const readingData = {
+              wms_device_id: device.id,
+              reading_date: targetDate,
+              insolation_value: dailyInsolation,
+              reading_count: readings.length,
+              metadata: {
+                all_readings: readings,
+                min_irr: Math.min(...readings.map(r => r.irr)),
+                max_irr: Math.max(...readings.map(r => r.irr)),
+              },
+            }
 
-        // Check if reading already exists
-        const { data: existingReading } = await supabase
-          .from("insolation_readings")
-          .select("id")
-          .eq("wms_device_id", device.id)
-          .eq("reading_date", targetDate)
-          .single()
-
-        const readingData = {
-          wms_device_id: device.id,
-          reading_date: targetDate,
-          insolation_value: dailyInsolation,
-          reading_count: readings.length,
-          metadata: {
-            all_readings: readings, // All time-series readings used for integration
-            min_irr: Math.min(...readings.map(r => r.irr)),
-            max_irr: Math.max(...readings.map(r => r.irr)),
-          },
-        }
-
-        if (existingReading) {
-          await supabase
-            .from("insolation_readings")
-            .update(readingData)
-            .eq("id", existingReading.id)
-          result.readingsUpdated++
-          logger.info(`[WMS Insolation Sync] Updated existing reading for device ${device.vendor_device_id} on ${targetDate}`)
+            if (existingReading) {
+              await supabase
+                .from("insolation_readings")
+                .update(readingData)
+                .eq("id", existingReading.id)
+              result.readingsUpdated++
+            } else {
+              await supabase.from("insolation_readings").insert(readingData)
+              result.readingsCreated++
+            }
+          }
         } else {
-          await supabase.from("insolation_readings").insert(readingData)
-          result.readingsCreated++
-          logger.info(`[WMS Insolation Sync] Created new reading for device ${device.vendor_device_id} on ${targetDate}`)
+          // For other vendors (e.g., INTELLO), sync per day
+          const datesToSync: string[] = []
+          for (let daysAgo = 1; daysAgo <= 100; daysAgo++) {
+            const targetDate = new Date(today)
+            targetDate.setDate(targetDate.getDate() - daysAgo)
+            datesToSync.push(targetDate.toISOString().split("T")[0])
+          }
+          
+          for (const targetDate of datesToSync) {
+            try {
+              logger.info(`[WMS Insolation Sync] Fetching insolation data for device ${device.vendor_device_id} for date ${targetDate}`)
+              const readings = await adapter.getInsolationData(device.vendor_device_id, targetDate, targetDate)
+
+              if (!readings || readings.length === 0) {
+                logger.warn(`[WMS Insolation Sync] No readings for device ${device.vendor_device_id} on ${targetDate}`)
+                continue
+              }
+
+              const dailyInsolation = adapter.calculateDailyInsolation(readings)
+              logger.info(`[WMS Insolation Sync] Calculated daily insolation: ${dailyInsolation.toFixed(4)} kWh/m² from ${readings.length} readings for ${targetDate}`)
+
+              // Check if reading already exists
+              const { data: existingReading } = await supabase
+                .from("insolation_readings")
+                .select("id")
+                .eq("wms_device_id", device.id)
+                .eq("reading_date", targetDate)
+                .single()
+
+              const readingData = {
+                wms_device_id: device.id,
+                reading_date: targetDate,
+                insolation_value: dailyInsolation,
+                reading_count: readings.length,
+                metadata: {
+                  all_readings: readings,
+                  min_irr: Math.min(...readings.map(r => r.irr)),
+                  max_irr: Math.max(...readings.map(r => r.irr)),
+                },
+              }
+
+              if (existingReading) {
+                await supabase
+                  .from("insolation_readings")
+                  .update(readingData)
+                  .eq("id", existingReading.id)
+                result.readingsUpdated++
+                logger.info(`[WMS Insolation Sync] Updated existing reading for device ${device.vendor_device_id} on ${targetDate}`)
+              } else {
+                await supabase.from("insolation_readings").insert(readingData)
+                result.readingsCreated++
+                logger.info(`[WMS Insolation Sync] Created new reading for device ${device.vendor_device_id} on ${targetDate}`)
+              }
+            } catch (dayError: any) {
+              logger.warn(
+                `[WMS Insolation Sync] Error syncing device ${device.vendor_device_id} for ${targetDate}: ${dayError.message}`
+              )
+              // Continue with other days
+            }
+          }
         }
-      } catch (dayError: any) {
-        logger.warn(
-          `[WMS Insolation Sync] Error syncing device ${device.vendor_device_id} for ${targetDate}: ${dayError.message}`
+      } catch (error: any) {
+        logger.error(
+          `[WMS Insolation Sync] Error during backfill for device ${device.vendor_device_id}: ${error.message}`,
+          { error }
         )
-        // Continue with other days
+        throw error
       }
     }
 

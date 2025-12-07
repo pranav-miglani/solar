@@ -2237,12 +2237,25 @@ Unique Constraints:
                         </ul>
                       </li>
                       <li>
+                        <strong>For SCADA vendor (date range sync):</strong>
+                        <ul className="ml-4 mt-1 list-disc">
+                          <li>Vendor API supports date range insolation fetch (single call for multiple days)</li>
+                          <li>For 100-day backfill: Single API call with date range (fromDate to toDate covering 100 days)</li>
+                          <li>For daily sync: API call with same date for both fromDate and toDate</li>
+                          <li>API returns daily aggregated values already in kWh/m² (no integration needed)</li>
+                          <li>Uses <code className="bg-background px-1 rounded">calculateDailyInsolation()</code> which returns the pre-aggregated value directly for SCADA</li>
+                          <li>Upserts daily insolation reading into <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
+                          <li>Device identifier: Uses LOC_CODE (stored as vendor_device_id) for API calls</li>
+                        </ul>
+                      </li>
+                      <li>
                         <strong>Manual Sync Flow (100-Day Backfill):</strong>
                         <ul className="ml-4 mt-1 list-disc">
                           <li>Triggered via <code className="bg-background px-1 rounded">POST /api/wms-vendors/[id]/sync-devices</code> (all devices) or <code className="bg-background px-1 rounded">POST /api/wms-devices/[id]/sync</code> (single device)</li>
                           <li>Passes <code className="bg-background px-1 rounded">null</code> as date parameter to trigger 100-day backfill</li>
-                          <li>Iterates through last 100 days (from 100 days ago to yesterday, excluding today)</li>
-                          <li>For each day, fetches insolation for device(s) and stores in <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
+                          <li><strong>INTELLO:</strong> Iterates through last 100 days (from 100 days ago to yesterday, excluding today), fetches insolation per day for each device</li>
+                          <li><strong>SCADA:</strong> Single API call with date range covering last 100 days (from 100 days ago to yesterday, excluding today), processes all returned daily values</li>
+                          <li>For each day, stores insolation in <code className="bg-background px-1 rounded">insolation_readings</code> table</li>
                           <li>Returns summary with readings created/updated counts</li>
                         </ul>
                       </li>
@@ -2342,7 +2355,8 @@ Unique Constraints:
 │   │   └── vendorManager.ts     # Factory pattern
 │   ├── wms/                     # Weather Monitoring System adapters
 │   │   ├── baseWmsAdapter.ts    # Abstract base class for WMS vendors
-│   │   └── intelloAdapter.ts    # Intello WMS implementation
+│   │   ├── intelloAdapter.ts    # Intello WMS implementation
+│   │   └── scadaAdapter.ts      # SCADA WMS implementation
 │   ├── cron/                    # Cron job definitions
 │   │   ├── plantSyncCron.js    # Plant sync scheduler (checks morning/evening times)
 │   │   ├── liveTelemetrySyncCron.js  # Live telemetry sync scheduler
@@ -2505,6 +2519,20 @@ Unique Constraints:
                             <li>Calculates daily insolation (area under IRR vs time curve) in kWh/m² using left endpoint method: Σ [IRR_i × Δt_i] / 1000</li>
                           </ul>
                         </div>
+                        <div>
+                          <h5 className="font-medium text-xs mb-1">ScadaAdapter (lib/wms/scadaAdapter.ts)</h5>
+                          <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                            <li>SCADA WMS vendor implementation</li>
+                            <li>Authentication: POST /api/CMN_07_Super/SLogin (loginId, password, userName, userType) - returns SS_KEY</li>
+                            <li>Sites & Devices: POST /api/CMN_07_Super/POST_USER_SUM_LIST_WMS (returns both sites and devices in single call)</li>
+                            <li>Insolation: POST /api/CMN_02/WM_DASH (LOC_CODE, LOGIN_ID, WM_TYPE=ISO, DT1, DT2) - returns daily aggregated values in kWh/m²</li>
+                            <li>SS_KEY is persistent and cached (only refreshed if API calls fail)</li>
+                            <li>Uses form-urlencoded requests (not JSON)</li>
+                            <li>Insolation values are already daily aggregated (no integration needed)</li>
+                            <li>Device mapping: LOC_CODE → vendor_device_id, USER_ID → serial_no</li>
+                            <li>Date format: DD-MM-YYYY in API response, converted to YYYY-MM-DD internally</li>
+                          </ul>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2557,7 +2585,7 @@ Unique Constraints:
                       </p>
                       <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
                         <li><strong>GET /api/wms-vendors</strong> - List WMS vendors (filtered by org for ORG users)</li>
-                        <li><strong>POST /api/wms-vendors</strong> - Create WMS vendor (SUPERADMIN/DEVELOPER only)</li>
+                        <li><strong>POST /api/wms-vendors</strong> - Create WMS vendor (SUPERADMIN/DEVELOPER only). Supports INTELLO and SCADA vendor types</li>
                         <li><strong>GET /api/wms-vendors/[id]</strong> - Get single WMS vendor</li>
                         <li><strong>PUT /api/wms-vendors/[id]</strong> - Update WMS vendor (SUPERADMIN/DEVELOPER only)</li>
                         <li><strong>DELETE /api/wms-vendors/[id]</strong> - Delete WMS vendor (SUPERADMIN/DEVELOPER only)</li>
@@ -2905,6 +2933,12 @@ Unique Constraints:
                           <td className="p-2">Intello WMS API base URL (Weather Monitoring System)</td>
                           <td className="p-2">✅ Yes (if using Intello WMS)</td>
                           <td className="p-2">https://portal.intellotechsolutions.co.in:5000</td>
+                        </tr>
+                        <tr className="border-b bg-blue-50 dark:bg-blue-950/10">
+                          <td className="p-2"><code className="bg-background px-1 rounded">SCADA_API_BASE_URL</code></td>
+                          <td className="p-2">SCADA WMS API base URL (Weather Monitoring System)</td>
+                          <td className="p-2">✅ Yes (if using SCADA WMS)</td>
+                          <td className="p-2">https://log.poweramr.com</td>
                         </tr>
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">SYNC_WINDOW_START</code></td>

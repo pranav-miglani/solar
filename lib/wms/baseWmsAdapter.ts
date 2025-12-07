@@ -49,7 +49,7 @@ export interface InsolationReading {
 export interface WmsVendorConfig {
   id: number
   name: string
-  vendorType: 'INTELLO' | string
+  vendorType: 'INTELLO' | 'SCADA' | string
   credentials: Record<string, any>
   isActive: boolean
   orgId: number

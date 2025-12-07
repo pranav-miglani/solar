@@ -75,8 +75,14 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
     name: "",
     vendor_type: "INTELLO",
     org_id: "",
+    // INTELLO credentials
     email: "",
     password_hash: "",
+    // SCADA credentials
+    loginId: "",
+    password: "",
+    userName: "",
+    userType: "",
     is_active: true,
   })
 
@@ -121,6 +127,10 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
         org_id: vendor.org_id?.toString() || "",
         email: "", // Credentials are not returned for security
         password_hash: "", // Credentials are not returned for security
+        loginId: "",
+        password: "",
+        userName: "",
+        userType: "",
         is_active: vendor.is_active,
       })
     } else {
@@ -131,6 +141,10 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
         org_id: "",
         email: "",
         password_hash: "",
+        loginId: "",
+        password: "",
+        userName: "",
+        userType: "",
         is_active: true,
       })
     }
@@ -145,15 +159,32 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
       return
     }
 
-    if (!formData.email || !formData.password_hash) {
-      alert("Please provide email and password hash for INTELLO")
+    // Build credentials based on vendor type
+    let credentials: any = {}
+    
+    if (formData.vendor_type === "INTELLO") {
+      if (!formData.email || !formData.password_hash) {
+        alert("Please provide email and password hash for INTELLO")
+        return
+      }
+      credentials = {
+        email: formData.email,
+        password_hash: formData.password_hash,
+      }
+    } else if (formData.vendor_type === "SCADA") {
+      if (!formData.loginId || !formData.password || !formData.userName || !formData.userType) {
+        alert("Please provide loginId, password, userName, and userType for SCADA")
+        return
+      }
+      credentials = {
+        loginId: formData.loginId,
+        password: formData.password,
+        userName: formData.userName,
+        userType: formData.userType,
+      }
+    } else {
+      alert(`Unsupported vendor type: ${formData.vendor_type}`)
       return
-    }
-
-    // Build credentials for INTELLO
-    const credentials = {
-      email: formData.email,
-      password_hash: formData.password_hash,
     }
 
     const url = editingVendor
@@ -492,6 +523,89 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
                         />
                         <p className="text-xs text-muted-foreground mt-1">
                           SHA-256 hash of the password for Intello authentication
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* SCADA Credentials */}
+                  {formData.vendor_type === "SCADA" && (
+                    <>
+                      <div>
+                        <Label htmlFor="loginId">Login ID *</Label>
+                        <Input
+                          id="loginId"
+                          type="text"
+                          value={formData.loginId}
+                          onChange={(e) =>
+                            setFormData({ ...formData, loginId: e.target.value })
+                          }
+                          required
+                          className="mt-1"
+                          placeholder="C10041"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Login ID for SCADA authentication
+                        </p>
+                      </div>
+                      <div>
+                        <Label htmlFor="password">Password *</Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          value={formData.password}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              password: e.target.value,
+                            })
+                          }
+                          required
+                          className="mt-1"
+                          placeholder="drs@123"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Password for SCADA authentication
+                        </p>
+                      </div>
+                      <div>
+                        <Label htmlFor="userName">User Name *</Label>
+                        <Input
+                          id="userName"
+                          type="text"
+                          value={formData.userName}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              userName: e.target.value,
+                            })
+                          }
+                          required
+                          className="mt-1"
+                          placeholder="LOGICS"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          User name for SCADA authentication
+                        </p>
+                      </div>
+                      <div>
+                        <Label htmlFor="userType">User Type *</Label>
+                        <Input
+                          id="userType"
+                          type="text"
+                          value={formData.userType}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              userType: e.target.value,
+                            })
+                          }
+                          required
+                          className="mt-1"
+                          placeholder="SOLAR"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          User type for SCADA authentication (e.g., SOLAR)
                         </p>
                       </div>
                     </>
