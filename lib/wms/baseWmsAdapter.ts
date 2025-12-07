@@ -67,6 +67,15 @@ export abstract class BaseWmsAdapter {
   }
 
   /**
+   * Set vendor ID and Supabase client for token storage
+   * Default implementation does nothing - adapters should override this to enable token caching
+   */
+  setTokenStorage(vendorId: number, supabaseClient: any): void {
+    // Default implementation: no-op
+    // Adapters should override this to enable token caching
+  }
+
+  /**
    * Authenticate with WMS vendor API and return access token
    * Should implement token caching internally
    */
