@@ -83,6 +83,9 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
     password: "",
     userName: "",
     userType: "",
+    // TRACKSO credentials
+    tracksoEmail: "",
+    tracksoPassword: "",
     is_active: true,
   })
 
@@ -131,6 +134,8 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
         password: "",
         userName: "",
         userType: "",
+        tracksoEmail: "",
+        tracksoPassword: "",
         is_active: vendor.is_active,
       })
     } else {
@@ -145,6 +150,8 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
         password: "",
         userName: "",
         userType: "",
+        tracksoEmail: "",
+        tracksoPassword: "",
         is_active: true,
       })
     }
@@ -181,6 +188,15 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
         password: formData.password,
         userName: formData.userName,
         userType: formData.userType,
+      }
+    } else if (formData.vendor_type === "TRACKSO") {
+      if (!formData.tracksoEmail || !formData.tracksoPassword) {
+        alert("Please provide email and password for TRACKSO")
+        return
+      }
+      credentials = {
+        email: formData.tracksoEmail,
+        password: formData.tracksoPassword,
       }
     } else {
       alert(`Unsupported vendor type: ${formData.vendor_type}`)
@@ -452,6 +468,7 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
                       <SelectContent>
                         <SelectItem value="INTELLO">Intello</SelectItem>
                         <SelectItem value="SCADA">SCADA</SelectItem>
+                        <SelectItem value="TRACKSO">TRACKSO</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

@@ -89,18 +89,26 @@ export class IntelloAdapter extends BaseWmsAdapter {
 
     const data = await response.json()
     const token = data.token as string
-    const expirationTime = data.expirationTime as number // seconds
+    const expirationTime = data.expirationTime as number | undefined // seconds (may be undefined)
 
     if (!token) {
       logger.error(`[IntelloAdapter] No token in authentication response: ${JSON.stringify(data)}`)
       throw new Error("Intello authentication failed: no token in response")
     }
 
-    logger.info(`[IntelloAdapter] Authentication successful. Token expiration: ${expirationTime}s`)
+    // If expiration time is not present in response, default to 23 hours 30 minutes
+    const defaultExpirationSeconds = 23 * 60 * 60 + 30 * 60 // 23h 30m in seconds
+    const expirationTimeSeconds = expirationTime ?? defaultExpirationSeconds
+
+    if (!expirationTime) {
+      logger.info(`[IntelloAdapter] Token expiration not present in API response, using default: ${defaultExpirationSeconds}s (23h 30m)`)
+    } else {
+      logger.info(`[IntelloAdapter] Authentication successful. Token expiration: ${expirationTimeSeconds}s`)
+    }
 
     // Cache token in database
     if (this.vendorId && this.supabaseClient) {
-      const expiresAt = new Date(Date.now() + expirationTime * 1000)
+      const expiresAt = new Date(Date.now() + expirationTimeSeconds * 1000)
       logger.info(`[IntelloAdapter] Caching token in database (expires at: ${expiresAt.toISOString()})`)
       await this.supabaseClient
         .from("wms_vendors")
@@ -108,7 +116,7 @@ export class IntelloAdapter extends BaseWmsAdapter {
           access_token: token,
           token_expires_at: expiresAt.toISOString(),
           token_metadata: {
-            expirationTime,
+            expirationTime: expirationTimeSeconds,
             stored_at: new Date().toISOString(),
           },
         })

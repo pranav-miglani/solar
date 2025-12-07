@@ -51,7 +51,7 @@ export interface InsolationReading {
 export interface WmsVendorConfig {
   id: number
   name: string
-  vendorType: 'INTELLO' | 'SCADA' | string
+  vendorType: 'INTELLO' | 'SCADA' | 'TRACKSO' | string
   credentials: Record<string, any>
   isActive: boolean
   orgId: number
@@ -101,6 +101,12 @@ export abstract class BaseWmsAdapter {
     toDate: string,
     deviceName?: string
   ): Promise<InsolationReading[]>
+
+  /**
+   * Extract devices from a site
+   * Each vendor adapter must implement this to extract devices from their site structure
+   */
+  abstract extractDevicesFromSite(site: WmsSite): WmsDevice[]
 
   /**
    * Calculate daily insolation from all readings

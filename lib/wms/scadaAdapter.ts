@@ -43,14 +43,35 @@ export class ScadaAdapter extends BaseWmsAdapter {
       
       const { data: vendor } = await this.supabaseClient
         .from("wms_vendors")
-        .select("access_token, token_metadata")
+        .select("access_token, token_expires_at, token_metadata")
         .eq("id", this.vendorId)
         .single()
 
       if (vendor?.access_token) {
-        // SS_KEY is persistent, use cached value
-        logger.info(`[ScadaAdapter] Using cached SS_KEY: ${vendor.access_token.substring(0, 20)}...`)
-        return vendor.access_token
+        // Check if token has expiration - if not, set default 23h 30m
+        if (!vendor.token_expires_at) {
+          logger.info(`[ScadaAdapter] Token expiration not present, setting default 23h 30m`)
+          const defaultExpirationMs = 23 * 60 * 60 * 1000 + 30 * 60 * 1000 // 23h 30m in milliseconds
+          const defaultExpiresAt = new Date(Date.now() + defaultExpirationMs)
+          
+          await this.supabaseClient
+            .from("wms_vendors")
+            .update({ token_expires_at: defaultExpiresAt.toISOString() })
+            .eq("id", this.vendorId)
+          
+          logger.info(`[ScadaAdapter] Set default token expiration: ${defaultExpiresAt.toISOString()}`)
+        } else {
+          // Check if token is still valid (expires more than 5 minutes from now)
+          const expiresAt = new Date(vendor.token_expires_at)
+          const now = new Date()
+          
+          if (expiresAt > new Date(now.getTime() + 5 * 60 * 1000)) {
+            logger.info(`[ScadaAdapter] Using cached SS_KEY (expires at: ${expiresAt.toISOString()})`)
+            return vendor.access_token
+          } else {
+            logger.info(`[ScadaAdapter] Cached SS_KEY expired (expires at: ${expiresAt.toISOString()}), fetching new key`)
+          }
+        }
       } else {
         logger.info(`[ScadaAdapter] No cached SS_KEY found, fetching new key`)
       }
@@ -103,14 +124,20 @@ export class ScadaAdapter extends BaseWmsAdapter {
 
     logger.info(`[ScadaAdapter] Authentication successful. SS_KEY obtained.`)
 
-    // Cache SS_KEY in database (persistent, no expiration)
+    // Cache SS_KEY in database
+    // Default expiration: 23 hours 30 minutes (even though SS_KEY is persistent, we set a default expiration)
     if (this.vendorId && this.supabaseClient) {
       logger.info(`[ScadaAdapter] Caching SS_KEY in database`)
+      
+      // Default expiration: 23 hours 30 minutes
+      const defaultExpirationMs = 23 * 60 * 60 * 1000 + 30 * 60 * 1000 // 23h 30m in milliseconds
+      const expiresAt = new Date(Date.now() + defaultExpirationMs)
+      
       await this.supabaseClient
         .from("wms_vendors")
         .update({
           access_token: ssKey,
-          token_expires_at: null, // SS_KEY doesn't expire, but we'll refresh if API calls fail
+          token_expires_at: expiresAt.toISOString(), // Set default expiration of 23h 30m
           token_metadata: {
             loginId: loginId,
             userName: data.USER_NAME,
@@ -118,7 +145,7 @@ export class ScadaAdapter extends BaseWmsAdapter {
           },
         })
         .eq("id", this.vendorId)
-      logger.info(`[ScadaAdapter] SS_KEY cached successfully`)
+      logger.info(`[ScadaAdapter] SS_KEY cached successfully with default expiration: ${expiresAt.toISOString()}`)
     }
 
     return ssKey
@@ -197,16 +224,45 @@ export class ScadaAdapter extends BaseWmsAdapter {
       const vendorSiteId = String(item.SN) // SN = vendor_site_id
       const siteName = item.user || "" // user = site_name
       
-      // Parse PLANT_COMMISSIONED_DATE (format: "2025-Jul-16")
+      // Parse PLANT_COMMISSIONED_DATE (format: "2025-Jul-16" or "2025-07-16")
       let createdDate: string | undefined
       if (item.PLANT_COMMISSIONED_DATE) {
         try {
-          const date = new Date(item.PLANT_COMMISSIONED_DATE)
-          if (!isNaN(date.getTime())) {
-            createdDate = date.toISOString().split('T')[0] // YYYY-MM-DD
+          // Handle format "YYYY-MMM-DD" (e.g., "2025-Jul-16")
+          const dateStr = item.PLANT_COMMISSIONED_DATE
+          if (dateStr.includes('-') && dateStr.length > 10) {
+            // Try parsing with month name first
+            const date = new Date(dateStr)
+            if (!isNaN(date.getTime())) {
+              createdDate = date.toISOString().split('T')[0] // YYYY-MM-DD
+            } else {
+              // Fallback: try manual parsing for "YYYY-MMM-DD"
+              const parts = dateStr.split('-')
+              if (parts.length === 3) {
+                const year = parts[0]
+                const monthName = parts[1]
+                const day = parts[2]
+                // Map month names to numbers
+                const monthMap: Record<string, string> = {
+                  'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+                  'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+                  'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+                }
+                const monthNum = monthMap[monthName] || monthName
+                if (monthNum && year && day) {
+                  createdDate = `${year}-${monthNum}-${day.padStart(2, '0')}`
+                }
+              }
+            }
+          } else {
+            // Try standard date parsing
+            const date = new Date(dateStr)
+            if (!isNaN(date.getTime())) {
+              createdDate = date.toISOString().split('T')[0] // YYYY-MM-DD
+            }
           }
         } catch (e) {
-          // Ignore date parsing errors
+          logger.warn(`[ScadaAdapter] Failed to parse PLANT_COMMISSIONED_DATE: ${item.PLANT_COMMISSIONED_DATE}`, { error: e })
         }
       }
 
@@ -416,6 +472,24 @@ export class ScadaAdapter extends BaseWmsAdapter {
 
     // Fallback to base class calculation if generation field not available
     return super.calculateDailyInsolation(readings)
+  }
+
+  /**
+   * Extract devices from sites
+   * SCADA returns devices in site metadata
+   */
+  extractDevicesFromSite(site: WmsSite): WmsDevice[] {
+    const devices = site.metadata?.devices || []
+    
+    return devices.map((device: any) => ({
+      vendorDeviceId: device.vendorDeviceId || "",
+      deviceName: device.deviceName,
+      macAddress: device.macAddress,
+      serialNo: device.serialNo,
+      metadata: {
+        ...device.metadata,
+      },
+    }))
   }
 }
 

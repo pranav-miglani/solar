@@ -1,5 +1,6 @@
 import { IntelloAdapter } from "@/lib/wms/intelloAdapter"
 import { ScadaAdapter } from "@/lib/wms/scadaAdapter"
+import { TracksoAdapter } from "@/lib/wms/tracksoAdapter"
 import type { WmsVendorConfig, WmsSite, WmsDevice, BaseWmsAdapter, InsolationReading } from "@/lib/wms/baseWmsAdapter"
 import MDC from "@/lib/context/mdc"
 import { logger } from "@/lib/context/logger"
@@ -155,6 +156,11 @@ function getWmsAdapter(vendor: any): BaseWmsAdapter {
       adapter.setTokenStorage(vendor.id, getMainClient())
       return adapter
     }
+    case "TRACKSO": {
+      const adapter = new TracksoAdapter(config)
+      adapter.setTokenStorage(vendor.id, getMainClient())
+      return adapter
+    }
     default:
       throw new Error(`Unsupported WMS vendor type: ${vendor.vendor_type}`)
   }
@@ -239,19 +245,34 @@ export async function syncWmsVendorSites(
         created_date: site.createdDate,
         installer_type: site.installerType,
         metadata: site.metadata || {},
+        updated_at: new Date().toISOString(), // Ensure updated_at is set for all sites
       }
 
       if (existingSite) {
-        // Update existing site
-        await supabase
+        // Update existing site - ensure all fields are updated
+        const { error: updateError } = await supabase
           .from("wms_sites")
           .update(siteData)
           .eq("id", existingSite.id)
+        
+        if (updateError) {
+          logger.error(`[WMS Sync] Error updating site ${site.vendorSiteId}: ${updateError.message}`, { error: updateError })
+          continue
+        }
+        
         result.sitesUpdated++
+        logger.debug(`[WMS Sync] Updated site: ${site.siteName} (${site.vendorSiteId})`)
       } else {
         // Create new site
-        await supabase.from("wms_sites").insert(siteData)
+        const { error: insertError } = await supabase.from("wms_sites").insert(siteData)
+        
+        if (insertError) {
+          logger.error(`[WMS Sync] Error creating site ${site.vendorSiteId}: ${insertError.message}`, { error: insertError })
+          continue
+        }
+        
         result.sitesCreated++
+        logger.debug(`[WMS Sync] Created site: ${site.siteName} (${site.vendorSiteId})`)
       }
 
       // Get site ID for device sync (use maybeSingle to handle not found gracefully)
@@ -272,23 +293,8 @@ export async function syncWmsVendorSites(
         continue
       }
 
-      // Extract and sync devices
-      let devices: WmsDevice[] = []
-      
-      if (adapter instanceof IntelloAdapter) {
-        devices = adapter.extractDevicesFromSite(site)
-      } else if (adapter instanceof ScadaAdapter) {
-        // SCADA devices are stored in site.metadata.devices
-        if (site.metadata?.devices && Array.isArray(site.metadata.devices)) {
-          devices = site.metadata.devices.map((d: any) => ({
-            vendorDeviceId: d.vendorDeviceId,
-            deviceName: d.deviceName,
-            macAddress: d.macAddress,
-            serialNo: d.serialNo,
-            metadata: d.metadata || {},
-          }))
-        }
-      }
+      // Extract and sync devices - use adapter method consistently for all vendors
+      const devices = adapter.extractDevicesFromSite(site)
       
       result.devicesSynced += devices.length
 
@@ -313,17 +319,34 @@ export async function syncWmsVendorSites(
           mac_address: device.macAddress,
           serial_no: device.serialNo,
           metadata: device.metadata || {},
+          updated_at: new Date().toISOString(), // Ensure updated_at is set for all devices
         }
 
         if (existingDevice) {
-          await supabase
+          // Update existing device - ensure all fields are updated
+          const { error: updateError } = await supabase
             .from("wms_devices")
             .update(deviceData)
             .eq("id", existingDevice.id)
+          
+          if (updateError) {
+            logger.error(`[WMS Sync] Error updating device ${device.vendorDeviceId}: ${updateError.message}`, { error: updateError })
+            continue
+          }
+          
           result.devicesUpdated++
+          logger.debug(`[WMS Sync] Updated device: ${device.deviceName} (${device.vendorDeviceId})`)
         } else {
-          await supabase.from("wms_devices").insert(deviceData)
+          // Create new device
+          const { error: insertError } = await supabase.from("wms_devices").insert(deviceData)
+          
+          if (insertError) {
+            logger.error(`[WMS Sync] Error creating device ${device.vendorDeviceId}: ${insertError.message}`, { error: insertError })
+            continue
+          }
+          
           result.devicesCreated++
+          logger.debug(`[WMS Sync] Created device: ${device.deviceName} (${device.vendorDeviceId})`)
         }
       }
     }
@@ -428,6 +451,10 @@ export async function syncWmsVendorDevices(
       // Extract and sync devices
       if (adapter instanceof IntelloAdapter) {
         const devices = adapter.extractDevicesFromSite(site)
+        result.devicesSynced += devices.length
+      } else if (adapter instanceof TracksoAdapter) {
+        // TRACKSO devices are stored in site.metadata.devices
+        const devices = site.metadata?.devices || []
         result.devicesSynced += devices.length
 
         for (const device of devices) {
@@ -830,65 +857,61 @@ export async function syncWmsDevice(
       `[WMS Device Sync] Found site ${vendorSite.vendorSiteId} (${vendorSite.siteName}) in vendor API`
     )
 
-    // Extract devices from site
-    if (adapter instanceof IntelloAdapter) {
-      logger.info(`[WMS Device Sync] Extracting devices from site ${vendorSite.vendorSiteId}`)
-      const devices = adapter.extractDevicesFromSite(vendorSite)
-      logger.info(
-        `[WMS Device Sync] Found ${devices.length} devices in site: ${devices.map(d => d.vendorDeviceId).join(", ")}`
+    // Extract devices from site - use adapter method consistently for all vendors
+    logger.info(`[WMS Device Sync] Extracting devices from site ${vendorSite.vendorSiteId}`)
+    const devices = adapter.extractDevicesFromSite(vendorSite)
+    logger.info(
+      `[WMS Device Sync] Found ${devices.length} devices in site: ${devices.map(d => d.vendorDeviceId).join(", ")}`
+    )
+    
+    const vendorDevice = devices.find(
+      (d) => d.vendorDeviceId === device.vendor_device_id
+    )
+
+    if (!vendorDevice) {
+      logger.error(
+        `[WMS Device Sync] Device ${device.vendor_device_id} not found in site ${site.vendor_site_id}. Available devices: ${devices.map(d => d.vendorDeviceId).join(", ")}`
       )
-      
-      const vendorDevice = devices.find(
-        (d) => d.vendorDeviceId === device.vendor_device_id
+      throw new Error(
+        `Device ${device.vendor_device_id} not found in site ${site.vendor_site_id}`
       )
-
-      if (!vendorDevice) {
-        logger.error(
-          `[WMS Device Sync] Device ${device.vendor_device_id} not found in site ${site.vendor_site_id}. Available devices: ${devices.map(d => d.vendorDeviceId).join(", ")}`
-        )
-        throw new Error(
-          `Device ${device.vendor_device_id} not found in site ${site.vendor_site_id}`
-        )
-      }
-
-      logger.info(
-        `[WMS Device Sync] Found device ${vendorDevice.vendorDeviceId} in vendor API. Name: ${vendorDevice.deviceName || "N/A"}, MAC: ${vendorDevice.macAddress || "N/A"}, Serial: ${vendorDevice.serialNo || "N/A"}`
-      )
-
-      // Update device
-      const deviceData = {
-        device_name: vendorDevice.deviceName,
-        mac_address: vendorDevice.macAddress,
-        serial_no: vendorDevice.serialNo,
-        metadata: vendorDevice.metadata || {},
-      }
-
-      logger.info(
-        `[WMS Device Sync] Updating device ${deviceId} in database with new data`
-      )
-      const { error: updateError } = await supabase
-        .from("wms_devices")
-        .update(deviceData)
-        .eq("id", deviceId)
-
-      if (updateError) {
-        logger.error(
-          `[WMS Device Sync] Database update failed for device ${deviceId}`,
-          { updateError }
-        )
-        throw updateError
-      }
-
-      const duration = Date.now() - startTime
-      logger.info(
-        `[WMS Device Sync] Device ${device.vendor_device_id} (ID: ${deviceId}) synced successfully in ${duration}ms`
-      )
-
-      return { success: true, deviceUpdated: true }
     }
 
-    logger.error(`[WMS Device Sync] Unsupported adapter type: ${vendor.vendor_type}`)
-    throw new Error("Unsupported adapter type")
+    logger.info(
+      `[WMS Device Sync] Found device ${vendorDevice.vendorDeviceId} in vendor API. Name: ${vendorDevice.deviceName || "N/A"}, MAC: ${vendorDevice.macAddress || "N/A"}, Serial: ${vendorDevice.serialNo || "N/A"}`
+    )
+
+    // Update device with all fields
+    const deviceData = {
+      device_name: vendorDevice.deviceName,
+      mac_address: vendorDevice.macAddress,
+      serial_no: vendorDevice.serialNo,
+      metadata: vendorDevice.metadata || {},
+      updated_at: new Date().toISOString(), // Ensure updated_at is set
+    }
+
+    logger.info(
+      `[WMS Device Sync] Updating device ${deviceId} in database with new data`
+    )
+    const { error: updateError } = await supabase
+      .from("wms_devices")
+      .update(deviceData)
+      .eq("id", deviceId)
+
+    if (updateError) {
+      logger.error(
+        `[WMS Device Sync] Database update failed for device ${deviceId}`,
+        { updateError }
+      )
+      throw updateError
+    }
+
+    const duration = Date.now() - startTime
+    logger.info(
+      `[WMS Device Sync] Device ${device.vendor_device_id} (ID: ${deviceId}) synced successfully in ${duration}ms`
+    )
+
+    return { success: true, deviceUpdated: true }
   } catch (error: any) {
     const duration = Date.now() - startTime
     logger.error(

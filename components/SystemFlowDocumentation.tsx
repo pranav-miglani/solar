@@ -31,7 +31,8 @@ import {
   Copy,
   Check,
   User,
-  Users
+  Users,
+  CloudSun
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -448,6 +449,9 @@ export function SystemFlowDocumentation() {
       newExpanded.delete("vendor-pvblink")
       newExpanded.delete("vendor-shinemonitor")
       newExpanded.delete("vendor-foxesscloud")
+      newExpanded.delete("wms-vendor-intello")
+      newExpanded.delete("wms-vendor-scada")
+      newExpanded.delete("wms-vendor-trackso")
       // Then expand the selected vendor
       newExpanded.add(vendorId)
       
@@ -2219,6 +2223,7 @@ Unique Constraints:
                         <ul className="ml-4 mt-1 list-disc">
                           <li><strong>INTELLO:</strong> API only supports single day per call. <code className="bg-background px-1 rounded">getInsolationData()</code> makes one API call per day. Returns pre-calculated daily insolation in kWh/m² (extracted from dailyReport JSON). No integration calculation needed.</li>
                           <li><strong>SCADA:</strong> API supports date range efficiently. Single call can return multiple days. <code className="bg-background px-1 rounded">getInsolationData()</code> uses LOC_CODE (vendor_device_id) and USER_ID (device_name) for API calls. Returns pre-aggregated daily kWh/m² values.</li>
+                          <li><strong>TRACKSO:</strong> API requires startTime/endTime in epoch milliseconds (start and end of day). <code className="bg-background px-1 rounded">getInsolationData()</code> makes one API call per day. Returns pre-calculated daily insolation in kWh/m² (value field). No integration calculation needed.</li>
                           <li>Sync service is <strong>vendor-agnostic</strong> - automatically detects and uses the most efficient method per vendor</li>
                         </ul>
                       </li>
@@ -2496,6 +2501,20 @@ Unique Constraints:
                             <li>API only supports single day per call - must iterate through dates for backfill</li>
                             <li>Extracts devices (RTUs) from site response</li>
                             <li>Uses pre-calculated insolation directly (no integration calculation needed, irr field not used)</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h5 className="font-medium text-xs mb-1">TracksoAdapter (lib/wms/tracksoAdapter.ts)</h5>
+                          <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                            <li>TRACKSO WMS vendor implementation</li>
+                            <li>Authentication: POST /v1/login (email, password) - uses TRACKSO_API_BASE_URL</li>
+                            <li>Sites: GET /sites/&#123;vendorDeviceId&#125; - uses TRACKSO_API_BASE_URL</li>
+                            <li>Devices: Returned in authentication response (site_access) and site metadata</li>
+                            <li>Insolation: POST /dataquery/site - uses TRACKSO_API_BASE_URL</li>
+                            <li>Insolation API returns pre-calculated daily value in kWh/m² (value field)</li>
+                            <li>API requires startTime/endTime in epoch milliseconds (start and end of day)</li>
+                            <li>Uses pre-calculated insolation directly (no integration calculation needed, irr field not used)</li>
+                            <li>auth_token expires after 23 hours 30 minutes</li>
                           </ul>
                         </div>
                         <div>
@@ -2927,6 +2946,12 @@ Unique Constraints:
                           <td className="p-2">SCADA WMS API base URL (Weather Monitoring System)</td>
                           <td className="p-2">✅ Yes (if using SCADA WMS)</td>
                           <td className="p-2">https://log.poweramr.com</td>
+                        </tr>
+                        <tr className="border-b bg-blue-50 dark:bg-blue-950/10">
+                          <td className="p-2"><code className="bg-background px-1 rounded">TRACKSO_API_BASE_URL</code></td>
+                          <td className="p-2">TRACKSO WMS API base URL (Weather Monitoring System)</td>
+                          <td className="p-2">✅ Yes (if using TRACKSO WMS)</td>
+                          <td className="p-2">https://prodapi.trackso.in</td>
                         </tr>
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">SYNC_WINDOW_START</code></td>
@@ -4321,6 +4346,621 @@ User-Agent: Mozilla/5.0...`}
                     </div>
                   </div>
                   )}
+                </div>
+
+                {/* WMS Vendor Mappings */}
+                <div className="mt-12 pt-8 border-t-2 border-primary/20">
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                    <CloudSun className="h-6 w-6 text-primary" />
+                    WMS Vendor API to Database Mappings
+                  </h2>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Detailed API endpoint mappings and attribute transformations for Weather Monitoring System (WMS) vendors.
+                  </p>
+
+                  {/* INTELLO WMS Section */}
+                  <div id="wms-vendor-intello" className="space-y-4 mt-8">
+                    <VendorSectionHeader vendorId="wms-vendor-intello" vendorName="INTELLO WMS" icon={CloudSun} />
+                    
+                    {expandedSections.has("wms-vendor-intello") && (
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-4 border-t">
+                      <div>
+                        <h4 className="font-semibold mb-2">1. Authentication</h4>
+                        <div className="bg-background p-3 rounded text-sm space-y-2">
+                          <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">POST {process.env.INTELLO_API_BASE_URL || "https://portal.intellotechsolutions.co.in:5000"}/api/intello/authenticate</code></div>
+                          <div><strong>Request Body:</strong></div>
+                          <CodeBlock 
+                            id="intello-wms-auth-request"
+                            code={`{
+  "username": "string (email)",
+  "password": "string (password_hash)"
+}`}
+                          />
+                          <div><strong>Response:</strong></div>
+                          <CodeBlock 
+                            id="intello-wms-auth-response"
+                            code={`{
+  "token": "string",
+  "expirationTime": number (seconds)
+}`}
+                          />
+                          <div><strong>Token Storage:</strong> Stored in <code className="bg-muted px-1 rounded">wms_vendors.access_token</code>, <code className="bg-muted px-1 rounded">wms_vendors.token_expires_at</code></div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">2. List Sites & Devices</h4>
+                        <div className="bg-background p-3 rounded text-sm space-y-2">
+                          <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">GET {process.env.INTELLO_API_BASE_URL || "https://portal.intellotechsolutions.co.in:5000"}/api/intello/user/v1/sites</code></div>
+                          <div><strong>Response Structure:</strong></div>
+                          <CodeBlock 
+                            id="intello-wms-sites-response"
+                            code={`[
+  {
+    "id": number,
+    "siteName": string,
+    "address": string,
+    "latitude": number,
+    "longitude": number,
+    "location": string,
+    "elevation": number,
+    "status": string,
+    "panelCount": number,
+    "panelWattage": number,
+    "createdDate": string,
+    "rtuList": [
+      {
+        "id": string (RTU ID, e.g., "RTU2495"),
+        "name": string,
+        "macAddress": string,
+        "serialNo": string
+      }
+    ]
+  }
+]`}
+                          />
+                          <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                            <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Site & Device Mapping</h5>
+                          </div>
+                          <div><strong>Database Mapping:</strong></div>
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b bg-muted">
+                                <th className="text-left p-2 font-semibold">API Field</th>
+                                <th className="text-left p-2 font-semibold">DB Column</th>
+                                <th className="text-left p-2 font-semibold">Transformation</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">id</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.vendor_site_id</code></td>
+                                <td className="p-2">Convert to string</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">siteName</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.site_name</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">address</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.address</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">latitude/longitude</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.latitude/longitude</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">rtuList[].id</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_devices.vendor_device_id</code></td>
+                                <td className="p-2">Direct mapping (RTU ID)</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">rtuList[].name</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_devices.device_name</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">rtuList[].macAddress</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_devices.mac_address</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">rtuList[].serialNo</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_devices.serial_no</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">3. Insolation Data</h4>
+                        <div className="bg-background p-3 rounded text-sm space-y-2">
+                          <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">GET {process.env.INTELLO_REPORT_API_BASE_URL || "https://she8sfoqs5.execute-api.ap-south-1.amazonaws.com/prod"}/report?fromDate=YYYY-MM-DD&mode=Daily&resultType=ZDGLOSS&rtuid={`{deviceId}`}</code></div>
+                          <div><strong>Note:</strong> API only supports single day per call. Must iterate through dates for backfill.</div>
+                          <div><strong>Response:</strong></div>
+                          <CodeBlock 
+                            id="intello-wms-insolation-response"
+                            code={`{
+  "date": "YYYY-MM-DD",
+  "dailyReport": "[{\"insolation\": 4.25, \"ActualGen\": 0, \"IdealGen\": 13.06875}]"
+}`}
+                          />
+                          <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                            <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Insolation Mapping</h5>
+                            <p className="text-xs text-blue-800 dark:text-blue-200">
+                              Insolation value is extracted from <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">dailyReport</code> JSON string (first item&apos;s <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">insolation</code> field). Value is already in kWh/m² (pre-calculated).
+                            </p>
+                          </div>
+                          <div><strong>Database Mapping:</strong></div>
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b bg-muted">
+                                <th className="text-left p-2 font-semibold">API Field</th>
+                                <th className="text-left p-2 font-semibold">DB Column</th>
+                                <th className="text-left p-2 font-semibold">Transformation</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">dailyReport[0].insolation</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">insolation_readings.insolation_value</code></td>
+                                <td className="p-2">Parse JSON string, extract first item&apos;s insolation (already kWh/m²)</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">date</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">insolation_readings.reading_date</code></td>
+                                <td className="p-2">Direct mapping (YYYY-MM-DD)</td>
+                              </tr>
+                              <tr>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">deviceId (rtuid param)</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">insolation_readings.wms_device_id</code></td>
+                                <td className="p-2">Lookup device by vendor_device_id</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                    )}
+                  </div>
+
+                  {/* SCADA WMS Section */}
+                  <div id="wms-vendor-scada" className="space-y-4 mt-8">
+                    <VendorSectionHeader vendorId="wms-vendor-scada" vendorName="SCADA WMS" icon={CloudSun} />
+                    
+                    {expandedSections.has("wms-vendor-scada") && (
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-4 border-t">
+                      <div>
+                        <h4 className="font-semibold mb-2">1. Authentication</h4>
+                        <div className="bg-background p-3 rounded text-sm space-y-2">
+                          <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">POST {process.env.SCADA_API_BASE_URL || "https://log.poweramr.com"}/api/CMN_07_Super/SLogin</code></div>
+                          <div><strong>Content-Type:</strong> <code className="bg-muted px-1 rounded">application/x-www-form-urlencoded</code></div>
+                          <div><strong>Request Body (form-urlencoded):</strong></div>
+                          <CodeBlock 
+                            id="scada-wms-auth-request"
+                            code={`LOGIN_ID=string
+PASSWORD=string
+USER_NAME=string
+USER_TYPE=string (e.g., "SOLAR")`}
+                          />
+                          <div><strong>Response:</strong></div>
+                          <CodeBlock 
+                            id="scada-wms-auth-response"
+                            code={`{
+  "SS_KEY": "string",
+  "responseCode": "Login Success",
+  "success": "True"
+}`}
+                          />
+                          <div><strong>Token Storage:</strong> Stored in <code className="bg-muted px-1 rounded">wms_vendors.access_token</code> (SS_KEY is persistent, only refreshed on API errors)</div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">2. List Sites & Devices</h4>
+                        <div className="bg-background p-3 rounded text-sm space-y-2">
+                          <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">POST {process.env.SCADA_API_BASE_URL || "https://log.poweramr.com"}/api/CMN_07_Super/POST_USER_SUM_LIST_WMS</code></div>
+                          <div><strong>Content-Type:</strong> <code className="bg-muted px-1 rounded">application/x-www-form-urlencoded</code></div>
+                          <div><strong>Request Body (form-urlencoded):</strong></div>
+                          <CodeBlock 
+                            id="scada-wms-sites-request"
+                            code={`LOGIN_ID=string
+SS_KEY=string`}
+                          />
+                          <div><strong>Response Structure:</strong></div>
+                          <CodeBlock 
+                            id="scada-wms-sites-response"
+                            code={`{
+  "success": true,
+  "data": [
+    {
+      "SN": string (vendor_site_id),
+      "user": string (site_name),
+      "PLANT_LOCATION": string (address),
+      "LATITUDE": string,
+      "LONGITUDE": string,
+      "ADDRESS": string (location),
+      "PLANT_COMMISSIONED_DATE": "YYYY-MMM-DD",
+      "LOC_CODE": string (vendor_device_id),
+      "USER_ID": string (device_name),
+      "PASSWORD": string (mac_address)
+    }
+  ]
+}`}
+                          />
+                          <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                            <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Site & Device Mapping</h5>
+                          </div>
+                          <div><strong>Database Mapping:</strong></div>
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b bg-muted">
+                                <th className="text-left p-2 font-semibold">API Field</th>
+                                <th className="text-left p-2 font-semibold">DB Column</th>
+                                <th className="text-left p-2 font-semibold">Transformation</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">SN</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.vendor_site_id</code></td>
+                                <td className="p-2">Convert to string</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">user</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.site_name</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">PLANT_LOCATION</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.address</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">LATITUDE/LONGITUDE</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.latitude/longitude</code></td>
+                                <td className="p-2">Parse float</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">ADDRESS</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.location</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">PLANT_COMMISSIONED_DATE</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.created_date</code></td>
+                                <td className="p-2">Parse date (format: "YYYY-MMM-DD") → YYYY-MM-DD</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">LOC_CODE</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_devices.vendor_device_id</code></td>
+                                <td className="p-2">Convert to string (used for insolation API)</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">USER_ID</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_devices.device_name</code></td>
+                                <td className="p-2">Convert to string</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">PASSWORD</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_devices.mac_address</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">USER_ID</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_devices.serial_no</code></td>
+                                <td className="p-2">Convert to string</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">3. Insolation Data</h4>
+                        <div className="bg-background p-3 rounded text-sm space-y-2">
+                          <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">POST {process.env.SCADA_API_BASE_URL || "https://log.poweramr.com"}/api/CMN_02/WM_DASH</code></div>
+                          <div><strong>Content-Type:</strong> <code className="bg-muted px-1 rounded">application/x-www-form-urlencoded</code></div>
+                          <div><strong>Request Body (form-urlencoded):</strong></div>
+                          <CodeBlock 
+                            id="scada-wms-insolation-request"
+                            code={`LOC_CODE=string (vendor_device_id)
+LOGIN_ID=string (device_name, USER_ID)
+WM_TYPE=ISO
+DT1=YYYY-MM-DD (fromDate)
+DT2=YYYY-MM-DD (toDate)`}
+                          />
+                          <div><strong>Response:</strong></div>
+                          <CodeBlock 
+                            id="scada-wms-insolation-response"
+                            code={`{
+  "success": true,
+  "WM_DASH": [
+    {
+      "Date": "DD-MM-YYYY",
+      "Solar Insolation": "3.698" (kWh/m²)
+    }
+  ]
+}`}
+                          />
+                          <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                            <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Insolation Mapping</h5>
+                            <p className="text-xs text-blue-800 dark:text-blue-200">
+                              SCADA returns pre-aggregated daily values already in kWh/m². Date format is DD-MM-YYYY and is converted to YYYY-MM-DD internally.
+                            </p>
+                          </div>
+                          <div><strong>Database Mapping:</strong></div>
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b bg-muted">
+                                <th className="text-left p-2 font-semibold">API Field</th>
+                                <th className="text-left p-2 font-semibold">DB Column</th>
+                                <th className="text-left p-2 font-semibold">Transformation</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">Solar Insolation</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">insolation_readings.insolation_value</code></td>
+                                <td className="p-2">Parse float (already kWh/m²)</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">Date</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">insolation_readings.reading_date</code></td>
+                                <td className="p-2">Convert DD-MM-YYYY → YYYY-MM-DD</td>
+                              </tr>
+                              <tr>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">LOC_CODE (from request)</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">insolation_readings.wms_device_id</code></td>
+                                <td className="p-2">Lookup device by vendor_device_id</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                    )}
+                  </div>
+
+                  {/* TRACKSO WMS Section */}
+                  <div id="wms-vendor-trackso" className="space-y-4 mt-8">
+                    <VendorSectionHeader vendorId="wms-vendor-trackso" vendorName="TRACKSO WMS" icon={CloudSun} />
+                    
+                    {expandedSections.has("wms-vendor-trackso") && (
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-4 border-t">
+                      <div>
+                        <h4 className="font-semibold mb-2">1. Authentication</h4>
+                        <div className="bg-background p-3 rounded text-sm space-y-2">
+                          <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">POST {process.env.TRACKSO_API_BASE_URL || "https://prodapi.trackso.in"}/v1/login</code></div>
+                          <div><strong>Request Body:</strong></div>
+                          <CodeBlock 
+                            id="trackso-wms-auth-request"
+                            code={`{
+  "email": "string",
+  "password": "string"
+}`}
+                          />
+                          <div><strong>Response:</strong></div>
+                          <CodeBlock 
+                            id="trackso-wms-auth-response"
+                            code={`{
+  "status": "OK",
+  "statusCode": 200,
+  "result": {
+    "auth_token": "string",
+    "user_key": "string",
+    "id": "string",
+    "site_access": {
+      "deviceId1": {
+        "access_level": 1,
+        "site_name": "string"
+      }
+    }
+  }
+}`}
+                          />
+                          <div><strong>Token Storage:</strong> Stored in <code className="bg-muted px-1 rounded">wms_vendors.access_token</code>, <code className="bg-muted px-1 rounded">wms_vendors.token_expires_at</code></div>
+                          <div><strong>Token Expiration:</strong> 23 hours 30 minutes (84600000 milliseconds)</div>
+                          <div><strong>Note:</strong> <code className="bg-muted px-1 rounded">site_access</code> contains device information (keys are vendor_device_id, values contain site_name)</div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">2. List Sites & Devices</h4>
+                        <div className="bg-background p-3 rounded text-sm space-y-2">
+                          <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">GET {process.env.TRACKSO_API_BASE_URL || "https://prodapi.trackso.in"}/sites/{`{vendorDeviceId}`}</code></div>
+                          <div><strong>Headers:</strong> <code className="bg-muted px-1 rounded">x-auth-token: {`{auth_token}`}</code></div>
+                          <div><strong>Note:</strong> Devices are returned in authentication response (<code className="bg-muted px-1 rounded">site_access</code>). Full site details are fetched per device.</div>
+                          <div><strong>Response Structure:</strong></div>
+                          <CodeBlock 
+                            id="trackso-wms-sites-response"
+                            code={`{
+  "status": "OK",
+  "statusCode": 200,
+  "result": {
+    "id": "string" (vendor_site_id),
+    "site_key": "string" (vendor_device_id),
+    "name": "string" (site_name, address),
+    "description": "string" (location),
+    "coordinates": ["latitude", "longitude"],
+    "site_capacity": number (kW),
+    "ac_capacity": number (kW, panel_wattage),
+    "panel_count": number,
+    "panel_average_tilt": number (elevation),
+    "siteStatus": {
+      "status": "string" (ONLINE/OFFLINE)
+    },
+    "createdAt": number (epoch milliseconds)
+  }
+}`}
+                          />
+                          <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                            <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Site & Device Mapping</h5>
+                          </div>
+                          <div><strong>Database Mapping:</strong></div>
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b bg-muted">
+                                <th className="text-left p-2 font-semibold">API Field</th>
+                                <th className="text-left p-2 font-semibold">DB Column</th>
+                                <th className="text-left p-2 font-semibold">Transformation</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">id</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.vendor_site_id</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">name</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.site_name</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">name</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.address</code></td>
+                                <td className="p-2">Direct mapping (same as site_name)</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">coordinates[0]/[1]</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.latitude/longitude</code></td>
+                                <td className="p-2">Parse float</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">description</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.location</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">panel_average_tilt</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.elevation</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">siteStatus.status</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.status</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">panel_count</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.panel_count</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">ac_capacity</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.panel_wattage</code></td>
+                                <td className="p-2">Direct mapping (already in kW)</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">createdAt</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.created_date</code></td>
+                                <td className="p-2">Epoch milliseconds → ISO string → YYYY-MM-DD</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">site_key</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_devices.vendor_device_id</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                              <tr>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">name</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">wms_devices.device_name</code></td>
+                                <td className="p-2">Direct mapping</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">3. Insolation Data</h4>
+                        <div className="bg-background p-3 rounded text-sm space-y-2">
+                          <div><strong>Endpoint:</strong> <code className="bg-muted px-1 rounded">POST {process.env.TRACKSO_API_BASE_URL || "https://prodapi.trackso.in"}/dataquery/site</code></div>
+                          <div><strong>Headers:</strong> <code className="bg-muted px-1 rounded">x-auth-token: {`{auth_token}`}</code></div>
+                          <div><strong>Request Body:</strong></div>
+                          <CodeBlock 
+                            id="trackso-wms-insolation-request"
+                            code={`{
+  "startTime": number (epoch milliseconds, start of day),
+  "endTime": number (epoch milliseconds, end of day),
+  "timeGrouping": "DAY",
+  "limit": 1,
+  "siteParameterAggregationType": {
+    "deviceId": [
+      {
+        "parameterName": "Solar Insolation",
+        "dataQueryOperation": "LAST"
+      }
+    ]
+  }
+}`}
+                          />
+                          <div><strong>Response:</strong></div>
+                          <CodeBlock 
+                            id="trackso-wms-insolation-response"
+                            code={`{
+  "status": "OK",
+  "statusCode": 200,
+  "result": {
+    "result": [
+      {
+        "site_key": "string" (deviceId),
+        "data": [
+          {
+            "parameter_name": "Solar Insolation",
+            "value": 3.698,
+            "unit_of_measure": "KWh/m2",
+            "timestamp": number (epoch milliseconds)
+          }
+        ]
+      }
+    ]
+  }
+}`}
+                          />
+                          <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-900 mb-3">
+                            <h5 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Insolation Mapping</h5>
+                            <p className="text-xs text-blue-800 dark:text-blue-200">
+                              TRACKSO returns pre-calculated daily values already in kWh/m². Timestamp is in epoch milliseconds and is converted to date string.
+                            </p>
+                          </div>
+                          <div><strong>Database Mapping:</strong></div>
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b bg-muted">
+                                <th className="text-left p-2 font-semibold">API Field</th>
+                                <th className="text-left p-2 font-semibold">DB Column</th>
+                                <th className="text-left p-2 font-semibold">Transformation</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">data[].value</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">insolation_readings.insolation_value</code></td>
+                                <td className="p-2">Parse float (already kWh/m²)</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="p-2"><code className="bg-muted px-1 rounded">data[].timestamp</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">insolation_readings.reading_date</code></td>
+                                <td className="p-2">Epoch milliseconds → Date → YYYY-MM-DD</td>
+                              </tr>
+                              <tr>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">site_key (from response)</code></td>
+                                <td className="p-2"><code className="bg-muted px-1 rounded">insolation_readings.wms_device_id</code></td>
+                                <td className="p-2">Lookup device by vendor_device_id</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Vendor Onboarding Guide */}

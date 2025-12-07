@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate vendor type
-    if (vendor_type !== "INTELLO" && vendor_type !== "SCADA") {
+    if (vendor_type !== "INTELLO" && vendor_type !== "SCADA" && vendor_type !== "TRACKSO") {
       return NextResponse.json(
         { error: `Unsupported WMS vendor type: ${vendor_type}` },
         { status: 400 }
