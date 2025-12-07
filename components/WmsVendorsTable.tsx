@@ -626,6 +626,49 @@ export function WmsVendorsTable({ accountType }: WmsVendorsTableProps) {
                     </>
                   )}
 
+                  {/* TRACKSO Credentials */}
+                  {formData.vendor_type === "TRACKSO" && (
+                    <>
+                      <div>
+                        <Label htmlFor="tracksoEmail">Email *</Label>
+                        <Input
+                          id="tracksoEmail"
+                          type="email"
+                          value={formData.tracksoEmail}
+                          onChange={(e) =>
+                            setFormData({ ...formData, tracksoEmail: e.target.value })
+                          }
+                          required
+                          className="mt-1"
+                          placeholder="solartech@susolartech.com"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Email address used for TRACKSO authentication
+                        </p>
+                      </div>
+                      <div>
+                        <Label htmlFor="tracksoPassword">Password *</Label>
+                        <Input
+                          id="tracksoPassword"
+                          type="password"
+                          value={formData.tracksoPassword}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              tracksoPassword: e.target.value,
+                            })
+                          }
+                          required
+                          className="mt-1"
+                          placeholder="solartech@123"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Password for TRACKSO authentication
+                        </p>
+                      </div>
+                    </>
+                  )}
+
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="is_active"
