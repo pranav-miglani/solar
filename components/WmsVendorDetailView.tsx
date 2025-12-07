@@ -14,6 +14,7 @@ import {
   Calendar,
   ExternalLink,
   Loader2,
+  AlertCircle,
 } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
@@ -112,9 +113,12 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4 md:p-6">
         <div className="flex items-center justify-center h-64">
-          <div className="text-muted-foreground">Loading vendor details...</div>
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="text-muted-foreground">Loading vendor details...</div>
+          </div>
         </div>
       </div>
     )
@@ -122,10 +126,11 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
 
   if (error || !vendor) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4 md:p-6">
         <Card className="p-6">
-          <div className="text-center">
-            <p className="text-destructive mb-4">{error || "Vendor not found"}</p>
+          <div className="text-center space-y-4">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
+            <p className="text-destructive text-lg font-medium">{error || "Vendor not found"}</p>
             <Button onClick={() => router.push("/wms")} variant="outline">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to WMS
@@ -137,26 +142,28 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button onClick={() => router.push("/wms")} variant="outline" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <CloudSun className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+              <CloudSun className="h-6 w-6 md:h-8 md:w-8 text-primary" />
               {vendor.name}
             </h1>
-            <p className="text-muted-foreground mt-1">WMS Vendor Details</p>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">WMS Vendor Details</p>
           </div>
         </div>
         <Button
           onClick={handleSyncSites}
           disabled={syncing || refreshing}
           variant="outline"
-          className="min-w-[120px]"
+          size="sm"
+          className="w-full sm:w-auto min-w-[120px]"
         >
           {syncing || refreshing ? (
             <>
@@ -172,30 +179,31 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Vendor Information Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Vendor Type
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Badge variant="outline" className="text-lg">
+            <Badge variant="outline" className="text-base font-semibold px-3 py-1">
               {vendor.vendor_type || "N/A"}
             </Badge>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Organization
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">
+              <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="font-medium text-base">
                 {vendor.organizations?.name || (vendor.org_id ? `Org ID: ${vendor.org_id}` : "No Organization")}
               </span>
             </div>
@@ -203,50 +211,50 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Status
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Badge variant={vendor.is_active ? "default" : "secondary"}>
+            <Badge variant={vendor.is_active ? "default" : "secondary"} className="text-sm font-medium px-3 py-1">
               {vendor.is_active ? "Active" : "Inactive"}
             </Badge>
           </CardContent>
         </Card>
 
         <Card className={refreshing ? "opacity-75 transition-opacity" : ""}>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               Sites
               {refreshing && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{refreshing ? "..." : sitesCount}</div>
+            <div className="text-3xl font-bold mb-2">{refreshing ? "..." : sitesCount}</div>
             <Link
               href={`/wms/vendors/${vendorId}/sites`}
-              className="text-sm text-primary hover:underline flex items-center gap-1 mt-2"
+              className="text-sm text-primary hover:underline flex items-center gap-1.5 mt-3 transition-colors"
             >
-              View Sites <ExternalLink className="h-3 w-3" />
+              View Sites <ExternalLink className="h-3.5 w-3.5" />
             </Link>
           </CardContent>
         </Card>
 
         <Card className={refreshing ? "opacity-75 transition-opacity" : ""}>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               Devices
               {refreshing && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{refreshing ? "..." : devicesCount}</div>
+            <div className="text-3xl font-bold">{refreshing ? "..." : devicesCount}</div>
           </CardContent>
         </Card>
 
         <Card className={refreshing ? "opacity-75 transition-opacity" : ""}>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               Last Sites Sync
               {refreshing && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
@@ -254,7 +262,7 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <span className="text-sm">
                 {refreshing ? (
                   <span className="text-muted-foreground italic">Updating...</span>
@@ -269,7 +277,7 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
         </Card>
 
         <Card className={refreshing ? "opacity-75 transition-opacity" : ""}>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               Last Insolation Sync
               {refreshing && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
@@ -277,7 +285,7 @@ export function WmsVendorDetailView({ vendorId }: { vendorId: string }) {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <span className="text-sm">
                 {refreshing ? (
                   <span className="text-muted-foreground italic">Updating...</span>
