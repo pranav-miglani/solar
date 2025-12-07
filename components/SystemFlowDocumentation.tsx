@@ -4634,7 +4634,7 @@ SS_KEY=string`}
                               <tr className="border-b">
                                 <td className="p-2"><code className="bg-muted px-1 rounded">PLANT_COMMISSIONED_DATE</code></td>
                                 <td className="p-2"><code className="bg-muted px-1 rounded">wms_sites.created_date</code></td>
-                                <td className="p-2">Parse date (format: "YYYY-MMM-DD") → YYYY-MM-DD</td>
+                                <td className="p-2">Parse date (format: &quot;YYYY-MMM-DD&quot;) → YYYY-MM-DD</td>
                               </tr>
                               <tr className="border-b">
                                 <td className="p-2"><code className="bg-muted px-1 rounded">LOC_CODE</code></td>
