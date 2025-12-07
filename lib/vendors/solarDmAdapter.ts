@@ -1347,8 +1347,8 @@ async listPlants(): Promise<Plant[]> {
    */
   protected normalizeAlert(rawData: any): Alert {
     // Map SolarDM faultLevel to severity
-    // faultLevel: 1=LOW, 2=MEDIUM, 3=HIGH, 4=CRITICAL (assuming similar to Solarman)
-    const severityMap: Record<number, "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"> = {
+    // faultLevel: 1=HIGH, 2=MEDIUM, 3=LOW, 4=CRITICAL (assuming similar to Solarman)
+    const severityMap: Record<number,  "HIGH" | "MEDIUM" | "LOW" | "CRITICAL"> = {
       1: "LOW",
       2: "MEDIUM",
       3: "HIGH",
@@ -1360,7 +1360,7 @@ async listPlants(): Promise<Plant[]> {
     return {
       vendorAlertId: rawData.id?.toString() || "",
       title: rawData.faultInfo || "Alert",
-      description: rawData.faultInfo || null,
+      description: "No Mains Voltage",
       severity,
       metadata: rawData,
     }

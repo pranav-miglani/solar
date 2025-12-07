@@ -28,8 +28,9 @@ export default async function AlertsVendorsPage() {
 
   const accountType = sessionData.accountType as string
 
-  // Only SUPERADMIN and GOVT get the global alerts vendor view for now
-  if (accountType !== "SUPERADMIN" && accountType !== "GOVT") {
+  // SUPERADMIN, DEVELOPER, and GOVT get the global alerts vendor view
+  // ORG users should access alerts through their organization context
+  if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER" && accountType !== "GOVT") {
     redirect("/dashboard")
   }
 
