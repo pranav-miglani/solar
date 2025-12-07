@@ -588,7 +588,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <TooltipProvider>
+      <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-gradient-to-r from-muted/50 to-muted/30 rounded-lg border">
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
         {!isReadOnlyGovt && (
@@ -1509,8 +1510,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       )}
 
       {/* Sync Settings Dialog */}
-      <TooltipProvider>
-        <Dialog open={syncSettingsDialogOpen} onOpenChange={setSyncSettingsDialogOpen}>
+      <Dialog open={syncSettingsDialogOpen} onOpenChange={setSyncSettingsDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">
@@ -1687,7 +1687,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
           )}
           </DialogContent>
         </Dialog>
-      </TooltipProvider>
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
