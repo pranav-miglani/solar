@@ -268,30 +268,34 @@ export class ScadaAdapter extends BaseWmsAdapter {
   /**
    * Get insolation data for a specific device
    * SCADA returns daily aggregated insolation values already in kWh/m²
-   * @param deviceId - LOC_CODE (device identifier)
+   * @param deviceId - LOC_CODE (device identifier, used for LOC_CODE parameter)
    * @param fromDate - Start date (YYYY-MM-DD)
    * @param toDate - End date (YYYY-MM-DD)
+   * @param deviceName - USER_ID (device name, used for LOGIN_ID parameter)
    */
   async getInsolationData(
     deviceId: string,
     fromDate: string,
-    toDate: string
+    toDate: string,
+    deviceName?: string
   ): Promise<InsolationReading[]> {
     const ssKey = await this.authenticate()
-    const credentials = this.getCredentials()
-    const loginId = credentials.loginId as string
+    
+    if (!deviceName) {
+      throw new Error("SCADA insolation data requires deviceName (USER_ID) parameter")
+    }
 
     const apiBaseUrl = this.getApiBaseUrl()
     const insolationUrl = `${apiBaseUrl}/api/CMN_02/WM_DASH`
     const { logger } = await import("@/lib/context/logger")
     
     logger.info(`[ScadaAdapter] Calling insolation data API: POST ${insolationUrl}`)
-    logger.info(`[ScadaAdapter] Request params: LOC_CODE=${deviceId}, LOGIN_ID=${loginId}, DT1=${fromDate}, DT2=${toDate}`)
+    logger.info(`[ScadaAdapter] Request params: LOC_CODE=${deviceId}, LOGIN_ID=${deviceName} (from deviceName), DT1=${fromDate}, DT2=${toDate}`)
 
     // Build form-urlencoded body
     const formData = new URLSearchParams()
     formData.append('LOC_CODE', deviceId)
-    formData.append('LOGIN_ID', loginId)
+    formData.append('LOGIN_ID', deviceName) // Use deviceName (USER_ID) for LOGIN_ID
     formData.append('WM_TYPE', 'ISO')
     formData.append('DT1', fromDate)
     formData.append('DT2', toDate)

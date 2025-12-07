@@ -88,14 +88,16 @@ export abstract class BaseWmsAdapter {
 
   /**
    * Get insolation data for a specific device
-   * @param deviceId - Vendor-specific device identifier
+   * @param deviceId - Vendor-specific device identifier (primary identifier for API calls)
    * @param fromDate - Start date (YYYY-MM-DD)
    * @param toDate - End date (YYYY-MM-DD)
+   * @param deviceName - Optional device name/identifier (vendor-specific, e.g., USER_ID for SCADA)
    */
   abstract getInsolationData(
     deviceId: string,
     fromDate: string,
-    toDate: string
+    toDate: string,
+    deviceName?: string
   ): Promise<InsolationReading[]>
 
   /**

@@ -179,11 +179,13 @@ export class IntelloAdapter extends BaseWmsAdapter {
    * @param deviceId - RTU ID (e.g., "RTU2495")
    * @param fromDate - Start date (YYYY-MM-DD)
    * @param toDate - End date (YYYY-MM-DD)
+   * @param deviceName - Optional device name (not used for INTELLO, kept for interface consistency)
    */
   async getInsolationData(
     deviceId: string,
     fromDate: string,
-    toDate: string
+    toDate: string,
+    deviceName?: string
   ): Promise<InsolationReading[]> {
     const { logger } = await import("@/lib/context/logger")
     const apiBaseUrl = this.getApiBaseUrl()
