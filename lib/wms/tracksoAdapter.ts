@@ -348,14 +348,41 @@ export class TracksoAdapter extends BaseWmsAdapter {
     const apiBaseUrl = this.getApiBaseUrl()
     const authToken = await this.authenticate()
 
-    // Convert dates to epoch milliseconds (start and end of day)
-    const startDate = new Date(fromDate)
-    startDate.setHours(0, 0, 0, 0)
-    const startTime = startDate.getTime()
+    // Convert dates to epoch milliseconds in IST (Asia/Kolkata) timezone
+    // For TRACKSO, if fromDate === toDate, use that single day's start and end in IST
+    // Otherwise, use the range from start of fromDate to end of toDate in IST
+    
+    // Helper function to convert date string to IST start of day (00:00:00 IST)
+    const getISTStartOfDay = (dateStr: string): number => {
+      // Parse date string (YYYY-MM-DD)
+      const [year, month, day] = dateStr.split('-').map(Number)
+      // Create date string in IST format: "YYYY-MM-DD 00:00:00" in IST
+      // Use Intl.DateTimeFormat to get the correct epoch for IST midnight
+      const istDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00+05:30`
+      return new Date(istDateStr).getTime()
+    }
 
-    const endDate = new Date(toDate)
-    endDate.setHours(23, 59, 59, 999)
-    const endTime = endDate.getTime()
+    // Helper function to convert date string to IST end of day (23:59:59.999 IST)
+    const getISTEndOfDay = (dateStr: string): number => {
+      const [year, month, day] = dateStr.split('-').map(Number)
+      const istDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T23:59:59.999+05:30`
+      return new Date(istDateStr).getTime()
+    }
+
+    // For TRACKSO: if fromDate === toDate, use that single day's range in IST
+    // Otherwise, use fromDate start to toDate end in IST
+    let startTime: number
+    let endTime: number
+
+    if (fromDate === toDate) {
+      // Single day: use that day's start and end in IST
+      startTime = getISTStartOfDay(fromDate)
+      endTime = getISTEndOfDay(toDate)
+    } else {
+      // Date range: use start of fromDate to end of toDate in IST
+      startTime = getISTStartOfDay(fromDate)
+      endTime = getISTEndOfDay(toDate)
+    }
 
     const insolationUrl = `${apiBaseUrl}/dataquery/site`
     
