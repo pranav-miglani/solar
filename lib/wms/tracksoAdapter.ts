@@ -377,11 +377,11 @@ export class TracksoAdapter extends BaseWmsAdapter {
     if (fromDate === toDate) {
       // Single day: use that day's start and end in IST
       startTime = getISTStartOfDay(fromDate)
-      endTime = getISTEndOfDay(toDate)
+      endTime = getISTEndOfDay(fromDate)
     } else {
       // Date range: use start of fromDate to end of toDate in IST
       startTime = getISTStartOfDay(fromDate)
-      endTime = getISTEndOfDay(toDate)
+      endTime = getISTEndOfDay(fromDate)
     }
 
     const insolationUrl = `${apiBaseUrl}/dataquery/site`
