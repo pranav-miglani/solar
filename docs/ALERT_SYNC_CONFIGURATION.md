@@ -9,7 +9,7 @@ The alert sync system automatically fetches alerts from vendor APIs and stores t
 ## Schedule & Frequency
 
 ### Cron Schedule
-- **Frequency**: Every 15 minutes (`*/15 * * * *`)
+- **Frequency**: Every hour (`0 * * * *`) - Runs at minute 0 of every hour
 - **Cron File**: `lib/cron/alertSyncCron.js`
 - **API Endpoint**: `/api/cron/sync-alerts`
 - **Enabled by default**: Yes (can be disabled via `ENABLE_ALERT_SYNC_CRON=false`)

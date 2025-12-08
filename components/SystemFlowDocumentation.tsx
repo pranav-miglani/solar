@@ -301,7 +301,7 @@ const SystemArchitectureDiagram = () => {
             
             <Node title="Alert Sync Cron" color="orange" icon="⏰" className="min-h-[90px]">
               <div className="text-[10px] space-y-0.5">
-                <div>Scheduled sync • Vendor alerts</div>
+                <div>Every hour • Vendor alerts</div>
                 <div className="pt-1 border-t border-orange-500/30">→ /api/cron/sync-alerts</div>
               </div>
             </Node>
@@ -1126,7 +1126,7 @@ export function SystemFlowDocumentation() {
                   <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1 ml-4 list-disc">
                     <li>Alert sync is <strong>separate from plant sync and telemetry sync</strong> - runs independently</li>
                     <li>Currently only <strong>Solarman</strong> and <strong>SolarDM</strong> vendors are supported</li>
-                    <li>Alert sync respects the restricted time window (8 PM - 5 AM IST)</li>
+                    <li>Alert sync runs <strong>every hour</strong> (at minute 0) - no restricted time window</li>
                     <li>Alerts are filtered to specific types:
                       <ul className="ml-4 mt-1 list-disc">
                         <li><strong>Solarman:</strong> <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">deviceType === &quot;INVERTER&quot;</code> and <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">alertQueryName === &quot;No Mains Voltage&quot;</code></li>
@@ -2814,10 +2814,13 @@ Unique Constraints:
                     <div className="bg-muted/50 p-4 rounded-lg">
                       <h4 className="font-medium mb-2">alertSyncCron.js</h4>
                       <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                        <li>Schedule: Every 30 minutes (<code className="bg-background px-1 rounded">*/30 * * * *</code>)</li>
+                        <li>Schedule: Every hour (<code className="bg-background px-1 rounded">0 * * * *</code>) - Runs at minute 0 of every hour</li>
                         <li>Calls: <code className="bg-background px-1 rounded">GET /api/cron/sync-alerts</code></li>
-                        <li>Syncs alerts for all active vendors</li>
+                        <li>Syncs alerts for all active vendors (Solarman and SolarDM only)</li>
+                        <li>Filters by <code className="bg-background px-1 rounded">organizations.auto_sync_enabled</code></li>
+                        <li>Uses <code className="bg-background px-1 rounded">CRON_SECRET</code> for security (if configured)</li>
                         <li>Runs in-process (server.js starts it)</li>
+                        <li>Can be disabled with <code className="bg-background px-1 rounded">ENABLE_ALERT_SYNC_CRON=false</code></li>
                       </ul>
                     </div>
                     <div className="bg-muted/50 p-4 rounded-lg">

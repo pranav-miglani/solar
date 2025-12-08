@@ -9,7 +9,7 @@ This document lists all sync operations, their frequencies, schedules, and confi
 ## 1. Alert Sync
 
 ### Frequency
-- **Cron Schedule**: Every **15 minutes** (`*/15 * * * *`)
+- **Cron Schedule**: Every **hour** (`0 * * * *`) - Runs at minute 0 of every hour
 - **Cron File**: `lib/cron/alertSyncCron.js`
 - **API Endpoint**: `/api/cron/sync-alerts`
 
@@ -222,7 +222,7 @@ This document lists all sync operations, their frequencies, schedules, and confi
 
 | Sync Operation | Frequency | Schedule | Restricted Window | Configurable |
 |----------------|-----------|---------|-------------------|--------------|
-| **Alert Sync** | Every 15 min | `*/15 * * * *` | ❌ No | `ENABLE_ALERT_SYNC_CRON` |
+| **Alert Sync** | Every hour | `0 * * * *` | ❌ No | `ENABLE_ALERT_SYNC_CRON` |
 | **Plant Sync** | Once daily | Every 15 min (checks), syncs at vendor time (default: 02:00 IST) | ❌ No | `ENABLE_PLANT_SYNC_CRON`, `plant_sync_time_ist` |
 | **Live Telemetry** | Every 15 min (vendor-specific intervals) | `*/15 * * * *` | ✅ Yes (8 PM - 5 AM IST) | `ENABLE_LIVE_TELEMETRY_SYNC_CRON`, `telemetry_sync_interval` |
 | **WMS Site Sync** | Twice daily | `0 6,22 * * *` (6 AM & 10 PM IST) | ❌ No | `ENABLE_WMS_SITE_SYNC_CRON` |
@@ -262,7 +262,7 @@ This document lists all sync operations, their frequencies, schedules, and confi
 ## Quick Reference
 
 ### Most Frequent
-- **Alert Sync**: Every 15 minutes
+- **Alert Sync**: Every hour (at minute 0)
 - **Live Telemetry**: Every 15 minutes (vendor-specific intervals)
 - **Plant Sync Check**: Every 15 minutes (actual sync once daily)
 
