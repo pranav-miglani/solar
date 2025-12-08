@@ -65,8 +65,20 @@ export async function runAnalyticsSnapshot(): Promise<SnapshotSummary> {
     orgConfigMap.set(org.id, org.config || {})
   }
 
-  for (const vendor of vendors || []) {
+  const totalVendors = vendors?.length || 0
+  logger.info("[Analytics Snapshot] Starting snapshot for vendors", { totalVendors, readingDate })
+
+  for (let vendorIndex = 0; vendorIndex < (vendors || []).length; vendorIndex++) {
+    const vendor = vendors![vendorIndex]
     summary.vendorsProcessed++
+    
+    logger.info("[Analytics Snapshot] Processing vendor", {
+      vendorIndex: vendorIndex + 1,
+      totalVendors,
+      vendorId: vendor.id,
+      vendorName: vendor.name,
+    })
+
     const orgConfig = orgConfigMap.get(vendor.org_id) || {}
     const orgSyncEnabled = orgConfig.auto_sync_enabled !== false
     if (!orgSyncEnabled) {
@@ -99,6 +111,7 @@ export async function runAnalyticsSnapshot(): Promise<SnapshotSummary> {
 
     try {
       // Load plants from main DB for this vendor
+      logger.info("[Analytics Snapshot] Fetching plants from main DB", { vendorId: vendor.id })
       const { data: plants, error: plantError } = await main
         .from("plants")
         .select("id, org_id, vendor_id, vendor_plant_id, name, daily_energy_kwh, monthly_energy_mwh, yearly_energy_mwh, total_energy_mwh, updated_at")
@@ -108,33 +121,64 @@ export async function runAnalyticsSnapshot(): Promise<SnapshotSummary> {
         throw plantError
       }
 
-      // Update plant name in analytics plants table
-      for (const plant of plants || []) {
-        await analytics
-          .from("plants")
-          .upsert(
-            {
-              id: plant.id,
-              org_id: plant.org_id,
-              vendor_id: plant.vendor_id,
-              vendor_plant_id: plant.vendor_plant_id,
-              plant_name: plant.name,
-            },
-            { onConflict: "id" }
-          )
+      const plantCount = plants?.length || 0
+      logger.info("[Analytics Snapshot] Found plants", { vendorId: vendor.id, plantCount })
+
+      // Batch upsert plants in analytics DB
+      const BATCH_SIZE = 100
+      const plantBatch = (plants || []).map((plant) => ({
+        id: plant.id,
+        org_id: plant.org_id,
+        vendor_id: plant.vendor_id,
+        vendor_plant_id: plant.vendor_plant_id,
+        plant_name: plant.name,
+      }))
+
+      if (plantBatch.length > 0) {
+        const totalBatches = Math.ceil(plantBatch.length / BATCH_SIZE)
+        logger.info("[Analytics Snapshot] Upserting plants in batches", {
+          vendorId: vendor.id,
+          totalPlants: plantBatch.length,
+          totalBatches,
+        })
+
+        for (let i = 0; i < plantBatch.length; i += BATCH_SIZE) {
+          const batch = plantBatch.slice(i, i + BATCH_SIZE)
+          const batchNum = Math.floor(i / BATCH_SIZE) + 1
+          const { error: plantUpsertError } = await analytics
+            .from("plants")
+            .upsert(batch, { onConflict: "id" })
+
+          if (plantUpsertError) {
+            logger.error("[Analytics Snapshot] Failed to upsert plants batch", {
+              vendorId: vendor.id,
+              batchNum,
+              batchStart: i,
+              batchSize: batch.length,
+              error: plantUpsertError.message,
+            })
+            throw plantUpsertError
+          }
+
+          if (batchNum % 10 === 0 || batchNum === totalBatches) {
+            logger.info("[Analytics Snapshot] Plant batch progress", {
+              vendorId: vendor.id,
+              batchNum,
+              totalBatches,
+            })
+          }
+        }
       }
 
-      for (const plant of plants || []) {
-        summary.plantsProcessed++
-
+      // Prepare energy readings payloads
+      const energyReadings = (plants || []).map((plant) => {
         const dailyEnergyKwh = toNumberOrNull(plant.daily_energy_kwh)
         const monthlyEnergyMwh = toNumberOrNull(plant.monthly_energy_mwh)
         const yearlyEnergyMwh = toNumberOrNull(plant.yearly_energy_mwh)
         const totalEnergyMwh = toNumberOrNull(plant.total_energy_mwh)
-
         const monthlyEnergyKwh = monthlyEnergyMwh !== null ? monthlyEnergyMwh * 1000 : null
 
-        const payload = {
+        return {
           org_id: plant.org_id,
           vendor_id: plant.vendor_id,
           plant_id: plant.id,
@@ -150,20 +194,50 @@ export async function runAnalyticsSnapshot(): Promise<SnapshotSummary> {
             raw: plant,
           },
         }
+      })
 
-        const { error } = await analytics.from("plant_energy_readings").upsert(payload, { onConflict: "plant_id,reading_date" })
-        if (error) {
-          logger.error("[Analytics Snapshot] Failed to upsert plant energy reading", {
-            vendorId: vendor.id,
-            plantId: plant.id,
-            error: error.message,
-          })
-          throw error
+      // Batch upsert energy readings
+      if (energyReadings.length > 0) {
+        const totalBatches = Math.ceil(energyReadings.length / BATCH_SIZE)
+        logger.info("[Analytics Snapshot] Upserting energy readings in batches", {
+          vendorId: vendor.id,
+          totalReadings: energyReadings.length,
+          totalBatches,
+        })
+
+        for (let i = 0; i < energyReadings.length; i += BATCH_SIZE) {
+          const batch = energyReadings.slice(i, i + BATCH_SIZE)
+          const batchNum = Math.floor(i / BATCH_SIZE) + 1
+          const { error: readingUpsertError } = await analytics
+            .from("plant_energy_readings")
+            .upsert(batch, { onConflict: "plant_id,reading_date" })
+
+          if (readingUpsertError) {
+            logger.error("[Analytics Snapshot] Failed to upsert energy readings batch", {
+              vendorId: vendor.id,
+              batchNum,
+              batchStart: i,
+              batchSize: batch.length,
+              error: readingUpsertError.message,
+            })
+            throw readingUpsertError
+          }
+
+          vendorRows += batch.length
+          summary.rowsUpserted += batch.length
+
+          if (batchNum % 10 === 0 || batchNum === totalBatches) {
+            logger.info("[Analytics Snapshot] Energy readings batch progress", {
+              vendorId: vendor.id,
+              batchNum,
+              totalBatches,
+              rowsUpserted: vendorRows,
+            })
+          }
         }
-
-        vendorRows++
-        summary.rowsUpserted++
       }
+
+      summary.plantsProcessed += plants?.length || 0
 
       // Update run record and vendor status on success
       const runEndTime = new Date().toISOString()

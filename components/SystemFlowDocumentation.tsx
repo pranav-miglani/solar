@@ -254,6 +254,16 @@ const SystemArchitectureDiagram = () => {
             </div>
           </Node>
 
+          <Node title="Analytics Database" color="purple" icon="📊" className="min-h-[100px]">
+            <div className="font-medium mb-1">Separate Supabase Instance</div>
+            <div className="text-[10px] space-y-0.5">
+              <div><strong>Tables:</strong> organizations, vendors, plants, plant_energy_readings, analytics_snapshot_runs</div>
+              <div><strong>Purpose:</strong> Daily energy snapshots (100-day rolling retention)</div>
+              <div><strong>Mirrored Config:</strong> Organizations, vendors, plants (with hash-based change detection)</div>
+              <div><strong>FK Constraints:</strong> All relationships enforced with CASCADE deletes</div>
+            </div>
+          </Node>
+
           <Node title="External Vendor APIs" color="red" icon="🌍" className="min-h-[100px]">
             <div>Solarman • SolarDM • ShineMonitor • PVBlink • Foxesscloud</div>
             <div className="text-[10px] italic mt-1">Returns telemetry & plant data</div>
@@ -305,6 +315,20 @@ const SystemArchitectureDiagram = () => {
               <div className="text-[10px] space-y-0.5">
                 <div>Daily 6 AM IST • Yesterday&apos;s insolation</div>
                 <div className="pt-1 border-t border-orange-500/30">→ /api/cron/sync-wms-insolation-morning</div>
+              </div>
+            </Node>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+            <Node title="Analytics Config Mirror Cron" color="purple" icon="⏰" className="min-h-[90px]">
+              <div className="text-[10px] space-y-0.5">
+                <div>Daily 1 AM IST • Mirror orgs/vendors/plants</div>
+                <div className="pt-1 border-t border-purple-500/30">→ /api/cron/analytics/mirror-config</div>
+              </div>
+            </Node>
+            <Node title="Analytics Snapshot Cron" color="purple" icon="⏰" className="min-h-[90px]">
+              <div className="text-[10px] space-y-0.5">
+                <div>Daily 10 PM IST • Capture energy snapshots</div>
+                <div className="pt-1 border-t border-purple-500/30">→ /api/cron/analytics/snapshot-energy</div>
               </div>
             </Node>
           </div>
@@ -2411,6 +2435,37 @@ Unique Constraints:
                         <li>Token caching in database (similar to inverter vendors)</li>
                       </ul>
                     </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">lib/services/analyticsMirrorService.ts</h4>
+                      <p className="text-xs text-muted-foreground mb-2">Analytics database configuration mirroring service</p>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><code className="bg-background px-1 rounded">mirrorOrgVendorConfig()</code> - Main entry point, mirrors orgs/vendors/plants from main DB to analytics DB</li>
+                        <li><code className="bg-background px-1 rounded">stripTimestamps()</code> - Helper to remove timestamp fields before hashing</li>
+                        <li><code className="bg-background px-1 rounded">computeHash()</code> - Creates deterministic hash of configuration objects</li>
+                        <li>Fetches orgs, vendors, and plants from main DB</li>
+                        <li>Upserts into analytics DB with hash-based change detection</li>
+                        <li>Updates <code className="bg-background px-1 rounded">config_hash</code>, <code className="bg-background px-1 rounded">config_ready</code>, <code className="bg-background px-1 rounded">config_last_run_at</code>, <code className="bg-background px-1 rounded">config_last_status</code>, <code className="bg-background px-1 rounded">config_last_error</code></li>
+                        <li>Plants mirrored in batches of 100 for performance</li>
+                        <li>Sets <code className="bg-background px-1 rounded">analytics_ready=true</code> on vendors when config mirror succeeds</li>
+                      </ul>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">lib/services/analyticsSnapshotService.ts</h4>
+                      <p className="text-xs text-muted-foreground mb-2">Analytics database daily energy snapshot service</p>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><code className="bg-background px-1 rounded">runAnalyticsSnapshot()</code> - Main entry point, captures current day&apos;s energy snapshot</li>
+                        <li><code className="bg-background px-1 rounded">getIstDateString()</code> - Helper to get current date in IST (YYYY-MM-DD)</li>
+                        <li><code className="bg-background px-1 rounded">toNumberOrNull()</code> - Helper to safely convert values to number or null</li>
+                        <li>Fetches vendors from analytics DB (only <code className="bg-background px-1 rounded">analytics_ready=true</code> and <code className="bg-background px-1 rounded">config_last_status=success</code>)</li>
+                        <li>Fetches organizations from analytics DB to check <code className="bg-background px-1 rounded">auto_sync_enabled</code></li>
+                        <li>Fetches plants from main DB (only for enabled orgs)</li>
+                        <li>For each plant, constructs payload with daily, monthly, yearly, total energy (converting units as needed)</li>
+                        <li>Units: Daily/monthly energy in kWh, yearly/total energy in MWh</li>
+                        <li>Upserts into <code className="bg-background px-1 rounded">plant_energy_readings</code> table</li>
+                        <li>Records snapshot run status in <code className="bg-background px-1 rounded">analytics_snapshot_runs</code> table</li>
+                        <li>Calls <code className="bg-background px-1 rounded">cleanup_old_plant_energy_readings()</code> function to enforce 100-day retention</li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
 
@@ -2589,6 +2644,25 @@ Unique Constraints:
                       </div>
                     </div>
                     <div className="mt-3">
+                      <h4 className="font-medium text-sm mb-1">Analytics API Endpoints</h4>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Analytics database API routes (SUPERADMIN/DEVELOPER only):
+                      </p>
+                      <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><strong>GET /api/analytics/orgs</strong> - List mirrored organizations from analytics DB</li>
+                        <li><strong>GET /api/analytics/vendors</strong> - List mirrored vendors with last snapshot run status (includes organizations relationship)</li>
+                        <li><strong>GET /api/analytics/plants</strong> - List mirrored plants (includes organizations and vendors relationships)</li>
+                        <li><strong>GET /api/analytics/plants/[id]/energy</strong> - Fetch plant energy readings for a specific plant (last 100 days)</li>
+                        <li><strong>POST /api/cron/analytics/mirror-config</strong> - Mirror org/vendor/plant config from main DB to analytics DB (cron endpoint, supports dual auth: CRON_SECRET or session)</li>
+                        <li><strong>POST /api/cron/analytics/snapshot-energy</strong> - Capture current day&apos;s energy snapshot (cron endpoint, supports dual auth: CRON_SECRET or session)</li>
+                      </ul>
+                      <div className="bg-purple-50 dark:bg-purple-950/20 p-2 rounded-lg border border-purple-200 dark:border-purple-900 mt-2">
+                        <p className="text-xs text-purple-800 dark:text-purple-200">
+                          <strong>📊 Analytics Note:</strong> Analytics DB is a separate Supabase instance for storing historical daily energy snapshots. Config mirroring runs daily to keep org/vendor/plant data in sync. Snapshot cron captures end-of-day energy data. All relationships use foreign key constraints with CASCADE deletes for data integrity.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3">
                       <h4 className="font-medium text-sm mb-1">WMS UI Pages & Components</h4>
                       <p className="text-xs text-muted-foreground mb-2">
                         Weather Monitoring System user interface:
@@ -2614,6 +2688,30 @@ Unique Constraints:
                       <div className="bg-green-50 dark:bg-green-950/20 p-2 rounded-lg border border-green-200 dark:border-green-900 mt-2">
                         <p className="text-xs text-green-800 dark:text-green-200">
                           <strong>✅ Navigation Flow:</strong> Vendors → Sites → Devices → Insolation. All pages include proper authentication, RBAC checks, and error handling.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <h4 className="font-medium text-sm mb-1">Analytics UI Pages & Components</h4>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Analytics dashboard user interface (SUPERADMIN/DEVELOPER only):
+                      </p>
+                      <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><strong>/analytics</strong> - Main analytics dashboard (AnalyticsDashboard component)</li>
+                        <li><strong>/analytics/plants</strong> - Plants list page (AnalyticsPlantsList component, supports vendorId filter)</li>
+                        <li><strong>/analytics/plants/[id]</strong> - Plant-specific energy analytics (PlantEnergyAnalytics component)</li>
+                      </ul>
+                      <div className="mt-2">
+                        <h5 className="font-medium text-xs mb-1">Components:</h5>
+                        <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li><code className="bg-background px-1 rounded">AnalyticsDashboard</code> - Main dashboard showing mirrored orgs/vendors with config, sync status, and manual trigger buttons</li>
+                          <li><code className="bg-background px-1 rounded">AnalyticsPlantsList</code> - Plants table grouped by org/vendor with navigation to plant analytics</li>
+                          <li><code className="bg-background px-1 rounded">PlantEnergyAnalytics</code> - Four energy graphs (Daily, Total, Monthly, Yearly) with metadata modal on data point click</li>
+                        </ul>
+                      </div>
+                      <div className="bg-purple-50 dark:bg-purple-950/20 p-2 rounded-lg border border-purple-200 dark:border-purple-900 mt-2">
+                        <p className="text-xs text-purple-800 dark:text-purple-200">
+                          <strong>📊 Analytics Features:</strong> Config mirroring with hash-based change detection, daily energy snapshots with 100-day retention, interactive graphs with raw vendor payload visibility, manual trigger buttons for config mirror and snapshot capture.
                         </p>
                       </div>
                     </div>
@@ -2743,6 +2841,37 @@ Unique Constraints:
                         <li>Can be disabled with <code className="bg-background px-1 rounded">ENABLE_WMS_INSOLATION_SYNC_MORNING_CRON=false</code></li>
                       </ul>
                     </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">analyticsConfigMirrorCron.js</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Schedule: Daily at 1 AM IST (<code className="bg-background px-1 rounded">0 1 * * *</code>, configurable via <code className="bg-background px-1 rounded">ANALYTICS_CONFIG_MIRROR_CRON_SCHEDULE</code>)</li>
+                        <li>Calls: <code className="bg-background px-1 rounded">POST /api/cron/analytics/mirror-config</code></li>
+                        <li>Mirrors organizations, vendors, and plants from main DB to analytics DB</li>
+                        <li>Uses hash-based change detection to update only when config changes</li>
+                        <li>Sets <code className="bg-background px-1 rounded">analytics_ready=true</code> on vendors when mirror succeeds</li>
+                        <li>Plants mirrored in batches of 100</li>
+                        <li>Dual authentication: Supports <code className="bg-background px-1 rounded">CRON_SECRET</code> or session-based auth (for manual triggers)</li>
+                        <li>Runs in-process (server.js starts it)</li>
+                        <li>Can be disabled with <code className="bg-background px-1 rounded">ENABLE_ANALYTICS_CONFIG_MIRROR_CRON=false</code></li>
+                      </ul>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">analyticsSnapshotCron.js</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Schedule: Daily at 10 PM IST (<code className="bg-background px-1 rounded">0 22 * * *</code>, configurable via <code className="bg-background px-1 rounded">ANALYTICS_SNAPSHOT_CRON_SCHEDULE</code>)</li>
+                        <li>Calls: <code className="bg-background px-1 rounded">POST /api/cron/analytics/snapshot-energy</code></li>
+                        <li>Captures current day&apos;s energy snapshot for all plants</li>
+                        <li>Only runs for vendors marked <code className="bg-background px-1 rounded">analytics_ready=true</code> and <code className="bg-background px-1 rounded">config_last_status=success</code></li>
+                        <li>Fetches plants from main DB, energy data from vendor APIs</li>
+                        <li>Stores daily/monthly/yearly/total energy in <code className="bg-background px-1 rounded">plant_energy_readings</code> table</li>
+                        <li>Units: Daily/monthly energy in kWh, yearly/total energy in MWh</li>
+                        <li>Records snapshot run status per vendor in <code className="bg-background px-1 rounded">analytics_snapshot_runs</code> table</li>
+                        <li>Automatically cleans up readings older than 100 days</li>
+                        <li>Dual authentication: Supports <code className="bg-background px-1 rounded">CRON_SECRET</code> or session-based auth (for manual triggers)</li>
+                        <li>Runs in-process (server.js starts it)</li>
+                        <li>Can be disabled with <code className="bg-background px-1 rounded">ENABLE_ANALYTICS_SNAPSHOT_CRON=false</code></li>
+                      </ul>
+                    </div>
                   </div>
                   <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded-lg border border-yellow-200 dark:border-yellow-900">
                     <p className="text-xs text-yellow-800 dark:text-yellow-200">
@@ -2776,6 +2905,16 @@ Unique Constraints:
                       <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
                         <li>Uses service role key</li>
                         <li>For server components and API routes</li>
+                      </ul>
+                    </div>
+                    <div className="mt-2">
+                      <h4 className="font-medium text-sm mb-1">pooled.ts - Analytics Database Client</h4>
+                      <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li><code className="bg-background px-1 rounded">getAnalyticsClient()</code> - Singleton analytics DB client</li>
+                        <li>Uses <code className="bg-background px-1 rounded">ANALYTICS_SUPABASE_URL</code> and <code className="bg-background px-1 rounded">ANALYTICS_SUPABASE_SERVICE_ROLE_KEY</code> environment variables</li>
+                        <li>Separate Supabase instance for analytics data</li>
+                        <li>Service role key bypasses RLS</li>
+                        <li>Used for mirroring config and capturing energy snapshots</li>
                       </ul>
                     </div>
                   </div>
@@ -2966,10 +3105,10 @@ Unique Constraints:
                       <td className="p-2">30 16 * * *</td>
                     </tr>
                     <tr className="border-b">
-                      <td className="p-2"><code className="bg-background px-1 rounded">ANALYTICS_CONFIG_CRON_SCHEDULE</code></td>
-                      <td className="p-2">Cron (server TZ) for org/vendor config mirror to analytics</td>
+                      <td className="p-2"><code className="bg-background px-1 rounded">ANALYTICS_CONFIG_MIRROR_CRON_SCHEDULE</code></td>
+                      <td className="p-2">Cron (server TZ) for org/vendor config mirror to analytics (default: 0 19 * * * ≈ 01:00 IST)</td>
                       <td className="p-2">⚠️ Optional</td>
-                      <td className="p-2">0 16 * * *</td>
+                      <td className="p-2">0 19 * * *</td>
                     </tr>
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">CRON_SECRET</code></td>
@@ -3002,8 +3141,20 @@ Unique Constraints:
                           <td className="p-2">true</td>
                         </tr>
                         <tr className="border-b">
-                          <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_WMS_INSOLATION_SYNC_CRON</code></td>
-                          <td className="p-2">Enable in-process WMS insolation sync cron (true/false)</td>
+                          <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_WMS_INSOLATION_SYNC_MORNING_CRON</code></td>
+                          <td className="p-2">Enable in-process WMS insolation sync morning cron (true/false)</td>
+                          <td className="p-2">⚠️ Optional</td>
+                          <td className="p-2">true</td>
+                        </tr>
+                        <tr className="border-b bg-purple-50 dark:bg-purple-950/10">
+                          <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_ANALYTICS_CONFIG_MIRROR_CRON</code></td>
+                          <td className="p-2">Enable in-process analytics config mirror cron (true/false)</td>
+                          <td className="p-2">⚠️ Optional</td>
+                          <td className="p-2">true</td>
+                        </tr>
+                        <tr className="border-b bg-purple-50 dark:bg-purple-950/10">
+                          <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_ANALYTICS_SNAPSHOT_CRON</code></td>
+                          <td className="p-2">Enable in-process analytics snapshot cron (true/false)</td>
                           <td className="p-2">⚠️ Optional</td>
                           <td className="p-2">true</td>
                         </tr>
@@ -3048,11 +3199,14 @@ Unique Constraints:
                     <div>
                       <h4 className="font-medium mb-2">Database Infrastructure</h4>
                       <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                        <li><strong>Main Database:</strong> Single Supabase PostgreSQL instance (all data stored here)</li>
+                        <li><strong>Main Database:</strong> Single Supabase PostgreSQL instance (all operational data stored here)</li>
+                        <li><strong>Analytics Database:</strong> Separate Supabase PostgreSQL instance for historical energy snapshots (100-day rolling retention)</li>
                         <li><strong>Telemetry Storage:</strong> Live telemetry stored in <code className="bg-background px-1 rounded">plants</code> table; historical telemetry fetched on-demand from vendor APIs (not persisted)</li>
+                        <li><strong>Analytics Storage:</strong> Daily energy snapshots stored in <code className="bg-background px-1 rounded">plant_energy_readings</code> table (analytics DB)</li>
                         <li><strong>Connection Pooling:</strong> HTTP connection reuse via pooledFetch</li>
-                        <li><strong>RLS:</strong> Enabled but bypassed via service role key</li>
-                        <li><strong>Backups:</strong> Supabase point-in-time recovery (configure in dashboard)</li>
+                        <li><strong>RLS:</strong> Enabled but bypassed via service role key (both databases)</li>
+                        <li><strong>Foreign Keys:</strong> Analytics DB has FK constraints with CASCADE deletes for data integrity</li>
+                        <li><strong>Backups:</strong> Supabase point-in-time recovery (configure in dashboard for both instances)</li>
                       </ul>
                     </div>
 
@@ -3118,16 +3272,19 @@ Unique Constraints:
                   <h3 className="font-semibold text-lg">Deployment Checklist</h3>
                   <div className="bg-muted/50 p-4 rounded-lg">
                     <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
-                      <li>✅ All environment variables configured</li>
-                      <li>✅ Database migrations applied (001_initial_schema.sql, 002_rls_policies.sql, etc.)</li>
-                      <li>✅ RLS policies enabled (though bypassed by service role key)</li>
+                      <li>✅ All environment variables configured (including analytics DB credentials)</li>
+                      <li>✅ Database migrations applied (main DB: 001_initial_schema.sql, 002_rls_policies.sql, etc.; analytics DB: 039_create_analytics_schema.sql)</li>
+                      <li>✅ RLS policies enabled (though bypassed by service role key for both databases)</li>
+                      <li>✅ Analytics DB foreign key constraints verified</li>
                       <li>✅ Edge Functions deployed and scheduled</li>
                       <li>✅ Default passwords changed (run migration 004_manual_user_setup.sql or create new accounts)</li>
                       <li>✅ SSL certificates valid</li>
                       <li>✅ Monitoring and error tracking configured</li>
-                      <li>✅ Backup strategy in place (Supabase point-in-time recovery)</li>
+                      <li>✅ Backup strategy in place (Supabase point-in-time recovery for both databases)</li>
                       <li>✅ CRON_SECRET set for cron endpoint security</li>
                       <li>✅ Vendor API credentials configured in UI</li>
+                      <li>✅ Analytics config mirror cron tested</li>
+                      <li>✅ Analytics snapshot cron tested</li>
                       <li>⚠️ Consider moving cron jobs to external scheduler</li>
                       <li>⚠️ Implement structured logging to external service</li>
                       <li>⚠️ Add rate limiting at API gateway level</li>
