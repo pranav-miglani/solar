@@ -2,8 +2,6 @@ export interface VendorCredentials {
   [key: string]: string | number | boolean
 }
 
-export type PlantSyncMode = 'LIST_PLANTS' | 'PER_PLANT'
-
 export interface VendorConfig {
   id: number
   name: string
@@ -11,9 +9,6 @@ export interface VendorConfig {
   apiBaseUrl?: string // Optional - can be read from environment variables instead
   credentials: VendorCredentials
   isActive: boolean
-  // Optional plant sync configuration. Not all adapters need this directly,
-  // but services (e.g. plantSyncService) can branch behavior based on it.
-  plantSyncMode?: PlantSyncMode
   perPlantSyncIntervalMinutes?: number
   plantSyncTimeIst?: string // Daily plant sync time in IST (default: "02:00")
 }

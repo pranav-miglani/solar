@@ -161,7 +161,6 @@ async function syncVendorLiveTelemetry(
       apiBaseUrl: vendor.api_base_url,
       credentials: vendor.credentials,
       isActive: vendor.is_active,
-      plantSyncMode: vendor.plant_sync_mode,
       perPlantSyncIntervalMinutes: vendor.per_plant_sync_interval_minutes,
       plantSyncTimeIst: vendor.plant_sync_time_ist || "02:00",
     }

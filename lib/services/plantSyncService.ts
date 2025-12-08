@@ -62,29 +62,6 @@ async function validateAndRefreshToken(
 }
 
 /**
- * Resolve plant sync mode for a vendor. Defaults are based on vendor_type:
- * - SOLARMAN, SHINEMONITOR -> LIST_PLANTS
- * - SOLARDM, PVBLINK       -> PER_PLANT
- * - FOXESSCLOUD, OTHER     -> LIST_PLANTS
- */
-function getPlantSyncMode(vendor: any): 'LIST_PLANTS' | 'PER_PLANT' {
-  if (vendor.plant_sync_mode === 'LIST_PLANTS' || vendor.plant_sync_mode === 'PER_PLANT') {
-    return vendor.plant_sync_mode
-  }
-
-  switch (vendor.vendor_type) {
-    case 'SOLARMAN':
-    case 'SHINEMONITOR':
-      return 'LIST_PLANTS'
-    case 'SOLARDM':
-    case 'PVBLINK':
-      return 'PER_PLANT'
-    default:
-      return 'LIST_PLANTS'
-  }
-}
-
-/**
  * Sync plants for a single vendor
  */
 async function syncVendorPlants(
@@ -104,9 +81,8 @@ async function syncVendorPlants(
   }
 
   try {
-    const plantSyncMode = getPlantSyncMode(vendor)
     logger.info(
-      `[Sync] Vendor ${vendor.id} (${vendor.name}) using plant_sync_mode=${plantSyncMode}`
+      `[Sync] Vendor ${vendor.id} (${vendor.name}) syncing plants`
     )
 
     // Get organization name
@@ -128,7 +104,6 @@ async function syncVendorPlants(
               // apiBaseUrl removed - now read from environment variables (e.g., SOLARMAN_API_BASE_URL)
               credentials: vendor.credentials as Record<string, any>,
               isActive: vendor.is_active,
-              plantSyncMode,
               perPlantSyncIntervalMinutes: vendor.per_plant_sync_interval_minutes ?? 15,
               plantSyncTimeIst: vendor.plant_sync_time_ist || "02:00",
             }
