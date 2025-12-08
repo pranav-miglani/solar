@@ -2,7 +2,7 @@ name: Invoke Sync Plants API
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # Every 10 minutes
+    - cron: "30 20 * * *"   # Runs daily at 2:00 AM IST
   workflow_dispatch:         # Allow manual run
 
 jobs:

@@ -354,7 +354,7 @@ function shouldRunPlantSync(vendor: any): boolean {
   const [syncHour, syncMin] = syncTime.split(":").map(Number)
 
   // Allow a small window around the configured time (e.g., +/- 5 minutes)
-  const SYNC_WINDOW_BUFFER_MINUTES = 5
+  const SYNC_WINDOW_BUFFER_MINUTES = 60
 
   const isNearSyncTime =
     currentHour === syncHour &&

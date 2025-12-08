@@ -42,14 +42,15 @@ app.prepare().then(() => {
     // Use setTimeout to ensure Next.js compilation is complete.
     setTimeout(() => {
       try {
-        // Plant sync cron
-        const enablePlantCron = process.env.ENABLE_PLANT_SYNC_CRON !== 'false'
-        if (enablePlantCron) {
-          const { startPlantSyncCron } = require('./lib/cron/plantSyncCron')
-          startPlantSyncCron()
-        } else {
-          console.log('⏸️ Plant sync cron is disabled (ENABLE_PLANT_SYNC_CRON=false)')
-        }
+        // moving below to github actions
+        // // Plant sync cron
+        // const enablePlantCron = process.env.ENABLE_PLANT_SYNC_CRON !== 'false'
+        // if (enablePlantCron) {
+        //   const { startPlantSyncCron } = require('./lib/cron/plantSyncCron')
+        //   startPlantSyncCron()
+        // } else {
+        //   console.log('⏸️ Plant sync cron is disabled (ENABLE_PLANT_SYNC_CRON=false)')
+        // }
 
         // Alert sync cron (can be toggled independently)
         const enableAlertCron = process.env.ENABLE_ALERT_SYNC_CRON !== 'false'
