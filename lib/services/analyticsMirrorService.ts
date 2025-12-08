@@ -5,8 +5,10 @@ import { getMainClient, getAnalyticsClient } from "@/lib/supabase/pooled"
 type MirrorSummary = {
   orgsProcessed: number
   vendorsProcessed: number
+  plantsProcessed: number
   orgsUpdated: number
   vendorsUpdated: number
+  plantsUpdated: number
 }
 
 const TIMESTAMP_KEYS = ["created_at", "updated_at", "last_refresh_at", "last_refreshed_at", "last_synced_at", "last_synced_time", "last_sync_time"]
@@ -38,8 +40,10 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
   const summary: MirrorSummary = {
     orgsProcessed: 0,
     vendorsProcessed: 0,
+    plantsProcessed: 0,
     orgsUpdated: 0,
     vendorsUpdated: 0,
+    plantsUpdated: 0,
   }
 
   // Mirror organizations
@@ -146,6 +150,53 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
     }
 
     summary.vendorsUpdated++
+  }
+
+  // Mirror plants in batches
+  const BATCH_SIZE = 100
+  let offset = 0
+  let hasMore = true
+
+  while (hasMore) {
+    const { data: plantsBatch, error: plantError } = await main
+      .from("plants")
+      .select("id, org_id, vendor_id, vendor_plant_id, name")
+      .range(offset, offset + BATCH_SIZE - 1)
+
+    if (plantError) {
+      logger.error("[Analytics Mirror] Failed to fetch plants from main DB", { error: plantError.message })
+      throw plantError
+    }
+
+    if (!plantsBatch || plantsBatch.length === 0) {
+      hasMore = false
+      break
+    }
+
+    for (const plant of plantsBatch) {
+      summary.plantsProcessed++
+      const { error } = await analytics.from("plants").upsert(
+        {
+          id: plant.id,
+          org_id: plant.org_id,
+          vendor_id: plant.vendor_id,
+          vendor_plant_id: plant.vendor_plant_id,
+          plant_name: plant.name,
+          updated_at: now,
+        },
+        { onConflict: "id" }
+      )
+
+      if (error) {
+        logger.error("[Analytics Mirror] Failed to upsert plant into analytics DB", { plantId: plant.id, error: error.message })
+        throw error
+      }
+
+      summary.plantsUpdated++
+    }
+
+    offset += BATCH_SIZE
+    hasMore = plantsBatch.length === BATCH_SIZE
   }
 
   logger.info("[Analytics Mirror] Mirror complete", summary)

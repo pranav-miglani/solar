@@ -36,6 +36,38 @@ CREATE TABLE IF NOT EXISTS vendors (
 CREATE INDEX IF NOT EXISTS idx_vendors_org_id ON vendors(org_id);
 CREATE INDEX IF NOT EXISTS idx_vendors_vendor_type ON vendors(vendor_type);
 
+-- Plants mirror (stores plant metadata for analytics)
+CREATE TABLE IF NOT EXISTS plants (
+  id INTEGER PRIMARY KEY,
+  org_id INTEGER NOT NULL,
+  vendor_id INTEGER NOT NULL,
+  vendor_plant_id TEXT NOT NULL,
+  plant_name TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(vendor_id, vendor_plant_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_plants_org_id ON plants(org_id);
+CREATE INDEX IF NOT EXISTS idx_plants_vendor_id ON plants(vendor_id);
+CREATE INDEX IF NOT EXISTS idx_plants_vendor_plant_id ON plants(vendor_plant_id);
+
+-- Snapshot run tracking
+CREATE TABLE IF NOT EXISTS analytics_snapshot_runs (
+  id SERIAL PRIMARY KEY,
+  vendor_id INTEGER NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  status TEXT NOT NULL, -- 'running', 'success', 'error'
+  error_message TEXT,
+  plants_processed INTEGER DEFAULT 0,
+  rows_upserted INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_snapshot_runs_vendor_id ON analytics_snapshot_runs(vendor_id);
+CREATE INDEX IF NOT EXISTS idx_snapshot_runs_started_at ON analytics_snapshot_runs(started_at DESC);
+
 -- Daily energy snapshots per plant (100-day rolling window maintained via cleanup function)
 CREATE TABLE IF NOT EXISTS plant_energy_readings (
   id SERIAL PRIMARY KEY,
@@ -92,6 +124,9 @@ CREATE TRIGGER trg_vendors_updated_at BEFORE UPDATE ON vendors
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER trg_plant_energy_updated_at BEFORE UPDATE ON plant_energy_readings
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_plants_updated_at BEFORE UPDATE ON plants
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 
