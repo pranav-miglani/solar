@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -32,11 +32,7 @@ export function AnalyticsPlantsList({ vendorId }: AnalyticsPlantsListProps) {
   const [plants, setPlants] = useState<Plant[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchPlants()
-  }, [vendorId])
-
-  async function fetchPlants() {
+  const fetchPlants = useCallback(async () => {
     try {
       setLoading(true)
       const url = vendorId
@@ -52,7 +48,11 @@ export function AnalyticsPlantsList({ vendorId }: AnalyticsPlantsListProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [vendorId])
+
+  useEffect(() => {
+    fetchPlants()
+  }, [fetchPlants])
 
   // Group plants by org -> vendor
   const groupedPlants = new Map<number, Map<number, Plant[]>>()

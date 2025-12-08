@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import {
   BarChart,
   Bar,
@@ -45,11 +45,7 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
   const [selectedReading, setSelectedReading] = useState<EnergyReading | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
-  useEffect(() => {
-    fetchReadings()
-  }, [plantId])
-
-  async function fetchReadings() {
+  const fetchReadings = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/analytics/plants/${plantId}/energy`)
@@ -62,7 +58,11 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [plantId])
+
+  useEffect(() => {
+    fetchReadings()
+  }, [fetchReadings])
 
   function handleDataPointClick(data: any) {
     const reading = readings.find((r) => r.reading_date === data.date)

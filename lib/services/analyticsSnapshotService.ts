@@ -110,11 +110,12 @@ export async function runAnalyticsSnapshot(): Promise<SnapshotSummary> {
     let vendorError: Error | null = null
 
     try {
-      // Load plants from main DB for this vendor
+
+      // Load plants from main DB for this vendor (includes was_online_today)
       logger.info("[Analytics Snapshot] Fetching plants from main DB", { vendorId: vendor.id })
       const { data: plants, error: plantError } = await main
         .from("plants")
-        .select("id, org_id, vendor_id, vendor_plant_id, name, daily_energy_kwh, monthly_energy_mwh, yearly_energy_mwh, total_energy_mwh, updated_at")
+        .select("id, org_id, vendor_id, vendor_plant_id, name, daily_energy_kwh, monthly_energy_mwh, yearly_energy_mwh, total_energy_mwh, was_online_today, updated_at")
         .eq("vendor_id", vendor.id)
 
       if (plantError) {
@@ -178,6 +179,9 @@ export async function runAnalyticsSnapshot(): Promise<SnapshotSummary> {
         const totalEnergyMwh = toNumberOrNull(plant.total_energy_mwh)
         const monthlyEnergyKwh = monthlyEnergyMwh !== null ? monthlyEnergyMwh * 1000 : null
 
+        // Get was_online_today from plants table (captures yesterday's status before reset)
+        const wasOnline = plant.was_online_today ?? false
+
         return {
           org_id: plant.org_id,
           vendor_id: plant.vendor_id,
@@ -188,6 +192,7 @@ export async function runAnalyticsSnapshot(): Promise<SnapshotSummary> {
           monthly_energy_kwh: monthlyEnergyKwh,
           yearly_energy_mwh: yearlyEnergyMwh,
           total_energy_mwh: totalEnergyMwh,
+          was_online: wasOnline,
           metadata: {
             source: "main_plants_snapshot",
             captured_at_ist: readingDate,
@@ -291,6 +296,28 @@ export async function runAnalyticsSnapshot(): Promise<SnapshotSummary> {
     await analytics.rpc("cleanup_old_plant_energy_readings")
   } catch (error: any) {
     logger.error("[Analytics Snapshot] Cleanup old plant energy readings failed", { error: error.message })
+  }
+
+  // Reset was_online_today flag for all plants AFTER capturing today's snapshot
+  // Snapshot runs at 10 PM IST (end of day), so was_online_today contains today's status
+  // We capture it first, then reset for tomorrow
+  try {
+    const { data: resetResult, error: resetError } = await main.rpc("reset_was_online_today")
+    if (resetError) {
+      logger.warn("[Analytics Snapshot] Failed to reset was_online_today after snapshot", {
+        error: resetError.message,
+      })
+      // Non-critical - flag will be reset next day or during next snapshot
+    } else {
+      logger.info("[Analytics Snapshot] Reset was_online_today flag for all plants (for tomorrow)", {
+        plantsReset: resetResult || 0,
+      })
+    }
+  } catch (resetException: any) {
+    logger.warn("[Analytics Snapshot] Exception resetting was_online_today after snapshot", {
+      error: resetException.message,
+    })
+    // Non-critical - continue
   }
 
   logger.info("[Analytics Snapshot] Completed snapshot run", summary)

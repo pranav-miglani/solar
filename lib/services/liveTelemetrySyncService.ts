@@ -421,7 +421,17 @@ async function syncVendorLiveTelemetry(
           // Update each plant individually since Supabase doesn't support batch updates with different values per row
           const updatePromises = updateChunk.map(async (item) => {
             // Ensure update data only contains telemetry fields - explicitly construct to avoid accidental field inclusion
-            const updateData = {
+            const updateData: {
+              current_power_kw: number | null
+              daily_energy_kwh: number | null
+              monthly_energy_mwh: number | null
+              yearly_energy_mwh: number | null
+              total_energy_mwh: number | null
+              network_status: string | null
+              last_update_time: string | null
+              last_refreshed_at: string
+              was_online_today?: boolean
+            } = {
               current_power_kw: item.data.current_power_kw,
               daily_energy_kwh: item.data.daily_energy_kwh,
               monthly_energy_mwh: item.data.monthly_energy_mwh,
@@ -433,6 +443,12 @@ async function syncVendorLiveTelemetry(
               // Explicitly exclude: org_id, vendor_id, capacity_kw, name, location, etc.
             }
             
+            // Update was_online_today if network_status is "NORMAL"
+            // Track that plant was online at some point during today
+            if (item.data.network_status === "NORMAL") {
+              updateData.was_online_today = true
+            }
+
             const { error: updateError } = await supabase
             .from("plants")
               .update(updateData) // Only telemetry fields, explicitly constructed
@@ -444,6 +460,7 @@ async function syncVendorLiveTelemetry(
               )
               return { success: false, plantId: item.id, error: updateError.message }
             }
+
             return { success: true, plantId: item.id }
           })
 

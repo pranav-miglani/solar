@@ -250,6 +250,7 @@ const SystemArchitectureDiagram = () => {
             <div className="text-[10px] space-y-0.5">
               <div><strong>Tables:</strong> accounts, organizations, vendors, plants, work_orders, alerts, wms_vendors, wms_sites, wms_devices, insolation_readings</div>
               <div><strong>Live Telemetry:</strong> Stored in plants table (current_power_kw, daily_energy_kwh, monthly_energy_mwh, etc.)</div>
+              <div><strong>Daily Online Status:</strong> Stored in plants.was_online_today (tracks if plant was online during current day, reset daily)</div>
               <div><strong>Insolation:</strong> Stored in insolation_readings (last 100 days, rollover)</div>
             </div>
           </Node>
@@ -259,6 +260,7 @@ const SystemArchitectureDiagram = () => {
             <div className="text-[10px] space-y-0.5">
               <div><strong>Tables:</strong> organizations, vendors, plants, plant_energy_readings, analytics_snapshot_runs</div>
               <div><strong>Purpose:</strong> Daily energy snapshots (100-day rolling retention)</div>
+              <div><strong>Daily Online Status:</strong> Stored in plant_energy_readings.was_online (copied from main DB during snapshot)</div>
               <div><strong>Mirrored Config:</strong> Organizations, vendors, plants (with hash-based change detection)</div>
               <div><strong>FK Constraints:</strong> All relationships enforced with CASCADE deletes</div>
             </div>
@@ -2458,12 +2460,14 @@ Unique Constraints:
                         <li><code className="bg-background px-1 rounded">toNumberOrNull()</code> - Helper to safely convert values to number or null</li>
                         <li>Fetches vendors from analytics DB (only <code className="bg-background px-1 rounded">analytics_ready=true</code> and <code className="bg-background px-1 rounded">config_last_status=success</code>)</li>
                         <li>Fetches organizations from analytics DB to check <code className="bg-background px-1 rounded">auto_sync_enabled</code></li>
-                        <li>Fetches plants from main DB (only for enabled orgs)</li>
+                        <li>Fetches plants from main DB (only for enabled orgs), including <code className="bg-background px-1 rounded">was_online_today</code> flag</li>
                         <li>For each plant, constructs payload with daily, monthly, yearly, total energy (converting units as needed)</li>
+                        <li>Copies <code className="bg-background px-1 rounded">was_online_today</code> from main DB to analytics DB <code className="bg-background px-1 rounded">plant_energy_readings.was_online</code></li>
                         <li>Units: Daily/monthly energy in kWh, yearly/total energy in MWh</li>
                         <li>Upserts into <code className="bg-background px-1 rounded">plant_energy_readings</code> table</li>
                         <li>Records snapshot run status in <code className="bg-background px-1 rounded">analytics_snapshot_runs</code> table</li>
                         <li>Calls <code className="bg-background px-1 rounded">cleanup_old_plant_energy_readings()</code> function to enforce 100-day retention</li>
+                        <li>Resets <code className="bg-background px-1 rounded">was_online_today = false</code> for all plants after snapshot (backup reset mechanism)</li>
                       </ul>
                     </div>
                   </div>
@@ -2652,9 +2656,10 @@ Unique Constraints:
                         <li><strong>GET /api/analytics/orgs</strong> - List mirrored organizations from analytics DB</li>
                         <li><strong>GET /api/analytics/vendors</strong> - List mirrored vendors with last snapshot run status (includes organizations relationship)</li>
                         <li><strong>GET /api/analytics/plants</strong> - List mirrored plants (includes organizations and vendors relationships)</li>
-                        <li><strong>GET /api/analytics/plants/[id]/energy</strong> - Fetch plant energy readings for a specific plant (last 100 days)</li>
+                        <li><strong>GET /api/analytics/plants/[id]/energy</strong> - Fetch plant energy readings for a specific plant (last 100 days, includes was_online)</li>
                         <li><strong>POST /api/cron/analytics/mirror-config</strong> - Mirror org/vendor/plant config from main DB to analytics DB (cron endpoint, supports dual auth: CRON_SECRET or session)</li>
                         <li><strong>POST /api/cron/analytics/snapshot-energy</strong> - Capture current day&apos;s energy snapshot (cron endpoint, supports dual auth: CRON_SECRET or session)</li>
+                        <li><strong>POST /api/cron/reset-was-online-today</strong> - Reset was_online_today flag for all plants (cron endpoint, supports dual auth: CRON_SECRET or session)</li>
                       </ul>
                       <div className="bg-purple-50 dark:bg-purple-950/20 p-2 rounded-lg border border-purple-200 dark:border-purple-900 mt-2">
                         <p className="text-xs text-purple-800 dark:text-purple-200">
@@ -2789,8 +2794,21 @@ Unique Constraints:
                         <li>Checks restricted window (8 PM - 5 AM IST by default)</li>
                         <li>Service filters vendors by <code className="bg-background px-1 rounded">telemetry_sync_interval</code> (15/30/45 min)</li>
                         <li>Only syncs vendors whose interval matches current time</li>
+                        <li>Updates <code className="bg-background px-1 rounded">was_online_today = true</code> if <code className="bg-background px-1 rounded">network_status = &quot;NORMAL&quot;</code></li>
                         <li>Uses <code className="bg-background px-1 rounded">CRON_SECRET</code> for security (if configured)</li>
                         <li>Runs in-process (server.js starts it)</li>
+                      </ul>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">resetWasOnlineTodayCron.js</h4>
+                      <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                        <li>Schedule: Daily at 12:05 AM IST (<code className="bg-background px-1 rounded">5 18 * * *</code>, configurable via <code className="bg-background px-1 rounded">RESET_WAS_ONLINE_TODAY_CRON_SCHEDULE</code>)</li>
+                        <li>Calls: <code className="bg-background px-1 rounded">POST /api/cron/reset-was-online-today</code></li>
+                        <li>Resets <code className="bg-background px-1 rounded">was_online_today = false</code> for all plants at start of day</li>
+                        <li>Primary reset mechanism - flag is also reset during analytics snapshot as backup</li>
+                        <li>Uses <code className="bg-background px-1 rounded">CRON_SECRET</code> for security (if configured)</li>
+                        <li>Runs in-process (server.js starts it)</li>
+                        <li>Can be disabled with <code className="bg-background px-1 rounded">ENABLE_RESET_WAS_ONLINE_TODAY_CRON=false</code></li>
                       </ul>
                     </div>
                     <div className="bg-muted/50 p-4 rounded-lg">
@@ -3159,6 +3177,18 @@ Unique Constraints:
                           <td className="p-2">true</td>
                         </tr>
                         <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_RESET_WAS_ONLINE_TODAY_CRON</code></td>
+                          <td className="p-2">Enable in-process reset was_online_today cron (true/false)</td>
+                          <td className="p-2">⚠️ Optional</td>
+                          <td className="p-2">true</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2"><code className="bg-background px-1 rounded">RESET_WAS_ONLINE_TODAY_CRON_SCHEDULE</code></td>
+                          <td className="p-2">Cron (server TZ) for resetting was_online_today flag (default: 5 18 * * * ≈ 12:05 AM IST)</td>
+                          <td className="p-2">⚠️ Optional</td>
+                          <td className="p-2">5 18 * * *</td>
+                        </tr>
+                        <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_PER_PLANT_LIVE_TELEMETRY</code></td>
                           <td className="p-2">Enable per-plant live telemetry fetching during plant sync if not in listPlants() (true/false)</td>
                           <td className="p-2">⚠️ Optional</td>
@@ -3203,6 +3233,7 @@ Unique Constraints:
                         <li><strong>Analytics Database:</strong> Separate Supabase PostgreSQL instance for historical energy snapshots (100-day rolling retention)</li>
                         <li><strong>Telemetry Storage:</strong> Live telemetry stored in <code className="bg-background px-1 rounded">plants</code> table; historical telemetry fetched on-demand from vendor APIs (not persisted)</li>
                         <li><strong>Analytics Storage:</strong> Daily energy snapshots stored in <code className="bg-background px-1 rounded">plant_energy_readings</code> table (analytics DB)</li>
+                        <li><strong>Daily Online Status:</strong> Tracked in <code className="bg-background px-1 rounded">plants.was_online_today</code> (main DB), copied to <code className="bg-background px-1 rounded">plant_energy_readings.was_online</code> (analytics DB) during snapshot</li>
                         <li><strong>Connection Pooling:</strong> HTTP connection reuse via pooledFetch</li>
                         <li><strong>RLS:</strong> Enabled but bypassed via service role key (both databases)</li>
                         <li><strong>Foreign Keys:</strong> Analytics DB has FK constraints with CASCADE deletes for data integrity</li>

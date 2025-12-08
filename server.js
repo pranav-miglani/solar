@@ -114,6 +114,15 @@ app.prepare().then(() => {
         } else {
           console.log('⏸️ Analytics snapshot cron is disabled (ENABLE_ANALYTICS_SNAPSHOT_CRON=false)')
         }
+
+        // Reset was_online_today cron (runs daily at 12:05 AM IST to reset flag for new day)
+        const enableResetWasOnlineTodayCron = process.env.ENABLE_RESET_WAS_ONLINE_TODAY_CRON !== 'false'
+        if (enableResetWasOnlineTodayCron) {
+          const { startResetWasOnlineTodayCron } = require('./lib/cron/resetWasOnlineTodayCron')
+          startResetWasOnlineTodayCron()
+        } else {
+          console.log('⏸️ Reset was_online_today cron is disabled (ENABLE_RESET_WAS_ONLINE_TODAY_CRON=false)')
+        }
       } catch (error) {
         console.error('Failed to start cron job(s):', error)
       }
