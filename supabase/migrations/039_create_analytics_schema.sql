@@ -129,4 +129,120 @@ CREATE TRIGGER trg_plant_energy_updated_at BEFORE UPDATE ON plant_energy_reading
 CREATE TRIGGER trg_plants_updated_at BEFORE UPDATE ON plants
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- ============================================
+-- FOREIGN KEY CONSTRAINTS
+-- ============================================
+
+-- Vendors -> Organizations
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'fk_vendors_org_id' 
+    AND conrelid = 'vendors'::regclass
+  ) THEN
+    ALTER TABLE vendors
+      ADD CONSTRAINT fk_vendors_org_id
+      FOREIGN KEY (org_id) REFERENCES organizations(id)
+      ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- Plants -> Organizations
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'fk_plants_org_id' 
+    AND conrelid = 'plants'::regclass
+  ) THEN
+    ALTER TABLE plants
+      ADD CONSTRAINT fk_plants_org_id
+      FOREIGN KEY (org_id) REFERENCES organizations(id)
+      ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- Plants -> Vendors
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'fk_plants_vendor_id' 
+    AND conrelid = 'plants'::regclass
+  ) THEN
+    ALTER TABLE plants
+      ADD CONSTRAINT fk_plants_vendor_id
+      FOREIGN KEY (vendor_id) REFERENCES vendors(id)
+      ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- Analytics Snapshot Runs -> Vendors
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'fk_snapshot_runs_vendor_id' 
+    AND conrelid = 'analytics_snapshot_runs'::regclass
+  ) THEN
+    ALTER TABLE analytics_snapshot_runs
+      ADD CONSTRAINT fk_snapshot_runs_vendor_id
+      FOREIGN KEY (vendor_id) REFERENCES vendors(id)
+      ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- Plant Energy Readings -> Organizations
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'fk_plant_energy_readings_org_id' 
+    AND conrelid = 'plant_energy_readings'::regclass
+  ) THEN
+    ALTER TABLE plant_energy_readings
+      ADD CONSTRAINT fk_plant_energy_readings_org_id
+      FOREIGN KEY (org_id) REFERENCES organizations(id)
+      ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- Plant Energy Readings -> Vendors
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'fk_plant_energy_readings_vendor_id' 
+    AND conrelid = 'plant_energy_readings'::regclass
+  ) THEN
+    ALTER TABLE plant_energy_readings
+      ADD CONSTRAINT fk_plant_energy_readings_vendor_id
+      FOREIGN KEY (vendor_id) REFERENCES vendors(id)
+      ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- Plant Energy Readings -> Plants
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'fk_plant_energy_readings_plant_id' 
+    AND conrelid = 'plant_energy_readings'::regclass
+  ) THEN
+    ALTER TABLE plant_energy_readings
+      ADD CONSTRAINT fk_plant_energy_readings_plant_id
+      FOREIGN KEY (plant_id) REFERENCES plants(id)
+      ON DELETE CASCADE;
+  END IF;
+END $$;
+
+COMMENT ON CONSTRAINT fk_vendors_org_id ON vendors IS 'Foreign key to organizations table. Cascades deletes.';
+COMMENT ON CONSTRAINT fk_plants_org_id ON plants IS 'Foreign key to organizations table. Cascades deletes.';
+COMMENT ON CONSTRAINT fk_plants_vendor_id ON plants IS 'Foreign key to vendors table. Cascades deletes.';
+COMMENT ON CONSTRAINT fk_snapshot_runs_vendor_id ON analytics_snapshot_runs IS 'Foreign key to vendors table. Cascades deletes.';
+COMMENT ON CONSTRAINT fk_plant_energy_readings_org_id ON plant_energy_readings IS 'Foreign key to organizations table. Cascades deletes.';
+COMMENT ON CONSTRAINT fk_plant_energy_readings_vendor_id ON plant_energy_readings IS 'Foreign key to vendors table. Cascades deletes.';
+COMMENT ON CONSTRAINT fk_plant_energy_readings_plant_id ON plant_energy_readings IS 'Foreign key to plants table. Cascades deletes.';
 

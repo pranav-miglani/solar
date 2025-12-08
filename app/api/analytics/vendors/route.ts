@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const orgIdParam = searchParams.get("orgId")
 
+    // Fetch vendors with organizations (FK relationship now exists)
     let query = analytics
       .from("vendors")
       .select(`
@@ -46,14 +47,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const { data: vendors, error } = await query
+    const { data: vendors, error: vendorsError } = await query
 
-    if (error) {
-      return NextResponse.json({ error: "Failed to fetch vendors", details: error.message }, { status: 500 })
+    if (vendorsError) {
+      return NextResponse.json({ error: "Failed to fetch vendors", details: vendorsError.message }, { status: 500 })
     }
 
+    const vendorsWithOrgs = vendors || []
+
     // Get last snapshot run status for each vendor
-    const vendorIds = (vendors || []).map((v) => v.id)
+    const vendorIds = vendorsWithOrgs.map((v) => v.id)
     const { data: lastRuns } = await analytics
       .from("analytics_snapshot_runs")
       .select("vendor_id, status, error_message, completed_at")
@@ -67,7 +70,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const vendorsWithStatus = (vendors || []).map((vendor) => ({
+    const vendorsWithStatus = vendorsWithOrgs.map((vendor) => ({
       ...vendor,
       lastRun: runsByVendor.get(vendor.id) || null,
     }))

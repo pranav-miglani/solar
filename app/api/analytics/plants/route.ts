@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
     const orgIdParam = searchParams.get("orgId")
     const vendorIdParam = searchParams.get("vendorId")
 
+    // Fetch plants with organizations and vendors (FK relationships now exist)
     let query = analytics
       .from("plants")
       .select(`
@@ -59,10 +60,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const { data: plants, error } = await query
+    const { data: plants, error: plantsError } = await query
 
-    if (error) {
-      return NextResponse.json({ error: "Failed to fetch plants", details: error.message }, { status: 500 })
+    if (plantsError) {
+      return NextResponse.json({ error: "Failed to fetch plants", details: plantsError.message }, { status: 500 })
     }
 
     return NextResponse.json({ plants: plants || [] })
