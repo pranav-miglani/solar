@@ -135,18 +135,6 @@ async function syncVendorPlants(
 
     const adapter = VendorManager.getAdapter(vendorConfig)
 
-    // For now, the 15‑minute cron only runs full listPlants() sync for LIST_PLANTS mode.
-    // Vendors configured for PER_PLANT mode will be handled by a separate per‑plant
-    // metrics cron (which can still call listPlants() at configured morning/evening times).
-    if (plantSyncMode === "PER_PLANT") {
-      logger.info(
-        `[Sync] Skipping listPlants() sync for vendor ${vendor.name} (${vendor.id}) because plant_sync_mode=PER_PLANT. ` +
-          `Topology and metrics will be refreshed by the per‑plant cron and twice‑daily listPlants() job.`
-      )
-      result.success = true
-      return result
-    }
-
     // Set token storage for adapters that support it
     if (typeof (adapter as any).setTokenStorage === "function") {
       (adapter as any).setTokenStorage(vendor.id, supabase)
@@ -180,60 +168,6 @@ async function syncVendorPlants(
       samplePlant?.metadata?.dailyEnergyKwh !== undefined ||
       samplePlant?.metadata?.monthlyEnergyMwh !== undefined
 
-    // If live telemetry is not available in listPlants(), try to fetch it using listPlant()
-    // This is optional and can be disabled via environment variable
-    const enablePerPlantLiveTelemetry = process.env.ENABLE_PER_PLANT_LIVE_TELEMETRY !== 'false'
-    
-    if (!hasLiveTelemetryInListPlants && enablePerPlantLiveTelemetry) {
-      logger.info(
-        `[Sync] Live telemetry not available in listPlants() for vendor ${vendor.name}, ` +
-        `attempting to fetch via listPlant() for ${vendorPlants.length} plants`
-      )
-
-      // Fetch live telemetry for each plant in parallel (batched)
-      const LIVE_TELEMETRY_BATCH_SIZE = 20 // Smaller batch size to avoid overwhelming vendor API
-      const enrichedPlants: Plant[] = []
-
-      for (let i = 0; i < vendorPlants.length; i += LIVE_TELEMETRY_BATCH_SIZE) {
-        const batch = vendorPlants.slice(i, i + LIVE_TELEMETRY_BATCH_SIZE)
-        const batchNumber = Math.floor(i / LIVE_TELEMETRY_BATCH_SIZE) + 1
-
-        logger.info(
-          `[Sync] Fetching live telemetry for batch ${batchNumber} (${batch.length} plants)`
-        )
-
-        const batchPromises = batch.map(async (plant) => {
-          try {
-            const enrichedPlant = await adapter.listPlant(plant.id)
-            if (enrichedPlant && enrichedPlant.metadata) {
-              // Merge live telemetry from listPlant() into plant metadata
-              return {
-                ...plant,
-                metadata: {
-                  ...plant.metadata,
-                  ...enrichedPlant.metadata,
-                },
-              }
-            }
-            return plant
-          } catch (error: any) {
-            // If listPlant() fails, use the plant from listPlants() as-is
-            logger.debug(
-              `[Sync] listPlant() failed for plant ${plant.id}, using data from listPlants(): ${error.message}`
-            )
-            return plant
-          }
-        })
-
-        const batchResults = await Promise.all(batchPromises)
-        enrichedPlants.push(...batchResults)
-      }
-
-      vendorPlants = enrichedPlants
-      logger.info(
-        `[Sync] Enriched ${vendorPlants.length} plants with live telemetry data`
-      )
-    }
 
     // Prepare plant data for upsert
     // All these fields are refreshed on every sync to keep data up-to-date
@@ -601,7 +535,7 @@ export async function syncAllPlants(): Promise<SyncSummary> {
           vendorId: vendor.id,
           vendorName: vendor.name,
           orgId: vendor.org_id,
-          operation: `sync-vendor-${vendor.id}`,
+          operation: `sync-vendor-plants : ${vendor.id},${vendor.name},${vendor.orgName}`,
         },
         () => syncVendorPlants(vendor, supabase)
       )

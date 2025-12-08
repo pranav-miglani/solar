@@ -82,10 +82,8 @@ ORDER BY ordinal_position;
 - description (text)
 - severity (alert_severity)
 - status (alert_status)
-- metadata (jsonb)
 - created_at (timestamp with time zone)
 - updated_at (timestamp with time zone)
-- resolved_at (timestamp with time zone)
 
 ### If Migration Still Fails
 
@@ -124,10 +122,8 @@ CREATE TABLE alerts (
   description TEXT,
   severity alert_severity NOT NULL DEFAULT 'MEDIUM',
   status alert_status NOT NULL DEFAULT 'ACTIVE',
-  metadata JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  resolved_at TIMESTAMPTZ
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Create indexes
@@ -248,10 +244,8 @@ BEGIN
       description TEXT,
       severity alert_severity NOT NULL DEFAULT 'MEDIUM',
       status alert_status NOT NULL DEFAULT 'ACTIVE',
-      metadata JSONB DEFAULT '{}',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      resolved_at TIMESTAMPTZ
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     
     -- Create indexes

@@ -414,10 +414,12 @@ System alerts from vendor APIs.
 | `description` | TEXT | Alert description |
 | `severity` | ENUM | LOW, MEDIUM, HIGH, CRITICAL |
 | `status` | ENUM | ACTIVE, RESOLVED, ACKNOWLEDGED |
-| `metadata` | JSONB | Additional alert data |
+| `alert_time` | TIMESTAMPTZ | When the alert started |
+| `end_time` | TIMESTAMPTZ | When the alert ended/cleared (nullable) |
+| `grid_down_seconds` | INTEGER | Computed grid downtime in seconds |
+| `grid_down_benefit_kwh` | NUMERIC(12,3) | Calculated downtime benefit energy (kWh) |
 | `created_at` | TIMESTAMPTZ | Creation timestamp |
 | `updated_at` | TIMESTAMPTZ | Last update timestamp |
-| `resolved_at` | TIMESTAMPTZ | Resolution timestamp (nullable) |
 
 ### Telemetry Database (Separate Instance)
 

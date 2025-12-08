@@ -293,10 +293,8 @@ The `alerts` table stores vendor alerts with the following structure:
 | `description` | TEXT | Alert description | Vendor API |
 | `severity` | ENUM | LOW, MEDIUM, HIGH, CRITICAL | Mapped from vendor |
 | `status` | ENUM | ACTIVE, RESOLVED, ACKNOWLEDGED | Mapped from vendor |
-| `metadata` | JSONB | Additional vendor data | Vendor API |
 | `created_at` | TIMESTAMPTZ | Creation timestamp | System |
 | `updated_at` | TIMESTAMPTZ | Last update timestamp | System |
-| `resolved_at` | TIMESTAMPTZ | Resolution timestamp (nullable) | System |
 
 ### Alert Sync Implementation
 

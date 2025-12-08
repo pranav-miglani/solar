@@ -181,8 +181,11 @@ const swaggerSpec = {
           severity: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] },
           status: { type: 'string', enum: ['ACTIVE', 'RESOLVED'] },
           alert_time: { type: 'string', format: 'date-time' },
-          resolved_at: { type: 'string', format: 'date-time', nullable: true },
-          metadata: { type: 'object', nullable: true },
+          end_time: { type: 'string', format: 'date-time', nullable: true },
+          grid_down_seconds: { type: 'integer', nullable: true },
+          grid_down_benefit_kwh: { type: 'number', nullable: true },
+          created_at: { type: 'string', format: 'date-time' },
+          updated_at: { type: 'string', format: 'date-time' },
           plants: {
             type: 'object',
             nullable: true,

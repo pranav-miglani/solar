@@ -128,7 +128,7 @@ async function syncVendorLiveTelemetry(
 
   try {
     // Get all plants for this vendor (including inactive ones - sync continues until user deletes)
-    const { data: plants, error: plantsError } = await supabase
+    const { data: plantsInDB, error: plantsError } = await supabase
       .from("plants")
       .select("id, vendor_plant_id")
       .eq("vendor_id", vendor.id)
@@ -137,14 +137,14 @@ async function syncVendorLiveTelemetry(
       throw new Error(`Failed to fetch plants: ${plantsError.message}`)
     }
 
-    if (!plants || plants.length === 0) {
+    if (!plantsInDB || plantsInDB.length === 0) {
       logger.info(`[LiveTelemetry] No plants found for vendor ${vendor.name}`)
       result.success = true
       return result
     }
 
-    result.total = plants.length
-    logger.info(`[LiveTelemetry] Syncing live telemetry for ${plants.length} plants from vendor ${vendor.name}`)
+    result.total = plantsInDB.length
+    logger.info(`[LiveTelemetry] Syncing live telemetry for ${plantsInDB.length} plants from vendor ${vendor.name}`)
 
     // Get telemetry sync mode (default to LIST_PLANTS for efficiency)
     const telemetrySyncMode = vendor.telemetry_sync_mode || 'LIST_PLANTS'
@@ -209,7 +209,7 @@ async function syncVendorLiveTelemetry(
         }
         
         // Match fetched plants with database plants and prepare updates
-        for (const plant of plants) {
+        for (const plant of plantsInDB) {
           const plantData = plantDataMap.get(plant.vendor_plant_id)
           
           if (!plantData) {
@@ -272,7 +272,7 @@ async function syncVendorLiveTelemetry(
           error.message
         )
         // Mark all plants as failed
-        for (const plant of plants) {
+        for (const plant of plantsInDB) {
           plantResults.push({
             plantId: plant.id,
             vendorPlantId: plant.vendor_plant_id,
@@ -288,8 +288,8 @@ async function syncVendorLiveTelemetry(
       )
       
       // Fetch telemetry for plants in batches (parallel API calls)
-      for (let i = 0; i < plants.length; i += FETCH_BATCH_SIZE) {
-        const batch = plants.slice(i, i + FETCH_BATCH_SIZE)
+      for (let i = 0; i < plantsInDB.length; i += FETCH_BATCH_SIZE) {
+        const batch = plantsInDB.slice(i, i + FETCH_BATCH_SIZE)
         const batchNumber = Math.floor(i / FETCH_BATCH_SIZE) + 1
         logger.info(
           `[LiveTelemetry] Fetching batch ${batchNumber} (${batch.length} plants) for vendor ${vendor.name}`
@@ -609,19 +609,69 @@ export async function syncAllLiveTelemetry(): Promise<LiveTelemetrySummary> {
         summary.totalVendors = vendorsToSync.length
         logger.info(`[LiveTelemetry] Starting sync for ${vendorsToSync.length} vendors (filtered from ${vendors.length} total)`)
 
-        // Sync each vendor sequentially to avoid overwhelming APIs
-        for (const vendor of vendorsToSync) {
-          const result = await syncVendorLiveTelemetry(vendor, supabase)
-          summary.results.push(result)
-
-          if (result.success) {
-            summary.successful++
-          } else {
-            summary.failed++
+        // Group vendors by organization for parallel processing
+        const vendorsByOrg = new Map<number, any[]>()
+        vendorsToSync.forEach((vendor) => {
+          if (vendor.org_id) {
+            if (!vendorsByOrg.has(vendor.org_id)) {
+              vendorsByOrg.set(vendor.org_id, [])
+            }
+            vendorsByOrg.get(vendor.org_id)!.push(vendor)
           }
+        })
 
-          summary.totalPlantsSynced += result.synced
-          summary.totalPlantsFailed += result.failed
+        logger.info(`[LiveTelemetry] Processing ${vendorsByOrg.size} organizations (${vendorsToSync.length} vendors total)`)
+
+        // Process organizations in parallel with concurrency limit
+        // For t3.nano: limit to 3-5 concurrent orgs to avoid resource exhaustion
+        // Adjust MAX_CONCURRENT_ORGS based on instance performance
+        const MAX_CONCURRENT_ORGS = 3
+        const orgArray = Array.from(vendorsByOrg.entries())
+
+        // Process orgs in batches to respect concurrency limit
+        for (let i = 0; i < orgArray.length; i += MAX_CONCURRENT_ORGS) {
+          const orgBatch = orgArray.slice(i, i + MAX_CONCURRENT_ORGS)
+          const batchNumber = Math.floor(i / MAX_CONCURRENT_ORGS) + 1
+          const totalBatches = Math.ceil(orgArray.length / MAX_CONCURRENT_ORGS)
+
+          logger.info(
+            `[LiveTelemetry] Processing org batch ${batchNumber}/${totalBatches} ` +
+            `(${orgBatch.length} orgs, ${orgBatch.reduce((sum, [, vendors]) => sum + vendors.length, 0)} vendors)`
+          )
+
+          // Process orgs in parallel within batch
+          const orgResults = await Promise.all(
+            orgBatch.map(async ([orgId, vendors]) => {
+              // Process vendors within org sequentially to avoid overwhelming vendor APIs
+              const orgVendorResults: VendorLiveTelemetryResult[] = []
+
+              for (const vendor of vendors) {
+                const result = await syncVendorLiveTelemetry(vendor, supabase)
+                orgVendorResults.push(result)
+
+                if (result.success) {
+                  summary.successful++
+                } else {
+                  summary.failed++
+                }
+
+                summary.totalPlantsSynced += result.synced
+                summary.totalPlantsFailed += result.failed
+              }
+
+              return orgVendorResults
+            })
+          )
+
+          // Flatten results from all orgs in this batch
+          orgResults.flat().forEach((result) => {
+            summary.results.push(result)
+          })
+
+          logger.info(
+            `[LiveTelemetry] Completed org batch ${batchNumber}/${totalBatches}: ` +
+            `${summary.successful} successful, ${summary.failed} failed vendors so far`
+          )
         }
 
         summary.duration = Date.now() - startTime
