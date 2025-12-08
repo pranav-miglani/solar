@@ -17,6 +17,7 @@ import {
   BookOpen,
   BookMarked,
   CloudSun,
+  Database,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -107,6 +108,12 @@ export function DashboardSidebar() {
       href: "/wms",
       icon: CloudSun,
       roles: ["SUPERADMIN", "DEVELOPER", "ORG", "GOVT"],
+    },
+    {
+      title: "Analytics",
+      href: "/analytics",
+      icon: Database,
+      roles: ["SUPERADMIN", "DEVELOPER"],
     },
   ]
 
