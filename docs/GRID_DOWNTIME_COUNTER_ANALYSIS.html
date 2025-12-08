@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Downtime Counter System - Analysis & Design</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        h2 {
+            color: #34495e;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #ecf0f1;
+            font-size: 1.8em;
+        }
+
+        h3 {
+            color: #555;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+
+        h4 {
+            color: #666;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        p {
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+
+        ul, ol {
+            margin-left: 30px;
+            margin-bottom: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #e74c3c;
+        }
+
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 20px 0;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+
+        pre code {
+            background: none;
+            color: #ecf0f1;
+            padding: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        th {
+            background: #3498db;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .highlight {
+            background: #fff3cd;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .success {
+            background: #d4edda;
+            padding: 15px;
+            border-left: 4px solid #28a745;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .warning {
+            background: #fff3cd;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .error {
+            background: #f8d7da;
+            padding: 15px;
+            border-left: 4px solid #dc3545;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            padding: 15px;
+            border-left: 4px solid #2196F3;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .checklist {
+            list-style: none;
+            margin-left: 0;
+        }
+
+        .checklist li:before {
+            content: "☐ ";
+            margin-right: 10px;
+            font-size: 1.2em;
+        }
+
+        .architecture-diagram {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            border: 1px solid #dee2e6;
+        }
+
+        .toc {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+            border: 1px solid #dee2e6;
+        }
+
+        .toc h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+
+        .toc ul {
+            list-style: none;
+            margin-left: 0;
+        }
+
+        .toc li {
+            margin-bottom: 8px;
+        }
+
+        .toc a {
+            color: #3498db;
+            text-decoration: none;
+        }
+
+        .toc a:hover {
+            text-decoration: underline;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-right: 5px;
+        }
+
+        .badge-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .badge-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .badge-error {
+            background: #dc3545;
+            color: white;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .code-block-title {
+            background: #34495e;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px 5px 0 0;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 0;
+        }
+
+        pre.code-block {
+            margin-top: 0;
+            border-radius: 0 0 5px 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Grid Downtime Counter System - Analysis & Design</h1>
+
+        <div class="toc">
+            <h3>Table of Contents</h3>
+            <ul>
+                <li><a href="#executive-summary">Executive Summary</a></li>
+                <li><a href="#current-state">Current State Analysis</a></li>
+                <li><a href="#requirements">Requirements Analysis</a></li>
+                <li><a href="#design-options">Design Options</a></li>
+                <li><a href="#recommended-approach">Recommended Approach</a></li>
+                <li><a href="#implementation">Implementation Details</a></li>
+                <li><a href="#data-flow">Data Flow Summary</a></li>
+                <li><a href="#query-patterns">Query Patterns</a></li>
+                <li><a href="#checklist">Implementation Checklist</a></li>
+                <li><a href="#open-questions">Open Questions</a></li>
+                <li><a href="#cost-performance">Cost & Performance</a></li>
+                <li><a href="#conclusion">Conclusion</a></li>
+            </ul>
+        </div>
+
+        <div class="section" id="executive-summary">
+            <h2>Executive Summary</h2>
+            <p>This document analyzes the requirements and design for implementing a cumulative grid downtime counter system, similar to how total energy is tracked. The system will maintain <strong>per plant</strong>:</p>
+            <ul>
+                <li><strong>Daily</strong> grid downtime counter (100-day rolling retention, resets daily)</li>
+                <li><strong>Total</strong> grid downtime counter (monotonically increasing, never resets)</li>
+            </ul>
+            <div class="info-box">
+                <strong>Key Requirement:</strong> Grid downtime must be calculated for <strong>both closed/resolved alerts AND open alerts</strong>. Open alerts contribute downtime from <code>alert_time</code> to current time (<code>NOW()</code>).
+            </div>
+        </div>
+
+        <div class="section" id="current-state">
+            <h2>Current State Analysis</h2>
+
+            <h3>1. Current Grid Downtime Tracking</h3>
+            <p><strong>Location</strong>: <code>alerts</code> table</p>
+            <ul>
+                <li><code>grid_down_seconds</code> (INTEGER) - Duration of each alert in seconds</li>
+                <li><code>grid_down_benefit_kwh</code> (NUMERIC(12,3)) - Calculated benefit energy</li>
+            </ul>
+
+            <p><strong>Calculation</strong>:</p>
+            <ul>
+                <li><code>grid_down_seconds</code> = <code>max(0, end_time - alert_time)</code></li>
+                <li><code>grid_down_benefit_kwh</code> = <code>0.5 × hours(9AM-4PM overlap) × capacity_kw</code></li>
+            </ul>
+
+            <div class="info-box">
+                <strong>Characteristics:</strong>
+                <ul>
+                    <li><span class="badge badge-success">✓</span> Per-alert granularity (individual alert records)</li>
+                    <li><span class="badge badge-success">✓</span> Calculated during alert sync</li>
+                    <li><span class="badge badge-error">✗</span> No cumulative aggregation</li>
+                    <li><span class="badge badge-error">✗</span> No time-series tracking</li>
+                    <li><span class="badge badge-error">✗</span> No daily/monthly/total counters</li>
+                </ul>
+            </div>
+
+            <h3>2. Reference Pattern: Energy Counters</h3>
+            <p><strong>Main DB (<code>plants</code> table)</strong>:</p>
+            <ul>
+                <li><code>daily_energy_kwh</code> - Current day's energy</li>
+                <li><code>monthly_energy_mwh</code> - Month-to-date energy</li>
+                <li><code>yearly_energy_mwh</code> - Year-to-date energy</li>
+                <li><code>total_energy_mwh</code> - Cumulative total (monotonically increasing)</li>
+            </ul>
+
+            <p><strong>Analytics DB (<code>plant_energy_readings</code> table)</strong>:</p>
+            <ul>
+                <li>Daily snapshots with 100-day retention</li>
+                <li>Columns: <code>daily_energy_kwh</code>, <code>monthly_energy_kwh</code>, <code>yearly_energy_mwh</code>, <code>total_energy_mwh</code></li>
+                <li>Unique constraint: <code>(plant_id, reading_date)</code></li>
+                <li>Cleanup function: Deletes records older than 100 days</li>
+            </ul>
+
+            <p><strong>Sync Mechanism</strong>:</p>
+            <ul>
+                <li>Updated during telemetry sync (every 15 minutes)</li>
+                <li>Snapshot captured daily at 10 PM IST via <code>analyticsSnapshotService.ts</code></li>
+                <li>Values come directly from vendor API (not aggregated from alerts)</li>
+            </ul>
+        </div>
+
+        <div class="section" id="requirements">
+            <h2>Requirements Analysis</h2>
+
+            <h3>Functional Requirements</h3>
+            <ol>
+                <li><strong>Daily Counter</strong>: Grid downtime accumulated per day (100-day retention, resets daily at midnight IST)</li>
+                <li><strong>Total Counter</strong>: Cumulative grid downtime (monotonically increasing, never resets)</li>
+                <li><strong>Per Plant Basis</strong>: Counters maintained separately for each plant</li>
+                <li><strong>Open Alerts Support</strong>: Calculate downtime for open alerts (from <code>alert_time</code> to <code>NOW()</code>)</li>
+                <li><strong>Closed Alerts Support</strong>: Calculate downtime for closed alerts (from <code>alert_time</code> to <code>end_time</code>)</li>
+                <li><strong>Aggregation Source</strong>: Aggregate from <code>alerts</code> table (not vendor API)</li>
+            </ol>
+
+            <h3>Non-Functional Requirements</h3>
+            <ol>
+                <li><strong>Performance</strong>: Efficient aggregation queries</li>
+                <li><strong>Data Integrity</strong>: Accurate cumulative calculations</li>
+                <li><strong>Retention</strong>: 100-day rolling window for daily snapshots, total counter never resets</li>
+                <li><strong>Consistency</strong>: Counters should match sum of alerts</li>
+            </ol>
+        </div>
+
+        <div class="section" id="design-options">
+            <h2>Design Options</h2>
+
+            <h3>Option 1: Dual Storage (Main DB + Analytics DB) - <span class="badge badge-success">RECOMMENDED</span></h3>
+            
+            <p><strong>Main DB (<code>plants</code> table)</strong> - Add columns:</p>
+            <div class="code-block-title">SQL Schema - Main DB</div>
+            <pre class="code-block"><code>-- Grid downtime counters (per plant)
+daily_grid_down_seconds INTEGER DEFAULT 0,  -- Current day's downtime, resets daily
+total_grid_down_seconds INTEGER DEFAULT 0,  -- Cumulative total (monotonically increasing)
+
+-- Benefit energy counters (optional, if needed)
+daily_grid_down_benefit_kwh NUMERIC(12,3) DEFAULT 0,
+total_grid_down_benefit_kwh NUMERIC(14,3) DEFAULT 0,
+
+-- Optimization: Track last calculation time for open alerts
+last_open_alert_calc_at TIMESTAMPTZ,  -- Last time we calculated open alerts for this plant</code></pre>
+
+            <p><strong>Analytics DB</strong> - New table <code>plant_grid_downtime_readings</code>:</p>
+            <div class="code-block-title">SQL Schema - Analytics DB</div>
+            <pre class="code-block"><code>CREATE TABLE plant_grid_downtime_readings (
+  id SERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL,
+  vendor_id INTEGER NOT NULL,
+  plant_id INTEGER NOT NULL,
+  vendor_plant_id TEXT NOT NULL,
+  reading_date DATE NOT NULL,
+  
+  -- Daily counter (for this specific day)
+  daily_grid_down_seconds INTEGER DEFAULT 0,
+  daily_grid_down_benefit_kwh NUMERIC(12,3) DEFAULT 0,
+  
+  -- Total counter (cumulative, never resets)
+  total_grid_down_seconds INTEGER DEFAULT 0,
+  total_grid_down_benefit_kwh NUMERIC(14,3) DEFAULT 0,
+  
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  
+  UNIQUE(plant_id, reading_date)
+);</code></pre>
+
+            <div class="success">
+                <strong>Pros:</strong>
+                <ul>
+                    <li>✓ Consistent with energy counter pattern</li>
+                    <li>✓ Main DB has current values (fast queries)</li>
+                    <li>✓ Analytics DB has historical snapshots (100-day retention)</li>
+                    <li>✓ Total counter preserved in main DB (never lost)</li>
+                    <li>✓ Can query current values without joining analytics DB</li>
+                </ul>
+            </div>
+
+            <div class="warning">
+                <strong>Cons:</strong>
+                <ul>
+                    <li>⚠ Requires maintaining counters in two places</li>
+                    <li>⚠ More complex sync logic</li>
+                </ul>
+            </div>
+
+            <h3>Option 2: Analytics DB Only</h3>
+            <p>Store all counters only in <code>plant_grid_downtime_readings</code> table.</p>
+            <div class="error">
+                <strong>Cons:</strong>
+                <ul>
+                    <li>✗ Current values require querying analytics DB</li>
+                    <li>✗ Slower for real-time queries</li>
+                    <li>✗ Inconsistent with energy counter pattern</li>
+                </ul>
+            </div>
+
+            <h3>Option 3: Main DB Only (No Analytics)</h3>
+            <p>Store counters only in <code>plants</code> table, no historical snapshots.</p>
+            <div class="error">
+                <strong>Cons:</strong>
+                <ul>
+                    <li>✗ No historical tracking (can't see trends)</li>
+                    <li>✗ No 100-day retention for daily snapshots</li>
+                    <li>✗ Inconsistent with energy counter pattern</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section" id="recommended-approach">
+            <h2>Recommended Approach: Option 1 (Dual Storage)</h2>
+
+            <h3>Architecture Overview</h3>
+            <div class="architecture-diagram">┌─────────────────────────────────────────────────────────────┐
+│                    Alert Sync Process                        │
+│  (Every hour via alertSyncCron.js)                         │
+└─────────────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│        1. Sync Alerts from Vendor API                       │
+│        2. For each alert (NEW or UPDATED):                  │
+│           - Calculate grid_down_seconds                      │
+│           - Calculate grid_down_benefit_kwh                 │
+│           - Upsert alert into alerts table                   │
+└─────────────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│    Recalculate Counters (plants table)                       │
+│                                                              │
+│    For each plant with alerts:                              │
+│    1. Sum closed alerts:                                     │
+│       - grid_down_seconds from alert_time to end_time       │
+│    2. Sum open alerts:                                      │
+│       - grid_down_seconds from alert_time to NOW()          │
+│    3. Update counters:                                      │
+│       - daily_grid_down_seconds = sum for today             │
+│       - total_grid_down_seconds = sum of all time            │
+│    4. Update last_open_alert_calc_at = NOW()                │
+└─────────────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│    Periodic Open Alert Recalculation (Every 15 min)         │
+│                                                              │
+│    For plants with open alerts:                             │
+│    1. Recalculate open alerts (alert_time to NOW())         │
+│    2. Update daily and total counters                       │
+│    3. Update last_open_alert_calc_at = NOW()                │
+└─────────────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│    Daily Snapshot (10 PM IST)                                │
+│                                                              │
+│    For each plant:                                           │
+│    1. Recalculate all counters (including open alerts)       │
+│    2. Upsert into plant_grid_downtime_readings (analytics)  │
+│    3. Reset daily_grid_down_seconds = 0                      │
+│    4. Keep total_grid_down_seconds (never resets)           │
+└─────────────────────────────────────────────────────────────┘</div>
+        </div>
+
+        <div class="section" id="implementation">
+            <h2>Implementation Details</h2>
+
+            <h3>1. Database Schema Changes</h3>
+            
+            <h4>Main DB Migration</h4>
+            <p><strong>File</strong>: <code>supabase/migrations/043_add_grid_downtime_counters.sql</code></p>
+            <div class="code-block-title">Migration SQL</div>
+            <pre class="code-block"><code>-- Add grid downtime counters to plants table
+ALTER TABLE plants
+  ADD COLUMN IF NOT EXISTS daily_grid_down_seconds INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_grid_down_seconds INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS daily_grid_down_benefit_kwh NUMERIC(12,3) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_grid_down_benefit_kwh NUMERIC(14,3) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS last_open_alert_calc_at TIMESTAMPTZ;
+
+-- Comments
+COMMENT ON COLUMN plants.daily_grid_down_seconds IS 'Grid downtime in seconds for current day. Includes both closed and open alerts. Reset daily at midnight IST.';
+COMMENT ON COLUMN plants.total_grid_down_seconds IS 'Cumulative grid downtime in seconds (monotonically increasing, never resets). Includes both closed and open alerts.';
+COMMENT ON COLUMN plants.last_open_alert_calc_at IS 'Last time open alerts were recalculated for this plant. Used to optimize periodic recalculation.';
+
+-- Index for optimization (find plants with stale open alert calculations)
+CREATE INDEX IF NOT EXISTS idx_plants_open_alerts_stale 
+  ON plants(last_open_alert_calc_at) 
+  WHERE last_open_alert_calc_at IS NULL 
+     OR last_open_alert_calc_at < NOW() - INTERVAL '15 minutes';</code></pre>
+
+            <h4>Analytics DB Migration</h4>
+            <p><strong>File</strong>: <code>supabase/migrations/044_add_grid_downtime_analytics.sql</code></p>
+            <div class="code-block-title">Migration SQL</div>
+            <pre class="code-block"><code>-- Create plant_grid_downtime_readings table in analytics DB
+CREATE TABLE IF NOT EXISTS plant_grid_downtime_readings (
+  id SERIAL PRIMARY KEY,
+  org_id INTEGER NOT NULL,
+  vendor_id INTEGER NOT NULL,
+  plant_id INTEGER NOT NULL,
+  vendor_plant_id TEXT NOT NULL,
+  reading_date DATE NOT NULL,
+  
+  -- Daily counter (for this specific day)
+  daily_grid_down_seconds INTEGER NOT NULL DEFAULT 0,
+  daily_grid_down_benefit_kwh NUMERIC(12,3) NOT NULL DEFAULT 0,
+  
+  -- Total counter (cumulative, never resets)
+  total_grid_down_seconds INTEGER NOT NULL DEFAULT 0,
+  total_grid_down_benefit_kwh NUMERIC(14,3) NOT NULL DEFAULT 0,
+  
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  
+  UNIQUE(plant_id, reading_date)
+);
+
+-- Indexes for efficient queries
+CREATE INDEX IF NOT EXISTS idx_grid_downtime_plant_date 
+  ON plant_grid_downtime_readings(plant_id, reading_date DESC);
+CREATE INDEX IF NOT EXISTS idx_grid_downtime_date 
+  ON plant_grid_downtime_readings(reading_date DESC);
+CREATE INDEX IF NOT EXISTS idx_grid_downtime_vendor_date 
+  ON plant_grid_downtime_readings(vendor_id, reading_date DESC);
+
+-- Foreign keys (same pattern as plant_energy_readings)
+ALTER TABLE plant_grid_downtime_readings
+  ADD CONSTRAINT fk_grid_downtime_org_id
+  FOREIGN KEY (org_id) REFERENCES organizations(id)
+  ON DELETE CASCADE;
+
+ALTER TABLE plant_grid_downtime_readings
+  ADD CONSTRAINT fk_grid_downtime_vendor_id
+  FOREIGN KEY (vendor_id) REFERENCES vendors(id)
+  ON DELETE CASCADE;
+
+ALTER TABLE plant_grid_downtime_readings
+  ADD CONSTRAINT fk_grid_downtime_plant_id
+  FOREIGN KEY (plant_id) REFERENCES plants(id)
+  ON DELETE CASCADE;
+
+-- Cleanup function (100-day retention)
+CREATE OR REPLACE FUNCTION cleanup_old_grid_downtime_readings()
+RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  deleted_count INTEGER;
+BEGIN
+  DELETE FROM plant_grid_downtime_readings
+  WHERE reading_date < CURRENT_DATE - INTERVAL '100 days';
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  RETURN deleted_count;
+END;
+$$;</code></pre>
+
+            <h3>2. Counter Calculation Logic</h3>
+            
+            <div class="info-box">
+                <strong>Key Challenge:</strong> Open alerts don't have <code>end_time</code>, so we need to calculate downtime from <code>alert_time</code> to <code>NOW()</code>. This means counters need periodic recalculation.
+            </div>
+
+            <h4>Option A: Recalculate on Every Alert Sync (Simple but Less Efficient)</h4>
+            <p><strong>During Alert Sync (<code>alertSyncService.ts</code>)</strong></p>
+            <div class="code-block-title">TypeScript - Recalculate All Counters</div>
+            <pre class="code-block"><code>// After syncing all alerts for a plant, recalculate counters
+async function recalculatePlantDowntimeCounters(plantId: number) {
+  const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  
+  // Get all alerts for this plant
+  const { data: alerts } = await supabase
+    .from("alerts")
+    .select("alert_time, end_time, grid_down_seconds, grid_down_benefit_kwh")
+    .eq("plant_id", plantId);
+  
+  let dailySeconds = 0;
+  let totalSeconds = 0;
+  let dailyBenefit = 0;
+  let totalBenefit = 0;
+  
+  for (const alert of alerts || []) {
+    let alertSeconds = 0;
+    
+    if (alert.end_time) {
+      // Closed alert: use stored grid_down_seconds
+      alertSeconds = alert.grid_down_seconds || 0;
+    } else {
+      // Open alert: calculate from alert_time to NOW()
+      const alertTime = new Date(alert.alert_time);
+      alertSeconds = Math.floor((now.getTime() - alertTime.getTime()) / 1000);
+    }
+    
+    totalSeconds += alertSeconds;
+    totalBenefit += alert.grid_down_benefit_kwh || 0;
+    
+    // Check if alert overlaps with today
+    const alertTime = new Date(alert.alert_time);
+    const alertEnd = alert.end_time ? new Date(alert.end_time) : now;
+    
+    if (alertEnd >= todayStart) {
+      const overlapStart = alertTime > todayStart ? alertTime : todayStart;
+      const overlapEnd = alertEnd < now ? alertEnd : now;
+      const overlapSeconds = Math.floor((overlapEnd.getTime() - overlapStart.getTime()) / 1000);
+      dailySeconds += Math.max(0, overlapSeconds);
+    }
+  }
+  
+  // Update plant counters
+  await supabase
+    .from("plants")
+    .update({
+      daily_grid_down_seconds: dailySeconds,
+      total_grid_down_seconds: totalSeconds,
+      daily_grid_down_benefit_kwh: dailyBenefit,
+      total_grid_down_benefit_kwh: totalBenefit,
+      last_open_alert_calc_at: now.toISOString(),
+    })
+    .eq("id", plantId);
+}</code></pre>
+
+            <h4>Option B: Incremental Updates + Periodic Recalculation (Optimized)</h4>
+            <p><strong>Recommended Approach</strong>:</p>
+            <ol>
+                <li><strong>During Alert Sync</strong>: Only recalculate for plants with new/updated alerts</li>
+                <li><strong>Periodic Cron</strong>: Recalculate open alerts every 15 minutes for all plants</li>
+                <li><strong>Daily Snapshot</strong>: Full recalculation before snapshot</li>
+            </ol>
+
+            <div class="warning">
+                <strong>Important Considerations:</strong>
+                <ul>
+                    <li><strong>Open Alerts</strong>: Must recalculate periodically (every 15 minutes recommended)</li>
+                    <li><strong>Daily Counter</strong>: Needs full recalculation to handle day boundaries correctly</li>
+                    <li><strong>Total Counter</strong>: Can use incremental updates for closed alerts, but open alerts need recalculation</li>
+                    <li><strong>Performance</strong>: Recalculating all alerts per plant is O(n) where n = number of alerts. For plants with many alerts, consider batching or caching.</li>
+                </ul>
+            </div>
+
+            <h3>3. Daily Snapshot Logic</h3>
+            <p><strong>New Service</strong>: <code>lib/services/gridDowntimeSnapshotService.ts</code></p>
+            <p>Similar to <code>analyticsSnapshotService.ts</code>, but for grid downtime:</p>
+            <ol>
+                <li>Fetch all plants from main DB</li>
+                <li>For each plant:
+                    <ul>
+                        <li>Recalculate all counters (including open alerts up to NOW())</li>
+                        <li>Upsert into <code>plant_grid_downtime_readings</code> (analytics DB)</li>
+                        <li>Reset <code>daily_grid_down_seconds = 0</code> in main DB</li>
+                        <li>Keep <code>total_grid_down_seconds</code> (never resets)</li>
+                    </ul>
+                </li>
+                <li>Call cleanup function (delete records older than 100 days)</li>
+            </ol>
+
+            <h3>4. Cron Jobs</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Cron Job</th>
+                        <th>Schedule</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>recalculateOpenAlertsCron.js</code></td>
+                        <td><code>*/15 * * * *</code> (Every 15 minutes)</td>
+                        <td>Recalculate open alerts for all plants (update daily & total counters)</td>
+                    </tr>
+                    <tr>
+                        <td><code>gridDowntimeSnapshotCron.js</code></td>
+                        <td><code>30 16 * * *</code> (10 PM IST)</td>
+                        <td>Daily snapshot to analytics DB, then reset daily counter</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box">
+                <strong>Note:</strong> Only 2 cron jobs needed:
+                <ul>
+                    <li><strong>Periodic Recalculation</strong>: Every 15 minutes to keep open alerts up-to-date</li>
+                    <li><strong>Daily Snapshot</strong>: Once daily to capture snapshot and reset daily counter</li>
+                </ul>
+            </div>
+
+            <h3>5. Optimization Strategies</h3>
+            
+            <h4>Strategy 1: Smart Recalculation (Recommended)</h4>
+            <p>Only recalculate when necessary:</p>
+            <ul>
+                <li><strong>During Alert Sync</strong>: Recalculate only for plants with new/updated alerts</li>
+                <li><strong>Periodic Cron</strong>: Only recalculate plants with open alerts (use <code>last_open_alert_calc_at</code> index)</li>
+                <li><strong>Daily Snapshot</strong>: Full recalculation for all plants (ensures accuracy)</li>
+            </ul>
+
+            <div class="code-block-title">SQL Query - Find Plants Needing Recalculation</div>
+            <pre class="code-block"><code>-- Find plants with open alerts that need recalculation
+SELECT DISTINCT p.id, p.name
+FROM plants p
+INNER JOIN alerts a ON a.plant_id = p.id
+WHERE a.end_time IS NULL  -- Open alerts
+  AND (
+    p.last_open_alert_calc_at IS NULL
+    OR p.last_open_alert_calc_at < NOW() - INTERVAL '15 minutes'
+  )
+ORDER BY p.id;</code></pre>
+
+            <h4>Strategy 2: Batch Processing</h4>
+            <p>Process plants in batches to avoid timeouts:</p>
+            <ul>
+                <li>Process 100 plants at a time</li>
+                <li>Use <code>Promise.all</code> with concurrency limit (e.g., 10 concurrent plants)</li>
+                <li>Log progress for monitoring</li>
+            </ul>
+
+            <h4>Strategy 3: Caching Open Alert Calculations</h4>
+            <p>Cache calculations with TTL:</p>
+            <ul>
+                <li>Store calculated downtime for open alerts in memory/Redis</li>
+                <li>TTL: 15 minutes (matches cron frequency)</li>
+                <li>Invalidate cache when alert is updated/resolved</li>
+            </ul>
+            <div class="warning">
+                <strong>Trade-off</strong>: Caching adds complexity but reduces database load. For most use cases, direct recalculation is simpler and sufficient.
+            </div>
+
+            <h4>Strategy 4: Database-Level Calculation (Advanced)</h4>
+            <p>Use PostgreSQL functions to calculate in-database:</p>
+            <div class="code-block-title">SQL Function - Calculate Plant Downtime</div>
+            <pre class="code-block"><code>CREATE OR REPLACE FUNCTION calculate_plant_downtime(
+  p_plant_id INTEGER,
+  p_calc_time TIMESTAMPTZ DEFAULT NOW()
+)
+RETURNS TABLE(
+  daily_seconds INTEGER,
+  total_seconds INTEGER,
+  daily_benefit_kwh NUMERIC,
+  total_benefit_kwh NUMERIC
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_today_start TIMESTAMPTZ;
+  v_daily_seconds INTEGER := 0;
+  v_total_seconds INTEGER := 0;
+  v_daily_benefit NUMERIC := 0;
+  v_total_benefit NUMERIC := 0;
+BEGIN
+  v_today_start := DATE_TRUNC('day', p_calc_time AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata';
+  
+  SELECT 
+    COALESCE(SUM(
+      CASE 
+        WHEN end_time IS NOT NULL THEN 
+          EXTRACT(EPOCH FROM (end_time - alert_time))::INTEGER
+        ELSE 
+          EXTRACT(EPOCH FROM (p_calc_time - alert_time))::INTEGER
+      END
+    ), 0),
+    COALESCE(SUM(
+      CASE 
+        WHEN end_time IS NOT NULL THEN 
+          CASE 
+            WHEN end_time >= v_today_start AND alert_time < p_calc_time THEN
+              EXTRACT(EPOCH FROM (LEAST(end_time, p_calc_time) - GREATEST(alert_time, v_today_start)))::INTEGER
+            ELSE 0
+          END
+        ELSE 
+          CASE 
+            WHEN alert_time < p_calc_time THEN
+              EXTRACT(EPOCH FROM (p_calc_time - GREATEST(alert_time, v_today_start)))::INTEGER
+            ELSE 0
+          END
+      END
+    ), 0),
+    COALESCE(SUM(grid_down_benefit_kwh), 0),
+    COALESCE(SUM(
+      CASE 
+        WHEN end_time >= v_today_start OR (end_time IS NULL AND alert_time < p_calc_time) THEN
+          grid_down_benefit_kwh
+        ELSE 0
+      END
+    ), 0)
+  INTO v_total_seconds, v_daily_seconds, v_total_benefit, v_daily_benefit
+  FROM alerts
+  WHERE plant_id = p_plant_id;
+  
+  RETURN QUERY SELECT 
+    GREATEST(0, v_daily_seconds)::INTEGER,
+    GREATEST(0, v_total_seconds)::INTEGER,
+    GREATEST(0, v_daily_benefit)::NUMERIC,
+    GREATEST(0, v_total_benefit)::NUMERIC;
+END;
+$$;</code></pre>
+
+            <div class="success">
+                <strong>Recommendation</strong>: Use <strong>Strategy 1 (Smart Recalculation)</strong> for initial implementation. It's simple, efficient, and maintainable. Consider Strategy 4 (Database Functions) if performance becomes an issue with large numbers of alerts.
+            </div>
+        </div>
+
+        <div class="section" id="data-flow">
+            <h2>Data Flow Summary</h2>
+
+            <h3>Alert Sync Flow (Every Hour)</h3>
+            <ol>
+                <li>Fetch alerts from vendor API</li>
+                <li>For each alert:
+                    <ul>
+                        <li>Calculate <code>grid_down_seconds</code> and <code>grid_down_benefit_kwh</code>
+                            <ul>
+                                <li>If <code>end_time</code> exists: <code>end_time - alert_time</code></li>
+                                <li>If <code>end_time</code> is NULL: <code>NOW() - alert_time</code> (open alert)</li>
+                            </ul>
+                        </li>
+                        <li>Upsert alert into <code>alerts</code> table</li>
+                    </ul>
+                </li>
+                <li>For each affected plant (with new/updated alerts):
+                    <ul>
+                        <li>Recalculate all counters (sum all alerts for that plant)</li>
+                        <li>Update <code>daily_grid_down_seconds</code> and <code>total_grid_down_seconds</code></li>
+                        <li>Update <code>last_open_alert_calc_at = NOW()</code></li>
+                    </ul>
+                </li>
+            </ol>
+
+            <h3>Periodic Recalculation Flow (Every 15 Minutes)</h3>
+            <ol>
+                <li>Find plants with open alerts that need recalculation:
+                    <ul>
+                        <li>Query plants where <code>last_open_alert_calc_at</code> is NULL or older than 15 minutes</li>
+                        <li>Join with alerts table to find plants with open alerts (<code>end_time IS NULL</code>)</li>
+                    </ul>
+                </li>
+                <li>For each plant:
+                    <ul>
+                        <li>Recalculate all counters (including open alerts up to NOW())</li>
+                        <li>Update <code>daily_grid_down_seconds</code> and <code>total_grid_down_seconds</code></li>
+                        <li>Update <code>last_open_alert_calc_at = NOW()</code></li>
+                    </ul>
+                </li>
+            </ol>
+
+            <h3>Daily Snapshot Flow (10 PM IST)</h3>
+            <ol>
+                <li>For each plant:
+                    <ul>
+                        <li>Recalculate all counters (full recalculation including open alerts)</li>
+                        <li>Read current counters from <code>plants</code> table</li>
+                        <li>Upsert into <code>plant_grid_downtime_readings</code> (analytics DB)</li>
+                        <li>Reset <code>daily_grid_down_seconds = 0</code> (keep <code>total_grid_down_seconds</code>)</li>
+                    </ul>
+                </li>
+                <li>Call cleanup function (delete records older than 100 days)</li>
+            </ol>
+        </div>
+
+        <div class="section" id="query-patterns">
+            <h2>Query Patterns</h2>
+
+            <h3>Current Values (Main DB)</h3>
+            <div class="code-block-title">SQL Query</div>
+            <pre class="code-block"><code>-- Get current grid downtime for a plant
+SELECT 
+  daily_grid_down_seconds,
+  total_grid_down_seconds,
+  daily_grid_down_benefit_kwh,
+  total_grid_down_benefit_kwh,
+  last_open_alert_calc_at
+FROM plants
+WHERE id = :plant_id;</code></pre>
+
+            <h3>Historical Trends (Analytics DB)</h3>
+            <div class="code-block-title">SQL Query</div>
+            <pre class="code-block"><code>-- Get last 100 days of grid downtime for a plant
+SELECT 
+  reading_date,
+  daily_grid_down_seconds,
+  total_grid_down_seconds,
+  daily_grid_down_benefit_kwh,
+  total_grid_down_benefit_kwh
+FROM plant_grid_downtime_readings
+WHERE plant_id = :plant_id
+ORDER BY reading_date DESC
+LIMIT 100;</code></pre>
+
+            <h3>Aggregation Queries</h3>
+            <div class="code-block-title">SQL Query</div>
+            <pre class="code-block"><code>-- Total grid downtime across all plants (current)
+SELECT 
+  SUM(total_grid_down_seconds) as total_seconds,
+  SUM(total_grid_down_benefit_kwh) as total_benefit_kwh
+FROM plants;
+
+-- Daily grid downtime trend (last 30 days)
+SELECT 
+  reading_date,
+  SUM(daily_grid_down_seconds) as total_daily_seconds,
+  SUM(daily_grid_down_benefit_kwh) as total_daily_benefit_kwh
+FROM plant_grid_downtime_readings
+WHERE reading_date >= CURRENT_DATE - INTERVAL '30 days'
+GROUP BY reading_date
+ORDER BY reading_date DESC;</code></pre>
+        </div>
+
+        <div class="section" id="checklist">
+            <h2>Implementation Checklist</h2>
+
+            <h3>Phase 1: Database Schema</h3>
+            <ul class="checklist">
+                <li>Create migration <code>043_add_grid_downtime_counters.sql</code> (main DB)</li>
+                <li>Create migration <code>044_add_grid_downtime_analytics.sql</code> (analytics DB)</li>
+                <li>Run migrations on staging</li>
+                <li>Verify schema changes</li>
+            </ul>
+
+            <h3>Phase 2: Counter Calculation Logic</h3>
+            <ul class="checklist">
+                <li>Update <code>alertSyncService.ts</code> to recalculate counters after syncing alerts</li>
+                <li>Implement recalculation function that handles both open and closed alerts</li>
+                <li>Handle open alerts (calculate from <code>alert_time</code> to <code>NOW()</code>)</li>
+                <li>Handle closed alerts (use stored <code>grid_down_seconds</code>)</li>
+                <li>Update <code>last_open_alert_calc_at</code> timestamp</li>
+                <li>Test counter calculations during alert sync</li>
+            </ul>
+
+            <h3>Phase 3: Periodic Recalculation Cron</h3>
+            <ul class="checklist">
+                <li>Create <code>recalculateOpenAlertsCron.js</code></li>
+                <li>Implement logic to find plants with stale open alert calculations</li>
+                <li>Recalculate counters for affected plants</li>
+                <li>Create API endpoint <code>/api/cron/recalculate-open-alerts</code></li>
+                <li>Register cron in <code>server.js</code> (every 15 minutes)</li>
+                <li>Test periodic recalculation</li>
+            </ul>
+
+            <h3>Phase 4: Snapshot Service</h3>
+            <ul class="checklist">
+                <li>Create <code>gridDowntimeSnapshotService.ts</code></li>
+                <li>Implement daily snapshot logic (full recalculation before snapshot)</li>
+                <li>Implement daily reset logic (reset <code>daily_grid_down_seconds = 0</code>)</li>
+                <li>Create API endpoint <code>/api/cron/analytics/snapshot-grid-downtime</code></li>
+                <li>Create cron job <code>gridDowntimeSnapshotCron.js</code> (10 PM IST)</li>
+                <li>Test snapshot and reset</li>
+            </ul>
+
+            <h3>Phase 5: Backfill</h3>
+            <ul class="checklist">
+                <li>Create <code>scripts/backfill-grid-downtime-counters.ts</code></li>
+                <li>Backfill main DB counters from existing alerts</li>
+                <li>Backfill analytics DB snapshots (if historical data exists)</li>
+                <li>Verify backfill accuracy</li>
+            </ul>
+
+            <h3>Phase 6: UI Integration</h3>
+            <ul class="checklist">
+                <li>Add grid downtime counters to plant detail view</li>
+                <li>Add grid downtime charts (daily and total trends)</li>
+                <li>Add grid downtime to production overview (if needed)</li>
+                <li>Add grid downtime to analytics dashboard</li>
+            </ul>
+
+            <h3>Phase 7: Testing & Validation</h3>
+            <ul class="checklist">
+                <li>Unit tests for counter increment logic</li>
+                <li>Integration tests for snapshot service</li>
+                <li>End-to-end tests for full flow</li>
+                <li>Validate counter accuracy against alerts table</li>
+                <li>Performance testing (large number of alerts)</li>
+            </ul>
+        </div>
+
+        <div class="section" id="open-questions">
+            <h2>Open Questions</h2>
+            <ol>
+                <li><strong>Units</strong>: Should we store seconds or hours? (Recommendation: seconds for precision, convert to hours in UI)</li>
+                <li><strong>Benefit Energy</strong>: Do we need benefit_kwh counters, or just seconds? (Recommendation: Keep both for consistency with current alerts)</li>
+                <li><strong>Alert Updates</strong>: How to handle when alert's <code>end_time</code> changes? (Recommendation: Recalculate and update counters)</li>
+                <li><strong>Historical Data</strong>: How far back should we backfill? (Recommendation: 1 year, or all available alerts)</li>
+                <li><strong>UI Display</strong>: Where should grid downtime be displayed? (Recommendation: Plant detail page, analytics dashboard)</li>
+                <li><strong>Aggregation</strong>: Should we aggregate at org/vendor level? (Recommendation: Yes, similar to energy aggregation)</li>
+            </ol>
+        </div>
+
+        <div class="section" id="cost-performance">
+            <h2>Cost & Performance Considerations</h2>
+
+            <h3>Database Storage</h3>
+            <p><strong>Main DB (<code>plants</code> table)</strong>:</p>
+            <ul>
+                <li>4 new columns (2 INTEGER + 2 NUMERIC) + 1 TIMESTAMPTZ ≈ 32 bytes per plant</li>
+                <li>For 10,000 plants: ~320 KB (negligible)</li>
+            </ul>
+
+            <p><strong>Analytics DB (<code>plant_grid_downtime_readings</code> table)</strong>:</p>
+            <ul>
+                <li>~150 bytes per record (with indexes)</li>
+                <li>10,000 plants × 100 days = 1,000,000 records</li>
+                <li>Total: ~150 MB (well within free tier)</li>
+            </ul>
+
+            <h3>Query Performance</h3>
+            <ul>
+                <li><strong>Counter Recalculation</strong>: O(n) where n = number of alerts per plant (requires full scan of alerts)</li>
+                <li><strong>Periodic Recalculation</strong>: O(m × n) where m = plants with open alerts, n = alerts per plant</li>
+                <li><strong>Snapshot</strong>: O(p × n) where p = total plants, n = average alerts per plant</li>
+                <li><strong>Historical Queries</strong>: O(log n) with proper indexes</li>
+            </ul>
+
+            <div class="warning">
+                <strong>Performance Considerations:</strong>
+                <ul>
+                    <li>Plants with many alerts (100+) may take 100-500ms to recalculate</li>
+                    <li>Periodic recalculation should process plants in batches (100 at a time)</li>
+                    <li>Consider database-level calculation (SQL function) for better performance</li>
+                    <li>Monitor query execution time and add indexes if needed</li>
+                </ul>
+            </div>
+
+            <h3>Impact on Alert Sync</h3>
+            <ul>
+                <li><strong>Additional Queries</strong>: 1 recalculation per affected plant (not per alert)</li>
+                <li><strong>Performance Impact</strong>: Moderate (recalculation requires scanning all alerts for plant)</li>
+                <li><strong>Latency</strong>: +50-200ms per affected plant (depends on number of alerts)</li>
+                <li><strong>Optimization</strong>: Only recalculate plants with new/updated alerts</li>
+            </ul>
+        </div>
+
+        <div class="section" id="conclusion">
+            <h2>Conclusion</h2>
+            <p>The recommended approach (Option 1: Dual Storage) provides:</p>
+            <ul>
+                <li><span class="badge badge-success">✓</span> Consistent with existing energy counter pattern</li>
+                <li><span class="badge badge-success">✓</span> Fast current value queries (main DB)</li>
+                <li><span class="badge badge-success">✓</span> Historical trend analysis (analytics DB)</li>
+                <li><span class="badge badge-success">✓</span> 100-day retention for daily snapshots</li>
+                <li><span class="badge badge-success">✓</span> Total counter never resets (monotonically increasing)</li>
+                <li><span class="badge badge-success">✓</span> Support for both open and closed alerts</li>
+                <li><span class="badge badge-success">✓</span> Optimized recalculation (only when needed)</li>
+                <li><span class="badge badge-success">✓</span> Simplified design (only 2 counters: daily and total)</li>
+            </ul>
+            <p>This design maintains consistency with the existing architecture while providing the required functionality for grid downtime tracking. The simplified approach (daily + total only) reduces complexity while still providing all necessary insights.</p>
+
+            <div class="highlight">
+                <h3>Principal Engineer Recommendations</h3>
+                <ol>
+                    <li><strong>Start Simple</strong>: Implement Strategy 1 (Smart Recalculation) first. It's maintainable and sufficient for most use cases.</li>
+                    <li><strong>Monitor Performance</strong>: Track recalculation times. If plants with 100+ alerts take >500ms, consider Strategy 4 (Database Functions).</li>
+                    <li><strong>Batch Processing</strong>: Always process plants in batches (100 at a time) to avoid timeouts and memory issues.</li>
+                    <li><strong>Index Optimization</strong>: Ensure indexes on <code>alerts(plant_id, alert_time, end_time)</code> for fast recalculation queries.</li>
+                    <li><strong>Error Handling</strong>: Implement retry logic for failed recalculations. Log errors but don't block alert sync.</li>
+                    <li><strong>Testing</strong>: Test with plants that have 0, 1, 10, 100, and 1000+ alerts to validate performance.</li>
+                    <li><strong>Gradual Rollout</strong>: Deploy to staging first, monitor for 1 week, then production with feature flag.</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

@@ -1,0 +1,14 @@
+name: Invoke Sync Plants API
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # Every 10 minutes
+  workflow_dispatch:         # Allow manual run
+
+jobs:
+  call_api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call sync API
+        run: curl -s -X GET "https://solarhome.space/api/cron/sync-plants"
+
