@@ -1404,6 +1404,12 @@ Calculate efficiency metrics for work orders.
 | `ENABLE_PER_PLANT_LIVE_TELEMETRY` | Enable per-plant live telemetry fetching in plant sync when not available in listPlants() (`true` by default) | No |
 | `RESTRICTED_WINDOW_START` | Start time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "20:00") | No |
 | `RESTRICTED_WINDOW_END` | End time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "05:00") | No |
+| `ANALYTICS_SUPABASE_URL` | Analytics DB Supabase URL (separate project) | Yes (analytics) |
+| `ANALYTICS_SUPABASE_SERVICE_ROLE_KEY` | Analytics DB service role key (bypass RLS) | Yes (analytics) |
+| `ANALYTICS_SUPABASE_ANON_KEY` | Analytics DB anon key (only if needed for client reads; typically not used) | No |
+| `ANALYTICS_SNAPSHOT_TIME_IST` | Daily analytics snapshot time in IST (default: "22:00") | No |
+| `ANALYTICS_CONFIG_CRON_SCHEDULE` | Cron expression (server TZ) for config mirror (default: "0 16 * * *" ≈ 21:30/22:00 IST) | No |
+| `ANALYTICS_SNAPSHOT_CRON_SCHEDULE` | Cron expression (server TZ) for analytics snapshot (default: "30 16 * * *" ≈ 22:00 IST) | No |
 
 ### Database Configuration
 

@@ -8,6 +8,7 @@ import { pooledFetch } from "../vendors/httpClient"
 
 // Singleton instances for pooled clients
 let mainClient: SupabaseClient | null = null
+let analyticsClient: SupabaseClient | null = null
 
 /**
  * Get or create the main database client with connection pooling
@@ -47,9 +48,46 @@ export function getMainClient(): SupabaseClient {
 }
 
 /**
+ * Get or create the analytics database client with connection pooling
+ * Uses service role key to bypass RLS
+ * Connects to: ANALYTICS_SUPABASE_URL (separate analytics Supabase instance)
+ */
+export function getAnalyticsClient(): SupabaseClient {
+  if (analyticsClient) {
+    return analyticsClient
+  }
+
+  const analyticsUrl = process.env.ANALYTICS_SUPABASE_URL
+  const analyticsServiceKey = process.env.ANALYTICS_SUPABASE_SERVICE_ROLE_KEY
+
+  if (!analyticsUrl || !analyticsServiceKey) {
+    throw new Error("Missing analytics Supabase service role key. Ensure ANALYTICS_SUPABASE_URL and ANALYTICS_SUPABASE_SERVICE_ROLE_KEY are set.")
+  }
+
+  console.log(`📊 [Analytics DB] Connecting to: ${analyticsUrl}`)
+
+  analyticsClient = createClient(analyticsUrl, analyticsServiceKey, {
+    global: {
+      fetch: pooledFetch as typeof fetch,
+    },
+    db: {
+      schema: "public",
+    },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  })
+
+  return analyticsClient
+}
+
+/**
  * Reset pooled clients (useful for testing or reconfiguration)
  */
 export function resetPooledClients(): void {
   mainClient = null
+  analyticsClient = null
 }
 

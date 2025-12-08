@@ -743,8 +743,8 @@ export function SystemFlowDocumentation() {
                     <strong>8:00 PM - 5:00 AM IST:</strong> Telemetry sync operations are automatically skipped during this time window.
                     <strong>Plant sync is NOT restricted</strong> and can run at any time (including 2 AM).
                     This prevents unnecessary API calls during off-peak hours. Currently configured via environment variables 
-                    <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">RESTRICTED_WINDOW_START</code> (default: 20:00 IST) 
-                    and <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">RESTRICTED_WINDOW_END</code> (default: 05:00 IST).
+            <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">RESTRICTED_WINDOW_START</code> (default: 20:00 IST) 
+            and <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">RESTRICTED_WINDOW_END</code> (default: 05:00 IST).
                   </p>
                 </div>
               </div>
@@ -2947,6 +2947,30 @@ Unique Constraints:
                           <td className="p-2">⚠️ Optional</td>
                           <td className="p-2">05:00</td>
                         </tr>
+                    <tr className="border-b">
+                      <td className="p-2"><code className="bg-background px-1 rounded">ANALYTICS_SUPABASE_URL</code></td>
+                      <td className="p-2">Analytics DB Supabase URL (separate project, service-role only)</td>
+                      <td className="p-2">✅ Required (analytics)</td>
+                      <td className="p-2">-</td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="p-2"><code className="bg-background px-1 rounded">ANALYTICS_SUPABASE_SERVICE_ROLE_KEY</code></td>
+                      <td className="p-2">Analytics DB service role key (bypass RLS in analytics)</td>
+                      <td className="p-2">✅ Required (analytics)</td>
+                      <td className="p-2">-</td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="p-2"><code className="bg-background px-1 rounded">ANALYTICS_SNAPSHOT_CRON_SCHEDULE</code></td>
+                      <td className="p-2">Cron (server TZ) for energy snapshot (default: 30 16 * * * ≈ 22:00 IST)</td>
+                      <td className="p-2">⚠️ Optional</td>
+                      <td className="p-2">30 16 * * *</td>
+                    </tr>
+                    <tr className="border-b">
+                      <td className="p-2"><code className="bg-background px-1 rounded">ANALYTICS_CONFIG_CRON_SCHEDULE</code></td>
+                      <td className="p-2">Cron (server TZ) for org/vendor config mirror to analytics</td>
+                      <td className="p-2">⚠️ Optional</td>
+                      <td className="p-2">0 16 * * *</td>
+                    </tr>
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">CRON_SECRET</code></td>
                           <td className="p-2">Secret token for cron endpoint security (Authorization: Bearer header)</td>

@@ -96,6 +96,24 @@ app.prepare().then(() => {
         } else {
           console.log('⏸️ WMS insolation sync morning cron is disabled (ENABLE_WMS_INSOLATION_SYNC_MORNING_CRON=false)')
         }
+
+        // Analytics config mirror cron
+        const enableAnalyticsConfigCron = process.env.ENABLE_ANALYTICS_CONFIG_CRON !== 'false'
+        if (enableAnalyticsConfigCron) {
+          const { startAnalyticsConfigMirrorCron } = require('./lib/cron/analyticsConfigMirrorCron')
+          startAnalyticsConfigMirrorCron()
+        } else {
+          console.log('⏸️ Analytics config mirror cron is disabled (ENABLE_ANALYTICS_CONFIG_CRON=false)')
+        }
+
+        // Analytics snapshot cron
+        const enableAnalyticsSnapshotCron = process.env.ENABLE_ANALYTICS_SNAPSHOT_CRON !== 'false'
+        if (enableAnalyticsSnapshotCron) {
+          const { startAnalyticsSnapshotCron } = require('./lib/cron/analyticsSnapshotCron')
+          startAnalyticsSnapshotCron()
+        } else {
+          console.log('⏸️ Analytics snapshot cron is disabled (ENABLE_ANALYTICS_SNAPSHOT_CRON=false)')
+        }
       } catch (error) {
         console.error('Failed to start cron job(s):', error)
       }
