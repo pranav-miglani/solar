@@ -54,8 +54,8 @@ export async function GET(request: NextRequest) {
         }
 
         // Check if we're in the restricted time window (8 PM IST to 5 AM IST)
-        const syncWindowStart = process.env.SYNC_WINDOW_START || "20:00" // 8 PM IST default
-        const syncWindowEnd = process.env.SYNC_WINDOW_END || "05:00" // 5 AM IST default
+        const restrictedWindowStart = process.env.RESTRICTED_WINDOW_START || "20:00" // 8 PM IST default
+        const restrictedWindowEnd = process.env.RESTRICTED_WINDOW_END || "05:00" // 5 AM IST default
         
         // Get current time in Asia/Kolkata timezone using Intl API
         const now = new Date()
@@ -71,8 +71,8 @@ export async function GET(request: NextRequest) {
         const currentTimeMinutes = currentHour * 60 + currentMinute
         
         // Parse window times
-        const [startHour, startMin] = syncWindowStart.split(":").map(Number)
-        const [endHour, endMin] = syncWindowEnd.split(":").map(Number)
+        const [startHour, startMin] = restrictedWindowStart.split(":").map(Number)
+        const [endHour, endMin] = restrictedWindowEnd.split(":").map(Number)
         const startTimeMinutes = startHour * 60 + startMin
         const endTimeMinutes = endHour * 60 + endMin
         
@@ -88,10 +88,10 @@ export async function GET(request: NextRequest) {
         }
         
         if (inRestrictedWindow) {
-          logger.info(`⏸️ Live telemetry sync skipped - in restricted time window (${syncWindowStart} - ${syncWindowEnd} IST)`)
+          logger.info(`⏸️ Live telemetry sync skipped - in restricted time window (${restrictedWindowStart} - ${restrictedWindowEnd} IST)`)
           return NextResponse.json({
             success: false,
-            message: `Sync skipped - in restricted time window (${syncWindowStart} - ${syncWindowEnd} IST)`,
+            message: `Sync skipped - in restricted time window (${restrictedWindowStart} - ${restrictedWindowEnd} IST)`,
           })
         }
 

@@ -208,7 +208,7 @@ Check your deployment logs to monitor cron execution.
 
 2. **Check Environment Variables**:
    - Ensure all required Supabase environment variables are set
-   - `SYNC_WINDOW_START` and `SYNC_WINDOW_END` are optional (defaults: 20:00 and 05:00 IST)
+   - `RESTRICTED_WINDOW_START` and `RESTRICTED_WINDOW_END` are optional (defaults: 20:00 and 05:00 IST)
 
 3. **Verify Server is Running**:
    - The cron only runs when the Node.js server is active

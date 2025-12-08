@@ -29,7 +29,7 @@ This document lists all cron jobs related to plant synchronization, telemetry, a
 **Enable/Disable:** `ENABLE_PLANT_SYNC_CRON` (default: true)
 
 **Restrictions:**
-- Skips during 8 PM - 5 AM IST window (configurable via `SYNC_WINDOW_START` and `SYNC_WINDOW_END`)
+- Skips during 8 PM - 5 AM IST window (configurable via `RESTRICTED_WINDOW_START` and `RESTRICTED_WINDOW_END`)
 - Only syncs LIST_PLANTS mode vendors during regular 15-minute runs
 - PER_PLANT vendors are synced at configured morning/evening times
 
@@ -63,7 +63,7 @@ This document lists all cron jobs related to plant synchronization, telemetry, a
 - Example: Vendor with 15-min interval syncs at :00, :15, :30, :45
 
 **Restrictions:**
-- Skips during 8 PM - 5 AM IST window (configurable via `SYNC_WINDOW_START` and `SYNC_WINDOW_END`)
+- Skips during 8 PM - 5 AM IST window (configurable via `RESTRICTED_WINDOW_START` and `RESTRICTED_WINDOW_END`)
 
 ---
 
@@ -118,7 +118,7 @@ This document lists all cron jobs related to plant synchronization, telemetry, a
 **Enable/Disable:** `ENABLE_ALERT_SYNC_CRON` (default: true)
 
 **Restrictions:**
-- Skips during 8 PM - 5 AM IST window (configurable via `SYNC_WINDOW_START` and `SYNC_WINDOW_END`)
+- Skips during 8 PM - 5 AM IST window (configurable via `RESTRICTED_WINDOW_START` and `RESTRICTED_WINDOW_END`)
 
 ---
 
@@ -138,7 +138,7 @@ This document lists all cron jobs related to plant synchronization, telemetry, a
 All sync crons (except Disable Inactive Plants) respect a restricted time window:
 
 - **Default Window:** 8:00 PM - 5:00 AM IST
-- **Configurable via:** `SYNC_WINDOW_START` and `SYNC_WINDOW_END` environment variables
+- **Configurable via:** `RESTRICTED_WINDOW_START` and `RESTRICTED_WINDOW_END` environment variables
 - **Purpose:** Avoid syncing during peak vendor API usage hours
 - **Behavior:** Cron runs but skips actual sync during this window
 
@@ -154,8 +154,8 @@ ENABLE_ALERT_SYNC_CRON=true                    # Alert sync (default: true)
 ENABLE_DISABLE_INACTIVE_PLANTS_CRON=true       # Disable inactive (default: true)
 
 # Time Restrictions
-SYNC_WINDOW_START=20:00                        # Start of restricted window (IST)
-SYNC_WINDOW_END=05:00                          # End of restricted window (IST)
+RESTRICTED_WINDOW_START=20:00                  # Start of restricted window (IST)
+RESTRICTED_WINDOW_END=05:00                    # End of restricted window (IST)
 
 # Security
 CRON_SECRET=your-secret-token                  # Optional: Secure cron endpoints

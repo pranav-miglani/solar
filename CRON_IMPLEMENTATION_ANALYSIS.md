@@ -410,8 +410,8 @@ ENABLE_PLANT_SYNC_CRON=true
 CRON_SECRET=your-secret-token-here
 
 # Time window restrictions (IST timezone)
-SYNC_WINDOW_START=19:00  # 7 PM IST (default)
-SYNC_WINDOW_END=06:00    # 6 AM IST (default)
+RESTRICTED_WINDOW_START=19:00  # 7 PM IST (default)
+RESTRICTED_WINDOW_END=06:00    # 6 AM IST (default)
 
 # Cron schedule (for external cron services)
 PLANT_SYNC_CRON_SCHEDULE="*/15 * * * *"
@@ -597,7 +597,7 @@ console.log(summary)
 
 2. **Time Window Restrictions**: Skips sync during 7 PM - 6 AM IST
    - **Why**: Avoids syncing during peak hours or maintenance
-   - **Configurable**: Via `SYNC_WINDOW_START` and `SYNC_WINDOW_END`
+   - **Configurable**: Via `RESTRICTED_WINDOW_START` and `RESTRICTED_WINDOW_END`
 
 3. **Organization-level Control**: Each org can configure sync
    - **Why**: Different organizations may have different requirements
@@ -635,7 +635,7 @@ To import this cron functionality to another branch:
    ```
 
 3. **Update Environment Variables:**
-   - Add `CRON_SECRET`, `SYNC_WINDOW_START`, `SYNC_WINDOW_END`
+   - Add `CRON_SECRET`, `RESTRICTED_WINDOW_START`, `RESTRICTED_WINDOW_END`
 
 4. **Database Schema:**
    - Ensure `organizations` table has `auto_sync_enabled` and `sync_interval_minutes`

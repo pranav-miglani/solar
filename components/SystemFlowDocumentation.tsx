@@ -743,8 +743,8 @@ export function SystemFlowDocumentation() {
                     <strong>8:00 PM - 5:00 AM IST:</strong> Telemetry sync operations are automatically skipped during this time window.
                     <strong>Plant sync is NOT restricted</strong> and can run at any time (including 2 AM).
                     This prevents unnecessary API calls during off-peak hours. Currently configured via environment variables 
-                    <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">SYNC_WINDOW_START</code> (default: 20:00 IST) 
-                    and <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">SYNC_WINDOW_END</code> (default: 05:00 IST).
+                    <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">RESTRICTED_WINDOW_START</code> (default: 20:00 IST) 
+                    and <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">RESTRICTED_WINDOW_END</code> (default: 05:00 IST).
                   </p>
                 </div>
               </div>
@@ -2936,14 +2936,14 @@ Unique Constraints:
                           <td className="p-2">https://prodapi.trackso.in</td>
                         </tr>
                         <tr className="border-b">
-                          <td className="p-2"><code className="bg-background px-1 rounded">SYNC_WINDOW_START</code></td>
-                          <td className="p-2">Global restricted sync window start (HH:mm IST) - <strong>Deprecated</strong> (use per-vendor config)</td>
+                          <td className="p-2"><code className="bg-background px-1 rounded">RESTRICTED_WINDOW_START</code></td>
+                          <td className="p-2">Start time for restricted sync window (HH:mm IST) - Telemetry sync is skipped during this window</td>
                           <td className="p-2">⚠️ Optional</td>
                           <td className="p-2">20:00</td>
                         </tr>
                         <tr className="border-b">
-                          <td className="p-2"><code className="bg-background px-1 rounded">SYNC_WINDOW_END</code></td>
-                          <td className="p-2">Global restricted sync window end (HH:mm IST) - <strong>Deprecated</strong> (use per-vendor config)</td>
+                          <td className="p-2"><code className="bg-background px-1 rounded">RESTRICTED_WINDOW_END</code></td>
+                          <td className="p-2">End time for restricted sync window (HH:mm IST) - Telemetry sync is skipped during this window</td>
                           <td className="p-2">⚠️ Optional</td>
                           <td className="p-2">05:00</td>
                         </tr>

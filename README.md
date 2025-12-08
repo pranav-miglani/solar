@@ -1402,8 +1402,8 @@ Calculate efficiency metrics for work orders.
 | `ENABLE_ALERT_SYNC_CRON` | Enable/disable server-side alert sync cron (`true` by default) | No |
 | `ENABLE_LIVE_TELEMETRY_SYNC_CRON` | Enable/disable server-side live telemetry sync cron (`true` by default) | No |
 | `ENABLE_PER_PLANT_LIVE_TELEMETRY` | Enable per-plant live telemetry fetching in plant sync when not available in listPlants() (`true` by default) | No |
-| `SYNC_WINDOW_START` | Start time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "20:00") | No |
-| `SYNC_WINDOW_END` | End time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "05:00") | No |
+| `RESTRICTED_WINDOW_START` | Start time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "20:00") | No |
+| `RESTRICTED_WINDOW_END` | End time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "05:00") | No |
 
 ### Database Configuration
 
@@ -1428,9 +1428,9 @@ Plant synchronization is automatically enabled for all organizations by default 
 - **Clock-Based Scheduling**: Sync runs at fixed clock times based on the interval (e.g., 15 min = :00, :15, :30, :45)
 - **Time Window Restriction**: Sync is automatically skipped during the configured time window (default: 8 PM to 5 AM Asia/Kolkata timezone)
 
-**Environment Variables for Sync Window**:
-- `SYNC_WINDOW_START`: Start time in HH:MM format (Asia/Kolkata timezone, default: "20:00")
-- `SYNC_WINDOW_END`: End time in HH:MM format (Asia/Kolkata timezone, default: "05:00")
+**Environment Variables for Restricted Window**:
+- `RESTRICTED_WINDOW_START`: Start time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "20:00")
+- `RESTRICTED_WINDOW_END`: End time for restricted sync window (HH:MM format, Asia/Kolkata timezone, default: "05:00")
 
 **Note**: Time calculations use the `Asia/Kolkata` timezone (IST) via JavaScript's Intl API for accurate timezone handling.
 
