@@ -114,8 +114,14 @@ function computeDailySecondsForAlert(alert: AlertRecord, windowStart: Date, wind
 }
 
 export async function runGridDowntimeAnalytics(days: number = WINDOW_DAYS): Promise<GridDowntimeSummary> {
+  const startTime = Date.now()
   const main = getMainClient()
   const analytics = getAnalyticsClient()
+
+  logger.info("[Grid Downtime] Starting grid downtime analytics computation", {
+    windowDays: days,
+    timestamp: new Date().toISOString(),
+  })
 
   const summary: GridDowntimeSummary = {
     plantsProcessed: 0,
@@ -129,17 +135,38 @@ export async function runGridDowntimeAnalytics(days: number = WINDOW_DAYS): Prom
   const windowEnd = getIstDayBounds(todayUtc).dayEndUtc
   const windowStart = addDays(getIstDayBounds(todayUtc).dayStartUtc, -(days - 1))
 
+  logger.info("[Grid Downtime] Window defined", {
+    windowStart: windowStart.toISOString(),
+    windowEnd: windowEnd.toISOString(),
+    windowStartIST: toIstDateString(windowStart),
+    windowEndIST: toIstDateString(windowEnd),
+  })
+
   // Cleanup old rows (global delete older than window start)
-  const { error: deleteError } = await analytics
+  logger.info("[Grid Downtime] Starting cleanup of old rows", {
+    cutoffDate: toIstDateString(windowStart),
+  })
+  const cleanupStartTime = Date.now()
+  const { data: deletedData, error: deleteError } = await analytics
     .from("plant_grid_downtime_readings")
     .delete()
     .lt("reading_date", toIstDateString(windowStart))
+    .select()
 
   if (deleteError) {
     logger.error("[Grid Downtime] Failed to cleanup old rows", { error: deleteError.message })
+  } else {
+    const deletedCount = deletedData?.length || 0
+    summary.rowsDeleted = deletedCount
+    logger.info("[Grid Downtime] Cleanup completed", {
+      deletedRows: deletedCount,
+      duration: `${Date.now() - cleanupStartTime}ms`,
+    })
   }
 
   // Fetch plants from main DB
+  logger.info("[Grid Downtime] Fetching plants from main DB")
+  const plantsFetchStartTime = Date.now()
   const { data: plants, error: plantError } = await main
     .from("plants")
     .select("id, org_id, vendor_id, vendor_plant_id, name, capacity_kw")
@@ -149,15 +176,40 @@ export async function runGridDowntimeAnalytics(days: number = WINDOW_DAYS): Prom
     throw plantError
   }
 
-  logger.info("[Grid Downtime] Starting computation", {
-    plantCount: plants?.length || 0,
-    windowDays: days,
+  const plantCount = plants?.length || 0
+  logger.info("[Grid Downtime] Plants fetched", {
+    plantCount,
+    duration: `${Date.now() - plantsFetchStartTime}ms`,
   })
 
+  logger.info("[Grid Downtime] Starting computation for all plants", {
+    plantCount,
+    windowDays: days,
+    totalDatesToProcess: days,
+  })
+
+  const PROGRESS_LOG_INTERVAL = 100 // Log progress every N plants
+  let plantIndex = 0
+
   for (const plant of plants || []) {
+    plantIndex++
     summary.plantsProcessed++
+    const plantStartTime = Date.now()
+
+    // Log progress periodically
+    if (plantIndex % PROGRESS_LOG_INTERVAL === 0 || plantIndex === 1) {
+      logger.info("[Grid Downtime] Processing plant", {
+        plantIndex,
+        totalPlants: plantCount,
+        progress: `${((plantIndex / plantCount) * 100).toFixed(1)}%`,
+        plantId: plant.id,
+        plantName: plant.name,
+        vendorPlantId: plant.vendor_plant_id,
+      })
+    }
 
     // Fetch relevant alerts for this plant within window
+    const alertsFetchStartTime = Date.now()
     const { data: alerts, error: alertError } = await main
       .from("alerts")
       .select("alert_time, end_time")
@@ -167,18 +219,41 @@ export async function runGridDowntimeAnalytics(days: number = WINDOW_DAYS): Prom
       .or(`end_time.is.null,end_time.gte.${windowStart.toISOString()}`)
 
     if (alertError) {
-      logger.error("[Grid Downtime] Failed to fetch alerts", { plantId: plant.id, error: alertError.message })
+      logger.error("[Grid Downtime] Failed to fetch alerts", {
+        plantId: plant.id,
+        plantName: plant.name,
+        error: alertError.message,
+      })
       continue
+    }
+
+    const alertCount = alerts?.length || 0
+    if (plantIndex % PROGRESS_LOG_INTERVAL === 0 || plantIndex === 1) {
+      logger.info("[Grid Downtime] Alerts fetched for plant", {
+        plantId: plant.id,
+        alertCount,
+        duration: `${Date.now() - alertsFetchStartTime}ms`,
+      })
     }
 
     // Build daily map
     const dailySeconds = new Map<string, number>()
+    const computationStartTime = Date.now()
 
     for (const alert of alerts as AlertRecord[]) {
       const contribution = computeDailySecondsForAlert(alert, windowStart, windowEnd)
       for (const [dateKey, seconds] of contribution.entries()) {
         dailySeconds.set(dateKey, (dailySeconds.get(dateKey) || 0) + seconds)
       }
+    }
+
+    if (plantIndex % PROGRESS_LOG_INTERVAL === 0 || plantIndex === 1) {
+      logger.info("[Grid Downtime] Daily seconds computed for plant", {
+        plantId: plant.id,
+        daysWithData: dailySeconds.size,
+        totalSeconds: Array.from(dailySeconds.values()).reduce((sum, s) => sum + s, 0),
+        duration: `${Date.now() - computationStartTime}ms`,
+      })
     }
 
     // Prepare ordered dates for window
@@ -191,6 +266,7 @@ export async function runGridDowntimeAnalytics(days: number = WINDOW_DAYS): Prom
 
     // Get baseline total from the last reading before windowStart
     let lastTotal: number | null = null
+    const baselineFetchStartTime = Date.now()
     const { data: baselineRow, error: baselineError } = await analytics
       .from("plant_grid_downtime_readings")
       .select("total_grid_down_seconds, reading_date")
@@ -207,6 +283,21 @@ export async function runGridDowntimeAnalytics(days: number = WINDOW_DAYS): Prom
       })
     } else if (baselineRow && typeof baselineRow.total_grid_down_seconds === "number") {
       lastTotal = baselineRow.total_grid_down_seconds
+      if (plantIndex % PROGRESS_LOG_INTERVAL === 0 || plantIndex === 1) {
+        logger.info("[Grid Downtime] Baseline total found", {
+          plantId: plant.id,
+          baselineTotal: lastTotal,
+          baselineDate: baselineRow.reading_date,
+          duration: `${Date.now() - baselineFetchStartTime}ms`,
+        })
+      }
+    } else {
+      if (plantIndex % PROGRESS_LOG_INTERVAL === 0 || plantIndex === 1) {
+        logger.info("[Grid Downtime] No baseline total found (first-time computation)", {
+          plantId: plant.id,
+          duration: `${Date.now() - baselineFetchStartTime}ms`,
+        })
+      }
     }
 
     const rows: {
@@ -237,8 +328,14 @@ export async function runGridDowntimeAnalytics(days: number = WINDOW_DAYS): Prom
 
     // Upsert in batches of 100 to avoid payload limits
     const BATCH_SIZE = 100
+    const totalBatches = Math.ceil(rows.length / BATCH_SIZE)
+    const upsertStartTime = Date.now()
+
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = rows.slice(i, i + BATCH_SIZE)
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1
+      const batchStartTime = Date.now()
+
       const { error: upsertError } = await analytics
         .from("plant_grid_downtime_readings")
         .upsert(batch, { onConflict: "plant_id,reading_date" })
@@ -246,6 +343,9 @@ export async function runGridDowntimeAnalytics(days: number = WINDOW_DAYS): Prom
       if (upsertError) {
         logger.error("[Grid Downtime] Failed to upsert batch", {
           plantId: plant.id,
+          plantName: plant.name,
+          batchNumber,
+          totalBatches,
           batchStart: i,
           batchSize: batch.length,
           error: upsertError.message,
@@ -254,8 +354,42 @@ export async function runGridDowntimeAnalytics(days: number = WINDOW_DAYS): Prom
       }
 
       summary.rowsUpserted += batch.length
+
+      if (plantIndex % PROGRESS_LOG_INTERVAL === 0 || plantIndex === 1) {
+        logger.info("[Grid Downtime] Batch upserted", {
+          plantId: plant.id,
+          batchNumber,
+          totalBatches,
+          batchSize: batch.length,
+          duration: `${Date.now() - batchStartTime}ms`,
+        })
+      }
+    }
+
+    const plantDuration = Date.now() - plantStartTime
+    if (plantIndex % PROGRESS_LOG_INTERVAL === 0 || plantIndex === 1) {
+      logger.info("[Grid Downtime] Plant processing completed", {
+        plantId: plant.id,
+        plantName: plant.name,
+        rowsUpserted: rows.length,
+        totalDuration: `${plantDuration}ms`,
+        upsertDuration: `${Date.now() - upsertStartTime}ms`,
+      })
     }
   }
+
+  const totalDuration = Date.now() - startTime
+  logger.info("[Grid Downtime] Computation completed", {
+    summary: {
+      plantsProcessed: summary.plantsProcessed,
+      daysProcessed: summary.daysProcessed,
+      rowsUpserted: summary.rowsUpserted,
+      rowsDeleted: summary.rowsDeleted,
+    },
+    totalDuration: `${totalDuration}ms`,
+    averageTimePerPlant: `${Math.round(totalDuration / (summary.plantsProcessed || 1))}ms`,
+    timestamp: new Date().toISOString(),
+  })
 
   return summary
 }

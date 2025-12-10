@@ -5,6 +5,7 @@ import { logger } from "@/lib/context/logger"
 import { runGridDowntimeAnalytics } from "@/lib/services/gridDowntimeAnalyticsService"
 
 export const dynamic = "force-dynamic"
+export const maxDuration = 300 // 5 minutes for processing 8000+ plants
 
 export async function POST(request: NextRequest) {
   const requestId = randomUUID()
@@ -33,11 +34,22 @@ export async function POST(request: NextRequest) {
           logger.debug("[Auth Check] Analytics Grid Downtime: CRON_SECRET not configured, allowing request")
         }
 
+        logger.info("[Analytics Grid Downtime] Starting grid downtime analytics computation")
+        const computationStartTime = Date.now()
+        
         const summary = await runGridDowntimeAnalytics()
+
+        const computationDuration = Date.now() - computationStartTime
+        logger.info("[Analytics Grid Downtime] Computation completed", {
+          summary,
+          duration: `${computationDuration}ms`,
+          durationSeconds: `${(computationDuration / 1000).toFixed(2)}s`,
+        })
 
         return NextResponse.json({
           success: true,
           summary,
+          duration: `${computationDuration}ms`,
         })
       } catch (error: any) {
         logger.error("[Analytics Grid Downtime] Failed", { error: error?.message })
