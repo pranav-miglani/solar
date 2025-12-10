@@ -9,15 +9,12 @@ import { logger } from "@/lib/context/logger"
  * Handles authentication and data fetching from Intello WMS API
  */
 export class IntelloAdapter extends BaseWmsAdapter {
-  private vendorId?: number
-  private supabaseClient?: any
-
   /**
    * Set vendor ID and Supabase client for token storage
+   * Override to ensure proper initialization
    */
   setTokenStorage(vendorId: number, supabaseClient: any) {
-    this.vendorId = vendorId
-    this.supabaseClient = supabaseClient
+    super.setTokenStorage(vendorId, supabaseClient)
   }
 
   /**

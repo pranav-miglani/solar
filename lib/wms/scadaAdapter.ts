@@ -10,15 +10,12 @@ import { logger } from "@/lib/context/logger"
  * API Base: https://log.poweramr.com
  */
 export class ScadaAdapter extends BaseWmsAdapter {
-  private vendorId?: number
-  private supabaseClient?: any
-
   /**
    * Set vendor ID and Supabase client for token storage
+   * Override to ensure proper initialization
    */
   setTokenStorage(vendorId: number, supabaseClient: any) {
-    this.vendorId = vendorId
-    this.supabaseClient = supabaseClient
+    super.setTokenStorage(vendorId, supabaseClient)
   }
 
   /**

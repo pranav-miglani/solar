@@ -9,15 +9,12 @@ import { logger } from "@/lib/context/logger"
  * API Base: https://prodapi.trackso.in
  */
 export class TracksoAdapter extends BaseWmsAdapter {
-  private vendorId?: number
-  private supabaseClient?: any
-
   /**
    * Set vendor ID and Supabase client for token storage
+   * Override to ensure proper initialization
    */
   setTokenStorage(vendorId: number, supabaseClient: any) {
-    this.vendorId = vendorId
-    this.supabaseClient = supabaseClient
+    super.setTokenStorage(vendorId, supabaseClient)
   }
 
   /**

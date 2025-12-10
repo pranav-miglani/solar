@@ -194,15 +194,41 @@ export async function GET(request: NextRequest) {
       logger.info(`[Dashboard] Processing ${mappedPlantIds.length} mapped plant IDs for alerts`)
 
       // Get active alerts count for mapped plants
-      const activeAlertsResult = mappedPlantIds.length > 0
-        ? await supabase
-            .from("alerts")
-            .select("id", { count: "exact", head: true })
-            .eq("status", "ACTIVE")
-            .in("plant_id", mappedPlantIds)
-        : { count: 0, data: null, error: null }
+      // Batch the query to avoid HTTP header overflow when there are many plant IDs
+      // Process in chunks of 200 IDs at a time
+      let activeAlertsCount = 0
+      if (mappedPlantIds.length > 0) {
+        const BATCH_SIZE = 200
+        const batches: number[][] = []
+        
+        for (let i = 0; i < mappedPlantIds.length; i += BATCH_SIZE) {
+          batches.push(mappedPlantIds.slice(i, i + BATCH_SIZE))
+        }
+        
+        logger.info(`[Dashboard] Batching alert query into ${batches.length} batches of up to ${BATCH_SIZE} plant IDs each`)
+        
+        // Query each batch and sum the counts
+        const batchResults = await Promise.all(
+          batches.map(async (batch, index) => {
+            const { count, error } = await supabase
+              .from("alerts")
+              .select("id", { count: "exact", head: true })
+              .eq("status", "ACTIVE")
+              .in("plant_id", batch)
+            
+            if (error) {
+              logger.error(`[Dashboard] Error counting alerts for batch ${index + 1}/${batches.length}:`, error)
+              return 0
+            }
+            return count || 0
+          })
+        )
+        
+        activeAlertsCount = batchResults.reduce((sum, count) => sum + count, 0)
+        logger.info(`[Dashboard] Found ${activeAlertsCount} active alerts across ${batches.length} batches`)
+      }
 
-      logger.info(`[Dashboard] Found ${activeAlertsResult.count || 0} active alerts for mapped plants`)
+      logger.info(`[Dashboard] Found ${activeAlertsCount} active alerts for mapped plants`)
 
       // Calculate aggregated metrics from plants
       const totalEnergyMwh = plants.reduce((sum: number, p: any) => sum + (p.total_energy_mwh || 0), 0)
@@ -219,7 +245,7 @@ export async function GET(request: NextRequest) {
         totalPlants,
         unmappedPlants,
         mappedPlants,
-        activeAlerts: activeAlertsResult.count || 0,
+        activeAlerts: activeAlertsCount,
         totalWorkOrders: workOrderIds.length,
         totalEnergyMwh,
         dailyEnergyMwh,

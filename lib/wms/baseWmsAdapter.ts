@@ -63,6 +63,8 @@ export interface WmsVendorConfig {
  */
 export abstract class BaseWmsAdapter {
   protected config: WmsVendorConfig
+  protected vendorId?: number
+  protected supabaseClient?: any
 
   constructor(config: WmsVendorConfig) {
     this.config = config
@@ -70,11 +72,11 @@ export abstract class BaseWmsAdapter {
 
   /**
    * Set vendor ID and Supabase client for token storage
-   * Default implementation does nothing - adapters should override this to enable token caching
+   * Default implementation stores them for use in fetchWithAuth for 401 handling
    */
   setTokenStorage(vendorId: number, supabaseClient: any): void {
-    // Default implementation: no-op
-    // Adapters should override this to enable token caching
+    this.vendorId = vendorId
+    this.supabaseClient = supabaseClient
   }
 
   /**
@@ -291,7 +293,8 @@ export abstract class BaseWmsAdapter {
 
   protected async fetchWithAuth(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retryOn401: boolean = true
   ): Promise<Response> {
     const token = await this.authenticate()
     const url = `${this.getApiBaseUrl()}${endpoint}`
@@ -317,6 +320,44 @@ export abstract class BaseWmsAdapter {
 
     const requestDuration = Date.now() - requestStartTime
     logger.info(`[BaseWmsAdapter] API call completed: ${response.status} ${response.statusText} (${requestDuration}ms)`)
+
+    // Handle 401 Unauthorized - token expired or invalid
+    if (response.status === 401 && retryOn401) {
+      logger.warn(`[BaseWmsAdapter] Received 401 Unauthorized for ${method} ${url}, refreshing token and retrying...`)
+      
+      // Clear cached token in DB if token storage is configured
+      if (this.vendorId && this.supabaseClient) {
+        try {
+          await this.supabaseClient
+            .from("wms_vendors")
+            .update({ 
+              access_token: null, 
+              token_expires_at: null 
+            })
+            .eq("id", this.vendorId)
+          
+          logger.info(`[BaseWmsAdapter] Cleared cached token for vendor ${this.vendorId}`)
+        } catch (error) {
+          logger.error(`[BaseWmsAdapter] Failed to clear cached token:`, error)
+          // Continue with re-authentication even if clearing fails
+        }
+      }
+      
+      // Re-authenticate to get fresh token
+      logger.info(`[BaseWmsAdapter] Re-authenticating to get fresh token...`)
+      const newToken = await this.authenticate()
+      
+      // Retry the request once with new token
+      logger.info(`[BaseWmsAdapter] Retrying API call with fresh token: ${method} ${url}`)
+      return this.fetchWithAuth(endpoint, {
+        ...options,
+        headers: {
+          ...options.headers,
+          Authorization: `Bearer ${newToken}`,
+          "Content-Type": "application/json",
+        },
+      }, false) // Don't retry again to prevent infinite loops
+    }
 
     return response
   }
