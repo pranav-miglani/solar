@@ -34,6 +34,7 @@ function computeHash(payload: Record<string, any>): string {
 }
 
 export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
+  logger.info("[Analytics Mirror] Starting config mirror operation")
   const main = getMainClient()
   const analytics = getAnalyticsClient()
 
@@ -47,12 +48,14 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
   }
 
   // Mirror organizations
+  logger.info("[Analytics Mirror] Fetching organizations from main DB")
   const { data: orgs, error: orgError } = await main.from("organizations").select("*")
   if (orgError) {
     logger.error("[Analytics Mirror] Failed to fetch organizations from main DB", { error: orgError.message })
     throw orgError
   }
 
+  logger.info(`[Analytics Mirror] Found ${orgs?.length || 0} organizations to mirror`)
   const now = new Date().toISOString()
 
   for (const org of orgs || []) {
@@ -102,12 +105,17 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
     summary.orgsUpdated++
   }
 
+  logger.info(`[Analytics Mirror] Organizations mirror complete - Processed: ${summary.orgsProcessed}, Updated: ${summary.orgsUpdated}`)
+
   // Mirror vendors
+  logger.info("[Analytics Mirror] Fetching vendors from main DB")
   const { data: vendors, error: vendorError } = await main.from("vendors").select("*")
   if (vendorError) {
     logger.error("[Analytics Mirror] Failed to fetch vendors from main DB", { error: vendorError.message })
     throw vendorError
   }
+
+  logger.info(`[Analytics Mirror] Found ${vendors?.length || 0} vendors to mirror`)
 
   for (const vendor of vendors || []) {
     summary.vendorsProcessed++
@@ -152,12 +160,17 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
     summary.vendorsUpdated++
   }
 
+  logger.info(`[Analytics Mirror] Vendors mirror complete - Processed: ${summary.vendorsProcessed}, Updated: ${summary.vendorsUpdated}`)
+
   // Mirror plants in batches
+  logger.info("[Analytics Mirror] Starting plants mirror (batched)")
   const BATCH_SIZE = 100
   let offset = 0
   let hasMore = true
+  let batchNumber = 0
 
   while (hasMore) {
+    batchNumber++
     const { data: plantsBatch, error: plantError } = await main
       .from("plants")
       .select("id, org_id, vendor_id, vendor_plant_id, name, capacity_kw")
@@ -172,6 +185,8 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
       hasMore = false
       break
     }
+
+    logger.info(`[Analytics Mirror] Processing plants batch ${batchNumber} (${plantsBatch.length} plants, offset: ${offset})`)
 
     for (const plant of plantsBatch) {
       summary.plantsProcessed++
@@ -200,6 +215,7 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
     hasMore = plantsBatch.length === BATCH_SIZE
   }
 
+  logger.info(`[Analytics Mirror] Plants mirror complete - Processed: ${summary.plantsProcessed}, Updated: ${summary.plantsUpdated}`)
   logger.info("[Analytics Mirror] Mirror complete", summary)
   return summary
 }

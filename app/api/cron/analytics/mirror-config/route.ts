@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
 import { mirrorOrgVendorConfig } from "@/lib/services/analyticsMirrorService"
 import { logger } from "@/lib/context/logger"
+import MDC from "@/lib/context/mdc"
+import { randomUUID } from "crypto"
 
 export const dynamic = "force-dynamic"
 
@@ -57,17 +59,45 @@ function checkAuth(request: NextRequest): { authorized: boolean; error?: string 
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    const authCheck = checkAuth(request)
-    if (!authCheck.authorized) {
-      return NextResponse.json({ error: authCheck.error || "Unauthorized" }, { status: 401 })
-    }
+  const requestId = randomUUID()
+  
+  return MDC.runAsync(
+    {
+      source: "cron",
+      requestId,
+      operation: "analytics-mirror-config",
+    },
+    async () => {
+      try {
+        const authCheck = checkAuth(request)
+        if (!authCheck.authorized) {
+          logger.warn("[Analytics Mirror Config] Authorization failed", { error: authCheck.error })
+          return NextResponse.json({ error: authCheck.error || "Unauthorized" }, { status: 401 })
+        }
 
-    const summary = await mirrorOrgVendorConfig()
-    return NextResponse.json({ success: true, summary })
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
-  }
+        logger.info("[Analytics Mirror Config] Starting mirror operation")
+        const startTime = Date.now()
+        
+        const summary = await mirrorOrgVendorConfig()
+        
+        const duration = Date.now() - startTime
+        logger.info("[Analytics Mirror Config] Mirror operation completed successfully", {
+          summary,
+          duration: `${duration}ms`,
+        })
+        
+        const response = NextResponse.json({ success: true, summary })
+        logger.info("[Analytics Mirror Config] Response sent successfully")
+        return response
+      } catch (error: any) {
+        logger.error("[Analytics Mirror Config] Mirror operation failed", {
+          error: error.message,
+          stack: error.stack,
+        })
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+      }
+    }
+  )
 }
 
 export async function POST(request: NextRequest) {
