@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     async () => {
       try {
         // Verify cron secret (if configured)
-        const cronSecret = process.env.CRON_SECRET
+        const cronSecret = process.env.CRON_SECRET_V2
         const authHeader = request.headers.get("authorization")
 
         if (cronSecret) {
