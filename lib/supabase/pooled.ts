@@ -101,8 +101,9 @@ function createQueryLoggingClient(client: SupabaseClient, dbName: string): Supab
       
       // Intercept the 'from' method to log table queries
       if (prop === "from") {
+        const fromMethod = original as (table: string) => any
         return function (table: string) {
-          const queryBuilder = original.call(target, table)
+          const queryBuilder = fromMethod.call(target, table)
           
           // Wrap the query builder to log operations
           return new Proxy(queryBuilder, {
@@ -320,13 +321,14 @@ function createQueryLoggingClient(client: SupabaseClient, dbName: string): Supab
       
       // Intercept RPC calls
       if (prop === "rpc") {
+        const rpcMethod = original as (functionName: string, params?: any) => any
         return function (functionName: string, params?: any) {
           const startTime = Date.now()
           const paramsStr = params ? JSON.stringify(params).substring(0, 200) : ""
           
           logger.debug(`[SQL:${dbName}] RPC ${functionName}(${paramsStr})`)
           
-          const result = original.call(target, functionName, params)
+          const result = rpcMethod.call(target, functionName, params)
           
           if (result && typeof result.then === "function") {
             return result.then(
