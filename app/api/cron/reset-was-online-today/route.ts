@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
     async () => {
       try {
         logger.info("[ResetWasOnlineToday] API request received", {
+          requestId,
           method: request.method,
           url: request.url,
           timestamp: new Date().toISOString(),
@@ -111,17 +112,21 @@ export async function POST(request: NextRequest) {
 
         const authCheck = checkAuth(request)
         if (!authCheck.authorized) {
+          logger.warn("[ResetWasOnlineToday] Authorization failed", {
+            error: authCheck.error || "Unauthorized",
+            requestId,
+          })
           return NextResponse.json(
             { 
               error: authCheck.error || "Unauthorized",
               requestId,
-              traceId: requestId,
             }, 
             { status: 401 }
           )
         }
 
         logger.info("[ResetWasOnlineToday] Starting reset of was_online_today flag for all plants", {
+          requestId,
           source: authCheck.source,
           accountType: authCheck.accountType,
           accountId: authCheck.accountId,
@@ -130,11 +135,14 @@ export async function POST(request: NextRequest) {
         const main = getMainClient()
         const resetStartTime = Date.now()
 
-        logger.info("[ResetWasOnlineToday] Calling reset_was_online_today database function")
+        logger.info("[ResetWasOnlineToday] Calling reset_was_online_today database function", {
+          requestId,
+        })
         const { data: resetResult, error: resetError } = await main.rpc("reset_was_online_today")
 
         if (resetError) {
           logger.error("[ResetWasOnlineToday] Reset failed", { 
+            requestId,
             error: resetError.message,
             errorCode: resetError.code,
             errorDetails: resetError.details,
@@ -145,7 +153,6 @@ export async function POST(request: NextRequest) {
               success: false, 
               error: resetError.message,
               requestId,
-              traceId: requestId,
             },
             { status: 500 }
           )
@@ -155,6 +162,7 @@ export async function POST(request: NextRequest) {
         const plantsReset = resetResult || 0
 
         logger.info("[ResetWasOnlineToday] Reset completed successfully", {
+          requestId,
           plantsReset,
           duration: `${resetDuration}ms`,
           timestamp: new Date().toISOString(),
@@ -165,10 +173,10 @@ export async function POST(request: NextRequest) {
           plantsReset,
           duration: `${resetDuration}ms`,
           requestId,
-          traceId: requestId,
         })
       } catch (error: any) {
         logger.error("[ResetWasOnlineToday] Exception during reset", { 
+          requestId,
           error: error.message,
           stack: error.stack,
         })
@@ -177,7 +185,6 @@ export async function POST(request: NextRequest) {
             success: false, 
             error: error.message,
             requestId,
-            traceId: requestId,
           },
           { status: 500 }
         )
