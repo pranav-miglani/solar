@@ -241,3 +241,41 @@ export async function withMDCContext<T>(
     return handler()
   })
 }
+
+/**
+ * Helper to create a NextResponse.json with requestId automatically added
+ * This ensures all API responses include the requestId for tracking
+ * Usage: return jsonResponse(data, { status: 200 })
+ * 
+ * The requestId is taken from MDC context if available, otherwise a new one is generated.
+ * This ensures backward compatibility - existing response structure is preserved,
+ * requestId is just added to the response object.
+ */
+export function jsonResponse(
+  data: any,
+  init?: ResponseInit
+): NextResponse {
+  // Get requestId from MDC context, or generate one if not available
+  let requestId = MDC.get("requestId")
+  if (!requestId) {
+    // Generate a new requestId if MDC context doesn't have one
+    // This can happen if the route doesn't use withMDCContext
+    requestId = randomUUID()
+  }
+  
+  // If data is already an object, add requestId to it
+  // If data is a primitive or array, wrap it in an object
+  let responseData: any
+  
+  if (data === null || data === undefined) {
+    responseData = { requestId }
+  } else if (typeof data === "object" && !Array.isArray(data)) {
+    // Object: add requestId to existing object (preserves all existing fields)
+    responseData = { ...data, requestId }
+  } else {
+    // Primitive or array: wrap in object
+    responseData = { data, requestId }
+  }
+  
+  return NextResponse.json(responseData, init)
+}

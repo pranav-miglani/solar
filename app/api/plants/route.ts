@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
 import { getMainClient } from "@/lib/supabase/pooled"
-import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
+import { logApiRequest, logApiResponse, withMDCContext, jsonResponse } from "@/lib/api-logger"
 
 // For plants API, we need to bypass RLS for write operations
 
@@ -68,15 +68,15 @@ export async function GET(request: NextRequest) {
 
       if (error) {
         logApiResponse(request, 500, Date.now() - startTime, error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        return jsonResponse({ error: error.message }, { status: 500 })
       }
 
       logApiResponse(request, 200, Date.now() - startTime)
-      return NextResponse.json({ plants: plants || [] })
+      return jsonResponse({ plants: plants || [] })
     } catch (error: any) {
       console.error("Plants GET error:", error)
       logApiResponse(request, error.message?.includes("permission") ? 403 : 500, Date.now() - startTime, error)
-      return NextResponse.json(
+      return jsonResponse(
         { error: error.message || "Internal server error" },
         { status: error.message?.includes("permission") ? 403 : 500 }
       )
@@ -134,14 +134,14 @@ export async function POST(request: NextRequest) {
 
       if (error) {
         logApiResponse(request, 500, Date.now() - startTime, error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        return jsonResponse({ error: error.message }, { status: 500 })
       }
 
       logApiResponse(request, 201, Date.now() - startTime, { plantId: plant.id, name: plant.name })
-      return NextResponse.json({ plant }, { status: 201 })
+      return jsonResponse({ plant }, { status: 201 })
     } catch (error: any) {
       logApiResponse(request, 500, Date.now() - startTime, error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return jsonResponse({ error: error.message }, { status: 500 })
     }
   })
 }

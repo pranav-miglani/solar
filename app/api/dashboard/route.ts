@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { AccountType } from "@/lib/rbac"
 import { getMainClient } from "@/lib/supabase/pooled"
-import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
+import { logApiRequest, logApiResponse, withMDCContext, jsonResponse } from "@/lib/api-logger"
 import { logger } from "@/lib/context/logger"
 
 // Mark route as dynamic to prevent static generation (uses cookies)
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
       if (!session) {
         logApiResponse(request, 401, Date.now() - startTime)
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        return jsonResponse({ error: "Unauthorized" }, { status: 401 })
       }
 
       // Decode session
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
         sessionData = JSON.parse(Buffer.from(session, "base64").toString())
       } catch {
         logApiResponse(request, 401, Date.now() - startTime)
-        return NextResponse.json({ error: "Invalid session" }, { status: 401 })
+        return jsonResponse({ error: "Invalid session" }, { status: 401 })
       }
 
       const accountType = sessionData.accountType as AccountType
@@ -304,11 +304,11 @@ export async function GET(request: NextRequest) {
 
       logger.info(`[Dashboard] Dashboard data loaded successfully in ${Date.now() - startTime}ms`)
       logApiResponse(request, 200, Date.now() - startTime)
-      return NextResponse.json(dashboardData)
+      return jsonResponse(dashboardData)
     } catch (error) {
       logger.error(`[Dashboard] Error loading dashboard:`, error)
       logApiResponse(request, 500, Date.now() - startTime, error)
-      return NextResponse.json(
+      return jsonResponse(
         { error: "Internal server error" },
         { status: 500 }
       )
