@@ -50,13 +50,14 @@ async function validateAndRefreshToken(
     // Try to authenticate (will use cached token if valid)
     try {
       await adapter.authenticate()
+      logger.info(`[PlantSync] Token validated successfully for vendor ${vendorId}`)
       return true
     } catch (authError: any) {
-      console.error(`[Sync] Token validation failed for vendor ${vendorId}:`, authError.message)
+      logger.error(`[PlantSync] Token validation failed for vendor ${vendorId}:`, authError)
       return false
     }
   } catch (error: any) {
-    console.error(`[Sync] Error validating token for vendor ${vendorId}:`, error.message)
+    logger.error(`[PlantSync] Error validating token for vendor ${vendorId}:`, error)
     return false
   }
 }
@@ -297,7 +298,7 @@ async function syncVendorPlants(
           updated += batchUpdated
         }
       } catch (batchError: any) {
-        console.error(`[Sync] Batch ${batchNumber} exception for vendor ${vendor.name}:`, batchError)
+        logger.error(`[PlantSync] Batch ${batchNumber} exception for vendor ${vendor.name}:`, batchError)
         errors.push(`Batch ${batchNumber}: ${batchError.message}`)
       }
     }
@@ -399,11 +400,12 @@ export async function syncAllPlants(): Promise<SyncSummary> {
     .not("org_id", "is", null)
 
   if (vendorsError) {
+    logger.error(`[PlantSync] Failed to fetch vendors:`, vendorsError)
     throw new Error(`Failed to fetch vendors: ${vendorsError.message}`)
   }
 
   if (!vendors || vendors.length === 0) {
-    logger.info("No active vendors found")
+    logger.info(`[PlantSync] No active vendors found`)
     return {
       totalVendors: 0,
       successful: 0,
@@ -416,7 +418,7 @@ export async function syncAllPlants(): Promise<SyncSummary> {
     }
   }
 
-  logger.info(`Found ${vendors.length} active vendor(s)`)
+  logger.info(`[PlantSync] Found ${vendors.length} active vendor(s)`)
 
   // Filter vendors - plant sync now runs only twice a day (morning/evening)
   // This is to fetch newly added plants from vendors

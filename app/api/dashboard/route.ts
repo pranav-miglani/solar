@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type { AccountType } from "@/lib/rbac"
 import { getMainClient } from "@/lib/supabase/pooled"
 import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
+import { logger } from "@/lib/context/logger"
 
 // Mark route as dynamic to prevent static generation (uses cookies)
 export const dynamic = 'force-dynamic'
@@ -62,6 +63,8 @@ export async function GET(request: NextRequest) {
       const accountType = sessionData.accountType as AccountType
       const orgId = sessionData.orgId
 
+      logger.info(`[Dashboard] Loading dashboard for accountType: ${accountType}, orgId: ${orgId || 'null'}`)
+
     // Use service role client to bypass RLS
     const supabase = getMainClient()
 
@@ -72,6 +75,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (accountType === "SUPERADMIN" || accountType === "DEVELOPER") {
+      logger.info(`[Dashboard] Processing SUPERADMIN/DEVELOPER dashboard`)
+      
       // For SUPERADMIN, compute counts for:
       // - Plants
       // - Active alerts only (status = 'ACTIVE')
@@ -87,11 +92,17 @@ export async function GET(request: NextRequest) {
           .select("id", { count: "exact", head: true }),
       ])
 
+      logger.info(`[Dashboard] Query results - Plants: ${plantsResult.count || 0}, Active Alerts: ${activeAlertsResult.count || 0}, Work Orders: ${workOrdersResult.count || 0}`)
+
       // Get mapped plants (plants in active work orders)
-      const { data: mappedPlantsData } = await supabase
+      const { data: mappedPlantsData, error: mappedPlantsError } = await supabase
         .from("work_order_plants")
         .select("plant_id")
         .eq("is_active", true)
+
+      if (mappedPlantsError) {
+        logger.error(`[Dashboard] Error fetching mapped plants:`, mappedPlantsError)
+      }
 
       const mappedPlants = mappedPlantsData
         ? new Set(mappedPlantsData.map((wop) => wop.plant_id)).size
@@ -99,12 +110,19 @@ export async function GET(request: NextRequest) {
       const totalPlants = plantsResult.count || 0
       const unmappedPlants = totalPlants - mappedPlants
 
+      logger.info(`[Dashboard] Plant mapping - Total: ${totalPlants}, Mapped: ${mappedPlants}, Unmapped: ${unmappedPlants}`)
+
       // Calculate total energy generation (sum of total_energy_mwh from all plants)
-      const { data: allPlants } = await supabase
+      const { data: allPlants, error: plantsError } = await supabase
         .from("plants")
         .select("total_energy_mwh")
 
+      if (plantsError) {
+        logger.error(`[Dashboard] Error fetching plant energy data:`, plantsError)
+      }
+
       const totalEnergyMwh = allPlants?.reduce((sum, p) => sum + (p.total_energy_mwh || 0), 0) || 0
+      logger.info(`[Dashboard] Total energy calculated: ${totalEnergyMwh} MWh from ${allPlants?.length || 0} plants`)
 
       dashboardData.metrics = {
         totalPlants,
@@ -125,68 +143,84 @@ export async function GET(request: NextRequest) {
         showWorkOrdersSummary: true,
       }
     } else if (accountType === "GOVT") {
+      logger.info(`[Dashboard] Processing GOVT dashboard`)
+      
       // GOVT sees metrics based ONLY on plants mapped to work orders:
       // - Only count plants that are in active work orders
       // - `activeAlerts` is the count of alerts where status = 'ACTIVE' for those plants
       // - No total alerts metric is exposed on the dashboard.
       
-      // Get plant IDs from active work orders
-      const { data: workOrderPlantsData } = await supabase
-        .from("work_order_plants")
-        .select("plant_id")
-        .eq("is_active", true)
+      // Get all work orders
+      const { data: workOrders, error: woError } = await supabase
+        .from("work_orders")
+        .select("id")
 
-      const mappedPlantIds = workOrderPlantsData
-        ? workOrderPlantsData.map((wop) => wop.plant_id)
+      if (woError) {
+        logger.error(`[Dashboard] Error fetching work orders for GOVT:`, woError)
+      }
+
+      const workOrderIds = workOrders?.map((wo) => wo.id) || []
+      logger.info(`[Dashboard] Found ${workOrderIds.length} work orders for GOVT dashboard`)
+
+      // Get all active plants for all work orders using a join (similar to org production route)
+      const { data: workOrderPlants, error: wopError } = workOrderIds.length > 0
+        ? await supabase
+            .from("work_order_plants")
+            .select(`
+              plant_id,
+              plants (*)
+            `)
+            .in("work_order_id", workOrderIds)
+            .eq("is_active", true)
+        : { data: null, error: null }
+
+      if (wopError) {
+        logger.error(`[Dashboard] Error fetching work order plants for GOVT dashboard:`, wopError)
+      }
+
+      // Extract plants from the join result
+      const plants = workOrderPlants
+        ? workOrderPlants.map((wop: any) => wop.plants).filter(Boolean)
         : []
 
-      const mappedPlants = mappedPlantIds.length
+      logger.info(`[Dashboard] Extracted ${plants.length} plants from work orders`)
 
-      // Get metrics only for plants in work orders
-      const [plantsResult, activeAlertsResult, workOrdersResult] = await Promise.all([
-        mappedPlantIds.length > 0
-          ? supabase
-              .from("plants")
-              .select("id", { count: "exact", head: true })
-              .in("id", mappedPlantIds)
-          : { count: 0, data: null, error: null },
-        mappedPlantIds.length > 0
-          ? supabase
-              .from("alerts")
-              .select("id", { count: "exact", head: true })
-              .eq("status", "ACTIVE")
-              .in("plant_id", mappedPlantIds)
-          : { count: 0, data: null, error: null },
-        supabase
-          .from("work_orders")
-          .select("id", { count: "exact", head: true }),
-      ])
-      const totalPlants = plantsResult.count || 0
+      const mappedPlants = plants.length
+      const totalPlants = mappedPlants
       const unmappedPlants = 0 // GOVT users don't see unmapped plants
 
-      // Fetch all plant attributes for plants in work orders
-      const { data: allPlants } = mappedPlantIds.length > 0
-        ? await supabase
-            .from("plants")
-            .select("daily_energy_kwh, monthly_energy_mwh, yearly_energy_mwh, total_energy_mwh, current_power_kw, capacity_kw")
-            .in("id", mappedPlantIds)
-        : { data: [] as any[] }
+      // Get plant IDs for alert query
+      const mappedPlantIds = plants.map((p: any) => p.id)
+      logger.info(`[Dashboard] Processing ${mappedPlantIds.length} mapped plant IDs for alerts`)
 
-      // Calculate aggregated metrics
-      const totalEnergyMwh = allPlants?.reduce((sum, p) => sum + (p.total_energy_mwh || 0), 0) || 0
+      // Get active alerts count for mapped plants
+      const activeAlertsResult = mappedPlantIds.length > 0
+        ? await supabase
+            .from("alerts")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "ACTIVE")
+            .in("plant_id", mappedPlantIds)
+        : { count: 0, data: null, error: null }
+
+      logger.info(`[Dashboard] Found ${activeAlertsResult.count || 0} active alerts for mapped plants`)
+
+      // Calculate aggregated metrics from plants
+      const totalEnergyMwh = plants.reduce((sum: number, p: any) => sum + (p.total_energy_mwh || 0), 0)
       // Convert daily_energy_kwh to MWh (divide by 1000)
-      const dailyEnergyMwh = allPlants?.reduce((sum, p) => sum + ((p.daily_energy_kwh || 0) / 1000), 0) || 0
-      const monthlyEnergyMwh = allPlants?.reduce((sum, p) => sum + (p.monthly_energy_mwh || 0), 0) || 0
-      const yearlyEnergyMwh = allPlants?.reduce((sum, p) => sum + (p.yearly_energy_mwh || 0), 0) || 0
-      const currentPowerKw = allPlants?.reduce((sum, p) => sum + (p.current_power_kw || 0), 0) || 0
-      const installedCapacityKw = allPlants?.reduce((sum, p) => sum + (p.capacity_kw || 0), 0) || 0
+      const dailyEnergyMwh = plants.reduce((sum: number, p: any) => sum + ((p.daily_energy_kwh || 0) / 1000), 0)
+      const monthlyEnergyMwh = plants.reduce((sum: number, p: any) => sum + (p.monthly_energy_mwh || 0), 0)
+      const yearlyEnergyMwh = plants.reduce((sum: number, p: any) => sum + (p.yearly_energy_mwh || 0), 0)
+      const currentPowerKw = plants.reduce((sum: number, p: any) => sum + (p.current_power_kw || 0), 0)
+      const installedCapacityKw = plants.reduce((sum: number, p: any) => sum + (p.capacity_kw || 0), 0)
+
+      logger.info(`[Dashboard] GOVT metrics calculated - Total Energy: ${totalEnergyMwh} MWh, Daily: ${dailyEnergyMwh} MWh, Monthly: ${monthlyEnergyMwh} MWh, Yearly: ${yearlyEnergyMwh} MWh, Current Power: ${currentPowerKw} kW, Capacity: ${installedCapacityKw} kW`)
 
       dashboardData.metrics = {
         totalPlants,
         unmappedPlants,
         mappedPlants,
         activeAlerts: activeAlertsResult.count || 0,
-        totalWorkOrders: workOrdersResult.count || 0,
+        totalWorkOrders: workOrderIds.length,
         totalEnergyMwh,
         dailyEnergyMwh,
         monthlyEnergyMwh,
@@ -202,7 +236,10 @@ export async function GET(request: NextRequest) {
         showOrgBreakdown: true,
         showExportCSV: true,
       }
+      
+      logger.info(`[Dashboard] GOVT dashboard data prepared successfully`)
     } else if (accountType === "ORG" && orgId) {
+      logger.info(`[Dashboard] Processing ORG dashboard for orgId: ${orgId}`)
       // ORG users see org-specific metrics based ONLY on active alerts
       const plantsResult = await supabase
         .from("plants")
@@ -276,16 +313,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    logApiResponse(request, 200, Date.now() - startTime)
-    return NextResponse.json(dashboardData)
-  } catch (error) {
-    console.error("Dashboard error:", error)
-    logApiResponse(request, 500, Date.now() - startTime, error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
-  }
+      logger.info(`[Dashboard] Dashboard data loaded successfully in ${Date.now() - startTime}ms`)
+      logApiResponse(request, 200, Date.now() - startTime)
+      return NextResponse.json(dashboardData)
+    } catch (error) {
+      logger.error(`[Dashboard] Error loading dashboard:`, error)
+      logApiResponse(request, 500, Date.now() - startTime, error)
+      return NextResponse.json(
+        { error: "Internal server error" },
+        { status: 500 }
+      )
+    }
   })
 }
 
