@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     },
     async () => {
       try {
-        const cronSecret = process.env.CRON_SECRET
+        const cronSecret = process.env.CRON_SECRET_V2
         const authHeader = request.headers.get("authorization")
 
         if (cronSecret) {
