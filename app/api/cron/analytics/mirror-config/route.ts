@@ -6,6 +6,8 @@ import MDC from "@/lib/context/mdc"
 import { randomUUID } from "crypto"
 
 export const dynamic = "force-dynamic"
+// Increase timeout for long-running mirror operations (up to 60 seconds)
+export const maxDuration = 60
 
 function checkAuth(request: NextRequest): { authorized: boolean; error?: string } {
   // Check CRON_SECRET first (for cron jobs)
@@ -61,9 +63,15 @@ function checkAuth(request: NextRequest): { authorized: boolean; error?: string 
 export async function GET(request: NextRequest) {
   const requestId = randomUUID()
   
+  // Determine source: if called via CRON_SECRET, it's "cron", otherwise "user" (UI trigger)
+  const authHeader = request.headers.get("authorization") || ""
+  const secret = process.env.CRON_SECRET_V2
+  const isCronCall = secret && authHeader.replace("Bearer ", "") === secret
+  const source = isCronCall ? "cron" : "user"
+  
   return MDC.runAsync(
     {
-      source: "cron",
+      source,
       requestId,
       operation: "analytics-mirror-config",
     },

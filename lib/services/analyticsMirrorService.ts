@@ -1,5 +1,6 @@
 import crypto from "crypto"
 import { logger } from "@/lib/context/logger"
+import MDC from "@/lib/context/mdc"
 import { getMainClient, getAnalyticsClient } from "@/lib/supabase/pooled"
 
 type MirrorSummary = {
@@ -34,31 +35,42 @@ function computeHash(payload: Record<string, any>): string {
 }
 
 export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
-  logger.info("[Analytics Mirror] Starting config mirror operation")
-  const main = getMainClient()
-  const analytics = getAnalyticsClient()
+  // Ensure MDC context is set (will use existing context if already set by route handler)
+  const source = MDC.getSource() || "system"
+  const requestId = MDC.get("requestId") || "unknown"
+  
+  return MDC.withContextAsync(
+    {
+      source,
+      requestId,
+      operation: "mirror-org-vendor-config",
+    },
+    async () => {
+      logger.info("[Analytics Mirror] Starting config mirror operation")
+      const main = getMainClient()
+      const analytics = getAnalyticsClient()
 
-  const summary: MirrorSummary = {
-    orgsProcessed: 0,
-    vendorsProcessed: 0,
-    plantsProcessed: 0,
-    orgsUpdated: 0,
-    vendorsUpdated: 0,
-    plantsUpdated: 0,
-  }
+      const summary: MirrorSummary = {
+        orgsProcessed: 0,
+        vendorsProcessed: 0,
+        plantsProcessed: 0,
+        orgsUpdated: 0,
+        vendorsUpdated: 0,
+        plantsUpdated: 0,
+      }
 
-  // Mirror organizations
-  logger.info("[Analytics Mirror] Fetching organizations from main DB")
-  const { data: orgs, error: orgError } = await main.from("organizations").select("*")
-  if (orgError) {
-    logger.error("[Analytics Mirror] Failed to fetch organizations from main DB", { error: orgError.message })
-    throw orgError
-  }
+      // Mirror organizations
+      logger.info("[Analytics Mirror] Fetching organizations from main DB")
+      const { data: orgs, error: orgError } = await main.from("organizations").select("*")
+      if (orgError) {
+        logger.error("[Analytics Mirror] Failed to fetch organizations from main DB", { error: orgError.message })
+        throw orgError
+      }
 
-  logger.info(`[Analytics Mirror] Found ${orgs?.length || 0} organizations to mirror`)
-  const now = new Date().toISOString()
+      logger.info(`[Analytics Mirror] Found ${orgs?.length || 0} organizations to mirror`)
+      const now = new Date().toISOString()
 
-  for (const org of orgs || []) {
+      for (const org of orgs || []) {
     summary.orgsProcessed++
     const clean = stripTimestamps(org as any)
     const hash = computeHash(clean)
@@ -102,22 +114,22 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
       throw error
     }
 
-    summary.orgsUpdated++
-  }
+        summary.orgsUpdated++
+      }
 
-  logger.info(`[Analytics Mirror] Organizations mirror complete - Processed: ${summary.orgsProcessed}, Updated: ${summary.orgsUpdated}`)
+      logger.info(`[Analytics Mirror] Organizations mirror complete - Processed: ${summary.orgsProcessed}, Updated: ${summary.orgsUpdated}`)
 
-  // Mirror vendors
-  logger.info("[Analytics Mirror] Fetching vendors from main DB")
-  const { data: vendors, error: vendorError } = await main.from("vendors").select("*")
-  if (vendorError) {
-    logger.error("[Analytics Mirror] Failed to fetch vendors from main DB", { error: vendorError.message })
-    throw vendorError
-  }
+      // Mirror vendors
+      logger.info("[Analytics Mirror] Fetching vendors from main DB")
+      const { data: vendors, error: vendorError } = await main.from("vendors").select("*")
+      if (vendorError) {
+        logger.error("[Analytics Mirror] Failed to fetch vendors from main DB", { error: vendorError.message })
+        throw vendorError
+      }
 
-  logger.info(`[Analytics Mirror] Found ${vendors?.length || 0} vendors to mirror`)
+      logger.info(`[Analytics Mirror] Found ${vendors?.length || 0} vendors to mirror`)
 
-  for (const vendor of vendors || []) {
+      for (const vendor of vendors || []) {
     summary.vendorsProcessed++
     const clean = stripTimestamps(vendor as any)
     const hash = computeHash(clean)
@@ -157,41 +169,51 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
       throw error
     }
 
-    summary.vendorsUpdated++
-  }
+        summary.vendorsUpdated++
+      }
 
-  logger.info(`[Analytics Mirror] Vendors mirror complete - Processed: ${summary.vendorsProcessed}, Updated: ${summary.vendorsUpdated}`)
+      logger.info(`[Analytics Mirror] Vendors mirror complete - Processed: ${summary.vendorsProcessed}, Updated: ${summary.vendorsUpdated}`)
 
-  // Mirror plants in batches
-  logger.info("[Analytics Mirror] Starting plants mirror (batched)")
-  const BATCH_SIZE = 100
-  let offset = 0
-  let hasMore = true
-  let batchNumber = 0
+      // Mirror plants in batches with parallel processing for speed
+      logger.info("[Analytics Mirror] Starting plants mirror (batched with parallel processing)")
+      
+      // First, get total count to calculate batches
+      const { count: totalPlants, error: countError } = await main
+        .from("plants")
+        .select("id", { count: "exact", head: true })
+      
+      if (countError) {
+        logger.error("[Analytics Mirror] Failed to count plants", { error: countError.message })
+        throw countError
+      }
 
-  while (hasMore) {
-    batchNumber++
-    const { data: plantsBatch, error: plantError } = await main
-      .from("plants")
-      .select("id, org_id, vendor_id, vendor_plant_id, name, capacity_kw")
-      .range(offset, offset + BATCH_SIZE - 1)
+      const BATCH_SIZE = 500 // Increased batch size for better throughput
+      const MAX_CONCURRENT_BATCHES = 10 // Process up to 10 batches in parallel
+      const totalBatches = Math.ceil((totalPlants || 0) / BATCH_SIZE)
+      
+      logger.info(`[Analytics Mirror] Total plants: ${totalPlants}, Batch size: ${BATCH_SIZE}, Total batches: ${totalBatches}, Max concurrent: ${MAX_CONCURRENT_BATCHES}`)
 
-    if (plantError) {
-      logger.error("[Analytics Mirror] Failed to fetch plants from main DB", { error: plantError.message })
-      throw plantError
-    }
+      // Process batches in parallel with concurrency limit
+      const processBatch = async (batchIndex: number): Promise<{ processed: number; updated: number }> => {
+        const offset = batchIndex * BATCH_SIZE
+        const { data: plantsBatch, error: plantError } = await main
+          .from("plants")
+          .select("id, org_id, vendor_id, vendor_plant_id, name, capacity_kw")
+          .range(offset, offset + BATCH_SIZE - 1)
 
-    if (!plantsBatch || plantsBatch.length === 0) {
-      hasMore = false
-      break
-    }
+        if (plantError) {
+          logger.error("[Analytics Mirror] Failed to fetch plants batch", { batchIndex, offset, error: plantError.message })
+          throw plantError
+        }
 
-    logger.info(`[Analytics Mirror] Processing plants batch ${batchNumber} (${plantsBatch.length} plants, offset: ${offset})`)
+        if (!plantsBatch || plantsBatch.length === 0) {
+          return { processed: 0, updated: 0 }
+        }
 
-    for (const plant of plantsBatch) {
-      summary.plantsProcessed++
-      const { error } = await analytics.from("plants").upsert(
-        {
+        logger.info(`[Analytics Mirror] Processing plants batch ${batchIndex + 1}/${totalBatches} (${plantsBatch.length} plants, offset: ${offset})`)
+
+        // Batch upsert all plants in this batch at once
+        const plantsToUpsert = plantsBatch.map(plant => ({
           id: plant.id,
           org_id: plant.org_id,
           vendor_id: plant.vendor_id,
@@ -199,24 +221,55 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
           plant_name: plant.name,
           capacity_kw: plant.capacity_kw,
           updated_at: now,
-        },
-        { onConflict: "id" }
-      )
+        }))
 
-      if (error) {
-        logger.error("[Analytics Mirror] Failed to upsert plant into analytics DB", { plantId: plant.id, error: error.message })
-        throw error
+        const { error: batchError } = await analytics
+          .from("plants")
+          .upsert(plantsToUpsert, { onConflict: "id" })
+
+        if (batchError) {
+          logger.error("[Analytics Mirror] Failed to batch upsert plants", { 
+            batchIndex: batchIndex + 1,
+            plantCount: plantsBatch.length,
+            error: batchError.message 
+          })
+          throw batchError
+        }
+
+        logger.info(`[Analytics Mirror] Completed batch ${batchIndex + 1}/${totalBatches} (${plantsBatch.length} plants)`)
+        return { processed: plantsBatch.length, updated: plantsBatch.length }
       }
 
-      summary.plantsUpdated++
+      // Process batches in parallel with proper concurrency limiting
+      const batchIndices = Array.from({ length: totalBatches }, (_, i) => i)
+      const results: { processed: number; updated: number }[] = []
+      
+      // Process batches in chunks to limit concurrency
+      for (let i = 0; i < batchIndices.length; i += MAX_CONCURRENT_BATCHES) {
+        const batchChunk = batchIndices.slice(i, i + MAX_CONCURRENT_BATCHES)
+        const chunkNumber = Math.floor(i / MAX_CONCURRENT_BATCHES) + 1
+        const totalChunks = Math.ceil(batchIndices.length / MAX_CONCURRENT_BATCHES)
+        
+        logger.info(`[Analytics Mirror] Processing batch chunk ${chunkNumber}/${totalChunks} (${batchChunk.length} batches in parallel)`)
+        
+        // Process batches in this chunk in parallel
+        const chunkResults = await Promise.all(
+          batchChunk.map(batchIndex => processBatch(batchIndex))
+        )
+        
+        results.push(...chunkResults)
+      }
+
+      // Sum up results
+      for (const result of results) {
+        summary.plantsProcessed += result.processed
+        summary.plantsUpdated += result.updated
+      }
+
+      logger.info(`[Analytics Mirror] Plants mirror complete - Processed: ${summary.plantsProcessed}, Updated: ${summary.plantsUpdated}`)
+      logger.info("[Analytics Mirror] Mirror complete", summary)
+      return summary
     }
-
-    offset += BATCH_SIZE
-    hasMore = plantsBatch.length === BATCH_SIZE
-  }
-
-  logger.info(`[Analytics Mirror] Plants mirror complete - Processed: ${summary.plantsProcessed}, Updated: ${summary.plantsUpdated}`)
-  logger.info("[Analytics Mirror] Mirror complete", summary)
-  return summary
+  )
 }
 
