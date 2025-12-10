@@ -1,22 +1,29 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getMainClient } from "@/lib/supabase/pooled"
 import { logger } from "@/lib/context/logger"
+import MDC from "@/lib/context/mdc"
+import { randomUUID } from "crypto"
 
 export const dynamic = "force-dynamic"
 
-function checkAuth(request: NextRequest): { authorized: boolean; error?: string } {
+function checkAuth(request: NextRequest): { authorized: boolean; error?: string; source?: string; accountType?: string; accountId?: string } {
   // Check CRON_SECRET first (for cron jobs)
-  const secret = process.env.CRON_SECRET
+  const secret = process.env.CRON_SECRET_V2
   if (secret) {
     const authHeader = request.headers.get("authorization") || ""
     const token = authHeader.replace("Bearer ", "")
     if (token === secret) {
-      logger.info("[Auth Check] Reset Was Online Today: Authorized via CRON_SECRET")
-      return { authorized: true }
+      logger.info("[Auth Check] Reset Was Online Today: Authorized via CRON_SECRET", {
+        hasAuthHeader: !!authHeader,
+        tokenLength: token.length,
+        authHeaderPrefix: authHeader?.substring(0, 10),
+      })
+      return { authorized: true, source: "cron" }
     } else {
       logger.warn("[Auth Check] Reset Was Online Today: CRON_SECRET mismatch", {
         hasAuthHeader: !!authHeader,
         tokenLength: token.length,
+        authHeaderPrefix: authHeader?.substring(0, 10),
       })
     }
   } else {
@@ -51,46 +58,132 @@ function checkAuth(request: NextRequest): { authorized: boolean; error?: string 
   logger.info("[Auth Check] Reset Was Online Today: Authorized via session", {
     accountType,
     accountId: sessionData.accountId,
+    email: sessionData.email,
   })
-  return { authorized: true }
+  return { 
+    authorized: true, 
+    source: "user",
+    accountType,
+    accountId: sessionData.accountId,
+  }
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const authCheck = checkAuth(request)
-    if (!authCheck.authorized) {
-      return NextResponse.json({ error: authCheck.error || "Unauthorized" }, { status: 401 })
+  const requestId = randomUUID()
+  
+  // Determine source: if called via CRON_SECRET, it's "cron", otherwise "user" (UI trigger)
+  const authHeader = request.headers.get("authorization") || ""
+  const secret = process.env.CRON_SECRET_V2
+  const isCronCall = secret && authHeader.replace("Bearer ", "") === secret
+  const source = isCronCall ? "cron" : "user"
+  
+  // Get user info for context if available (before auth check)
+  let accountType: string | undefined
+  let userId: string | undefined
+  if (source === "user") {
+    const session = request.cookies.get("session")?.value
+    if (session) {
+      try {
+        const sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+        accountType = sessionData.accountType
+        userId = sessionData.accountId
+      } catch {
+        // Ignore parse errors, will be caught in checkAuth
+      }
     }
-
-    const main = getMainClient()
-    
-    logger.info("[ResetWasOnlineToday] Starting reset of was_online_today flag for all plants")
-
-    const { data: resetResult, error: resetError } = await main.rpc("reset_was_online_today")
-
-    if (resetError) {
-      logger.error("[ResetWasOnlineToday] Reset failed", { error: resetError.message })
-      return NextResponse.json(
-        { success: false, error: resetError.message },
-        { status: 500 }
-      )
-    }
-
-    logger.info("[ResetWasOnlineToday] Reset completed successfully", {
-      plantsReset: resetResult || 0,
-    })
-
-    return NextResponse.json({
-      success: true,
-      plantsReset: resetResult || 0,
-    })
-  } catch (error: any) {
-    logger.error("[ResetWasOnlineToday] Exception during reset", { error: error.message })
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    )
   }
+  
+  return MDC.runAsync(
+    {
+      source,
+      requestId,
+      operation: "reset-was-online-today",
+      accountType,
+      userId,
+    },
+    async () => {
+      try {
+        logger.info("[ResetWasOnlineToday] API request received", {
+          method: request.method,
+          url: request.url,
+          timestamp: new Date().toISOString(),
+        })
+
+        const authCheck = checkAuth(request)
+        if (!authCheck.authorized) {
+          return NextResponse.json(
+            { 
+              error: authCheck.error || "Unauthorized",
+              requestId,
+              traceId: requestId,
+            }, 
+            { status: 401 }
+          )
+        }
+
+        logger.info("[ResetWasOnlineToday] Starting reset of was_online_today flag for all plants", {
+          source: authCheck.source,
+          accountType: authCheck.accountType,
+          accountId: authCheck.accountId,
+        })
+
+        const main = getMainClient()
+        const resetStartTime = Date.now()
+
+        logger.info("[ResetWasOnlineToday] Calling reset_was_online_today database function")
+        const { data: resetResult, error: resetError } = await main.rpc("reset_was_online_today")
+
+        if (resetError) {
+          logger.error("[ResetWasOnlineToday] Reset failed", { 
+            error: resetError.message,
+            errorCode: resetError.code,
+            errorDetails: resetError.details,
+            duration: `${Date.now() - resetStartTime}ms`,
+          })
+          return NextResponse.json(
+            { 
+              success: false, 
+              error: resetError.message,
+              requestId,
+              traceId: requestId,
+            },
+            { status: 500 }
+          )
+        }
+
+        const resetDuration = Date.now() - resetStartTime
+        const plantsReset = resetResult || 0
+
+        logger.info("[ResetWasOnlineToday] Reset completed successfully", {
+          plantsReset,
+          duration: `${resetDuration}ms`,
+          timestamp: new Date().toISOString(),
+        })
+
+        return NextResponse.json({
+          success: true,
+          plantsReset,
+          duration: `${resetDuration}ms`,
+          requestId,
+          traceId: requestId,
+        })
+      } catch (error: any) {
+        logger.error("[ResetWasOnlineToday] Exception during reset", { 
+          error: error.message,
+          stack: error.stack,
+        })
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: error.message,
+            requestId,
+            traceId: requestId,
+          },
+          { status: 500 }
+        )
+      }
+    }
+  )
 }
 
 export async function GET(request: NextRequest) {
