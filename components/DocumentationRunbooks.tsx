@@ -1027,7 +1027,7 @@ export function DocumentationRunbooks() {
                         <strong>Key Components:</strong>
                         <ul className="ml-4 list-disc mt-1 space-y-1">
                           <li><strong>Server:</strong> <code className="bg-background px-1 rounded">server.js</code> - Custom HTTP server with cron initialization</li>
-                          <li><strong>Cron Jobs:</strong> 9 cron jobs running in-process (plant sync, telemetry sync, alerts, WMS, analytics, etc.)</li>
+                          <li><strong>Cron Jobs:</strong> 10 cron jobs running in-process (plant sync, telemetry sync, alerts, WMS site/insolation, disable plants, reset was_online, analytics config mirror, analytics energy snapshot, analytics grid downtime)</li>
                           <li><strong>API Routes:</strong> Next.js API routes (<code className="bg-background px-1 rounded">app/api/</code>)</li>
                           <li><strong>Frontend:</strong> Next.js SSR pages and React components</li>
                           <li><strong>Database:</strong> Supabase (connection pooling via <code className="bg-background px-1 rounded">lib/supabase/pooled.ts</code>)</li>
@@ -1062,6 +1062,7 @@ export function DocumentationRunbooks() {
                                 <li><code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">lambda-disable-plants</code> (triggered daily at 2 AM IST)</li>
                                 <li><code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">lambda-analytics-config-mirror</code> (triggered daily)</li>
                                 <li><code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">lambda-analytics-snapshot</code> (triggered daily at 10 PM IST)</li>
+                                <li><code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">lambda-analytics-grid-downtime</code> (triggered daily at ~10:15 PM IST)</li>
                                 <li><code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">lambda-reset-was-online</code> (triggered daily at 12:05 AM IST)</li>
                               </ul>
                             </li>
@@ -1713,6 +1714,9 @@ export function DocumentationRunbooks() {
                         This section analyzes migrating configuration data to DynamoDB to achieve near-zero database costs 
                         using AWS Free Tier (25 GB storage, 25 read/write units permanently free).
                       </p>
+                      <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-900 text-xs text-muted-foreground">
+                        <strong>Grid downtime note:</strong> Grid downtime analytics (100-day rolling daily + total seconds) currently lives in the Analytics Supabase DB (`plant_grid_downtime_readings`) with cumulative totals continuing from the last known baseline. If we ever move this to DynamoDB, mirror the PK (`plant_id`, `reading_date`) and store a running total per plant to avoid recomputing older windows.
+                      </div>
                     </div>
 
                     {/* DynamoDB Free Tier */}

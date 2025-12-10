@@ -258,8 +258,8 @@ const SystemArchitectureDiagram = () => {
           <Node title="Analytics Database" color="purple" icon="📊" className="min-h-[100px]">
             <div className="font-medium mb-1">Separate Supabase Instance</div>
             <div className="text-[10px] space-y-0.5">
-              <div><strong>Tables:</strong> organizations, vendors, plants, plant_energy_readings, analytics_snapshot_runs</div>
-              <div><strong>Purpose:</strong> Daily energy snapshots (100-day rolling retention)</div>
+              <div><strong>Tables:</strong> organizations, vendors, plants (with capacity_kw), plant_energy_readings, plant_grid_downtime_readings, analytics_snapshot_runs</div>
+              <div><strong>Purpose:</strong> Daily energy snapshots (100-day rolling retention) and grid downtime daily/total (100-day rolling, cumulative totals continue from prior baseline)</div>
               <div><strong>Daily Online Status:</strong> Stored in plant_energy_readings.was_online (copied from main DB during snapshot)</div>
               <div><strong>Mirrored Config:</strong> Organizations, vendors, plants (with hash-based change detection)</div>
               <div><strong>FK Constraints:</strong> All relationships enforced with CASCADE deletes</div>
@@ -331,6 +331,12 @@ const SystemArchitectureDiagram = () => {
               <div className="text-[10px] space-y-0.5">
                 <div>Daily 10 PM IST • Capture energy snapshots</div>
                 <div className="pt-1 border-t border-purple-500/30">→ /api/cron/analytics/snapshot-energy</div>
+              </div>
+            </Node>
+            <Node title="Analytics Grid Downtime Cron" color="purple" icon="⏰" className="min-h-[90px]">
+              <div className="text-[10px] space-y-0.5">
+                <div>Daily 10:15 PM IST • Grid downtime daily + totals (100-day window)</div>
+                <div className="pt-1 border-t border-purple-500/30">→ /api/cron/analytics/grid-downtime</div>
               </div>
             </Node>
           </div>
@@ -3126,6 +3132,12 @@ Unique Constraints:
                       <td className="p-2">30 16 * * *</td>
                     </tr>
                     <tr className="border-b">
+                      <td className="p-2"><code className="bg-background px-1 rounded">ANALYTICS_GRID_DOWNTIME_CRON_SCHEDULE</code></td>
+                      <td className="p-2">Cron (server TZ) for grid downtime analytics (default: 45 16 * * * ≈ 22:15 IST)</td>
+                      <td className="p-2">⚠️ Optional</td>
+                      <td className="p-2">45 16 * * *</td>
+                    </tr>
+                    <tr className="border-b">
                       <td className="p-2"><code className="bg-background px-1 rounded">ANALYTICS_CONFIG_MIRROR_CRON_SCHEDULE</code></td>
                       <td className="p-2">Cron (server TZ) for org/vendor config mirror to analytics (default: 0 19 * * * ≈ 01:00 IST)</td>
                       <td className="p-2">⚠️ Optional</td>
@@ -3173,12 +3185,18 @@ Unique Constraints:
                           <td className="p-2">⚠️ Optional</td>
                           <td className="p-2">true</td>
                         </tr>
-                        <tr className="border-b bg-purple-50 dark:bg-purple-950/10">
-                          <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_ANALYTICS_SNAPSHOT_CRON</code></td>
-                          <td className="p-2">Enable in-process analytics snapshot cron (true/false)</td>
-                          <td className="p-2">⚠️ Optional</td>
-                          <td className="p-2">true</td>
-                        </tr>
+                    <tr className="border-b bg-purple-50 dark:bg-purple-950/10">
+                      <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_ANALYTICS_SNAPSHOT_CRON</code></td>
+                      <td className="p-2">Enable in-process analytics snapshot cron (true/false)</td>
+                      <td className="p-2">⚠️ Optional</td>
+                      <td className="p-2">true</td>
+                    </tr>
+                    <tr className="border-b bg-purple-50 dark:bg-purple-950/10">
+                      <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_ANALYTICS_GRID_DOWNTIME_CRON</code></td>
+                      <td className="p-2">Enable in-process analytics grid downtime cron (true/false)</td>
+                      <td className="p-2">⚠️ Optional</td>
+                      <td className="p-2">true</td>
+                    </tr>
                         <tr className="border-b">
                           <td className="p-2"><code className="bg-background px-1 rounded">ENABLE_RESET_WAS_ONLINE_TODAY_CRON</code></td>
                           <td className="p-2">Enable in-process reset was_online_today cron (true/false)</td>

@@ -160,7 +160,7 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
   while (hasMore) {
     const { data: plantsBatch, error: plantError } = await main
       .from("plants")
-      .select("id, org_id, vendor_id, vendor_plant_id, name")
+      .select("id, org_id, vendor_id, vendor_plant_id, name, capacity_kw")
       .range(offset, offset + BATCH_SIZE - 1)
 
     if (plantError) {
@@ -182,6 +182,7 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
           vendor_id: plant.vendor_id,
           vendor_plant_id: plant.vendor_plant_id,
           plant_name: plant.name,
+          capacity_kw: plant.capacity_kw,
           updated_at: now,
         },
         { onConflict: "id" }

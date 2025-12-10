@@ -116,6 +116,15 @@ app.prepare().then(() => {
           console.log('⏸️ Analytics snapshot cron is disabled (ENABLE_ANALYTICS_SNAPSHOT_CRON=false)')
         }
 
+        // Analytics grid downtime cron
+        const enableAnalyticsGridDowntimeCron = process.env.ENABLE_ANALYTICS_GRID_DOWNTIME_CRON !== 'false'
+        if (enableAnalyticsGridDowntimeCron) {
+          const { startAnalyticsGridDowntimeCron } = require('./lib/cron/analyticsGridDowntimeCron')
+          startAnalyticsGridDowntimeCron()
+        } else {
+          console.log('⏸️ Analytics grid downtime cron is disabled (ENABLE_ANALYTICS_GRID_DOWNTIME_CRON=false)')
+        }
+
         // Reset was_online_today cron (runs daily at 12:05 AM IST to reset flag for new day)
         const enableResetWasOnlineTodayCron = process.env.ENABLE_RESET_WAS_ONLINE_TODAY_CRON !== 'false'
         if (enableResetWasOnlineTodayCron) {
