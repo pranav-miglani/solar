@@ -28,11 +28,18 @@ export async function GET(request: NextRequest) {
 
         if (cronSecret) {
           if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+            logger.warn("[Auth Check] Sync WMS Insolation Morning: CRON_SECRET mismatch or missing", {
+              hasAuthHeader: !!authHeader,
+              authHeaderPrefix: authHeader?.substring(0, 10),
+            })
             return NextResponse.json(
               { error: "Unauthorized" },
               { status: 401 }
             )
           }
+          logger.info("[Auth Check] Sync WMS Insolation Morning: Authorized via CRON_SECRET")
+        } else {
+          logger.debug("[Auth Check] Sync WMS Insolation Morning: CRON_SECRET not configured, allowing request")
         }
 
         // Sync yesterday's insolation (morning sync - safety check)

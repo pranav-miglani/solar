@@ -11,29 +11,47 @@ function checkAuth(request: NextRequest): { authorized: boolean; error?: string 
     const authHeader = request.headers.get("authorization") || ""
     const token = authHeader.replace("Bearer ", "")
     if (token === secret) {
+      logger.info("[Auth Check] Reset Was Online Today: Authorized via CRON_SECRET")
       return { authorized: true }
+    } else {
+      logger.warn("[Auth Check] Reset Was Online Today: CRON_SECRET mismatch", {
+        hasAuthHeader: !!authHeader,
+        tokenLength: token.length,
+      })
     }
+  } else {
+    logger.debug("[Auth Check] Reset Was Online Today: CRON_SECRET not configured, checking session")
   }
 
   // Check session (for manual triggers)
   const session = request.cookies.get("session")?.value
   if (!session) {
+    logger.warn("[Auth Check] Reset Was Online Today: No session cookie found")
     return { authorized: false, error: "Unauthorized" }
   }
 
   let sessionData
   try {
     sessionData = JSON.parse(Buffer.from(session, "base64").toString())
-  } catch {
+  } catch (error) {
+    logger.error("[Auth Check] Reset Was Online Today: Failed to parse session cookie", { error })
     return { authorized: false, error: "Invalid session" }
   }
 
   const accountType = sessionData.accountType as string
   // Only SUPERADMIN and DEVELOPER can trigger
   if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER") {
+    logger.warn("[Auth Check] Reset Was Online Today: Insufficient permissions", {
+      accountType,
+      accountId: sessionData.accountId,
+    })
     return { authorized: false, error: "Forbidden" }
   }
 
+  logger.info("[Auth Check] Reset Was Online Today: Authorized via session", {
+    accountType,
+    accountId: sessionData.accountId,
+  })
   return { authorized: true }
 }
 

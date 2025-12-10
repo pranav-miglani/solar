@@ -29,9 +29,11 @@ export async function GET(request: NextRequest) {
         // If CRON_SECRET is configured, require it
         if (cronSecret) {
           if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+            logger.debug("[Auth Check] Backfill WMS Insolation: CRON_SECRET mismatch, checking session")
             // Check if it's a user request (session-based auth)
             const session = request.cookies.get("session")?.value
             if (!session) {
+              logger.warn("[Auth Check] Backfill WMS Insolation: No CRON_SECRET and no session cookie")
               return NextResponse.json(
                 { error: "Unauthorized" },
                 { status: 401 }
@@ -42,7 +44,8 @@ export async function GET(request: NextRequest) {
             let sessionData
             try {
               sessionData = JSON.parse(Buffer.from(session, "base64").toString())
-            } catch {
+            } catch (error) {
+              logger.error("[Auth Check] Backfill WMS Insolation: Failed to parse session cookie", { error })
               return NextResponse.json(
                 { error: "Invalid session" },
                 { status: 401 }
@@ -52,12 +55,24 @@ export async function GET(request: NextRequest) {
             // Only SUPERADMIN and DEVELOPER can trigger backfill manually
             const accountType = sessionData.accountType as string
             if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER") {
+              logger.warn("[Auth Check] Backfill WMS Insolation: Insufficient permissions", {
+                accountType,
+                accountId: sessionData.accountId,
+              })
               return NextResponse.json(
                 { error: "Forbidden - Only SUPERADMIN and DEVELOPER can trigger backfill" },
                 { status: 403 }
               )
             }
+            logger.info("[Auth Check] Backfill WMS Insolation: Authorized via session", {
+              accountType,
+              accountId: sessionData.accountId,
+            })
+          } else {
+            logger.info("[Auth Check] Backfill WMS Insolation: Authorized via CRON_SECRET")
           }
+        } else {
+          logger.debug("[Auth Check] Backfill WMS Insolation: CRON_SECRET not configured, allowing request")
         }
 
         logger.info(`[WMS Insolation Backfill] Starting 100-day insolation backfill`)

@@ -32,8 +32,15 @@ export async function GET(request: NextRequest) {
 
         if (cronSecret) {
           if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+            logger.warn("[Auth Check] Sync Alerts: CRON_SECRET mismatch or missing", {
+              hasAuthHeader: !!authHeader,
+              authHeaderPrefix: authHeader?.substring(0, 10),
+            })
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
           }
+          logger.info("[Auth Check] Sync Alerts: Authorized via CRON_SECRET")
+        } else {
+          logger.debug("[Auth Check] Sync Alerts: CRON_SECRET not configured, allowing request")
         }
 
         logger.info("🕐 Alert sync cron triggered")
@@ -75,22 +82,32 @@ export async function POST(request: NextRequest) {
       try {
         const session = request.cookies.get("session")?.value
         if (!session) {
+          logger.warn("[Auth Check] Sync Alerts (Manual): No session cookie found")
           return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
         let sessionData: any
         try {
           sessionData = JSON.parse(Buffer.from(session, "base64").toString())
-        } catch {
+        } catch (error) {
+          logger.error("[Auth Check] Sync Alerts (Manual): Failed to parse session cookie", { error })
           return NextResponse.json({ error: "Invalid session" }, { status: 401 })
         }
 
         if (sessionData.accountType !== "SUPERADMIN" && sessionData.accountType !== "DEVELOPER") {
+          logger.warn("[Auth Check] Sync Alerts (Manual): Insufficient permissions", {
+            accountType: sessionData.accountType,
+            accountId: sessionData.accountId,
+          })
           return NextResponse.json(
             { error: "Forbidden - SUPERADMIN and DEVELOPER only" },
             { status: 403 }
           )
         }
+        logger.info("[Auth Check] Sync Alerts (Manual): Authorized via session", {
+          accountType: sessionData.accountType,
+          accountId: sessionData.accountId,
+        })
 
         return MDC.withContextAsync(
           {

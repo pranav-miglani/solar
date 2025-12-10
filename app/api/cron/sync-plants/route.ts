@@ -35,11 +35,18 @@ export async function GET(request: NextRequest) {
 
         if (cronSecret) {
           if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+            logger.warn("[Auth Check] Sync Plants: CRON_SECRET mismatch or missing", {
+              hasAuthHeader: !!authHeader,
+              authHeaderPrefix: authHeader?.substring(0, 10),
+            })
             return NextResponse.json(
               { error: "Unauthorized" },
               { status: 401 }
             )
           }
+          logger.info("[Auth Check] Sync Plants: Authorized via CRON_SECRET")
+        } else {
+          logger.debug("[Auth Check] Sync Plants: CRON_SECRET not configured, allowing request")
         }
 
         // Log current IST time for debugging
@@ -115,24 +122,34 @@ export async function POST(request: NextRequest) {
         // Verify authentication
         const session = request.cookies.get("session")?.value
         if (!session) {
+          logger.warn("[Auth Check] Sync Plants (Manual): No session cookie found")
           return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
         let sessionData
         try {
           sessionData = JSON.parse(Buffer.from(session, "base64").toString())
-        } catch {
+        } catch (error) {
+          logger.error("[Auth Check] Sync Plants (Manual): Failed to parse session cookie", { error })
           return NextResponse.json({ error: "Invalid session" }, { status: 401 })
         }
 
         // SUPERADMIN and DEVELOPER can manually trigger sync
         const accountType = sessionData.accountType as string
         if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER") {
+          logger.warn("[Auth Check] Sync Plants (Manual): Insufficient permissions", {
+            accountType,
+            accountId: sessionData.accountId,
+          })
           return NextResponse.json(
             { error: "Forbidden - SUPERADMIN and DEVELOPER only" },
             { status: 403 }
           )
         }
+        logger.info("[Auth Check] Sync Plants (Manual): Authorized via session", {
+          accountType,
+          accountId: sessionData.accountId,
+        })
 
         // Update MDC context with user info and execute sync
         return MDC.withContextAsync(

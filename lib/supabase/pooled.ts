@@ -32,9 +32,11 @@ export function getMainClient(): SupabaseClient {
   console.log(`📊 [Main DB] Connecting to: ${supabaseUrl}`)
 
   // Create client with custom fetch that uses connection pooling and logging
+  // Cast pooledFetch to match fetch signature (pooledFetch accepts string | URL, but fetch accepts RequestInfo | URL)
+  const loggingFetch = createLoggingFetch(pooledFetch as typeof fetch, "main")
   mainClient = createClient(supabaseUrl, supabaseServiceKey, {
     global: {
-      fetch: createLoggingFetch(pooledFetch, "main"),
+      fetch: loggingFetch,
     },
     db: {
       schema: "public",
@@ -68,9 +70,11 @@ export function getAnalyticsClient(): SupabaseClient {
 
   console.log(`📊 [Analytics DB] Connecting to: ${analyticsUrl}`)
 
+  // Cast pooledFetch to match fetch signature
+  const analyticsLoggingFetch = createLoggingFetch(pooledFetch as typeof fetch, "analytics")
   analyticsClient = createClient(analyticsUrl, analyticsServiceKey, {
     global: {
-      fetch: createLoggingFetch(pooledFetch, "analytics"),
+      fetch: analyticsLoggingFetch,
     },
     db: {
       schema: "public",
@@ -97,29 +101,35 @@ function createLoggingFetch(fetchFn: typeof fetch, dbName: string): typeof fetch
     return fetchFn as typeof fetch
   }
   
-  return async function (url: string | URL, options?: RequestInit): Promise<Response> {
+  return async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     const startTime = Date.now()
-    const urlObj = typeof url === "string" ? new URL(url) : url
+    
+    // Extract URL from input (handles string, URL, or Request)
+    let urlStr: string
+    if (typeof input === "string") {
+      urlStr = input
+    } else if (input instanceof URL) {
+      urlStr = input.toString()
+    } else {
+      // It's a Request object
+      urlStr = input.url
+    }
+    
+    const urlObj = new URL(urlStr)
     const pathname = urlObj.pathname
     
-    // Extract table name and operation from PostgREST URL
-    // Format: /rest/v1/table_name or /rest/v1/rpc/function_name
-    const restMatch = pathname.match(/\/rest\/v1\/(.+)$/)
-    const resource = restMatch ? restMatch[1] : pathname
-    
     // Determine operation from HTTP method
-    const method = options?.method || "GET"
-    let operation = method
+    const method = init?.method || (typeof input !== "string" && !(input instanceof URL) ? input.method : "GET") || "GET"
     
     // Log the request
     logger.debug(`[SQL:${dbName}] ${method} ${pathname}${urlObj.search ? `?${urlObj.search}` : ""}`)
     
     // Log request body for POST/PATCH/PUT
-    if (options?.body && (method === "POST" || method === "PATCH" || method === "PUT")) {
+    if (init?.body && (method === "POST" || method === "PATCH" || method === "PUT")) {
       try {
-        const bodyStr = typeof options.body === "string" 
-          ? options.body 
-          : JSON.stringify(options.body)
+        const bodyStr = typeof init.body === "string" 
+          ? init.body 
+          : JSON.stringify(init.body)
         const truncatedBody = bodyStr.length > 500 ? bodyStr.substring(0, 500) + "..." : bodyStr
         logger.debug(`[SQL:${dbName}] Request body: ${truncatedBody}`)
       } catch (e) {
@@ -128,7 +138,7 @@ function createLoggingFetch(fetchFn: typeof fetch, dbName: string): typeof fetch
     }
     
     try {
-      const response = await fetchFn(url, options)
+      const response = await fetchFn(input, init)
       const duration = Date.now() - startTime
       
       // Clone response to read body without consuming it
@@ -136,7 +146,6 @@ function createLoggingFetch(fetchFn: typeof fetch, dbName: string): typeof fetch
       
       // Log response status and size
       const contentType = response.headers.get("content-type") || ""
-      const contentLength = response.headers.get("content-length")
       
       if (!response.ok) {
         // For errors, log the error response

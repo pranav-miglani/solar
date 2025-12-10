@@ -22,8 +22,15 @@ export async function POST(request: NextRequest) {
 
         if (cronSecret) {
           if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+            logger.warn("[Auth Check] Analytics Grid Downtime: CRON_SECRET mismatch or missing", {
+              hasAuthHeader: !!authHeader,
+              authHeaderPrefix: authHeader?.substring(0, 10),
+            })
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
           }
+          logger.info("[Auth Check] Analytics Grid Downtime: Authorized via CRON_SECRET")
+        } else {
+          logger.debug("[Auth Check] Analytics Grid Downtime: CRON_SECRET not configured, allowing request")
         }
 
         const summary = await runGridDowntimeAnalytics()

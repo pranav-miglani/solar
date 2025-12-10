@@ -27,11 +27,18 @@ export async function GET(request: NextRequest) {
 
         if (cronSecret) {
           if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+            logger.warn("[Auth Check] Sync WMS Sites: CRON_SECRET mismatch or missing", {
+              hasAuthHeader: !!authHeader,
+              authHeaderPrefix: authHeader?.substring(0, 10),
+            })
             return NextResponse.json(
               { error: "Unauthorized" },
               { status: 401 }
             )
           }
+          logger.info("[Auth Check] Sync WMS Sites: Authorized via CRON_SECRET")
+        } else {
+          logger.debug("[Auth Check] Sync WMS Sites: CRON_SECRET not configured, allowing request")
         }
 
         logger.info("[WMS Site Sync Cron] Starting WMS site sync")
