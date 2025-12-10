@@ -13,6 +13,7 @@ const WINDOW_DAYS = 100
 const TIME_ZONE = "Asia/Kolkata"
 
 type AlertRecord = {
+  plant_id: number
   alert_time: string | null
   end_time: string | null
 }
@@ -188,6 +189,118 @@ export async function runGridDowntimeAnalytics(days: number = WINDOW_DAYS): Prom
     totalDatesToProcess: days,
   })
 
+  // ============================================
+  // PHASE 2: BATCH QUERIES (Optimization)
+  // ============================================
+  // Instead of 3514 individual queries, fetch all data in 2 batch queries:
+  // 1. All alerts for all plants (1 query)
+  // 2. All baselines for all plants (1 query)
+  // ============================================
+
+  // Batch fetch all alerts for all plants
+  logger.info("[Grid Downtime] Batch fetching all alerts for all plants")
+  const alertsBatchStartTime = Date.now()
+  const { data: allAlerts, error: alertsBatchError } = await main
+    .from("alerts")
+    .select("plant_id, alert_time, end_time")
+    .eq("description", "GRID_DOWN")
+    .lte("alert_time", windowEnd.toISOString())
+    .or(`end_time.is.null,end_time.gte.${windowStart.toISOString()}`)
+
+  if (alertsBatchError) {
+    logger.error("[Grid Downtime] Failed to batch fetch alerts", {
+      error: alertsBatchError.message,
+    })
+    throw alertsBatchError
+  }
+
+  const totalAlerts = allAlerts?.length || 0
+  logger.info("[Grid Downtime] Batch alerts fetched", {
+    totalAlerts,
+    duration: `${Date.now() - alertsBatchStartTime}ms`,
+  })
+
+  // Group alerts by plant_id in memory
+  const alertsByPlant = new Map<number, AlertRecord[]>()
+  for (const alert of allAlerts || []) {
+    if (!alert.plant_id) continue
+    if (!alertsByPlant.has(alert.plant_id)) {
+      alertsByPlant.set(alert.plant_id, [])
+    }
+    alertsByPlant.get(alert.plant_id)!.push({
+      plant_id: alert.plant_id,
+      alert_time: alert.alert_time,
+      end_time: alert.end_time,
+    })
+  }
+
+  logger.info("[Grid Downtime] Alerts grouped by plant", {
+    plantsWithAlerts: alertsByPlant.size,
+    totalAlerts,
+  })
+
+  // Batch fetch all baselines for all plants
+  logger.info("[Grid Downtime] Batch fetching all baselines for all plants")
+  const baselineBatchStartTime = Date.now()
+  const windowStartIST = toIstDateString(windowStart)
+  
+  // Fetch all baselines, then group by plant_id in memory
+  // Using raw SQL with DISTINCT ON for optimal performance
+  const { data: allBaselines, error: baselineBatchError } = await analytics
+    .from("plant_grid_downtime_readings")
+    .select("plant_id, total_grid_down_seconds, reading_date")
+    .lt("reading_date", windowStartIST)
+    .order("plant_id", { ascending: true })
+    .order("reading_date", { ascending: false })
+
+  if (baselineBatchError) {
+    logger.error("[Grid Downtime] Failed to batch fetch baselines", {
+      error: baselineBatchError.message,
+    })
+    throw baselineBatchError
+  }
+
+  // Group by plant_id and keep only the latest (highest reading_date) for each plant
+  const baselineMap = new Map<number, number | null>()
+  const plantBaselineDates = new Map<number, string>()
+  
+  for (const baseline of allBaselines || []) {
+    if (!baseline.plant_id) continue
+    
+    // If we haven't seen this plant yet, or this date is newer, update
+    const existingDate = plantBaselineDates.get(baseline.plant_id)
+    if (!existingDate || baseline.reading_date > existingDate) {
+      baselineMap.set(
+        baseline.plant_id,
+        typeof baseline.total_grid_down_seconds === "number"
+          ? baseline.total_grid_down_seconds
+          : null
+      )
+      plantBaselineDates.set(baseline.plant_id, baseline.reading_date)
+    }
+  }
+
+  logger.info("[Grid Downtime] Baselines fetched and grouped", {
+    plantsWithBaselines: baselineMap.size,
+    totalBaselineRows: allBaselines?.length || 0,
+    duration: `${Date.now() - baselineBatchStartTime}ms`,
+  })
+
+  // Prepare ordered dates for window (compute once, reuse for all plants)
+  const dates: string[] = []
+  let cursor = windowStart
+  while (cursor <= windowEnd) {
+    dates.push(toIstDateString(cursor))
+    cursor = addDays(cursor, 1)
+  }
+
+  logger.info("[Grid Downtime] Date range prepared", {
+    dateCount: dates.length,
+    firstDate: dates[0],
+    lastDate: dates[dates.length - 1],
+  })
+
+  // Process each plant using pre-fetched data
   const PROGRESS_LOG_INTERVAL = 100 // Log progress every N plants
   let plantIndex = 0
 
@@ -208,31 +321,14 @@ export async function runGridDowntimeAnalytics(days: number = WINDOW_DAYS): Prom
       })
     }
 
-    // Fetch relevant alerts for this plant within window
-    const alertsFetchStartTime = Date.now()
-    const { data: alerts, error: alertError } = await main
-      .from("alerts")
-      .select("alert_time, end_time")
-      .eq("plant_id", plant.id)
-      .eq("description", "GRID_DOWN")
-      .lte("alert_time", windowEnd.toISOString())
-      .or(`end_time.is.null,end_time.gte.${windowStart.toISOString()}`)
+    // Get alerts for this plant from pre-fetched data
+    const alerts = alertsByPlant.get(plant.id) || []
+    const alertCount = alerts.length
 
-    if (alertError) {
-      logger.error("[Grid Downtime] Failed to fetch alerts", {
-        plantId: plant.id,
-        plantName: plant.name,
-        error: alertError.message,
-      })
-      continue
-    }
-
-    const alertCount = alerts?.length || 0
     if (plantIndex % PROGRESS_LOG_INTERVAL === 0 || plantIndex === 1) {
-      logger.info("[Grid Downtime] Alerts fetched for plant", {
+      logger.info("[Grid Downtime] Alerts retrieved for plant (from batch)", {
         plantId: plant.id,
         alertCount,
-        duration: `${Date.now() - alertsFetchStartTime}ms`,
       })
     }
 
@@ -256,46 +352,19 @@ export async function runGridDowntimeAnalytics(days: number = WINDOW_DAYS): Prom
       })
     }
 
-    // Prepare ordered dates for window
-    const dates: string[] = []
-    let cursor = windowStart
-    while (cursor <= windowEnd) {
-      dates.push(toIstDateString(cursor))
-      cursor = addDays(cursor, 1)
-    }
+    // Get baseline total from pre-fetched data
+    const lastTotal = baselineMap.get(plant.id) ?? null
 
-    // Get baseline total from the last reading before windowStart
-    let lastTotal: number | null = null
-    const baselineFetchStartTime = Date.now()
-    const { data: baselineRow, error: baselineError } = await analytics
-      .from("plant_grid_downtime_readings")
-      .select("total_grid_down_seconds, reading_date")
-      .eq("plant_id", plant.id)
-      .lt("reading_date", toIstDateString(windowStart))
-      .order("reading_date", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (baselineError) {
-      logger.error("[Grid Downtime] Failed to fetch baseline total", {
-        plantId: plant.id,
-        error: baselineError.message,
-      })
-    } else if (baselineRow && typeof baselineRow.total_grid_down_seconds === "number") {
-      lastTotal = baselineRow.total_grid_down_seconds
-      if (plantIndex % PROGRESS_LOG_INTERVAL === 0 || plantIndex === 1) {
-        logger.info("[Grid Downtime] Baseline total found", {
+    if (plantIndex % PROGRESS_LOG_INTERVAL === 0 || plantIndex === 1) {
+      if (lastTotal !== null && lastTotal !== undefined) {
+        logger.info("[Grid Downtime] Baseline total found (from batch)", {
           plantId: plant.id,
           baselineTotal: lastTotal,
-          baselineDate: baselineRow.reading_date,
-          duration: `${Date.now() - baselineFetchStartTime}ms`,
+          baselineDate: plantBaselineDates.get(plant.id),
         })
-      }
-    } else {
-      if (plantIndex % PROGRESS_LOG_INTERVAL === 0 || plantIndex === 1) {
+      } else {
         logger.info("[Grid Downtime] No baseline total found (first-time computation)", {
           plantId: plant.id,
-          duration: `${Date.now() - baselineFetchStartTime}ms`,
         })
       }
     }
@@ -309,11 +378,14 @@ export async function runGridDowntimeAnalytics(days: number = WINDOW_DAYS): Prom
       daily_grid_down_seconds: number
       total_grid_down_seconds: number
     }[] = []
+    
+    // Use let since we need to update it in the loop
+    let currentTotal: number | null = lastTotal
     for (const dateKey of dates) {
       const daily = dailySeconds.get(dateKey) || 0
       summary.daysProcessed++
-      const total: number = lastTotal === null ? daily : lastTotal + daily
-      lastTotal = total
+      const total: number = currentTotal === null ? daily : currentTotal + daily
+      currentTotal = total
 
       rows.push({
         org_id: plant.org_id,
