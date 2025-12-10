@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic"
 
 function checkAuth(request: NextRequest): { authorized: boolean; error?: string } {
   // Check CRON_SECRET first (for cron jobs)
-  const secret = process.env.CRON_SECRET
+  const secret = process.env.CRON_SECRET_V2
   if (secret) {
     const authHeader = request.headers.get("authorization") || ""
     const token = authHeader.replace("Bearer ", "")
