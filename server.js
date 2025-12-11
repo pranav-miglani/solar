@@ -73,13 +73,14 @@ app.prepare().then(() => {
 
         // Live telemetry sync cron (updates current_power_kw, daily_energy_kwh, etc.)
         const enableLiveTelemetryCron = process.env.ENABLE_LIVE_TELEMETRY_SYNC_CRON !== 'false'
+        console.log('[INFO] [Server] ENABLE_LIVE_TELEMETRY_SYNC_CRON:', process.env.ENABLE_LIVE_TELEMETRY_SYNC_CRON, '| Enabled:', enableLiveTelemetryCron)
         if (enableLiveTelemetryCron) {
-          logger.info('🔄 Starting live telemetry sync cron...')
+          console.log('[INFO] [Server] 🔄 Starting live telemetry sync cron...')
           const { startLiveTelemetrySyncCron } = require('./lib/cron/liveTelemetrySyncCron')
           startLiveTelemetrySyncCron()
-          logger.info('✅ Live telemetry sync cron started successfully')
+          console.log('[INFO] [Server] ✅ Live telemetry sync cron started successfully')
         } else {
-          logger.info('⏸️ Live telemetry sync cron is disabled (ENABLE_LIVE_TELEMETRY_SYNC_CRON=false)')
+          console.log('[INFO] [Server] ⏸️ Live telemetry sync cron is disabled (ENABLE_LIVE_TELEMETRY_SYNC_CRON=false)')
         }
 
         // // Disable inactive plants cron (runs daily at 2 AM IST)
@@ -145,11 +146,9 @@ app.prepare().then(() => {
         // } else {
         //   console.log('⏸️ Reset was_online_today cron is disabled (ENABLE_RESET_WAS_ONLINE_TODAY_CRON=false)')
         // }
-          } catch (error) {
-            logger.error('Failed to start cron job(s):', error)
-          }
-        }
-      )
+      } catch (error) {
+        console.error('[ERROR] [Server] Failed to start cron job(s):', error)
+      }
     }, 2000) // Wait 2 seconds for Next.js to finish compilation
   })
 })
