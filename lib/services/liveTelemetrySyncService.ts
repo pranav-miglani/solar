@@ -64,6 +64,7 @@ function shouldSyncVendorTelemetry(vendor: any): boolean {
     hour12: false,
   }).formatToParts(now)
   
+  const currentHour = parseInt(kolkataTime.find((part) => part.type === "hour")?.value || "0")
   const currentMinute = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
   
   // Calculate which intervals have passed in this hour
@@ -74,7 +75,16 @@ function shouldSyncVendorTelemetry(vendor: any): boolean {
   
   // Check if current minute matches an interval boundary
   const expectedMinute = currentInterval * intervalMinutes
-  return currentMinute === expectedMinute
+  const shouldSync = currentMinute === expectedMinute
+  
+  // Log the interval check calculation for debugging
+  logger.debug(
+    `[LiveTelemetry] Interval check for vendor ${vendor.name}: ` +
+    `interval=${intervalMinutes}min, current=${currentHour}:${currentMinute.toString().padStart(2, "0")} IST, ` +
+    `expected_minute=${expectedMinute}, should_sync=${shouldSync}`
+  )
+  
+  return shouldSync
 }
 
 /**
@@ -552,9 +562,11 @@ export async function syncAllLiveTelemetry(): Promise<LiveTelemetrySummary> {
     },
     async () => {
       try {
+        logger.info("[LiveTelemetry] 🔄 Starting live telemetry sync service")
         const supabase = getMainClient()
 
         // Get all active vendors with their organization sync settings
+        logger.info("[LiveTelemetry] Fetching active vendors from database...")
         const { data: vendors, error: vendorsError } = await supabase
           .from("vendors")
           .select(`
@@ -569,61 +581,88 @@ export async function syncAllLiveTelemetry(): Promise<LiveTelemetrySummary> {
           .not("org_id", "is", null)
 
         if (vendorsError) {
+          logger.error(`[LiveTelemetry] ❌ Failed to fetch vendors: ${vendorsError.message}`)
           throw new Error(`Failed to fetch vendors: ${vendorsError.message}`)
         }
+        
+        logger.info(`[LiveTelemetry] Fetched ${vendors?.length || 0} active vendor(s) from database`)
 
         if (!vendors || vendors.length === 0) {
           logger.info("[LiveTelemetry] No active vendors found")
           return summary
         }
 
+        logger.info(`[LiveTelemetry] Found ${vendors.length} active vendor(s) to check for telemetry sync`)
+
+        // Get current IST time for logging
+        const now = new Date()
+        const kolkataTime = new Intl.DateTimeFormat("en-US", {
+          timeZone: "Asia/Kolkata",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).formatToParts(now)
+        const currentHour = parseInt(kolkataTime.find((part) => part.type === "hour")?.value || "0")
+        const currentMinute = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
+        const currentTimeStr = `${currentHour}:${currentMinute.toString().padStart(2, "0")} IST`
+        
+        logger.info(`[LiveTelemetry] Current time: ${currentTimeStr}`)
+
         // Filter vendors by org-level auto_sync_enabled and telemetry sync interval
-        const vendorsToSync = vendors.filter((vendor) => {
+        const vendorsToSync: any[] = []
+        const skippedVendors: Array<{ vendor: string; reason: string }> = []
+
+        vendors.forEach((vendor) => {
           // Check org-level auto_sync_enabled first
           const org = vendor.organizations
           if (!org) {
-            logger.warn(`⚠️ Organization not found for vendor ${vendor.id} (${vendor.name}), skipping telemetry sync`)
-            return false
+            const reason = `Organization not found for vendor ${vendor.id} (${vendor.name})`
+            logger.warn(`[LiveTelemetry] ⚠️ ${reason}`)
+            skippedVendors.push({ vendor: vendor.name, reason })
+            return
           }
 
           if (!org.auto_sync_enabled) {
-            logger.info(
-              `⏭️ Skipping telemetry sync for vendor ${vendor.id} (${vendor.name}): ` +
-              `auto_sync_enabled=false for org ${org.id} (${org.name})`
-            )
-            return false
+            const reason = `auto_sync_enabled=false for org ${org.id} (${org.name})`
+            logger.info(`[LiveTelemetry] ⏭️ Skipping vendor ${vendor.id} (${vendor.name}): ${reason}`)
+            skippedVendors.push({ vendor: vendor.name, reason })
+            return
           }
 
           // Then check if it's time to sync based on telemetry_sync_interval
+          const interval = vendor.telemetry_sync_interval || 15
           const shouldSync = shouldSyncVendorTelemetry(vendor)
+          
           if (!shouldSync) {
-            const now = new Date()
-            const kolkataTime = new Intl.DateTimeFormat("en-US", {
-              timeZone: "Asia/Kolkata",
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            }).formatToParts(now)
-            const currentHour = parseInt(kolkataTime.find((part) => part.type === "hour")?.value || "0")
-            const currentMinute = parseInt(kolkataTime.find((part) => part.type === "minute")?.value || "0")
-            const interval = vendor.telemetry_sync_interval || 15
-            
-            logger.debug(
-              `[LiveTelemetry] Skipping vendor ${vendor.name}: ` +
-              `interval=${interval}min, current IST time=${currentHour}:${currentMinute.toString().padStart(2, "0")}, ` +
-              `doesn't match interval boundary`
-            )
+            const reason = `interval=${interval}min, current time=${currentTimeStr} doesn't match interval boundary (syncs at :00, :${interval}, :${interval * 2}, etc.)`
+            logger.info(`[LiveTelemetry] ⏭️ Skipping vendor ${vendor.id} (${vendor.name}): ${reason}`)
+            skippedVendors.push({ vendor: vendor.name, reason })
+            return
           }
-          return shouldSync
+
+          // Vendor passed all checks
+          vendorsToSync.push(vendor)
+          logger.info(
+            `[LiveTelemetry] ✅ Vendor ${vendor.id} (${vendor.name}) scheduled for sync: ` +
+            `interval=${interval}min, org=${org.name}, sync_enabled=true`
+          )
         })
 
         if (vendorsToSync.length === 0) {
-          logger.info("[LiveTelemetry] No vendors to sync at this time (interval check)")
+          logger.info(
+            `[LiveTelemetry] No vendors to sync at this time. ` +
+            `Checked ${vendors.length} vendor(s), skipped ${skippedVendors.length}: ` +
+            skippedVendors.map((s) => `${s.vendor} (${s.reason})`).join("; ")
+          )
           return summary
         }
 
         summary.totalVendors = vendorsToSync.length
-        logger.info(`[LiveTelemetry] Starting sync for ${vendorsToSync.length} vendors (filtered from ${vendors.length} total)`)
+        logger.info(
+          `[LiveTelemetry] Starting sync for ${vendorsToSync.length} vendor(s) ` +
+          `(filtered from ${vendors.length} total): ` +
+          vendorsToSync.map((v) => `${v.name} (ID: ${v.id})`).join(", ")
+        )
 
         // Group vendors by organization for parallel processing
         const vendorsByOrg = new Map<number, any[]>()
@@ -662,6 +701,10 @@ export async function syncAllLiveTelemetry(): Promise<LiveTelemetrySummary> {
               const orgVendorResults: VendorLiveTelemetryResult[] = []
 
               for (const vendor of vendors) {
+                logger.info(
+                  `[LiveTelemetry] Processing vendor ${vendor.id} (${vendor.name}) ` +
+                  `for org ${orgId} (${vendors.indexOf(vendor) + 1}/${vendors.length} in org)`
+                )
                 const result = await syncVendorLiveTelemetry(vendor, supabase)
                 orgVendorResults.push(result)
 
