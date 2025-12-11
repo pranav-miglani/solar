@@ -14,8 +14,26 @@ if (process.env.NEW_RELIC_ENABLED === 'true') {
 const { createServer } = require('http')
 const { parse } = require('url')
 const next = require('next')
-const MDC = require('./lib/context/mdc').default
-const { logger } = require('./lib/context/logger')
+
+// Try to load logger and MDC, fallback to console if not available (during build)
+let MDC, logger
+try {
+  MDC = require('./lib/context/mdc').default
+  logger = require('./lib/context/logger').logger
+} catch (error) {
+  // Fallback to console if TypeScript files aren't compiled yet
+  console.warn('Logger/MDC not available, using console fallback:', error.message)
+  MDC = {
+    run: (context, fn) => fn(),
+    runAsync: async (context, fn) => await fn(),
+  }
+  logger = {
+    info: (...args) => console.log(...args),
+    error: (...args) => console.error(...args),
+    warn: (...args) => console.warn(...args),
+    debug: (...args) => console.debug(...args),
+  }
+}
 
 const dev = process.env.NODE_ENV !== 'production'
 const hostname = 'localhost'
