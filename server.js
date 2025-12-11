@@ -16,29 +16,52 @@ const { parse } = require('url')
 const next = require('next')
 
 // Load logger and MDC - these are TypeScript files that Next.js compiles
-// In production, Next.js compiles them during build, so they should be available
-// If not available, we'll load them after Next.js prepares (in the app.prepare() callback)
+// We'll load them after Next.js prepares (in the app.prepare() callback)
+// to ensure TypeScript files are compiled and available
 let MDC, logger
 
 function loadLoggerAndMDC() {
   try {
-    if (!MDC || !logger) {
-      MDC = require('./lib/context/mdc').default
-      logger = require('./lib/context/logger').logger
+    // Try to load TypeScript files - Next.js should have compilation hooks active after app.prepare()
+    const mdcModule = require('./lib/context/mdc')
+    const loggerModule = require('./lib/context/logger')
+    
+    if (!mdcModule || !mdcModule.default) {
+      throw new Error('MDC module not found or invalid')
     }
-    return { MDC, logger }
+    if (!loggerModule || !loggerModule.logger) {
+      throw new Error('Logger module not found or invalid')
+    }
+    
+    return { 
+      MDC: mdcModule.default, 
+      logger: loggerModule.logger 
+    }
   } catch (error) {
-    // If not available yet, return console fallback
+    // If not available, return console fallback
+    // This can happen if TypeScript files aren't compiled yet or path is wrong
+    console.warn('[Server] Logger/MDC not available, using console fallback:', error.message)
+    console.warn('[Server] Error details:', {
+      code: error.code,
+      path: error.path || './lib/context/mdc',
+      stack: error.stack,
+    })
     return {
       MDC: {
         run: (context, fn) => fn(),
         runAsync: async (context, fn) => await fn(),
       },
       logger: {
-        info: (...args) => console.log(...args),
-        error: (...args) => console.error(...args),
-        warn: (...args) => console.warn(...args),
-        debug: (...args) => console.debug(...args),
+        info: (...args) => console.log('[INFO]', ...args),
+        error: (msg, ...args) => {
+          if (args[0] instanceof Error) {
+            console.error('[ERROR]', msg, args[0].message, args[0].stack)
+          } else {
+            console.error('[ERROR]', msg, ...args)
+          }
+        },
+        warn: (...args) => console.warn('[WARN]', ...args),
+        debug: (...args) => console.debug('[DEBUG]', ...args),
       },
     }
   }
@@ -53,10 +76,18 @@ const app = next({ dev, hostname, port })
 const handle = app.getRequestHandler()
 
 app.prepare().then(() => {
-  // Load logger and MDC after Next.js prepares (TypeScript files are now compiled)
-  const { MDC: MDCInstance, logger: loggerInstance } = loadLoggerAndMDC()
-  MDC = MDCInstance
-  logger = loggerInstance
+  // Load logger and MDC after Next.js prepares (TypeScript files are now compiled/available)
+  // Next.js sets up TypeScript compilation hooks during prepare(), so TS files can be required
+  const loaded = loadLoggerAndMDC()
+  MDC = loaded.MDC
+  logger = loaded.logger
+  
+  // Log if we're using fallback (shouldn't happen after app.prepare())
+  if (!loaded.MDC || !loaded.logger || typeof loaded.logger.info !== 'function') {
+    console.warn('[Server] Warning: Using console fallback for logger - TypeScript files may not be available')
+  } else {
+    logger.info('[Server] Logger and MDC loaded successfully')
+  }
   
   // Create HTTP server first
   createServer(async (req, res) => {
