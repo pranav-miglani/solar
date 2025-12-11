@@ -14,6 +14,8 @@ if (process.env.NEW_RELIC_ENABLED === 'true') {
 const { createServer } = require('http')
 const { parse } = require('url')
 const next = require('next')
+const MDC = require('./lib/context/mdc').default
+const { logger } = require('./lib/context/logger')
 
 const dev = process.env.NODE_ENV !== 'production'
 const hostname = 'localhost'
@@ -30,18 +32,38 @@ app.prepare().then(() => {
       const parsedUrl = parse(req.url, true)
       await handle(req, res, parsedUrl)
     } catch (err) {
-      console.error('Error occurred handling', req.url, err)
+      logger.error('Error occurred handling request', {
+        url: req.url,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      })
       res.statusCode = 500
       res.end('internal server error')
     }
   }).listen(port, (err) => {
     if (err) throw err
-    console.log(`> Ready on http://${hostname}:${port}`)
+    
+    // Initialize MDC context for server startup
+    MDC.run(
+      {
+        source: 'system',
+        operation: 'server-startup',
+      },
+      () => {
+        logger.info(`> Ready on http://${hostname}:${port}`)
+      }
+    )
     
     // Start the cron jobs after server is ready.
     // Use setTimeout to ensure Next.js compilation is complete.
     setTimeout(() => {
-      try {
+      MDC.run(
+        {
+          source: 'system',
+          operation: 'cron-initialization',
+        },
+        () => {
+          try {
         // moving below to github actions
         // // Plant sync cron
         // const enablePlantCron = process.env.ENABLE_PLANT_SYNC_CRON !== 'false'
@@ -64,10 +86,12 @@ app.prepare().then(() => {
         // Live telemetry sync cron (updates current_power_kw, daily_energy_kwh, etc.)
         const enableLiveTelemetryCron = process.env.ENABLE_LIVE_TELEMETRY_SYNC_CRON !== 'false'
         if (enableLiveTelemetryCron) {
+          logger.info('🔄 Starting live telemetry sync cron...')
           const { startLiveTelemetrySyncCron } = require('./lib/cron/liveTelemetrySyncCron')
           startLiveTelemetrySyncCron()
+          logger.info('✅ Live telemetry sync cron started successfully')
         } else {
-          console.log('⏸️ Live telemetry sync cron is disabled (ENABLE_LIVE_TELEMETRY_SYNC_CRON=false)')
+          logger.info('⏸️ Live telemetry sync cron is disabled (ENABLE_LIVE_TELEMETRY_SYNC_CRON=false)')
         }
 
         // // Disable inactive plants cron (runs daily at 2 AM IST)
@@ -133,9 +157,11 @@ app.prepare().then(() => {
         // } else {
         //   console.log('⏸️ Reset was_online_today cron is disabled (ENABLE_RESET_WAS_ONLINE_TODAY_CRON=false)')
         // }
-      } catch (error) {
-        console.error('Failed to start cron job(s):', error)
-      }
+          } catch (error) {
+            logger.error('Failed to start cron job(s):', error)
+          }
+        }
+      )
     }, 2000) // Wait 2 seconds for Next.js to finish compilation
   })
 })
