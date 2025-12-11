@@ -15,63 +15,8 @@ const { createServer } = require('http')
 const { parse } = require('url')
 const next = require('next')
 
-// Load logger and MDC - these are TypeScript files that Next.js compiles
-// We'll load them after Next.js prepares (in the app.prepare() callback)
-// to ensure TypeScript files are compiled and available
-let MDC, logger
-
-function loadLoggerAndMDC() {
-  try {
-    // Use path.join with __dirname to ensure correct path resolution
-    // This handles cases where server.js might be in a subdirectory
-    const path = require('path')
-    const mdcPath = path.join(__dirname, 'lib', 'context', 'mdc')
-    const loggerPath = path.join(__dirname, 'lib', 'context', 'logger')
-    
-    // Try to load TypeScript files - Next.js should have compilation hooks active after app.prepare()
-    const mdcModule = require(mdcPath)
-    const loggerModule = require(loggerPath)
-    
-    if (!mdcModule || !mdcModule.default) {
-      throw new Error('MDC module not found or invalid')
-    }
-    if (!loggerModule || !loggerModule.logger) {
-      throw new Error('Logger module not found or invalid')
-    }
-    
-    return { 
-      MDC: mdcModule.default, 
-      logger: loggerModule.logger 
-    }
-  } catch (error) {
-    // If not available, return console fallback
-    // This can happen if TypeScript files aren't compiled yet or path is wrong
-    console.warn('[Server] Logger/MDC not available, using console fallback:', error.message)
-    console.warn('[Server] Error details:', {
-      code: error.code,
-      path: error.path,
-      requireStack: error.requireStack,
-    })
-    return {
-      MDC: {
-        run: (context, fn) => fn(),
-        runAsync: async (context, fn) => await fn(),
-      },
-      logger: {
-        info: (...args) => console.log('[INFO]', ...args),
-        error: (msg, ...args) => {
-          if (args[0] instanceof Error) {
-            console.error('[ERROR]', msg, args[0].message, args[0].stack)
-          } else {
-            console.error('[ERROR]', msg, ...args)
-          }
-        },
-        warn: (...args) => console.warn('[WARN]', ...args),
-        debug: (...args) => console.debug('[DEBUG]', ...args),
-      },
-    }
-  }
-}
+// Use console.log directly for server.js - simpler and more reliable
+// Cron files handle their own logging
 
 const dev = process.env.NODE_ENV !== 'production'
 const hostname = 'localhost'
@@ -82,18 +27,7 @@ const app = next({ dev, hostname, port })
 const handle = app.getRequestHandler()
 
 app.prepare().then(() => {
-  // Load logger and MDC after Next.js prepares (TypeScript files are now compiled/available)
-  // Next.js sets up TypeScript compilation hooks during prepare(), so TS files can be required
-  const loaded = loadLoggerAndMDC()
-  MDC = loaded.MDC
-  logger = loaded.logger
-  
-  // Log if we're using fallback (shouldn't happen after app.prepare())
-  if (!loaded.MDC || !loaded.logger || typeof loaded.logger.info !== 'function') {
-    console.warn('[Server] Warning: Using console fallback for logger - TypeScript files may not be available')
-  } else {
-    logger.info('[Server] Logger and MDC loaded successfully')
-  }
+  console.log('[INFO] [Server] Next.js app prepared successfully')
   
   // Create HTTP server first
   createServer(async (req, res) => {
@@ -101,7 +35,7 @@ app.prepare().then(() => {
       const parsedUrl = parse(req.url, true)
       await handle(req, res, parsedUrl)
     } catch (err) {
-      logger.error('Error occurred handling request', {
+      console.error('[ERROR] [Server] Error occurred handling request', {
         url: req.url,
         error: err instanceof Error ? err.message : String(err),
         stack: err instanceof Error ? err.stack : undefined,
@@ -112,27 +46,12 @@ app.prepare().then(() => {
   }).listen(port, (err) => {
     if (err) throw err
     
-    // Initialize MDC context for server startup
-    MDC.run(
-      {
-        source: 'system',
-        operation: 'server-startup',
-      },
-      () => {
-        logger.info(`> Ready on http://${hostname}:${port}`)
-      }
-    )
+    console.log(`[INFO] [Server] > Ready on http://${hostname}:${port}`)
     
     // Start the cron jobs after server is ready.
     // Use setTimeout to ensure Next.js compilation is complete.
     setTimeout(() => {
-      MDC.run(
-        {
-          source: 'system',
-          operation: 'cron-initialization',
-        },
-        () => {
-          try {
+      try {
         // moving below to github actions
         // // Plant sync cron
         // const enablePlantCron = process.env.ENABLE_PLANT_SYNC_CRON !== 'false'
