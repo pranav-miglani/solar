@@ -15,23 +15,32 @@ const { createServer } = require('http')
 const { parse } = require('url')
 const next = require('next')
 
-// Try to load logger and MDC, fallback to console if not available (during build)
+// Load logger and MDC - these are TypeScript files that Next.js compiles
+// In production, Next.js compiles them during build, so they should be available
+// If not available, we'll load them after Next.js prepares (in the app.prepare() callback)
 let MDC, logger
-try {
-  MDC = require('./lib/context/mdc').default
-  logger = require('./lib/context/logger').logger
-} catch (error) {
-  // Fallback to console if TypeScript files aren't compiled yet
-  console.warn('Logger/MDC not available, using console fallback:', error.message)
-  MDC = {
-    run: (context, fn) => fn(),
-    runAsync: async (context, fn) => await fn(),
-  }
-  logger = {
-    info: (...args) => console.log(...args),
-    error: (...args) => console.error(...args),
-    warn: (...args) => console.warn(...args),
-    debug: (...args) => console.debug(...args),
+
+function loadLoggerAndMDC() {
+  try {
+    if (!MDC || !logger) {
+      MDC = require('./lib/context/mdc').default
+      logger = require('./lib/context/logger').logger
+    }
+    return { MDC, logger }
+  } catch (error) {
+    // If not available yet, return console fallback
+    return {
+      MDC: {
+        run: (context, fn) => fn(),
+        runAsync: async (context, fn) => await fn(),
+      },
+      logger: {
+        info: (...args) => console.log(...args),
+        error: (...args) => console.error(...args),
+        warn: (...args) => console.warn(...args),
+        debug: (...args) => console.debug(...args),
+      },
+    }
   }
 }
 
@@ -44,6 +53,11 @@ const app = next({ dev, hostname, port })
 const handle = app.getRequestHandler()
 
 app.prepare().then(() => {
+  // Load logger and MDC after Next.js prepares (TypeScript files are now compiled)
+  const { MDC: MDCInstance, logger: loggerInstance } = loadLoggerAndMDC()
+  MDC = MDCInstance
+  logger = loggerInstance
+  
   // Create HTTP server first
   createServer(async (req, res) => {
     try {
