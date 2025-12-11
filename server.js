@@ -52,14 +52,14 @@ app.prepare().then(() => {
         //   console.log('⏸️ Plant sync cron is disabled (ENABLE_PLANT_SYNC_CRON=false)')
         // }
 
-        // Alert sync cron (can be toggled independently)
-        const enableAlertCron = process.env.ENABLE_ALERT_SYNC_CRON !== 'false'
-        if (enableAlertCron) {
-          const { startAlertSyncCron } = require('./lib/cron/alertSyncCron')
-          startAlertSyncCron()
-        } else {
-          console.log('⏸️ Alert sync cron is disabled (ENABLE_ALERT_SYNC_CRON=false)')
-        }
+        // // Alert sync cron (can be toggled independently)
+        // const enableAlertCron = process.env.ENABLE_ALERT_SYNC_CRON !== 'false'
+        // if (enableAlertCron) {
+        //   const { startAlertSyncCron } = require('./lib/cron/alertSyncCron')
+        //   startAlertSyncCron()
+        // } else {
+        //   console.log('⏸️ Alert sync cron is disabled (ENABLE_ALERT_SYNC_CRON=false)')
+        // }
 
         // Live telemetry sync cron (updates current_power_kw, daily_energy_kwh, etc.)
         const enableLiveTelemetryCron = process.env.ENABLE_LIVE_TELEMETRY_SYNC_CRON !== 'false'
@@ -70,69 +70,69 @@ app.prepare().then(() => {
           console.log('⏸️ Live telemetry sync cron is disabled (ENABLE_LIVE_TELEMETRY_SYNC_CRON=false)')
         }
 
-        // Disable inactive plants cron (runs daily at 2 AM IST)
-        const enableDisableInactivePlantsCron = process.env.ENABLE_DISABLE_INACTIVE_PLANTS_CRON !== 'false'
-        if (enableDisableInactivePlantsCron) {
-          const { startDisableInactivePlantsCron } = require('./lib/cron/disableInactivePlantsCron')
-          startDisableInactivePlantsCron()
-        } else {
-          console.log('⏸️ Disable inactive plants cron is disabled (ENABLE_DISABLE_INACTIVE_PLANTS_CRON=false)')
-        }
+        // // Disable inactive plants cron (runs daily at 2 AM IST)
+        // const enableDisableInactivePlantsCron = process.env.ENABLE_DISABLE_INACTIVE_PLANTS_CRON !== 'false'
+        // if (enableDisableInactivePlantsCron) {
+        //   const { startDisableInactivePlantsCron } = require('./lib/cron/disableInactivePlantsCron')
+        //   startDisableInactivePlantsCron()
+        // } else {
+        //   console.log('⏸️ Disable inactive plants cron is disabled (ENABLE_DISABLE_INACTIVE_PLANTS_CRON=false)')
+        // }
 
         // WMS site sync cron (runs twice daily at 6 AM and 10 PM IST)
-        const enableWmsSiteSyncCron = process.env.ENABLE_WMS_SITE_SYNC_CRON !== 'false'
-        if (enableWmsSiteSyncCron) {
-          const { startWmsSiteSyncCron } = require('./lib/cron/wmsSiteSyncCron')
-          startWmsSiteSyncCron()
-        } else {
-          console.log('⏸️ WMS site sync cron is disabled (ENABLE_WMS_SITE_SYNC_CRON=false)')
-        }
+        // const enableWmsSiteSyncCron = process.env.ENABLE_WMS_SITE_SYNC_CRON !== 'false'
+        // if (enableWmsSiteSyncCron) {
+        //   const { startWmsSiteSyncCron } = require('./lib/cron/wmsSiteSyncCron')
+        //   startWmsSiteSyncCron()
+        // } else {
+        //   console.log('⏸️ WMS site sync cron is disabled (ENABLE_WMS_SITE_SYNC_CRON=false)')
+        // }
 
         // WMS insolation sync morning cron (runs daily at 6 AM IST - syncs yesterday's data)
         // Note: End-of-day cron removed - only morning sync for all vendors
-        const enableWmsInsolationSyncMorningCron = process.env.ENABLE_WMS_INSOLATION_SYNC_MORNING_CRON !== 'false'
-        if (enableWmsInsolationSyncMorningCron) {
-          const { startWmsInsolationSyncMorningCron } = require('./lib/cron/wmsInsolationSyncMorningCron')
-          startWmsInsolationSyncMorningCron()
-        } else {
-          console.log('⏸️ WMS insolation sync morning cron is disabled (ENABLE_WMS_INSOLATION_SYNC_MORNING_CRON=false)')
-        }
+        // const enableWmsInsolationSyncMorningCron = process.env.ENABLE_WMS_INSOLATION_SYNC_MORNING_CRON !== 'false'
+        // if (enableWmsInsolationSyncMorningCron) {
+        //   const { startWmsInsolationSyncMorningCron } = require('./lib/cron/wmsInsolationSyncMorningCron')
+        //   startWmsInsolationSyncMorningCron()
+        // } else {
+        //   console.log('⏸️ WMS insolation sync morning cron is disabled (ENABLE_WMS_INSOLATION_SYNC_MORNING_CRON=false)')
+        // }
 
         // Analytics config mirror cron
-        const enableAnalyticsConfigCron = process.env.ENABLE_ANALYTICS_CONFIG_CRON !== 'false'
-        if (enableAnalyticsConfigCron) {
-          const { startAnalyticsConfigMirrorCron } = require('./lib/cron/analyticsConfigMirrorCron')
-          startAnalyticsConfigMirrorCron()
-        } else {
-          console.log('⏸️ Analytics config mirror cron is disabled (ENABLE_ANALYTICS_CONFIG_CRON=false)')
-        }
+        // const enableAnalyticsConfigCron = process.env.ENABLE_ANALYTICS_CONFIG_CRON !== 'false'
+        // if (enableAnalyticsConfigCron) {
+        //   const { startAnalyticsConfigMirrorCron } = require('./lib/cron/analyticsConfigMirrorCron')
+        //   startAnalyticsConfigMirrorCron()
+        // } else {
+        //   console.log('⏸️ Analytics config mirror cron is disabled (ENABLE_ANALYTICS_CONFIG_CRON=false)')
+        // }
 
         // Analytics snapshot cron
-        const enableAnalyticsSnapshotCron = process.env.ENABLE_ANALYTICS_SNAPSHOT_CRON !== 'false'
-        if (enableAnalyticsSnapshotCron) {
-          const { startAnalyticsSnapshotCron } = require('./lib/cron/analyticsSnapshotCron')
-          startAnalyticsSnapshotCron()
-        } else {
-          console.log('⏸️ Analytics snapshot cron is disabled (ENABLE_ANALYTICS_SNAPSHOT_CRON=false)')
-        }
+        // const enableAnalyticsSnapshotCron = process.env.ENABLE_ANALYTICS_SNAPSHOT_CRON !== 'false'
+        // if (enableAnalyticsSnapshotCron) {
+        //   const { startAnalyticsSnapshotCron } = require('./lib/cron/analyticsSnapshotCron')
+        //   startAnalyticsSnapshotCron()
+        // } else {
+        //   console.log('⏸️ Analytics snapshot cron is disabled (ENABLE_ANALYTICS_SNAPSHOT_CRON=false)')
+        // }
 
         // Analytics grid downtime cron
-        const enableAnalyticsGridDowntimeCron = process.env.ENABLE_ANALYTICS_GRID_DOWNTIME_CRON !== 'false'
-        if (enableAnalyticsGridDowntimeCron) {
-          const { startAnalyticsGridDowntimeCron } = require('./lib/cron/analyticsGridDowntimeCron')
-          startAnalyticsGridDowntimeCron()
-        } else {
-          console.log('⏸️ Analytics grid downtime cron is disabled (ENABLE_ANALYTICS_GRID_DOWNTIME_CRON=false)')
-        }
+        // const enableAnalyticsGridDowntimeCron = process.env.ENABLE_ANALYTICS_GRID_DOWNTIME_CRON !== 'false'
+        // if (enableAnalyticsGridDowntimeCron) {
+        //   const { startAnalyticsGridDowntimeCron } = require('./lib/cron/analyticsGridDowntimeCron')
+        //   startAnalyticsGridDowntimeCron()
+        // } else {
+        //   console.log('⏸️ Analytics grid downtime cron is disabled (ENABLE_ANALYTICS_GRID_DOWNTIME_CRON=false)')
+        // }
 
         // Reset was_online_today cron (runs daily at 12:05 AM IST to reset flag for new day)
-        const enableResetWasOnlineTodayCron = process.env.ENABLE_RESET_WAS_ONLINE_TODAY_CRON !== 'false'
-        if (enableResetWasOnlineTodayCron) {
-          const { startResetWasOnlineTodayCron } = require('./lib/cron/resetWasOnlineTodayCron')
-          startResetWasOnlineTodayCron()
-        } else {
-          console.log('⏸️ Reset was_online_today cron is disabled (ENABLE_RESET_WAS_ONLINE_TODAY_CRON=false)')
-        }
+        // const enableResetWasOnlineTodayCron = process.env.ENABLE_RESET_WAS_ONLINE_TODAY_CRON !== 'false'
+        // if (enableResetWasOnlineTodayCron) {
+        //   const { startResetWasOnlineTodayCron } = require('./lib/cron/resetWasOnlineTodayCron')
+        //   startResetWasOnlineTodayCron()
+        // } else {
+        //   console.log('⏸️ Reset was_online_today cron is disabled (ENABLE_RESET_WAS_ONLINE_TODAY_CRON=false)')
+        // }
       } catch (error) {
         console.error('Failed to start cron job(s):', error)
       }
