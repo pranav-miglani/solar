@@ -22,9 +22,15 @@ let MDC, logger
 
 function loadLoggerAndMDC() {
   try {
+    // Use path.join with __dirname to ensure correct path resolution
+    // This handles cases where server.js might be in a subdirectory
+    const path = require('path')
+    const mdcPath = path.join(__dirname, 'lib', 'context', 'mdc')
+    const loggerPath = path.join(__dirname, 'lib', 'context', 'logger')
+    
     // Try to load TypeScript files - Next.js should have compilation hooks active after app.prepare()
-    const mdcModule = require('./lib/context/mdc')
-    const loggerModule = require('./lib/context/logger')
+    const mdcModule = require(mdcPath)
+    const loggerModule = require(loggerPath)
     
     if (!mdcModule || !mdcModule.default) {
       throw new Error('MDC module not found or invalid')
@@ -43,8 +49,8 @@ function loadLoggerAndMDC() {
     console.warn('[Server] Logger/MDC not available, using console fallback:', error.message)
     console.warn('[Server] Error details:', {
       code: error.code,
-      path: error.path || './lib/context/mdc',
-      stack: error.stack,
+      path: error.path,
+      requireStack: error.requireStack,
     })
     return {
       MDC: {
