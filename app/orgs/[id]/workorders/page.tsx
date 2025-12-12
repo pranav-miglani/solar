@@ -62,6 +62,12 @@ export default function OrgWorkOrdersPage() {
 
   const accountType = account.accountType
 
+  // GOVT users cannot access organization pages directly
+  if (accountType === "GOVT") {
+    router.push("/dashboard")
+    return null
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <DashboardSidebar />
@@ -69,12 +75,14 @@ export default function OrgWorkOrdersPage() {
         <div className="mb-6 md:mb-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex items-center gap-4">
-              <Link href="/orgs">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Organizations
-                </Button>
-              </Link>
+              {accountType !== "GOVT" && (
+                <Link href="/orgs">
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to Organizations
+                  </Button>
+                </Link>
+              )}
               <div>
                 <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/60 bg-clip-text text-transparent">
                   Work Orders

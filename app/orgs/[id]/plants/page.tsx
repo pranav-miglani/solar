@@ -14,10 +14,18 @@ export default async function OrganizationPlantsPage({
     redirect("/auth/login")
   }
 
+  let sessionData
   try {
-    JSON.parse(Buffer.from(session, "base64").toString())
+    sessionData = JSON.parse(Buffer.from(session, "base64").toString())
   } catch {
     redirect("/auth/login")
+  }
+
+  const accountType = sessionData.accountType as string
+
+  // GOVT users cannot access organization pages
+  if (accountType === "GOVT") {
+    redirect("/dashboard")
   }
 
   return <OrganizationPlantsView orgId={params.id} />

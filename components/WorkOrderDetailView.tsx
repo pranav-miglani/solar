@@ -285,7 +285,7 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
               </div>
               <Building2 className="h-8 w-8 text-blue-500" />
             </div>
-            {organization && (
+            {organization && accountType !== "GOVT" && (
               <Link href={`/orgs/${organization.id}/plants`}>
                 <Button variant="ghost" size="sm" className="mt-2 w-full">
                   View Organization Plants

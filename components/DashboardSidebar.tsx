@@ -53,7 +53,7 @@ export function DashboardSidebar() {
       title: "Organizations",
       href: "/orgs",
       icon: Building2,
-      roles: ["SUPERADMIN", "DEVELOPER", "GOVT"],
+      roles: ["SUPERADMIN", "DEVELOPER"],
     },
     {
       title: "Vendors",
@@ -107,7 +107,7 @@ export function DashboardSidebar() {
       title: "Weather Monitoring",
       href: "/wms",
       icon: CloudSun,
-      roles: ["SUPERADMIN", "DEVELOPER", "ORG", "GOVT"],
+      roles: ["SUPERADMIN", "DEVELOPER", "ORG"],
     },
     {
       title: "Analytics",

@@ -22,8 +22,13 @@ export default async function WmsPage() {
 
   const accountType = sessionData.accountType as "SUPERADMIN" | "DEVELOPER" | "ORG" | "GOVT"
 
-  // All authenticated users can view WMS, but only SUPERADMIN/DEVELOPER can manage vendors
-  // ORG and GOVT have read-only access
+  // GOVT users cannot access WMS
+  if (accountType === "GOVT") {
+    redirect("/dashboard")
+  }
+
+  // All authenticated users (except GOVT) can view WMS, but only SUPERADMIN/DEVELOPER can manage vendors
+  // ORG has read-only access to their own organization's data
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">

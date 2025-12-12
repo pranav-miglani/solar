@@ -813,6 +813,9 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
     let skippedNoPlant = 0
     let skippedDateRange = 0
     let skippedInvalidDate = 0
+    const skippedDateRangeDetails: Array<{ alertId: string; alertDate: string; reason: string; startDate: string; endDate: string }> = []
+    const skippedNoPlantDetails: Array<{ alertId: string; vendorPlantId: string | null; vendorPlantIdType: string }> = []
+    const skippedInvalidDateDetails: Array<{ alertId: string; rawDate: string; reason: string }> = []
     let processedCount = 0
 
     // Process and upsert alerts
@@ -824,6 +827,11 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
       if (!mapping) {
         // We don't have this plant mapped yet; skip
         skippedNoPlant++
+        skippedNoPlantDetails.push({
+          alertId: raw.id?.toString() || "unknown",
+          vendorPlantId: vendorPlantId || null,
+          vendorPlantIdType: typeof raw.plantId,
+        })
         if (skippedNoPlant <= 5) {
           // Log first few skipped alerts for debugging
           logger.warn(`⏭️ Skipping alert ${raw.id} - plant ${vendorPlantId} (type: ${typeof raw.plantId}) not found in mapping. Available plant IDs: ${Array.from(plantIdToPlant.keys()).slice(0, 5).join(", ")}`)
@@ -845,6 +853,11 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
         
         if (Number.isNaN(alertTimeDate.getTime())) {
           skippedInvalidDate++
+          skippedInvalidDateDetails.push({
+            alertId: raw.id?.toString() || "unknown",
+            rawDate: raw.happenTime || "null",
+            reason: "invalid_happenTime_format",
+          })
           logger.warn(`⚠️ Invalid happenTime format: ${raw.happenTime} for alert ${raw.id}`)
           continue
         }
@@ -852,6 +865,11 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
         logger.debug(`📅 Parsed happenTime: ${raw.happenTime} -> ${alertTimeDate.toISOString()}`)
       } else {
         skippedInvalidDate++
+        skippedInvalidDateDetails.push({
+          alertId: raw.id?.toString() || "unknown",
+          rawDate: "null",
+          reason: "missing_happenTime",
+        })
         logger.warn(`⚠️ Missing happenTime for alert ${raw.id}`)
         continue
       }
@@ -869,9 +887,30 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
 
       // Filter by date range
       if (alertTimeDate) {
-        if (alertTimeDate < startDate || alertTimeDate > endDate) {
+        if (alertTimeDate < startDate) {
           skippedDateRange++
-          logger.debug(`⏭️ Skipping alert ${raw.id} - date ${alertTimeDate.toISOString()} outside range`)
+          const reason = `Alert date (${alertTimeDate.toISOString()}) is before configured start date (${startDate.toISOString()})`
+          skippedDateRangeDetails.push({
+            alertId: raw.id?.toString() || "unknown",
+            alertDate: alertTimeDate.toISOString(),
+            reason: "before_start_date",
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+          })
+          logger.debug(`⏭️ Skipping alert ${raw.id} - ${reason}`)
+          continue
+        }
+        if (alertTimeDate > endDate) {
+          skippedDateRange++
+          const reason = `Alert date (${alertTimeDate.toISOString()}) is after configured end date (${endDate.toISOString()})`
+          skippedDateRangeDetails.push({
+            alertId: raw.id?.toString() || "unknown",
+            alertDate: alertTimeDate.toISOString(),
+            reason: "after_end_date",
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+          })
+          logger.debug(`⏭️ Skipping alert ${raw.id} - ${reason}`)
           continue
         }
       }
@@ -1024,8 +1063,43 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
     logger.info(`   - Total from API: ${result.total}`)
     logger.info(`   - Processed: ${processedCount}`)
     logger.info(`   - Skipped (no plant mapping): ${skippedNoPlant}`)
+    if (skippedNoPlant > 0 && skippedNoPlantDetails.length > 0) {
+      logger.info(`   🌱 No plant mapping skip details:`)
+      skippedNoPlantDetails.slice(0, 5).forEach((detail) => {
+        logger.info(`      - Alert ${detail.alertId}: vendor_plant_id=${detail.vendorPlantId || "null"} (type: ${detail.vendorPlantIdType})`)
+      })
+      if (skippedNoPlantDetails.length > 5) {
+        logger.info(`      ... and ${skippedNoPlantDetails.length - 5} more`)
+      }
+      logger.info(`   🌱 Total plants in mapping: ${plantIdToPlant.size}`)
+    }
     logger.info(`   - Skipped (date range): ${skippedDateRange}`)
+    if (skippedDateRange > 0 && skippedDateRangeDetails.length > 0) {
+      logger.info(`   📅 Date range skip details:`)
+      skippedDateRangeDetails.slice(0, 5).forEach((detail) => {
+        const reasonText = detail.reason === "before_start_date" 
+          ? `before start date (${detail.startDate})`
+          : `after end date (${detail.endDate})`
+        logger.info(`      - Alert ${detail.alertId}: ${detail.alertDate} (${reasonText})`)
+      })
+      if (skippedDateRangeDetails.length > 5) {
+        logger.info(`      ... and ${skippedDateRangeDetails.length - 5} more`)
+      }
+      logger.info(`   📅 Configured date range: ${startDate.toISOString()} to ${endDate.toISOString()}`)
+    }
     logger.info(`   - Skipped (invalid date): ${skippedInvalidDate}`)
+    if (skippedInvalidDate > 0 && skippedInvalidDateDetails.length > 0) {
+      logger.info(`   ⚠️ Invalid date skip details:`)
+      skippedInvalidDateDetails.slice(0, 5).forEach((detail) => {
+        const reasonText = detail.reason === "invalid_happenTime_format"
+          ? "invalid happenTime format"
+          : "missing happenTime"
+        logger.info(`      - Alert ${detail.alertId}: ${reasonText} (raw value: ${detail.rawDate})`)
+      })
+      if (skippedInvalidDateDetails.length > 5) {
+        logger.info(`      ... and ${skippedInvalidDateDetails.length - 5} more`)
+      }
+    }
     logger.info(`   - Created: ${result.created}`)
     logger.info(`   - Updated: ${result.updated}`)
 

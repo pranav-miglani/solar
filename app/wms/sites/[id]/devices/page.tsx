@@ -14,10 +14,18 @@ export default async function WmsDevicesPage({
     redirect("/auth/login")
   }
 
+  let sessionData
   try {
-    JSON.parse(Buffer.from(session, "base64").toString())
+    sessionData = JSON.parse(Buffer.from(session, "base64").toString())
   } catch {
     redirect("/auth/login")
+  }
+
+  const accountType = sessionData.accountType as "SUPERADMIN" | "DEVELOPER" | "ORG" | "GOVT"
+
+  // GOVT users cannot access WMS
+  if (accountType === "GOVT") {
+    redirect("/dashboard")
   }
 
   return <WmsDevicesListView siteId={params.id} />
