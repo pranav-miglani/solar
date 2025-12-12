@@ -1032,7 +1032,8 @@ export function SystemFlowDocumentation() {
                                   <li>Calculates <code className="bg-background px-1 rounded">grid_down_benefit_kwh</code> (0.5 × hours × capacity_kw, only for 9 AM - 4 PM window)</li>
                                   <li>Maps severity: <code className="bg-background px-1 rounded">level + influence</code> → LOW/MEDIUM/HIGH/CRITICAL (safety influence upgrades to CRITICAL)</li>
                                   <li>Maps status: <code className="bg-background px-1 rounded">endTime === null</code> → ACTIVE, else → RESOLVED</li>
-                                  <li>Checks for existing alert by <code className="bg-background px-1 rounded">(vendor_id, vendor_alert_id, plant_id)</code></li>
+                                  <li>Checks for existing alert by <code className="bg-background px-1 rounded">(vendor_id, vendor_plant_id, vendor_alert_id)</code></li>
+                                  <li>If duplicates exist, uses most recent alert (by <code className="bg-background px-1 rounded">created_at</code>)</li>
                                   <li>Upserts alert to <code className="bg-background px-1 rounded">alerts</code> table</li>
                                 </ul>
                               </li>
@@ -1055,7 +1056,8 @@ export function SystemFlowDocumentation() {
                                   <li>Calculates <code className="bg-background px-1 rounded">grid_down_seconds</code> and <code className="bg-background px-1 rounded">grid_down_benefit_kwh</code></li>
                                   <li>Maps severity: <code className="bg-background px-1 rounded">faultLevel</code> → LOW/MEDIUM/HIGH/CRITICAL</li>
                                   <li>Maps status: <code className="bg-background px-1 rounded">recoverTime === null</code> → ACTIVE, else → RESOLVED</li>
-                                  <li>Checks for existing alert by <code className="bg-background px-1 rounded">(vendor_id, vendor_alert_id, plant_id)</code></li>
+                                  <li>Checks for existing alert by <code className="bg-background px-1 rounded">(vendor_id, vendor_plant_id, vendor_alert_id)</code></li>
+                                  <li>If duplicates exist, uses most recent alert (by <code className="bg-background px-1 rounded">created_at</code>)</li>
                                   <li>Upserts alert to <code className="bg-background px-1 rounded">alerts</code> table</li>
                                 </ul>
                               </li>
@@ -1089,7 +1091,16 @@ export function SystemFlowDocumentation() {
                 <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
                   <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Alert Processing Details</h4>
                   <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2 ml-4 list-disc">
-                    <li><strong>Deduplication:</strong> Alerts are deduplicated by <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">(vendor_id, vendor_alert_id, plant_id)</code> - if an alert with the same combination exists, it&apos;s updated instead of creating a duplicate</li>
+                    <li><strong>Deduplication & Unique Constraint:</strong>
+                      <ul className="ml-4 mt-1 list-disc">
+                        <li>Alerts are deduplicated by <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">(vendor_id, vendor_plant_id, vendor_alert_id)</code></li>
+                        <li>Database enforces uniqueness via unique index <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">uq_alerts_vendor_plant_alert</code> on these three columns</li>
+                        <li>Note: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">vendor_plant_id</code> is the vendor&apos;s plant identifier, <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">plant_id</code> is the system&apos;s internal ID</li>
+                        <li>If an alert with the same combination exists, it&apos;s updated instead of creating a duplicate</li>
+                        <li>If multiple duplicates are detected (from legacy data), the most recent alert (by <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">created_at</code>) is used</li>
+                        <li>Duplicate detection logs warnings with vendor details, alert IDs, and time span</li>
+                      </ul>
+                    </li>
                     <li><strong>Severity Mapping:</strong>
                       <ul className="ml-4 mt-1 list-disc">
                         <li><strong>Solarman:</strong> <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">level</code> (0=LOW, 1=MEDIUM, 2=HIGH) + <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">influence</code> (2/3=Safety → CRITICAL)</li>
@@ -1142,6 +1153,7 @@ export function SystemFlowDocumentation() {
                     <li>Alerts are only synced for plants that exist in the database (mapped plants)</li>
                     <li>Grid down benefit calculation only applies to alerts within 9 AM - 4 PM window (IST)</li>
                     <li>Manual sync available per-vendor via <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">POST /api/vendors/:id/sync-alerts</code> (requires vendor update permission)</li>
+                    <li><strong>Duplicate Prevention:</strong> Unique constraint <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">uq_alerts_vendor_plant_alert</code> prevents duplicate alerts at the database level. If constraint violation occurs, the sync logs a warning and continues with the next alert.</li>
                   </ul>
                 </div>
               </div>
@@ -1605,8 +1617,9 @@ export function SystemFlowDocumentation() {
                         </tr>
                       </tbody>
                     </table>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Indexes:</strong> plant_id, status, created_at, (vendor_id, plant_id, alert_time DESC), (vendor_id, vendor_alert_id, plant_id), (vendor_id, vendor_plant_id)
+                    <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                      <p><strong>Indexes:</strong> plant_id, status, created_at, (vendor_id, plant_id, alert_time DESC), (vendor_id, vendor_plant_id)</p>
+                      <p><strong>Unique Constraint:</strong> <code>uq_alerts_vendor_plant_alert</code> on <code>(vendor_id, vendor_plant_id, vendor_alert_id)</code> - prevents duplicate alerts at database level. Note: <code>vendor_plant_id</code> is the vendor&apos;s plant identifier, not the system&apos;s internal <code>plant_id</code>.</p>
                     </div>
                   </div>
 

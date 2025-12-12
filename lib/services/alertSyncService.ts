@@ -508,18 +508,73 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
         const vendorAlertId = raw.id?.toString()
 
         // Check for existing alert (prevent duplicates)
-        const { data: existing, error: existingError } = await supabase
+        // Uniqueness is based on: vendor_id, vendor_plant_id, vendor_alert_id
+        // Note: plant_id is system's internal ID, vendor_plant_id is vendor's plant identifier
+        const { data: allMatchingAlerts, error: countError } = await supabase
           .from("alerts")
-          .select("id")
+          .select("id, created_at", { count: "exact" })
           .eq("vendor_id", vendor.id)
           .eq("vendor_alert_id", vendorAlertId)
-          .eq("plant_id", mapping.plantId)
-          .maybeSingle()
+          .eq("vendor_plant_id", mapping.vendorPlantId)
+          .order("created_at", { ascending: false })
 
-        if (existingError) {
+        if (countError) {
           logger.warn(
-            `⚠️ Error checking existing alert for vendor ${vendor.id}`,
-            existingError
+            `⚠️ Error checking existing alerts for vendor ${vendor.id} (${vendor.name || "Unknown"}):`,
+            {
+              vendorId: vendor.id,
+              vendorName: vendor.name,
+              vendorAlertId: vendorAlertId,
+              plantId: mapping.plantId,
+              vendorPlantId: mapping.vendorPlantId,
+              error: countError,
+              errorCode: countError.code,
+              errorMessage: countError.message,
+            }
+          )
+        }
+
+        // Log duplicate detection
+        const duplicateCount = allMatchingAlerts?.length || 0
+        if (duplicateCount > 1) {
+          const oldestAlert = allMatchingAlerts?.[duplicateCount - 1]
+          const newestAlert = allMatchingAlerts?.[0]
+          const timeSpanHours = oldestAlert && newestAlert
+            ? Math.round((new Date(newestAlert.created_at).getTime() - new Date(oldestAlert.created_at).getTime()) / (1000 * 60 * 60))
+            : 0
+
+          logger.warn(
+            `⚠️ Found ${duplicateCount} duplicate alerts for vendor ${vendor.id} (${vendor.name || "Unknown"})`,
+            {
+              vendorId: vendor.id,
+              vendorName: vendor.name,
+              vendorAlertId: vendorAlertId,
+              plantId: mapping.plantId,
+              vendorPlantId: mapping.vendorPlantId,
+              duplicateCount: duplicateCount,
+              alertIds: allMatchingAlerts?.map((a: any) => a.id) || [],
+              oldestCreatedAt: oldestAlert?.created_at,
+              newestCreatedAt: newestAlert?.created_at,
+              timeSpanHours: timeSpanHours,
+              action: "Using most recent alert, others will be ignored",
+            }
+          )
+        }
+
+        // Get the first (most recent) alert if multiple exist
+        const existing = allMatchingAlerts && allMatchingAlerts.length > 0 ? allMatchingAlerts[0] : null
+
+        if (existing) {
+          logger.debug(
+            `Found existing alert for vendor ${vendor.id} (${vendor.name || "Unknown"})`,
+            {
+              vendorId: vendor.id,
+              vendorName: vendor.name,
+              vendorAlertId: vendorAlertId,
+              plantId: mapping.plantId,
+              existingAlertId: existing.id,
+              willUpdate: true,
+            }
           )
         }
 
@@ -846,18 +901,73 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
       const vendorAlertId = raw.id?.toString()
 
       // Check for existing alert (prevent duplicates)
-      const { data: existing, error: existingError } = await supabase
+      // Uniqueness is based on: vendor_id, vendor_plant_id, vendor_alert_id
+      // Note: plant_id is system's internal ID, vendor_plant_id is vendor's plant identifier
+      const { data: allMatchingAlerts, error: countError } = await supabase
         .from("alerts")
-        .select("id")
+        .select("id, created_at", { count: "exact" })
         .eq("vendor_id", vendor.id)
         .eq("vendor_alert_id", vendorAlertId)
-        .eq("plant_id", mapping.plantId)
-        .maybeSingle()
+        .eq("vendor_plant_id", mapping.vendorPlantId)
+        .order("created_at", { ascending: false })
 
-      if (existingError) {
+      if (countError) {
         logger.warn(
-          `⚠️ Error checking existing alert for vendor ${vendor.id}`,
-          existingError
+          `⚠️ Error checking existing alerts for vendor ${vendor.id} (${vendor.name || "Unknown"}):`,
+          {
+            vendorId: vendor.id,
+            vendorName: vendor.name,
+            vendorAlertId: vendorAlertId,
+            plantId: mapping.plantId,
+            vendorPlantId: mapping.vendorPlantId,
+            error: countError,
+            errorCode: countError.code,
+            errorMessage: countError.message,
+          }
+        )
+      }
+
+      // Log duplicate detection
+      const duplicateCount = allMatchingAlerts?.length || 0
+      if (duplicateCount > 1) {
+        const oldestAlert = allMatchingAlerts?.[duplicateCount - 1]
+        const newestAlert = allMatchingAlerts?.[0]
+        const timeSpanHours = oldestAlert && newestAlert
+          ? Math.round((new Date(newestAlert.created_at).getTime() - new Date(oldestAlert.created_at).getTime()) / (1000 * 60 * 60))
+          : 0
+
+        logger.warn(
+          `⚠️ Found ${duplicateCount} duplicate alerts for vendor ${vendor.id} (${vendor.name || "Unknown"})`,
+          {
+            vendorId: vendor.id,
+            vendorName: vendor.name,
+            vendorAlertId: vendorAlertId,
+            plantId: mapping.plantId,
+            vendorPlantId: mapping.vendorPlantId,
+            duplicateCount: duplicateCount,
+            alertIds: allMatchingAlerts?.map((a: any) => a.id) || [],
+            oldestCreatedAt: oldestAlert?.created_at,
+            newestCreatedAt: newestAlert?.created_at,
+            timeSpanHours: timeSpanHours,
+            action: "Using most recent alert, others will be ignored",
+          }
+        )
+      }
+
+      // Get the first (most recent) alert if multiple exist
+      const existing = allMatchingAlerts && allMatchingAlerts.length > 0 ? allMatchingAlerts[0] : null
+
+      if (existing) {
+        logger.debug(
+          `Found existing alert for vendor ${vendor.id} (${vendor.name || "Unknown"})`,
+          {
+            vendorId: vendor.id,
+            vendorName: vendor.name,
+            vendorAlertId: vendorAlertId,
+            plantId: mapping.plantId,
+            existingAlertId: existing.id,
+            willUpdate: true,
+          }
         )
       }
 
