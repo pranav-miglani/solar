@@ -1,6 +1,10 @@
 /**
  * Context-aware logger that automatically includes MDC context in logs
  * Writes logs to both console and files in the logs/ directory
+ * 
+ * Toggle between structured logger and console.log via USE_STRUCTURED_LOGGER env variable:
+ * - USE_STRUCTURED_LOGGER=true: Uses structured logger with MDC context and file logging
+ * - USE_STRUCTURED_LOGGER=false or unset: Uses simple console.log/console.error
  */
 
 import MDC from "./mdc"
@@ -8,6 +12,9 @@ import fs from "fs"
 import path from "path"
 
 type LogLevel = "debug" | "info" | "warn" | "error"
+
+// Check if structured logger should be used (default: true for backward compatibility)
+const USE_STRUCTURED_LOGGER = process.env.USE_STRUCTURED_LOGGER !== "false"
 
 // Ensure logs directory exists
 const LOGS_DIR = path.join(process.cwd(), "logs")
@@ -235,7 +242,55 @@ class ContextLogger {
   }
 }
 
-// Export singleton instance
-export const logger = new ContextLogger()
+/**
+ * Simple console-based logger (no MDC context, no file logging)
+ * Used when USE_STRUCTURED_LOGGER=false
+ */
+class ConsoleLogger {
+  debug(message: string, ...args: any[]): void {
+    if (process.env.NODE_ENV === "development") {
+      console.debug(`[DEBUG] ${message}`, ...args)
+    }
+  }
+
+  info(message: string, ...args: any[]): void {
+    console.log(`[INFO] ${message}`, ...args)
+  }
+
+  warn(message: string, ...args: any[]): void {
+    console.warn(`[WARN] ${message}`, ...args)
+  }
+
+  error(message: string, error?: Error | any, ...args: any[]): void {
+    if (error instanceof Error) {
+      console.error(`[ERROR] ${message}`, error.message, error.stack, ...args)
+    } else {
+      console.error(`[ERROR] ${message}`, error, ...args)
+    }
+  }
+}
+
+// Export logger instance based on environment variable
+// If USE_STRUCTURED_LOGGER=false, use simple console logger
+// Otherwise, use structured logger with MDC context and file logging
+export const logger = USE_STRUCTURED_LOGGER 
+  ? new ContextLogger() 
+  : new ConsoleLogger()
+
+// Log which logger mode is active (using console directly to avoid circular dependency)
+if (!USE_STRUCTURED_LOGGER) {
+  console.log(`[Logger] Using console logging mode (USE_STRUCTURED_LOGGER=false)`)
+} else {
+  // Use setTimeout to ensure this runs after module initialization
+  setTimeout(() => {
+    try {
+      logger.info(`[Logger] Using structured logger mode (USE_STRUCTURED_LOGGER=true or unset)`)
+    } catch {
+      // Fallback if logger not ready yet
+      console.log(`[Logger] Using structured logger mode (USE_STRUCTURED_LOGGER=true or unset)`)
+    }
+  }, 0)
+}
+
 export default logger
 
