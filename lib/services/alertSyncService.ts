@@ -15,6 +15,7 @@ interface AlertSyncResult {
   synced: number
   created: number
   updated: number
+  skipped: number // Alerts skipped due to no changes
   total: number
   error?: string
 }
@@ -26,6 +27,7 @@ interface AlertSyncSummary {
   totalAlertsSynced: number
   totalAlertsCreated: number
   totalAlertsUpdated: number
+  totalAlertsSkipped: number // Alerts skipped due to no changes
   results: AlertSyncResult[]
   duration: number
 }
@@ -290,6 +292,7 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
     synced: 0,
     created: 0,
     updated: 0,
+    skipped: 0,
     total: 0,
   }
 
@@ -510,9 +513,10 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
         // Check for existing alert (prevent duplicates)
         // Uniqueness is based on: vendor_id, vendor_plant_id, vendor_alert_id
         // Note: plant_id is system's internal ID, vendor_plant_id is vendor's plant identifier
+        // Fetch all relevant fields for comparison to avoid unnecessary updates
         const { data: allMatchingAlerts, error: countError } = await supabase
           .from("alerts")
-          .select("id, created_at", { count: "exact" })
+          .select("id, created_at, title, description, severity, status, alert_time, end_time, grid_down_seconds, grid_down_benefit_kwh", { count: "exact" })
           .eq("vendor_id", vendor.id)
           .eq("vendor_alert_id", vendorAlertId)
           .eq("vendor_plant_id", mapping.vendorPlantId)
@@ -594,19 +598,69 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
         }
 
         if (existing) {
-          const { error: updateError } = await supabase
-            .from("alerts")
-            .update(payload)
-            .eq("id", existing.id)
+          // Compare existing alert data with new payload to avoid unnecessary updates
+          const existingAlertTime = existing.alert_time ? new Date(existing.alert_time).toISOString() : null
+          const existingEndTime = existing.end_time ? new Date(existing.end_time).toISOString() : null
+          const newAlertTime = payload.alert_time
+          const newEndTime = payload.end_time
 
-          if (updateError) {
-            logger.error(
-              `❌ Failed to update alert ${existing.id} for vendor ${vendor.id}`,
-              updateError
+          const hasChanges = 
+            existing.title !== payload.title ||
+            existing.description !== payload.description ||
+            existing.severity !== payload.severity ||
+            existing.status !== payload.status ||
+            existingAlertTime !== newAlertTime ||
+            existingEndTime !== newEndTime ||
+            existing.grid_down_seconds !== payload.grid_down_seconds ||
+            (existing.grid_down_benefit_kwh !== null && payload.grid_down_benefit_kwh !== null && 
+             Math.abs(Number(existing.grid_down_benefit_kwh) - Number(payload.grid_down_benefit_kwh)) > 0.001) ||
+            (existing.grid_down_benefit_kwh === null && payload.grid_down_benefit_kwh !== null) ||
+            (existing.grid_down_benefit_kwh !== null && payload.grid_down_benefit_kwh === null)
+
+          if (!hasChanges) {
+            logger.debug(
+              `⏭️ Skipping update for alert ${existing.id} - no changes detected`,
+              {
+                vendorId: vendor.id,
+                vendorAlertId: vendorAlertId,
+                existingAlertId: existing.id,
+              }
             )
-          } else {
-            result.updated += 1
+            // Don't increment updated count, but still count as synced (processed) and skipped
             result.synced += 1
+            result.skipped += 1
+          } else {
+            const { error: updateError } = await supabase
+              .from("alerts")
+              .update(payload)
+              .eq("id", existing.id)
+
+            if (updateError) {
+              logger.error(
+                `❌ Failed to update alert ${existing.id} for vendor ${vendor.id}`,
+                updateError
+              )
+            } else {
+              result.updated += 1
+              result.synced += 1
+              logger.debug(
+                `✅ Updated alert ${existing.id} - changes detected`,
+                {
+                  vendorId: vendor.id,
+                  vendorAlertId: vendorAlertId,
+                  changes: {
+                    title: existing.title !== payload.title,
+                    description: existing.description !== payload.description,
+                    severity: existing.severity !== payload.severity,
+                    status: existing.status !== payload.status,
+                    alert_time: existingAlertTime !== newAlertTime,
+                    end_time: existingEndTime !== newEndTime,
+                    grid_down_seconds: existing.grid_down_seconds !== payload.grid_down_seconds,
+                    grid_down_benefit_kwh: existing.grid_down_benefit_kwh !== payload.grid_down_benefit_kwh,
+                  },
+                }
+              )
+            }
           }
         } else {
           const { error: insertError } = await supabase.from("alerts").insert(payload)
@@ -634,7 +688,7 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
     result.success = true
 
     logger.info(
-      `✅ Solarman alert sync complete for vendor ${vendor.name} (${vendor.id}): ${result.synced}/${result.total} alerts processed in ${duration}ms`
+      `✅ Solarman alert sync complete for vendor ${vendor.name} (${vendor.id}): ${result.synced}/${result.total} alerts processed (${result.created} created, ${result.updated} updated, ${result.skipped} skipped) in ${duration}ms`
     )
 
     // If we actually synced any alerts, record the timestamp on the vendor
@@ -682,6 +736,7 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
     synced: 0,
     created: 0,
     updated: 0,
+    skipped: 0,
     total: 0,
   }
 
@@ -942,9 +997,10 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
       // Check for existing alert (prevent duplicates)
       // Uniqueness is based on: vendor_id, vendor_plant_id, vendor_alert_id
       // Note: plant_id is system's internal ID, vendor_plant_id is vendor's plant identifier
+      // Fetch all relevant fields for comparison to avoid unnecessary updates
       const { data: allMatchingAlerts, error: countError } = await supabase
         .from("alerts")
-        .select("id, created_at", { count: "exact" })
+        .select("id, created_at, title, description, severity, status, alert_time, end_time, grid_down_seconds, grid_down_benefit_kwh", { count: "exact" })
         .eq("vendor_id", vendor.id)
         .eq("vendor_alert_id", vendorAlertId)
         .eq("vendor_plant_id", mapping.vendorPlantId)
@@ -1026,21 +1082,69 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
       }
 
       if (existing) {
-        logger.debug(`🔄 Updating existing alert ${existing.id} (vendor_alert_id: ${vendorAlertId})`)
-        const { error: updateError } = await supabase
-          .from("alerts")
-          .update(payload)
-          .eq("id", existing.id)
+        // Compare existing alert data with new payload to avoid unnecessary updates
+        const existingAlertTime = existing.alert_time ? new Date(existing.alert_time).toISOString() : null
+        const existingEndTime = existing.end_time ? new Date(existing.end_time).toISOString() : null
+        const newAlertTime = payload.alert_time
+        const newEndTime = payload.end_time
 
-        if (updateError) {
-          logger.error(
-            `❌ Failed to update alert ${existing.id} for vendor ${vendor.id}`,
-            updateError
+        const hasChanges = 
+          existing.title !== payload.title ||
+          existing.description !== payload.description ||
+          existing.severity !== payload.severity ||
+          existing.status !== payload.status ||
+          existingAlertTime !== newAlertTime ||
+          existingEndTime !== newEndTime ||
+          existing.grid_down_seconds !== payload.grid_down_seconds ||
+          (existing.grid_down_benefit_kwh !== null && payload.grid_down_benefit_kwh !== null && 
+           Math.abs(Number(existing.grid_down_benefit_kwh) - Number(payload.grid_down_benefit_kwh)) > 0.001) ||
+          (existing.grid_down_benefit_kwh === null && payload.grid_down_benefit_kwh !== null) ||
+          (existing.grid_down_benefit_kwh !== null && payload.grid_down_benefit_kwh === null)
+
+        if (!hasChanges) {
+          logger.debug(
+            `⏭️ Skipping update for alert ${existing.id} - no changes detected`,
+            {
+              vendorId: vendor.id,
+              vendorAlertId: vendorAlertId,
+              existingAlertId: existing.id,
+            }
           )
-        } else {
-          result.updated += 1
+          // Don't increment updated count, but still count as synced (processed)
           result.synced += 1
-          logger.debug(`✅ Updated alert ${existing.id}`)
+        } else {
+          logger.debug(`🔄 Updating existing alert ${existing.id} (vendor_alert_id: ${vendorAlertId})`)
+          const { error: updateError } = await supabase
+            .from("alerts")
+            .update(payload)
+            .eq("id", existing.id)
+
+          if (updateError) {
+            logger.error(
+              `❌ Failed to update alert ${existing.id} for vendor ${vendor.id}`,
+              updateError
+            )
+          } else {
+            result.updated += 1
+            result.synced += 1
+            logger.debug(
+              `✅ Updated alert ${existing.id} - changes detected`,
+              {
+                vendorId: vendor.id,
+                vendorAlertId: vendorAlertId,
+                changes: {
+                  title: existing.title !== payload.title,
+                  description: existing.description !== payload.description,
+                  severity: existing.severity !== payload.severity,
+                  status: existing.status !== payload.status,
+                  alert_time: existingAlertTime !== newAlertTime,
+                  end_time: existingEndTime !== newEndTime,
+                  grid_down_seconds: existing.grid_down_seconds !== payload.grid_down_seconds,
+                  grid_down_benefit_kwh: existing.grid_down_benefit_kwh !== payload.grid_down_benefit_kwh,
+                },
+              }
+            )
+          }
         }
       } else {
         logger.debug(`➕ Creating new alert (vendor_alert_id: ${vendorAlertId}, plant_id: ${mapping.plantId})`)
@@ -1102,6 +1206,9 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
     }
     logger.info(`   - Created: ${result.created}`)
     logger.info(`   - Updated: ${result.updated}`)
+    if (result.skipped > 0) {
+      logger.info(`   - Skipped (no changes): ${result.skipped}`)
+    }
 
     // Update vendor's last_alert_synced_at
     await supabase
@@ -1113,7 +1220,7 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
 
     const duration = Date.now() - startTime
     logger.info(
-      `✅ Synced ${result.synced} SolarDM alerts for vendor ${vendor.name} (${vendor.id}): ${result.created} created, ${result.updated} updated (${duration}ms)`
+      `✅ Synced ${result.synced} SolarDM alerts for vendor ${vendor.name} (${vendor.id}): ${result.created} created, ${result.updated} updated, ${result.skipped} skipped (${duration}ms)`
     )
   } catch (error: any) {
     result.error = error.message || String(error)
@@ -1167,6 +1274,7 @@ export async function syncAllAlerts(): Promise<AlertSyncSummary> {
       totalAlertsSynced: 0,
       totalAlertsCreated: 0,
       totalAlertsUpdated: 0,
+      totalAlertsSkipped: 0,
       results: [],
       duration: Date.now() - startTime,
     }
@@ -1186,6 +1294,7 @@ export async function syncAllAlerts(): Promise<AlertSyncSummary> {
       totalAlertsSynced: 0,
       totalAlertsCreated: 0,
       totalAlertsUpdated: 0,
+      totalAlertsSkipped: 0,
       results: [],
       duration: Date.now() - startTime,
     }
@@ -1220,6 +1329,7 @@ export async function syncAllAlerts(): Promise<AlertSyncSummary> {
       totalAlertsSynced: 0,
       totalAlertsCreated: 0,
       totalAlertsUpdated: 0,
+      totalAlertsSkipped: 0,
       results: [],
       duration: Date.now() - startTime,
     }
@@ -1253,6 +1363,7 @@ export async function syncAllAlerts(): Promise<AlertSyncSummary> {
             synced: 0,
             created: 0,
             updated: 0,
+            skipped: 0,
             total: 0,
             error: `Unsupported vendor type: ${vendor.vendor_type}`,
           })
@@ -1266,6 +1377,7 @@ export async function syncAllAlerts(): Promise<AlertSyncSummary> {
   const totalAlertsSynced = results.reduce((sum, r) => sum + r.synced, 0)
   const totalAlertsCreated = results.reduce((sum, r) => sum + r.created, 0)
   const totalAlertsUpdated = results.reduce((sum, r) => sum + r.updated, 0)
+  const totalAlertsSkipped = results.reduce((sum, r) => sum + (r.skipped || 0), 0)
 
   const summary: AlertSyncSummary = {
     totalVendors: vendorsToSync.length,
@@ -1274,13 +1386,14 @@ export async function syncAllAlerts(): Promise<AlertSyncSummary> {
     totalAlertsSynced,
     totalAlertsCreated,
     totalAlertsUpdated,
+    totalAlertsSkipped,
     results,
     duration: Date.now() - startTime,
   }
 
   logger.info(
     `✅ Alert sync complete: ${successful}/${summary.totalVendors} vendors successful, ` +
-      `${totalAlertsSynced} alerts synced (${totalAlertsCreated} created, ${totalAlertsUpdated} updated) ` +
+      `${totalAlertsSynced} alerts synced (${totalAlertsCreated} created, ${totalAlertsUpdated} updated, ${totalAlertsSkipped} skipped) ` +
       `in ${summary.duration}ms`
   )
 
@@ -1329,6 +1442,7 @@ export async function syncAlertsForVendor(vendorId: number): Promise<AlertSyncRe
       synced: 0,
       created: 0,
       updated: 0,
+      skipped: 0,
       total: 0,
       error: `Alert sync disabled for organization ${org.name} (auto_sync_enabled=false)`,
     }
@@ -1344,6 +1458,7 @@ export async function syncAlertsForVendor(vendorId: number): Promise<AlertSyncRe
       synced: 0,
       created: 0,
       updated: 0,
+      skipped: 0,
       total: 0,
       error: undefined,
     }
@@ -1366,6 +1481,7 @@ export async function syncAlertsForVendor(vendorId: number): Promise<AlertSyncRe
     synced: 0,
     created: 0,
     updated: 0,
+    skipped: 0,
     total: 0,
     error: `Alert sync is not implemented for vendor type: ${vendor.vendor_type}`,
   }
