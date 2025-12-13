@@ -121,11 +121,14 @@ export async function GET(request: NextRequest) {
 
         logger.info(`[WMS Site Sync Cron] Found ${vendorsToSync.length} active WMS vendors to sync (filtered from ${vendors.length} total)`)
 
-        // Sync each vendor using the same function as the per-vendor endpoint
-        for (const vendor of vendorsToSync) {
-          const result = await syncWmsVendorSites(vendor, supabase)
-          results.push(result)
-        }
+        // Sync all vendors in parallel using the same function as the per-vendor endpoint
+        // Each vendor has isolated token storage and adapter instances, so parallel execution is safe
+        // Different vendor types hit different external APIs, reducing rate limiting concerns
+        const syncPromises = vendorsToSync.map((vendor) => 
+          syncWmsVendorSites(vendor, supabase)
+        )
+        const vendorResults = await Promise.all(syncPromises)
+        results.push(...vendorResults)
 
         const successful = results.filter((r) => r.success).length
         const failed = results.filter((r) => !r.success).length

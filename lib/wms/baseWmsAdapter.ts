@@ -513,6 +513,12 @@ export abstract class BaseWmsAdapter {
         // Still retry once, but log the issue
       }
       
+      // Add a small delay after re-authentication to allow token to propagate
+      // Some APIs (like Intello) may need a moment for the token to be fully registered
+      // This helps avoid race conditions where the token is valid but not yet recognized
+      await new Promise(resolve => setTimeout(resolve, 200))
+      logger.info(`[BaseWmsAdapter] Waited 200ms after re-authentication for token propagation`)
+      
       // Retry the request once with new token
       logger.info(`[BaseWmsAdapter] Retrying API call with fresh token: ${method} ${url}`)
       logger.info(`[BaseWmsAdapter] Retry request headers: Authorization=Bearer ${newToken}, Content-Type=application/json`)
