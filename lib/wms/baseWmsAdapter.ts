@@ -492,6 +492,16 @@ export abstract class BaseWmsAdapter {
         }
       }
       
+      // Add a small delay after clearing token to ensure DB update propagates
+      // This is especially important in parallel execution scenarios
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Add random jitter (0-200ms) before authentication to prevent thundering herd
+      // When multiple vendors authenticate in parallel, this helps avoid rate limiting
+      const jitter = Math.floor(Math.random() * 200)
+      await new Promise(resolve => setTimeout(resolve, jitter))
+      logger.info(`[BaseWmsAdapter] Added ${jitter}ms jitter before re-authentication`)
+      
       // Re-authenticate to get fresh token (will fetch from DB or API)
       logger.info(`[BaseWmsAdapter] Re-authenticating to get fresh token...`)
       const newToken = await this.authenticate()
@@ -513,11 +523,12 @@ export abstract class BaseWmsAdapter {
         // Still retry once, but log the issue
       }
       
-      // Add a small delay after re-authentication to allow token to propagate
+      // Add a delay after re-authentication to allow token to propagate
       // Some APIs (like Intello) may need a moment for the token to be fully registered
       // This helps avoid race conditions where the token is valid but not yet recognized
-      await new Promise(resolve => setTimeout(resolve, 200))
-      logger.info(`[BaseWmsAdapter] Waited 200ms after re-authentication for token propagation`)
+      // Increased delay for parallel execution scenarios where multiple vendors authenticate simultaneously
+      await new Promise(resolve => setTimeout(resolve, 500))
+      logger.info(`[BaseWmsAdapter] Waited 500ms after re-authentication for token propagation`)
       
       // Retry the request once with new token
       logger.info(`[BaseWmsAdapter] Retrying API call with fresh token: ${method} ${url}`)
