@@ -691,8 +691,9 @@ async function syncSolarmanVendorAlerts(vendor: any, supabase: any): Promise<Ale
       `✅ Solarman alert sync complete for vendor ${vendor.name} (${vendor.id}): ${result.synced}/${result.total} alerts processed (${result.created} created, ${result.updated} updated, ${result.skipped} skipped) in ${duration}ms`
     )
 
-    // If we actually synced any alerts, record the timestamp on the vendor
-    if (result.synced > 0) {
+    // Update vendor's last_alert_synced_at whenever sync completes successfully
+    // This tracks when we last checked for alerts, even if none were found
+    if (result.success) {
       try {
         await supabase
           .from("vendors")
