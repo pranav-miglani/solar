@@ -425,6 +425,33 @@ export abstract class BaseWmsAdapter {
 
     const requestDuration = Date.now() - requestStartTime
     logger.info(`[BaseWmsAdapter] API call completed: ${response.status} ${response.statusText} (${requestDuration}ms)`)
+    
+    // Log response headers for debugging
+    logger.info(`[BaseWmsAdapter] Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`)
+    
+    // Clone response to read body for logging without consuming the original
+    // This allows the caller to still read the response body
+    try {
+      const responseClone = response.clone()
+      const responseBody = await responseClone.text()
+      logger.info(`[BaseWmsAdapter] Response body (full): ${responseBody}`)
+      
+      // Try to parse as JSON for better readability (only if body is not empty)
+      if (responseBody && responseBody.trim().length > 0) {
+        try {
+          const jsonBody = JSON.parse(responseBody)
+          logger.info(`[BaseWmsAdapter] Response body (parsed JSON): ${JSON.stringify(jsonBody, null, 2)}`)
+        } catch {
+          // Not JSON, that's fine - already logged as text
+          logger.debug(`[BaseWmsAdapter] Response body is not valid JSON`)
+        }
+      } else {
+        logger.info(`[BaseWmsAdapter] Response body is empty`)
+      }
+    } catch (error) {
+      logger.warn(`[BaseWmsAdapter] Could not read/clone response body for logging: ${error}`)
+      // Continue - original response is still usable
+    }
 
     // Handle 401 Unauthorized - token expired or invalid
     if (response.status === 401 && retryOn401) {
