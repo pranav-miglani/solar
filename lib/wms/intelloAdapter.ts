@@ -43,16 +43,30 @@ export class IntelloAdapter extends BaseWmsAdapter {
       if (vendor?.access_token && vendor?.token_expires_at) {
         const expiresAt = new Date(vendor.token_expires_at)
         const now = new Date()
+        const cachedToken = vendor.access_token
+        
+        logger.info(`[IntelloAdapter] Found cached token in database`)
+        logger.info(`[IntelloAdapter] Cached token (full): ${cachedToken}`)
+        logger.info(`[IntelloAdapter] Cached token length: ${cachedToken.length}`)
+        logger.info(`[IntelloAdapter] Token expires at: ${expiresAt.toISOString()}`)
+        logger.info(`[IntelloAdapter] Current time: ${now.toISOString()}`)
+        logger.info(`[IntelloAdapter] Time until expiration: ${Math.round((expiresAt.getTime() - now.getTime()) / 1000 / 60)} minutes`)
         
         // Token is valid if it expires more than 5 minutes from now
         if (expiresAt > new Date(now.getTime() + 5 * 60 * 1000)) {
           logger.info(`[IntelloAdapter] Using cached token (expires at: ${expiresAt.toISOString()})`)
-          return vendor.access_token
+          return cachedToken
         } else {
           logger.info(`[IntelloAdapter] Cached token expired (expires at: ${expiresAt.toISOString()}), fetching new token`)
         }
       } else {
         logger.info(`[IntelloAdapter] No cached token found, fetching new token`)
+        if (!vendor?.access_token) {
+          logger.info(`[IntelloAdapter] Reason: access_token is ${vendor?.access_token === null ? "null" : "undefined"}`)
+        }
+        if (!vendor?.token_expires_at) {
+          logger.info(`[IntelloAdapter] Reason: token_expires_at is ${vendor?.token_expires_at === null ? "null" : "undefined"}`)
+        }
       }
     }
 
@@ -85,6 +99,10 @@ export class IntelloAdapter extends BaseWmsAdapter {
     }
 
     const data = await response.json()
+    logger.info(`[IntelloAdapter] Authentication response data keys: ${Object.keys(data).join(", ")}`)
+    logger.info(`[IntelloAdapter] Authentication response has 'token': ${!!data.token}`)
+    logger.info(`[IntelloAdapter] Authentication response has 'expirationTime': ${!!data.expirationTime}`)
+    
     const token = data.token as string
     const expirationTime = data.expirationTime as number | undefined // seconds (may be undefined)
 
@@ -92,6 +110,9 @@ export class IntelloAdapter extends BaseWmsAdapter {
       logger.error(`[IntelloAdapter] No token in authentication response: ${JSON.stringify(data)}`)
       throw new Error("Intello authentication failed: no token in response")
     }
+    
+    logger.info(`[IntelloAdapter] Token extracted (full): ${token}`)
+    logger.info(`[IntelloAdapter] Token length: ${token.length}`)
 
     // If expiration time is not present in response, default to 23 hours 30 minutes
     const defaultExpirationSeconds = 23 * 60 * 60 + 30 * 60 // 23h 30m in seconds
@@ -107,7 +128,9 @@ export class IntelloAdapter extends BaseWmsAdapter {
     if (this.vendorId && this.supabaseClient) {
       const expiresAt = new Date(Date.now() + expirationTimeSeconds * 1000)
       logger.info(`[IntelloAdapter] Caching token in database (expires at: ${expiresAt.toISOString()})`)
-      await this.supabaseClient
+      logger.info(`[IntelloAdapter] Token to cache (full): ${token}`)
+      
+      const { error: updateError, data: updateData } = await this.supabaseClient
         .from("wms_vendors")
         .update({
           access_token: token,
@@ -118,7 +141,25 @@ export class IntelloAdapter extends BaseWmsAdapter {
           },
         })
         .eq("id", this.vendorId)
-      logger.info(`[IntelloAdapter] Token cached successfully`)
+        .select("access_token, token_expires_at")
+      
+      if (updateError) {
+        logger.error(`[IntelloAdapter] Failed to cache token in database:`, updateError)
+        throw new Error(`Failed to cache token: ${updateError.message}`)
+      }
+      
+      // Verify token was cached correctly
+      const cachedToken = updateData?.[0]?.access_token
+      if (cachedToken) {
+        logger.info(`[IntelloAdapter] Token cached successfully (verified)`)
+        logger.info(`[IntelloAdapter] Cached token matches: ${cachedToken === token ? "YES" : "NO"}`)
+        if (cachedToken !== token) {
+          logger.warn(`[IntelloAdapter] Token mismatch! Original (full): ${token}`)
+          logger.warn(`[IntelloAdapter] Token mismatch! Cached (full): ${cachedToken}`)
+        }
+      } else {
+        logger.warn(`[IntelloAdapter] Token cache verification failed - no token in update response`)
+      }
     }
 
     return token

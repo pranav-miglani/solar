@@ -307,7 +307,7 @@ export abstract class BaseWmsAdapter {
       logger.info(`[BaseWmsAdapter] Request body: ${typeof options.body === 'string' ? options.body : JSON.stringify(options.body)}`)
     }
 
-    logger.info(`[BaseWmsAdapter] Using token: ${token.substring(0, 20)}... (truncated for security)`)
+    logger.info(`[BaseWmsAdapter] Using token (full): ${token}`)
     const requestStartTime = Date.now()
     const response = await pooledFetch(url, {
       ...options,
@@ -323,12 +323,25 @@ export abstract class BaseWmsAdapter {
 
     // Handle 401 Unauthorized - token expired or invalid
     if (response.status === 401 && retryOn401) {
-      logger.warn(`[BaseWmsAdapter] Received 401 Unauthorized for ${method} ${url}, refreshing token and retrying...`)
+      // Log response body for debugging
+      let responseBody = ""
+      try {
+        responseBody = await response.clone().text()
+        logger.warn(`[BaseWmsAdapter] Received 401 Unauthorized for ${method} ${url}`)
+        logger.warn(`[BaseWmsAdapter] 401 Response body: ${responseBody}`)
+        logger.warn(`[BaseWmsAdapter] 401 Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`)
+      } catch (error) {
+        logger.warn(`[BaseWmsAdapter] Could not read 401 response body:`, error)
+      }
+      
+      logger.warn(`[BaseWmsAdapter] Old token (full): ${token}`)
+      logger.warn(`[BaseWmsAdapter] Old token length: ${token.length}`)
       
       // Clear cached token in DB if token storage is configured
       if (this.vendorId && this.supabaseClient) {
         try {
-          await this.supabaseClient
+          logger.info(`[BaseWmsAdapter] Clearing cached token for vendor ${this.vendorId}...`)
+          const { error: clearError } = await this.supabaseClient
             .from("wms_vendors")
             .update({ 
               access_token: null, 
@@ -336,9 +349,13 @@ export abstract class BaseWmsAdapter {
             })
             .eq("id", this.vendorId)
           
-          logger.info(`[BaseWmsAdapter] Cleared cached token for vendor ${this.vendorId}`)
+          if (clearError) {
+            logger.error(`[BaseWmsAdapter] Failed to clear cached token:`, clearError)
+          } else {
+            logger.info(`[BaseWmsAdapter] Cleared cached token for vendor ${this.vendorId}`)
+          }
         } catch (error) {
-          logger.error(`[BaseWmsAdapter] Failed to clear cached token:`, error)
+          logger.error(`[BaseWmsAdapter] Exception while clearing cached token:`, error)
           // Continue with re-authentication even if clearing fails
         }
       }
@@ -347,9 +364,15 @@ export abstract class BaseWmsAdapter {
       logger.info(`[BaseWmsAdapter] Re-authenticating to get fresh token...`)
       const newToken = await this.authenticate()
       
+      logger.info(`[BaseWmsAdapter] New token obtained (full): ${newToken}`)
+      logger.info(`[BaseWmsAdapter] New token length: ${newToken.length}`)
+      logger.info(`[BaseWmsAdapter] Token changed: ${token !== newToken ? "YES" : "NO"}`)
+      
       // Retry the request once with new token
       logger.info(`[BaseWmsAdapter] Retrying API call with fresh token: ${method} ${url}`)
-      return this.fetchWithAuth(endpoint, {
+      logger.info(`[BaseWmsAdapter] Retry request headers: Authorization=Bearer ${newToken}, Content-Type=application/json`)
+      
+      const retryResponse = await this.fetchWithAuth(endpoint, {
         ...options,
         headers: {
           ...options.headers,
@@ -357,6 +380,19 @@ export abstract class BaseWmsAdapter {
           "Content-Type": "application/json",
         },
       }, false) // Don't retry again to prevent infinite loops
+      
+      logger.info(`[BaseWmsAdapter] Retry response status: ${retryResponse.status} ${retryResponse.statusText}`)
+      if (!retryResponse.ok) {
+        let retryResponseBody = ""
+        try {
+          retryResponseBody = await retryResponse.clone().text()
+          logger.error(`[BaseWmsAdapter] Retry failed with ${retryResponse.status}: ${retryResponseBody}`)
+        } catch (error) {
+          logger.error(`[BaseWmsAdapter] Could not read retry response body:`, error)
+        }
+      }
+      
+      return retryResponse
     }
 
     return response
