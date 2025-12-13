@@ -81,7 +81,8 @@ export abstract class BaseWmsAdapter {
 
   /**
    * Authenticate with WMS vendor API and return access token
-   * Should implement token caching internally
+   * Should check database for cached token first, then fetch new token if needed
+   * Token caching should be done in database only (no in-memory caching)
    */
   abstract authenticate(): Promise<string>
 
@@ -467,7 +468,6 @@ export abstract class BaseWmsAdapter {
       }
       
       logger.warn(`[BaseWmsAdapter] Old token (full): ${token}`)
-      logger.warn(`[BaseWmsAdapter] Old token length: ${token.length}`)
       
       // Clear cached token in DB if token storage is configured
       if (this.vendorId && this.supabaseClient) {
@@ -492,7 +492,7 @@ export abstract class BaseWmsAdapter {
         }
       }
       
-      // Re-authenticate to get fresh token
+      // Re-authenticate to get fresh token (will fetch from DB or API)
       logger.info(`[BaseWmsAdapter] Re-authenticating to get fresh token...`)
       const newToken = await this.authenticate()
       

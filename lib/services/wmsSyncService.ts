@@ -147,19 +147,13 @@ function getWmsAdapter(vendor: any): BaseWmsAdapter {
 
   switch (vendor.vendor_type) {
     case "INTELLO": {
-      const adapter = new IntelloAdapter(config)
-      adapter.setTokenStorage(vendor.id, getMainClient())
-      return adapter
+      return new IntelloAdapter(config)
     }
     case "SCADA": {
-      const adapter = new ScadaAdapter(config)
-      adapter.setTokenStorage(vendor.id, getMainClient())
-      return adapter
+      return new ScadaAdapter(config)
     }
     case "TRACKSO": {
-      const adapter = new TracksoAdapter(config)
-      adapter.setTokenStorage(vendor.id, getMainClient())
-      return adapter
+      return new TracksoAdapter(config)
     }
     default:
       throw new Error(`Unsupported WMS vendor type: ${vendor.vendor_type}`)

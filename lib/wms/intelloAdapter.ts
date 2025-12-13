@@ -45,9 +45,7 @@ export class IntelloAdapter extends BaseWmsAdapter {
         const now = new Date()
         const cachedToken = vendor.access_token
         
-        logger.info(`[IntelloAdapter] Found cached token in database`)
-        logger.info(`[IntelloAdapter] Cached token (full): ${cachedToken}`)
-        logger.info(`[IntelloAdapter] Cached token length: ${cachedToken.length}`)
+        logger.info(`[IntelloAdapter] Cached token [DB] (full): ${cachedToken}`)
         logger.info(`[IntelloAdapter] Token expires at: ${expiresAt.toISOString()}`)
         logger.info(`[IntelloAdapter] Current time: ${now.toISOString()}`)
         logger.info(`[IntelloAdapter] Time until expiration: ${Math.round((expiresAt.getTime() - now.getTime()) / 1000 / 60)} minutes`)
