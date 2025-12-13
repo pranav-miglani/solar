@@ -18,58 +18,20 @@ export class TracksoAdapter extends BaseWmsAdapter {
   }
 
   /**
-   * Authenticate with TRACKSO API
-   * Uses cached auth_token if valid, otherwise fetches new token
-   * auth_token expires after 23 hours 30 minutes
+   * Fetch token directly from TRACKSO API
+   * This method is called by BaseWmsAdapter.authenticate() and UnauthorizedHandler
    */
-  async authenticate(): Promise<string> {
+  protected async fetchTokenFromApi(): Promise<{
+    token: string
+    expiresAt: Date
+    metadata?: Record<string, any>
+  }> {
     const credentials = this.getCredentials()
     const email = credentials.email as string
     const password = credentials.password as string
 
     if (!email || !password) {
       throw new Error("TRACKSO credentials missing: email and password are required")
-    }
-
-    // Check for cached token in database
-    if (this.vendorId && this.supabaseClient) {
-      logger.info(`[TracksoAdapter] Checking for cached token for vendor ID: ${this.vendorId}`)
-      
-      const { data: vendor } = await this.supabaseClient
-        .from("wms_vendors")
-        .select("access_token, token_expires_at")
-        .eq("id", this.vendorId)
-        .single()
-
-      if (vendor?.access_token) {
-        if (vendor.token_expires_at) {
-          const expiresAt = new Date(vendor.token_expires_at)
-          const now = new Date()
-          
-          // Token is valid if it expires more than 5 minutes from now
-          if (expiresAt > new Date(now.getTime() + 5 * 60 * 1000)) {
-            logger.info(`[TracksoAdapter] Using cached token (expires at: ${expiresAt.toISOString()})`)
-            return vendor.access_token
-          } else {
-            logger.info(`[TracksoAdapter] Cached token expired (expires at: ${expiresAt.toISOString()}), fetching new token`)
-          }
-        } else {
-          // Token exists but expiration is not present - set default 23h 30m
-          logger.info(`[TracksoAdapter] Token expiration not present, setting default 23h 30m`)
-          const defaultExpirationMs = 23 * 60 * 60 * 1000 + 30 * 60 * 1000 // 23h 30m in milliseconds
-          const defaultExpiresAt = new Date(Date.now() + defaultExpirationMs)
-          
-          await this.supabaseClient
-            .from("wms_vendors")
-            .update({ token_expires_at: defaultExpiresAt.toISOString() })
-            .eq("id", this.vendorId)
-          
-          logger.info(`[TracksoAdapter] Set default token expiration: ${defaultExpiresAt.toISOString()}, using cached token`)
-          return vendor.access_token
-        }
-      } else {
-        logger.info(`[TracksoAdapter] No cached token found, fetching new token`)
-      }
     }
 
     // Fetch new token
@@ -120,31 +82,20 @@ export class TracksoAdapter extends BaseWmsAdapter {
 
     logger.info(`[TracksoAdapter] Authentication successful. Token expires at: ${expiresAt.toISOString()}`)
 
-    // Cache token in database
-    if (this.vendorId && this.supabaseClient) {
-      logger.info(`[TracksoAdapter] Caching token in database (expires at: ${expiresAt.toISOString()})`)
-      
-      // Store site_access in token_metadata for efficient access without re-authentication
-      const tokenMetadata = {
-        expirationTimeMs,
-        stored_at: new Date().toISOString(),
-        user_key: result.user_key,
-        user_id: result.id,
-        site_access: result.site_access || {}, // Store device information from auth response
-      }
-      
-      await this.supabaseClient
-        .from("wms_vendors")
-        .update({
-          access_token: authToken,
-          token_expires_at: expiresAt.toISOString(),
-          token_metadata: tokenMetadata,
-        })
-        .eq("id", this.vendorId)
-      logger.info(`[TracksoAdapter] Token cached successfully with site_access (${Object.keys(result.site_access || {}).length} devices)`)
+    // Store site_access in token_metadata for efficient access without re-authentication
+    const metadata = {
+      expirationTimeMs,
+      stored_at: new Date().toISOString(),
+      user_key: result.user_key,
+      user_id: result.id,
+      site_access: result.site_access || {}, // Store device information from auth response
     }
 
-    return authToken
+    return {
+      token: authToken,
+      expiresAt,
+      metadata,
+    }
   }
 
   /**

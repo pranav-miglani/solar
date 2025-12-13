@@ -1,5 +1,7 @@
 import { pooledFetch } from "@/lib/vendors/httpClient"
 import { logger } from "@/lib/context/logger"
+import { TokenRepository } from "./modules/tokenRepository"
+import { UnauthorizedHandler } from "./modules/unauthorizedHandler"
 
 /**
  * WMS Site interface
@@ -65,6 +67,8 @@ export abstract class BaseWmsAdapter {
   protected config: WmsVendorConfig
   protected vendorId?: number
   protected supabaseClient?: any
+  protected tokenRepository?: TokenRepository
+  protected unauthorizedHandler?: UnauthorizedHandler
 
   constructor(config: WmsVendorConfig) {
     this.config = config
@@ -72,11 +76,13 @@ export abstract class BaseWmsAdapter {
 
   /**
    * Set vendor ID and Supabase client for token storage
-   * Default implementation stores them for use in fetchWithAuth for 401 handling
+   * Initializes TokenRepository and UnauthorizedHandler
    */
   setTokenStorage(vendorId: number, supabaseClient: any): void {
     this.vendorId = vendorId
     this.supabaseClient = supabaseClient
+    this.tokenRepository = new TokenRepository(vendorId, supabaseClient)
+    this.unauthorizedHandler = new UnauthorizedHandler(this.tokenRepository, () => this.fetchTokenFromApi())
   }
 
   /**
@@ -84,7 +90,36 @@ export abstract class BaseWmsAdapter {
    * Should check database for cached token first, then fetch new token if needed
    * Token caching should be done in database only (no in-memory caching)
    */
-  abstract authenticate(): Promise<string>
+  async authenticate(): Promise<string> {
+    // Check DB for cached token
+    if (this.tokenRepository) {
+      const tokenData = await this.tokenRepository.getTokenFromDb()
+      if (tokenData && this.tokenRepository.isTokenValid(tokenData)) {
+        return tokenData.token
+      }
+    }
+
+    // No valid cached token, fetch from API
+    const { token, expiresAt, metadata } = await this.fetchTokenFromApi()
+
+    // Save to DB
+    if (this.tokenRepository) {
+      await this.tokenRepository.saveTokenToDb(token, expiresAt, metadata)
+    }
+
+    return token
+  }
+
+  /**
+   * Fetch token directly from API (bypasses DB check)
+   * This is used by authenticate() and UnauthorizedHandler
+   * Each adapter must implement this to fetch token from their specific API
+   */
+  protected abstract fetchTokenFromApi(): Promise<{
+    token: string
+    expiresAt: Date
+    metadata?: Record<string, any>
+  }>
 
   /**
    * List all sites available from this WMS vendor
@@ -466,73 +501,19 @@ export abstract class BaseWmsAdapter {
       } catch (error) {
         logger.warn(`[BaseWmsAdapter] Could not read 401 response body:`, error)
       }
-      
-      logger.warn(`[BaseWmsAdapter] Old token (full): ${token}`)
-      
-      // Clear cached token in DB if token storage is configured
-      if (this.vendorId && this.supabaseClient) {
-        try {
-          logger.info(`[BaseWmsAdapter] Clearing cached token for vendor ${this.vendorId}...`)
-          const { error: clearError } = await this.supabaseClient
-            .from("wms_vendors")
-            .update({ 
-              access_token: null, 
-              token_expires_at: null 
-            })
-            .eq("id", this.vendorId)
-          
-          if (clearError) {
-            logger.error(`[BaseWmsAdapter] Failed to clear cached token:`, clearError)
-          } else {
-            logger.info(`[BaseWmsAdapter] Cleared cached token for vendor ${this.vendorId}`)
-          }
-        } catch (error) {
-          logger.error(`[BaseWmsAdapter] Exception while clearing cached token:`, error)
-          // Continue with re-authentication even if clearing fails
-        }
+
+      // Use UnauthorizedHandler to handle 401
+      // The old token is already in scope (from the failed request)
+      if (!this.unauthorizedHandler) {
+        logger.error(`[BaseWmsAdapter] UnauthorizedHandler not initialized. Cannot handle 401.`)
+        throw new Error("UnauthorizedHandler not initialized")
       }
-      
-      // Add a small delay after clearing token to ensure DB update propagates
-      // This is especially important in parallel execution scenarios
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      // Add random jitter (0-200ms) before authentication to prevent thundering herd
-      // When multiple vendors authenticate in parallel, this helps avoid rate limiting
-      const jitter = Math.floor(Math.random() * 200)
-      await new Promise(resolve => setTimeout(resolve, jitter))
-      logger.info(`[BaseWmsAdapter] Added ${jitter}ms jitter before re-authentication`)
-      
-      // Re-authenticate to get fresh token (will fetch from DB or API)
-      logger.info(`[BaseWmsAdapter] Re-authenticating to get fresh token...`)
-      const newToken = await this.authenticate()
-      
-      logger.info(`[BaseWmsAdapter] New token obtained (full): ${newToken}`)
-      logger.info(`[BaseWmsAdapter] New token length: ${newToken.length}`)
-      logger.info(`[BaseWmsAdapter] Token changed: ${token !== newToken ? "YES" : "NO"}`)
-      
-      // Validate new token is not empty
-      if (!newToken || newToken.trim().length === 0) {
-        logger.error(`[BaseWmsAdapter] New token is empty after re-authentication`)
-        throw new Error('[BaseWmsAdapter] Re-authentication returned empty token')
-      }
-      
-      // If token didn't change, this indicates the API returned the same invalid token
-      // This could mean credentials are wrong or account is locked
-      if (token === newToken) {
-        logger.error(`[BaseWmsAdapter] Re-authentication returned the same token that failed. This may indicate invalid credentials or account issues.`)
-        // Still retry once, but log the issue
-      }
-      
-      // Add a delay after re-authentication to allow token to propagate
-      // Some APIs (like Intello) may need a moment for the token to be fully registered
-      // This helps avoid race conditions where the token is valid but not yet recognized
-      // Increased delay for parallel execution scenarios where multiple vendors authenticate simultaneously
-      await new Promise(resolve => setTimeout(resolve, 500))
-      logger.info(`[BaseWmsAdapter] Waited 500ms after re-authentication for token propagation`)
-      
+
+      logger.info(`[BaseWmsAdapter] Handling 401 with UnauthorizedHandler...`)
+      const newToken = await this.unauthorizedHandler.handle401(token)
+
       // Retry the request once with new token
       logger.info(`[BaseWmsAdapter] Retrying API call with fresh token: ${method} ${url}`)
-      logger.info(`[BaseWmsAdapter] Retry request headers: Authorization=Bearer ${newToken}, Content-Type=application/json`)
       
       // Normalize headers to ensure consistent handling
       const normalizedRetryHeaders = this.normalizeHeaders(options.headers)

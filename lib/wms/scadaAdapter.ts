@@ -19,11 +19,14 @@ export class ScadaAdapter extends BaseWmsAdapter {
   }
 
   /**
-   * Authenticate with SCADA API
-   * Uses cached SS_KEY if available, otherwise fetches new key
-   * SS_KEY is persistent and only refreshed if API calls fail
+   * Fetch token directly from SCADA API
+   * This method is called by BaseWmsAdapter.authenticate() and UnauthorizedHandler
    */
-  async authenticate(): Promise<string> {
+  protected async fetchTokenFromApi(): Promise<{
+    token: string
+    expiresAt: Date
+    metadata?: Record<string, any>
+  }> {
     const credentials = this.getCredentials()
     const loginId = credentials.loginId as string
     const password = credentials.password as string
@@ -32,46 +35,6 @@ export class ScadaAdapter extends BaseWmsAdapter {
 
     if (!loginId || !password || !userName || !userType) {
       throw new Error("SCADA credentials missing: loginId, password, userName, and userType are required")
-    }
-
-    // Check for cached SS_KEY in database
-    if (this.vendorId && this.supabaseClient) {
-      logger.info(`[ScadaAdapter] Checking for cached SS_KEY for vendor ID: ${this.vendorId}`)
-      
-      const { data: vendor } = await this.supabaseClient
-        .from("wms_vendors")
-        .select("access_token, token_expires_at, token_metadata")
-        .eq("id", this.vendorId)
-        .single()
-
-      if (vendor?.access_token) {
-        // Check if token has expiration - if not, set default 23h 30m
-        if (!vendor.token_expires_at) {
-          logger.info(`[ScadaAdapter] Token expiration not present, setting default 23h 30m`)
-          const defaultExpirationMs = 23 * 60 * 60 * 1000 + 30 * 60 * 1000 // 23h 30m in milliseconds
-          const defaultExpiresAt = new Date(Date.now() + defaultExpirationMs)
-          
-          await this.supabaseClient
-            .from("wms_vendors")
-            .update({ token_expires_at: defaultExpiresAt.toISOString() })
-            .eq("id", this.vendorId)
-          
-          logger.info(`[ScadaAdapter] Set default token expiration: ${defaultExpiresAt.toISOString()}`)
-        } else {
-          // Check if token is still valid (expires more than 5 minutes from now)
-          const expiresAt = new Date(vendor.token_expires_at)
-          const now = new Date()
-          
-          if (expiresAt > new Date(now.getTime() + 5 * 60 * 1000)) {
-            logger.info(`[ScadaAdapter] Using cached SS_KEY (expires at: ${expiresAt.toISOString()})`)
-            return vendor.access_token
-          } else {
-            logger.info(`[ScadaAdapter] Cached SS_KEY expired (expires at: ${expiresAt.toISOString()}), fetching new key`)
-          }
-        }
-      } else {
-        logger.info(`[ScadaAdapter] No cached SS_KEY found, fetching new key`)
-      }
     }
 
     // Fetch new SS_KEY
@@ -121,31 +84,21 @@ export class ScadaAdapter extends BaseWmsAdapter {
 
     logger.info(`[ScadaAdapter] Authentication successful. SS_KEY obtained.`)
 
-    // Cache SS_KEY in database
     // Default expiration: 23 hours 30 minutes (even though SS_KEY is persistent, we set a default expiration)
-    if (this.vendorId && this.supabaseClient) {
-      logger.info(`[ScadaAdapter] Caching SS_KEY in database`)
-      
-      // Default expiration: 23 hours 30 minutes
-      const defaultExpirationMs = 23 * 60 * 60 * 1000 + 30 * 60 * 1000 // 23h 30m in milliseconds
-      const expiresAt = new Date(Date.now() + defaultExpirationMs)
-      
-      await this.supabaseClient
-        .from("wms_vendors")
-        .update({
-          access_token: ssKey,
-          token_expires_at: expiresAt.toISOString(), // Set default expiration of 23h 30m
-          token_metadata: {
-            loginId: loginId,
-            userName: data.USER_NAME,
-            stored_at: new Date().toISOString(),
-          },
-        })
-        .eq("id", this.vendorId)
-      logger.info(`[ScadaAdapter] SS_KEY cached successfully with default expiration: ${expiresAt.toISOString()}`)
+    const defaultExpirationMs = 23 * 60 * 60 * 1000 + 30 * 60 * 1000 // 23h 30m in milliseconds
+    const expiresAt = new Date(Date.now() + defaultExpirationMs)
+    
+    const metadata = {
+      loginId: loginId,
+      userName: data.USER_NAME,
+      stored_at: new Date().toISOString(),
     }
 
-    return ssKey
+    return {
+      token: ssKey,
+      expiresAt,
+      metadata,
+    }
   }
 
   /**
