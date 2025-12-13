@@ -38,28 +38,25 @@ export class IntelloAdapter extends BaseWmsAdapter {
     const apiBaseUrl = this.getApiBaseUrl()
     const authUrl = `${apiBaseUrl}/api/intello/authenticate`
     
-    logger.info(`[IntelloAdapter] Calling authentication API: POST ${authUrl}`)
-    logger.info(`[IntelloAdapter] Request body: { username: "${email}", password: "${passwordHash}" }`)
+    const requestBody = JSON.stringify({
+      username: email,
+      password: passwordHash,
+    })
     
-    const requestStartTime = Date.now()
+    logger.info(`[IntelloAdapter] Request: POST ${authUrl}`)
+    logger.info(`[IntelloAdapter] Request body: ${requestBody}`)
+    
     const response = await fetch(authUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        username: email,
-        password: passwordHash,
-      }),
+      body: requestBody,
     })
 
-    const requestDuration = Date.now() - requestStartTime
-    logger.info(`[IntelloAdapter] Authentication API response: ${response.status} ${response.statusText} (${requestDuration}ms)`)
-    logger.info(`[IntelloAdapter] Authentication response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`)
-
-    // Read response body for logging
     const responseText = await response.text()
-    logger.info(`[IntelloAdapter] Authentication response body (full): ${responseText}`)
+    logger.info(`[IntelloAdapter] Response: ${response.status} ${response.statusText}`)
+    logger.info(`[IntelloAdapter] Response body: ${responseText}`)
 
     if (!response.ok) {
       logger.error(`[IntelloAdapter] Authentication API failed: ${response.status} ${responseText}`)
@@ -71,55 +68,21 @@ export class IntelloAdapter extends BaseWmsAdapter {
     try {
       data = JSON.parse(responseText)
     } catch (parseError: any) {
-      logger.error(`[IntelloAdapter] Failed to parse authentication response as JSON: ${parseError.message}`)
-      logger.error(`[IntelloAdapter] Raw response text: ${responseText}`)
+      logger.error(`[IntelloAdapter] Failed to parse authentication response: ${parseError.message}`)
       throw new Error(`Intello authentication failed: Invalid JSON response - ${parseError.message}`)
     }
-
-    logger.info(`[IntelloAdapter] Authentication response data (full): ${JSON.stringify(data, null, 2)}`)
-    logger.info(`[IntelloAdapter] Authentication response data keys: ${Object.keys(data).join(", ")}`)
-    logger.info(`[IntelloAdapter] Authentication response has 'token': ${!!data.token}`)
-    logger.info(`[IntelloAdapter] Authentication response has 'expirationTime': ${!!data.expirationTime}`)
     
     const token = data.token as string
     const expirationTime = data.expirationTime as number | undefined // seconds (may be undefined)
 
     if (!token) {
-      logger.error(`[IntelloAdapter] No token in authentication response: ${JSON.stringify(data)}`)
+      logger.error(`[IntelloAdapter] No token in authentication response`)
       throw new Error("Intello authentication failed: no token in response")
-    }
-    
-    logger.info(`[IntelloAdapter] Token extracted (full): ${token}`)
-    logger.info(`[IntelloAdapter] Token length: ${token.length}`)
-    
-    // Decode JWT token to inspect payload (without verification)
-    try {
-      const tokenParts = token.split('.')
-      if (tokenParts.length === 3) {
-        const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString('utf-8'))
-        logger.info(`[IntelloAdapter] Token payload (decoded): ${JSON.stringify(payload, null, 2)}`)
-        logger.info(`[IntelloAdapter] Token issued at (iat): ${new Date(payload.iat * 1000).toISOString()}`)
-        logger.info(`[IntelloAdapter] Token expires at (exp): ${new Date(payload.exp * 1000).toISOString()}`)
-        logger.info(`[IntelloAdapter] Token subject (sub): ${payload.sub}`)
-        logger.info(`[IntelloAdapter] Token user: ${payload.user}`)
-        logger.info(`[IntelloAdapter] Token organizations: ${JSON.stringify(payload.organizations)}`)
-        logger.info(`[IntelloAdapter] Token role: ${payload.role}`)
-      } else {
-        logger.warn(`[IntelloAdapter] Token does not appear to be a valid JWT (expected 3 parts, got ${tokenParts.length})`)
-      }
-    } catch (decodeError: any) {
-      logger.warn(`[IntelloAdapter] Failed to decode token payload: ${decodeError.message}`)
     }
 
     // If expiration time is not present in response, default to 23 hours 30 minutes
     const defaultExpirationSeconds = 23 * 60 * 60 + 30 * 60 // 23h 30m in seconds
     const expirationTimeSeconds = expirationTime ?? defaultExpirationSeconds
-
-    if (!expirationTime) {
-      logger.info(`[IntelloAdapter] Token expiration not present in API response, using default: ${defaultExpirationSeconds}s (23h 30m)`)
-    } else {
-      logger.info(`[IntelloAdapter] Authentication successful. Token expiration: ${expirationTimeSeconds}s`)
-    }
 
     const expiresAt = new Date(Date.now() + expirationTimeSeconds * 1000)
     const metadata = {
@@ -141,18 +104,13 @@ export class IntelloAdapter extends BaseWmsAdapter {
     const apiBaseUrl = this.getApiBaseUrl()
     const sitesUrl = `${apiBaseUrl}/api/intello/user/v1/sites`
     
-    logger.info(`[IntelloAdapter] Calling list sites API: GET ${sitesUrl}`)
-    const requestStartTime = Date.now()
+    logger.info(`[IntelloAdapter] Request: GET ${sitesUrl}`)
     
     const response = await this.fetchWithAuth("/api/intello/user/v1/sites")
 
-    const requestDuration = Date.now() - requestStartTime
-    logger.info(`[IntelloAdapter] List sites API response: ${response.status} ${response.statusText} (${requestDuration}ms)`)
-    logger.info(`[IntelloAdapter] List sites response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`)
-
-    // Read response body for logging
     const responseText = await response.text()
-    logger.info(`[IntelloAdapter] List sites response body (full): ${responseText}`)
+    logger.info(`[IntelloAdapter] Response: ${response.status} ${response.statusText}`)
+    logger.info(`[IntelloAdapter] Response body: ${responseText}`)
 
     if (!response.ok) {
       logger.error(`[IntelloAdapter] List sites API failed: ${response.status} ${responseText}`)
@@ -164,13 +122,9 @@ export class IntelloAdapter extends BaseWmsAdapter {
     try {
       sites = JSON.parse(responseText) as any[]
     } catch (parseError: any) {
-      logger.error(`[IntelloAdapter] Failed to parse list sites response as JSON: ${parseError.message}`)
-      logger.error(`[IntelloAdapter] Raw response text: ${responseText}`)
+      logger.error(`[IntelloAdapter] Failed to parse list sites response: ${parseError.message}`)
       throw new Error(`Failed to fetch Intello sites: Invalid JSON response - ${parseError.message}`)
     }
-
-    logger.info(`[IntelloAdapter] List sites response data (full): ${JSON.stringify(sites, null, 2)}`)
-    logger.info(`[IntelloAdapter] Parsed ${sites.length} sites from API response`)
 
     const mappedSites = sites.map((site) => ({
       vendorSiteId: String(site.id),
@@ -190,14 +144,6 @@ export class IntelloAdapter extends BaseWmsAdapter {
       },
     }))
 
-    // Log device counts per site
-    mappedSites.forEach((site) => {
-      const deviceCount = site.metadata?.rtuList?.length || 0
-      logger.info(
-        `[IntelloAdapter] Site ${site.vendorSiteId} (${site.siteName}): ${deviceCount} devices`
-      )
-    })
-
     return mappedSites
   }
 
@@ -211,7 +157,7 @@ export class IntelloAdapter extends BaseWmsAdapter {
       const apiBaseUrl = this.getApiBaseUrl()
       const testUrl = `${apiBaseUrl}/api/intello/user/v1/sites`
       
-      logger.info(`[IntelloAdapter] Testing token validity with lightweight API call: GET ${testUrl}`)
+      logger.info(`[IntelloAdapter] Request: GET ${testUrl}`)
       
       // Add a small delay before testing to ensure token is fully propagated
       // This helps with APIs that need time to activate tokens server-side
@@ -225,21 +171,19 @@ export class IntelloAdapter extends BaseWmsAdapter {
         },
       })
 
+      const responseText = await response.text()
+      logger.info(`[IntelloAdapter] Response: ${response.status} ${response.statusText}`)
+      logger.info(`[IntelloAdapter] Response body: ${responseText}`)
+
       const isValid = response.ok && (response.status === 200 || response.status === 204)
       
-      if (isValid) {
-        logger.info(`[IntelloAdapter] Token validation successful (status: ${response.status})`)
-      } else {
+      if (!isValid && (response.status === 401 || response.status === 403)) {
         logger.warn(`[IntelloAdapter] Token validation failed (status: ${response.status})`)
-        if (response.status === 401 || response.status === 403) {
-          const errorText = await response.text().catch(() => "")
-          logger.warn(`[IntelloAdapter] Token validation error response: ${errorText}`)
-        }
       }
       
       return isValid
     } catch (error: any) {
-      logger.error(`[IntelloAdapter] Error testing token: ${error.message}`, { error })
+      logger.error(`[IntelloAdapter] Error testing token: ${error.message}`)
       // On error, assume token is invalid to be safe
       return false
     }
@@ -283,9 +227,7 @@ export class IntelloAdapter extends BaseWmsAdapter {
     const insolationUrl = `/report?fromDate=${fromDate}&mode=Daily&resultType=ZDGLOSS&rtuid=${deviceId}`
     const fullUrl = `${reportApiBaseUrl}${insolationUrl}`
     
-    logger.info(`[IntelloAdapter] Calling insolation data API: GET ${fullUrl}`)
-    logger.info(`[IntelloAdapter] Request params: deviceId=${deviceId}, fromDate=${fromDate}, toDate=${toDate}`)
-    const requestStartTime = Date.now()
+    logger.info(`[IntelloAdapter] Request: GET ${fullUrl}`)
     
     // Use report API base URL for this endpoint (not the main API base URL)
     // Need to make direct fetch call since fetchWithAuth uses main API base URL
@@ -298,13 +240,9 @@ export class IntelloAdapter extends BaseWmsAdapter {
       },
     })
 
-    const requestDuration = Date.now() - requestStartTime
-    logger.info(`[IntelloAdapter] Insolation data API response: ${response.status} ${response.statusText} (${requestDuration}ms)`)
-    logger.info(`[IntelloAdapter] Insolation data response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`)
-
-    // Read response body for logging
     const responseText = await response.text()
-    logger.info(`[IntelloAdapter] Insolation data response body (full): ${responseText}`)
+    logger.info(`[IntelloAdapter] Response: ${response.status} ${response.statusText}`)
+    logger.info(`[IntelloAdapter] Response body: ${responseText}`)
 
     if (!response.ok) {
       logger.error(`[IntelloAdapter] Insolation data API failed: ${response.status} ${responseText}`)
@@ -318,13 +256,9 @@ export class IntelloAdapter extends BaseWmsAdapter {
     try {
       result = JSON.parse(responseText) as any
     } catch (parseError: any) {
-      logger.error(`[IntelloAdapter] Failed to parse insolation data response as JSON: ${parseError.message}`)
-      logger.error(`[IntelloAdapter] Raw response text: ${responseText}`)
+      logger.error(`[IntelloAdapter] Failed to parse insolation data response: ${parseError.message}`)
       throw new Error(`Failed to fetch Intello insolation data: Invalid JSON response - ${parseError.message}`)
     }
-
-    logger.info(`[IntelloAdapter] Insolation data response (full): ${JSON.stringify(result, null, 2)}`)
-    logger.info(`[IntelloAdapter] Received insolation API response for date: ${result.date || fromDate}`)
 
     // Parse dailyReport JSON string
     let insolationValue = 0
@@ -336,16 +270,15 @@ export class IntelloAdapter extends BaseWmsAdapter {
         if (Array.isArray(parsedDailyReport) && parsedDailyReport.length > 0) {
           // Extract insolation from first item in dailyReport array
           insolationValue = parsedDailyReport[0]?.insolation || 0
-          logger.info(`[IntelloAdapter] Extracted insolation: ${insolationValue} kWh/m² from dailyReport`)
         } else {
-          logger.warn(`[IntelloAdapter] dailyReport is empty or not an array: ${result.dailyReport}`)
+          logger.warn(`[IntelloAdapter] dailyReport is empty or not an array`)
         }
       } catch (parseError: any) {
-        logger.error(`[IntelloAdapter] Failed to parse dailyReport JSON: ${parseError.message}`, { dailyReport: result.dailyReport })
+        logger.error(`[IntelloAdapter] Failed to parse dailyReport JSON: ${parseError.message}`)
         throw new Error(`Failed to parse dailyReport: ${parseError.message}`)
       }
     } else {
-      logger.warn(`[IntelloAdapter] No dailyReport in response: ${JSON.stringify(result)}`)
+      logger.warn(`[IntelloAdapter] No dailyReport in response`)
     }
 
     // Return as InsolationReading format for consistency
@@ -362,7 +295,6 @@ export class IntelloAdapter extends BaseWmsAdapter {
       generation: insolationValue, // Store kWh/m² directly (will be used by calculateDailyInsolation)
     } as InsolationReading & { generation?: number }]
 
-    logger.info(`[IntelloAdapter] Mapped insolation: ${insolationValue} kWh/m² for device ${deviceId} on ${responseDate}`)
 
     return mappedReadings
   }
@@ -391,7 +323,6 @@ export class IntelloAdapter extends BaseWmsAdapter {
       // For a single day, return the value directly
       if (validReadings.length === 1) {
         const insolationKwh = (validReadings[0] as any).generation
-        logger.info(`[IntelloAdapter] Using pre-calculated insolation: ${insolationKwh} kWh/m²`)
         return insolationKwh
       }
       
