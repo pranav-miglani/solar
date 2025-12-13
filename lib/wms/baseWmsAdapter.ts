@@ -82,7 +82,7 @@ export abstract class BaseWmsAdapter {
     this.vendorId = vendorId
     this.supabaseClient = supabaseClient
     this.tokenRepository = new TokenRepository(vendorId, supabaseClient)
-    this.unauthorizedHandler = new UnauthorizedHandler(this.tokenRepository, () => this.fetchTokenFromApi())
+    this.unauthorizedHandler = new UnauthorizedHandler(this.tokenRepository)
   }
 
   /**
@@ -99,8 +99,8 @@ export abstract class BaseWmsAdapter {
       }
     }
 
-    // No valid cached token, fetch from API
-    const { token, expiresAt, metadata } = await this.fetchTokenFromApi()
+    // No valid cached token, fetch and validate token from API
+    const { token, expiresAt, metadata } = await this.getValidToken()
 
     // Save to DB
     if (this.tokenRepository) {
@@ -108,6 +108,73 @@ export abstract class BaseWmsAdapter {
     }
 
     return token
+  }
+
+  /**
+   * Get a valid token from API with retry and validation
+   * Retries up to 3 times with exponential backoff if token validation fails
+   * This ensures we only use tokens that actually work
+   */
+  protected async getValidToken(): Promise<{
+    token: string
+    expiresAt: Date
+    metadata?: Record<string, any>
+  }> {
+    const maxAttempts = 3
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      logger.info(`[BaseWmsAdapter] Fetching token from API (attempt ${attempt}/${maxAttempts})...`)
+
+      // Fetch token from API
+      const { token, expiresAt, metadata } = await this.fetchTokenFromApi()
+
+      if (!token || token.trim().length === 0) {
+        logger.error(`[BaseWmsAdapter] Empty token returned from API on attempt ${attempt}`)
+        if (attempt === maxAttempts) {
+          throw new Error("Failed to get valid token: API returned empty token")
+        }
+        // Wait before retry
+        const delay = 1200 * attempt
+        logger.info(`[BaseWmsAdapter] Waiting ${delay}ms before retry...`)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+        continue
+      }
+
+      // Test token to ensure it actually works
+      logger.info(`[BaseWmsAdapter] Testing token validity (attempt ${attempt}/${maxAttempts})...`)
+      const isValid = await this.testToken(token)
+
+      if (isValid) {
+        logger.info(`[BaseWmsAdapter] Token validated successfully on attempt ${attempt}`)
+        return { token, expiresAt, metadata }
+      } else {
+        logger.warn(`[BaseWmsAdapter] Token validation failed on attempt ${attempt}`)
+        if (attempt === maxAttempts) {
+          throw new Error(
+            `Failed to get valid token after ${maxAttempts} attempts. API returned invalid token repeatedly.`
+          )
+        }
+        // Wait with exponential backoff before retry (forces timestamp change)
+        const delay = 1200 * attempt
+        logger.info(`[BaseWmsAdapter] Token invalid, waiting ${delay}ms before retry (to force timestamp change)...`)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+      }
+    }
+
+    throw new Error(`Failed to get valid token after ${maxAttempts} attempts`)
+  }
+
+  /**
+   * Test if a token is valid by making a lightweight API call
+   * Default implementation returns true (no validation)
+   * Vendors can override this to implement specific token validation
+   * @param token - Token to test
+   * @returns true if token is valid, false if token is invalid (401/403)
+   */
+  protected async testToken(token: string): Promise<boolean> {
+    // Default implementation: no validation
+    // Vendors can override this to test token with a lightweight API call
+    return true
   }
 
   /**
@@ -510,7 +577,7 @@ export abstract class BaseWmsAdapter {
       }
 
       logger.info(`[BaseWmsAdapter] Handling 401 with UnauthorizedHandler...`)
-      const newToken = await this.unauthorizedHandler.handle401(token)
+      const newToken = await this.unauthorizedHandler.handle401(token, () => this.getValidToken())
 
       // Retry the request once with new token
       logger.info(`[BaseWmsAdapter] Retrying API call with fresh token: ${method} ${url}`)

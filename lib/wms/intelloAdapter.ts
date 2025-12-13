@@ -202,6 +202,45 @@ export class IntelloAdapter extends BaseWmsAdapter {
   }
 
   /**
+   * Test if a token is valid by making a lightweight API call
+   * Uses the list sites endpoint with a minimal request to validate token
+   */
+  protected async testToken(token: string): Promise<boolean> {
+    try {
+      const apiBaseUrl = this.getApiBaseUrl()
+      const testUrl = `${apiBaseUrl}/api/intello/user/v1/sites`
+      
+      logger.info(`[IntelloAdapter] Testing token validity with lightweight API call: GET ${testUrl}`)
+      
+      const response = await fetch(testUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      const isValid = response.ok && (response.status === 200 || response.status === 204)
+      
+      if (isValid) {
+        logger.info(`[IntelloAdapter] Token validation successful (status: ${response.status})`)
+      } else {
+        logger.warn(`[IntelloAdapter] Token validation failed (status: ${response.status})`)
+        if (response.status === 401 || response.status === 403) {
+          const errorText = await response.text().catch(() => "")
+          logger.warn(`[IntelloAdapter] Token validation error response: ${errorText}`)
+        }
+      }
+      
+      return isValid
+    } catch (error: any) {
+      logger.error(`[IntelloAdapter] Error testing token: ${error.message}`, { error })
+      // On error, assume token is invalid to be safe
+      return false
+    }
+  }
+
+  /**
    * Get report API base URL from environment variable
    * Separate from main API base URL for insolation report endpoint
    */

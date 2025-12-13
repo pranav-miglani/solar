@@ -11,27 +11,26 @@ import { TokenRepository } from "./tokenRepository"
  */
 export class UnauthorizedHandler {
   private tokenRepository: TokenRepository
-  private fetchTokenFromApi: () => Promise<{ token: string; expiresAt: Date; metadata?: Record<string, any> }>
 
-  constructor(
-    tokenRepository: TokenRepository,
-    fetchTokenFromApi: () => Promise<{ token: string; expiresAt: Date; metadata?: Record<string, any> }>
-  ) {
+  constructor(tokenRepository: TokenRepository) {
     this.tokenRepository = tokenRepository
-    this.fetchTokenFromApi = fetchTokenFromApi
   }
 
   /**
    * Handle 401 Unauthorized response
    * @param oldToken - The token that failed (already in scope from the request)
+   * @param getValidToken - Function to get validated token (with retry logic)
    * @returns New token after refresh
    */
-  async handle401(oldToken: string): Promise<string> {
+  async handle401(
+    oldToken: string,
+    getValidToken: () => Promise<{ token: string; expiresAt: Date; metadata?: Record<string, any> }>
+  ): Promise<string> {
     logger.warn(`[UnauthorizedHandler] Handling 401 - old token (full): ${oldToken}`)
 
-    // Fetch new token directly from API (bypass DB check)
-    logger.info(`[UnauthorizedHandler] Fetching new token from API...`)
-    const { token: newToken, expiresAt, metadata } = await this.fetchTokenFromApi()
+    // Fetch new validated token from API (with retry and validation)
+    logger.info(`[UnauthorizedHandler] Fetching new validated token from API...`)
+    const { token: newToken, expiresAt, metadata } = await getValidToken()
 
     if (!newToken || newToken.trim().length === 0) {
       logger.error(`[UnauthorizedHandler] New token is empty after fetch`)
@@ -51,8 +50,9 @@ export class UnauthorizedHandler {
       await this.tokenRepository.saveTokenToDb(newToken, expiresAt, metadata)
     } else {
       // Tokens are the same - this is unusual but can happen
+      // However, since we validated the token, it should work now
       logger.warn(
-        `[UnauthorizedHandler] API returned the same token that failed. This may indicate invalid credentials or account issues.`
+        `[UnauthorizedHandler] API returned the same token that failed, but token has been validated. This may indicate timing/propagation issues.`
       )
       // Still update DB to refresh expiration time
       await this.tokenRepository.saveTokenToDb(newToken, expiresAt, metadata)
