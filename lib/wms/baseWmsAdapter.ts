@@ -291,12 +291,115 @@ export abstract class BaseWmsAdapter {
     return this.config.credentials
   }
 
+  /**
+   * Extract Authorization header from RequestInit headers
+   * Handles Headers object, plain object, string array, and undefined
+   */
+  private extractAuthHeader(headers: HeadersInit | undefined): string | null {
+    if (!headers) return null
+    
+    // Handle Headers object
+    if (headers instanceof Headers) {
+      return headers.get('Authorization') || headers.get('authorization')
+    }
+    
+    // Handle string array (string[][])
+    if (Array.isArray(headers)) {
+      const authEntry = headers.find(([key]) => 
+        key.toLowerCase() === 'authorization'
+      )
+      return authEntry ? authEntry[1] : null
+    }
+    
+    // Handle plain object (Record<string, string>)
+    if (typeof headers === 'object') {
+      return (headers as Record<string, string>)['Authorization'] || 
+             (headers as Record<string, string>)['authorization'] || 
+             null
+    }
+    
+    return null
+  }
+
+  /**
+   * Extract token from Authorization header value
+   * Handles "Bearer <token>", "bearer <token>", and edge cases
+   */
+  private extractTokenFromHeader(authHeader: string): string | null {
+    if (!authHeader || typeof authHeader !== 'string') return null
+    
+    // Normalize: trim and handle case-insensitive "Bearer"
+    const normalized = authHeader.trim()
+    const bearerPrefix = 'bearer '
+    
+    if (normalized.toLowerCase().startsWith(bearerPrefix)) {
+      const token = normalized.substring(bearerPrefix.length).trim()
+      // Validate token is not empty
+      if (token.length > 0) {
+        return token
+      }
+    }
+    
+    return null
+  }
+
+  /**
+   * Normalize headers to a plain object for consistent handling
+   */
+  private normalizeHeaders(headers: HeadersInit | undefined): Record<string, string> {
+    const normalized: Record<string, string> = {}
+    
+    if (!headers) return normalized
+    
+    // Handle Headers object
+    if (headers instanceof Headers) {
+      headers.forEach((value, key) => {
+        normalized[key] = value
+      })
+      return normalized
+    }
+    
+    // Handle string array (string[][])
+    if (Array.isArray(headers)) {
+      headers.forEach(([key, value]) => {
+        normalized[key] = value
+      })
+      return normalized
+    }
+    
+    // Handle plain object
+    if (typeof headers === 'object') {
+      return { ...headers as Record<string, string> }
+    }
+    
+    return normalized
+  }
+
   protected async fetchWithAuth(
     endpoint: string,
     options: RequestInit = {},
     retryOn401: boolean = true
   ): Promise<Response> {
-    const token = await this.authenticate()
+    // Check if Authorization header is already provided (e.g., from retry with explicit token)
+    let token: string
+    const existingAuthHeader = this.extractAuthHeader(options.headers)
+    const extractedToken = existingAuthHeader ? this.extractTokenFromHeader(existingAuthHeader) : null
+    
+    if (extractedToken) {
+      // Use token from provided Authorization header
+      token = extractedToken
+      logger.info(`[BaseWmsAdapter] Using token from provided Authorization header (full): ${token}`)
+    } else {
+      // No valid token provided, authenticate to get one
+      token = await this.authenticate()
+      logger.info(`[BaseWmsAdapter] Using token from authenticate() (full): ${token}`)
+    }
+    
+    // Validate token is not empty
+    if (!token || token.trim().length === 0) {
+      throw new Error('[BaseWmsAdapter] Invalid token: token is empty')
+    }
+    
     const url = `${this.getApiBaseUrl()}${endpoint}`
     
     // Import logger dynamically to avoid circular dependencies
@@ -306,13 +409,15 @@ export abstract class BaseWmsAdapter {
     if (options.body) {
       logger.info(`[BaseWmsAdapter] Request body: ${typeof options.body === 'string' ? options.body : JSON.stringify(options.body)}`)
     }
-
-    logger.info(`[BaseWmsAdapter] Using token (full): ${token}`)
+    
+    // Normalize headers to plain object for consistent merging
+    const normalizedHeaders = this.normalizeHeaders(options.headers)
+    
     const requestStartTime = Date.now()
     const response = await pooledFetch(url, {
       ...options,
       headers: {
-        ...options.headers,
+        ...normalizedHeaders,
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
@@ -368,14 +473,30 @@ export abstract class BaseWmsAdapter {
       logger.info(`[BaseWmsAdapter] New token length: ${newToken.length}`)
       logger.info(`[BaseWmsAdapter] Token changed: ${token !== newToken ? "YES" : "NO"}`)
       
+      // Validate new token is not empty
+      if (!newToken || newToken.trim().length === 0) {
+        logger.error(`[BaseWmsAdapter] New token is empty after re-authentication`)
+        throw new Error('[BaseWmsAdapter] Re-authentication returned empty token')
+      }
+      
+      // If token didn't change, this indicates the API returned the same invalid token
+      // This could mean credentials are wrong or account is locked
+      if (token === newToken) {
+        logger.error(`[BaseWmsAdapter] Re-authentication returned the same token that failed. This may indicate invalid credentials or account issues.`)
+        // Still retry once, but log the issue
+      }
+      
       // Retry the request once with new token
       logger.info(`[BaseWmsAdapter] Retrying API call with fresh token: ${method} ${url}`)
       logger.info(`[BaseWmsAdapter] Retry request headers: Authorization=Bearer ${newToken}, Content-Type=application/json`)
       
+      // Normalize headers to ensure consistent handling
+      const normalizedRetryHeaders = this.normalizeHeaders(options.headers)
+      
       const retryResponse = await this.fetchWithAuth(endpoint, {
         ...options,
         headers: {
-          ...options.headers,
+          ...normalizedRetryHeaders,
           Authorization: `Bearer ${newToken}`,
           "Content-Type": "application/json",
         },
