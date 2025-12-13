@@ -37,15 +37,6 @@ interface InsolationSyncResult {
   error?: string
 }
 
-interface SyncSummary {
-  totalVendors: number
-  successful: number
-  failed: number
-  totalSitesSynced: number
-  totalDevicesSynced: number
-  results: SiteSyncResult[]
-  duration: number
-}
 
 /**
  * Helper function to process and store daily insolation reading
@@ -1131,116 +1122,6 @@ async function backfillInsolationData(
   return result
 }
 
-/**
- * Sync all WMS vendors (sites and devices)
- */
-export async function syncAllWmsSites(): Promise<SyncSummary> {
-  return MDC.runAsync(
-    {
-      source: "cron",
-      operation: "sync-wms-sites",
-    },
-    async () => {
-      const startTime = Date.now()
-      const supabase = getMainClient()
-      const results: SiteSyncResult[] = []
-
-      logger.info("[WMS Sync] Starting site sync for all WMS vendors")
-
-      // Get all active WMS vendors with their organization sync settings
-      const { data: vendors, error } = await supabase
-        .from("wms_vendors")
-        .select(`
-          *,
-          organizations (
-            id,
-            name,
-            auto_sync_enabled
-          )
-        `)
-        .eq("is_active", true)
-        .not("org_id", "is", null)
-
-      if (error) {
-        throw error
-      }
-
-      if (!vendors || vendors.length === 0) {
-        logger.info("[WMS Sync] No active WMS vendors found")
-        return {
-          totalVendors: 0,
-          successful: 0,
-          failed: 0,
-          totalSitesSynced: 0,
-          totalDevicesSynced: 0,
-          results: [],
-          duration: Date.now() - startTime,
-        }
-      }
-
-      // Filter vendors by org-level auto_sync_enabled
-      const vendorsToSync = vendors.filter((vendor: any) => {
-        const org = vendor.organizations
-        if (!org) {
-          logger.warn(`⚠️ Organization not found for WMS vendor ${vendor.id} (${vendor.name}), skipping`)
-          return false
-        }
-
-        if (!org.auto_sync_enabled) {
-          logger.info(
-            `⏭️ Skipping WMS site sync for vendor ${vendor.id} (${vendor.name}): ` +
-            `auto_sync_enabled=false for org ${org.id} (${org.name})`
-          )
-          return false
-        }
-
-        return true
-      })
-
-      if (vendorsToSync.length === 0) {
-        logger.info("[WMS Sync] No vendors to sync (all orgs have auto_sync_enabled=false or missing org)")
-        return {
-          totalVendors: vendors.length,
-          successful: 0,
-          failed: 0,
-          totalSitesSynced: 0,
-          totalDevicesSynced: 0,
-          results: [],
-          duration: Date.now() - startTime,
-        }
-      }
-
-      logger.info(`[WMS Sync] Found ${vendorsToSync.length} active WMS vendors to sync (filtered from ${vendors.length} total)`)
-
-      // Sync each vendor
-      for (const vendor of vendorsToSync) {
-        const result = await syncWmsVendorSites(vendor, supabase)
-        results.push(result)
-      }
-
-      const successful = results.filter((r) => r.success).length
-      const failed = results.filter((r) => !r.success).length
-      const totalSitesSynced = results.reduce((sum, r) => sum + r.sitesSynced, 0)
-      const totalDevicesSynced = results.reduce((sum, r) => sum + r.devicesSynced, 0)
-
-      const summary: SyncSummary = {
-        totalVendors: vendorsToSync.length,
-        successful,
-        failed,
-        totalSitesSynced,
-        totalDevicesSynced,
-        results,
-        duration: Date.now() - startTime,
-      }
-
-      logger.info(
-        `[WMS Sync] Complete: ${successful}/${vendorsToSync.length} vendors successful, ${totalSitesSynced} sites, ${totalDevicesSynced} devices synced in ${summary.duration}ms`
-      )
-
-      return summary
-    }
-  )
-}
 
 /**
  * Sync insolation data for all WMS vendors
