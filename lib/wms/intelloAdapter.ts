@@ -204,6 +204,7 @@ export class IntelloAdapter extends BaseWmsAdapter {
   /**
    * Test if a token is valid by making a lightweight API call
    * Uses the list sites endpoint with a minimal request to validate token
+   * Adds a small delay before testing to allow for token propagation
    */
   protected async testToken(token: string): Promise<boolean> {
     try {
@@ -211,6 +212,10 @@ export class IntelloAdapter extends BaseWmsAdapter {
       const testUrl = `${apiBaseUrl}/api/intello/user/v1/sites`
       
       logger.info(`[IntelloAdapter] Testing token validity with lightweight API call: GET ${testUrl}`)
+      
+      // Add a small delay before testing to ensure token is fully propagated
+      // This helps with APIs that need time to activate tokens server-side
+      await new Promise((resolve) => setTimeout(resolve, 300))
       
       const response = await fetch(testUrl, {
         method: "GET",

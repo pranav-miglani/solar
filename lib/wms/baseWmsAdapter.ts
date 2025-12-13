@@ -121,6 +121,7 @@ export abstract class BaseWmsAdapter {
     metadata?: Record<string, any>
   }> {
     const maxAttempts = 3
+    let previousToken: string | null = null
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       logger.info(`[BaseWmsAdapter] Fetching token from API (attempt ${attempt}/${maxAttempts})...`)
@@ -140,12 +141,42 @@ export abstract class BaseWmsAdapter {
         continue
       }
 
+      // Check if same token was returned (indicates API caching/not refreshing)
+      if (previousToken && previousToken === token) {
+        logger.warn(
+          `[BaseWmsAdapter] API returned the same token as previous attempt. This may indicate token caching or propagation delay.`
+        )
+        // Wait longer if same token is returned (allows more time for propagation)
+        const delay = 2000 * attempt
+        logger.info(
+          `[BaseWmsAdapter] Same token returned, waiting ${delay}ms before retry (to allow token propagation)...`
+        )
+        await new Promise((resolve) => setTimeout(resolve, delay))
+        previousToken = token
+        continue
+      }
+
+      previousToken = token
+
+      // Wait after fetching token to allow server-side propagation
+      // This is critical for APIs that need time to propagate tokens
+      const propagationDelay = 1000 // 1 second
+      logger.info(
+        `[BaseWmsAdapter] Waiting ${propagationDelay}ms after token fetch to allow server-side propagation...`
+      )
+      await new Promise((resolve) => setTimeout(resolve, propagationDelay))
+
       // Test token to ensure it actually works
       logger.info(`[BaseWmsAdapter] Testing token validity (attempt ${attempt}/${maxAttempts})...`)
       const isValid = await this.testToken(token)
 
       if (isValid) {
         logger.info(`[BaseWmsAdapter] Token validated successfully on attempt ${attempt}`)
+        // Wait a bit more after successful validation before returning
+        // This ensures token is fully propagated and ready for use
+        const finalDelay = 500
+        logger.info(`[BaseWmsAdapter] Token validated, waiting ${finalDelay}ms before returning (final propagation)...`)
+        await new Promise((resolve) => setTimeout(resolve, finalDelay))
         return { token, expiresAt, metadata }
       } else {
         logger.warn(`[BaseWmsAdapter] Token validation failed on attempt ${attempt}`)
