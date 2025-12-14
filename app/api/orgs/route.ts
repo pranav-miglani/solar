@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
-import { getOrganizationsRepository } from "@/lib/repositories/main"
+import { getMainClient } from "@/lib/supabase/pooled"
 import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
 
 // For orgs API, we need to bypass RLS for write operations
@@ -35,9 +35,16 @@ export async function GET(request: NextRequest) {
 
       requirePermission(accountType as any, "organizations", "read")
 
-      // Use repository to fetch organizations
-      const orgsRepo = getOrganizationsRepository()
-      const orgs = await orgsRepo.findAll()
+      // Fetch organizations directly from Supabase
+      const supabase = getMainClient()
+      const { data: orgs, error } = await supabase
+        .from("organizations")
+        .select("*")
+        .order("name", { ascending: true })
+
+      if (error) {
+        throw error
+      }
 
       logApiResponse(request, 200, Date.now() - startTime)
       return NextResponse.json({ orgs })
@@ -90,9 +97,17 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Use repository to create organization
-      const orgsRepo = getOrganizationsRepository()
-      const org = await orgsRepo.create({ name })
+      // Create organization directly in Supabase
+      const supabase = getMainClient()
+      const { data: org, error: insertError } = await supabase
+        .from("organizations")
+        .insert({ name })
+        .select()
+        .single()
+
+      if (insertError) {
+        throw insertError
+      }
 
       logApiResponse(request, 201, Date.now() - startTime)
       return NextResponse.json({ org }, { status: 201 })

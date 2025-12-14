@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
-import { getAnalyticsOrganizationsRepository } from "@/lib/repositories/analytics"
+import { getAnalyticsClient } from "@/lib/supabase/pooled"
 
 export const dynamic = "force-dynamic"
 
@@ -24,9 +24,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    // Use repository to fetch organizations
-    const orgsRepo = getAnalyticsOrganizationsRepository()
-    const orgs = await orgsRepo.findAll()
+    // Fetch organizations directly from Analytics DB
+    const supabase = getAnalyticsClient()
+    const { data: orgs, error } = await supabase
+      .from("organizations")
+      .select("*")
+      .order("name", { ascending: true })
+
+    if (error) {
+      throw error
+    }
 
     return NextResponse.json({ orgs })
   } catch (error: any) {

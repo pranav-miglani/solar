@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
 import bcrypt from "bcryptjs"
-import { getAccountsRepository } from "@/lib/repositories/main"
+import { getMainClient } from "@/lib/supabase/pooled"
 import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
 
 // For accounts API, we need to bypass RLS for write operations
@@ -36,9 +36,16 @@ export async function GET(request: NextRequest) {
       // Only SUPERADMIN can view all accounts
       requirePermission(accountType as any, "accounts", "read")
 
-      // Use repository to fetch accounts
-      const accountsRepo = getAccountsRepository()
-      const accounts = await accountsRepo.findAll()
+      // Fetch accounts directly from Supabase
+      const supabase = getMainClient()
+      const { data: accounts, error } = await supabase
+        .from("accounts")
+        .select("*")
+        .order("email", { ascending: true })
+
+      if (error) {
+        throw error
+      }
 
       logApiResponse(request, 200, Date.now() - startTime)
       return NextResponse.json({ accounts })
@@ -136,11 +143,16 @@ export async function POST(request: NextRequest) {
       // Hash password before storing
       const passwordHash = await bcrypt.hash(password, 10)
 
-      // Use repository to create account
-      const accountsRepo = getAccountsRepository()
+      // Use Supabase directly to create account
+      const supabase = getMainClient()
 
       // Check if account already exists
-      const existingAccount = await accountsRepo.findByEmail(email)
+      const { data: existingAccount } = await supabase
+        .from("accounts")
+        .select("*")
+        .eq("email", email)
+        .single()
+
       if (existingAccount) {
         logApiResponse(request, 409, Date.now() - startTime, { email })
         return NextResponse.json(
@@ -151,7 +163,12 @@ export async function POST(request: NextRequest) {
 
       // For ORG accounts, check if org already has an account
       if (account_type === "ORG" && org_id) {
-        const existingOrgAccount = await accountsRepo.existsByOrgId(org_id)
+        const { data: existingOrgAccount } = await supabase
+          .from("accounts")
+          .select("id")
+          .eq("org_id", org_id)
+          .single()
+
         if (existingOrgAccount) {
           logApiResponse(request, 409, Date.now() - startTime, { org_id })
           return NextResponse.json(
@@ -161,13 +178,21 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const account = await accountsRepo.create({
-        email,
-        password_hash: passwordHash,
-        account_type,
-        org_id: account_type === "ORG" ? org_id : null,
-        display_name: display_name || null,
-      })
+      const { data: account, error: insertError } = await supabase
+        .from("accounts")
+        .insert({
+          email,
+          password_hash: passwordHash,
+          account_type,
+          org_id: account_type === "ORG" ? org_id : null,
+          display_name: display_name || null,
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        throw insertError
+      }
 
       logApiResponse(request, 201, Date.now() - startTime, { accountId: account.id, email: account.email })
       return NextResponse.json({ account }, { status: 201 })

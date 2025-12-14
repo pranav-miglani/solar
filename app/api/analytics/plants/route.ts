@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
-import { getAnalyticsPlantsRepository } from "@/lib/repositories/analytics"
+import { getAnalyticsClient } from "@/lib/supabase/pooled"
 
 export const dynamic = "force-dynamic"
 
@@ -28,24 +28,42 @@ export async function GET(request: NextRequest) {
     const orgIdParam = searchParams.get("orgId")
     const vendorIdParam = searchParams.get("vendorId")
 
-    // Use repository to fetch plants
-    const plantsRepo = getAnalyticsPlantsRepository()
+    const supabase = getAnalyticsClient()
 
-    const filters: { orgId?: number; vendorId?: number } = {}
+    // Build query for plants with relations
+    let query = supabase
+      .from("plants")
+      .select(`
+        *,
+        organizations (
+          id,
+          name
+        ),
+        vendors (
+          id,
+          name
+        )
+      `)
+      .order("name", { ascending: true })
+
     if (orgIdParam) {
       const orgId = parseInt(orgIdParam)
       if (!isNaN(orgId)) {
-        filters.orgId = orgId
+        query = query.eq("org_id", orgId)
       }
     }
     if (vendorIdParam) {
       const vendorId = parseInt(vendorIdParam)
       if (!isNaN(vendorId)) {
-        filters.vendorId = vendorId
+        query = query.eq("vendor_id", vendorId)
       }
     }
 
-    const plants = await plantsRepo.findAllWithRelations(filters)
+    const { data: plants, error } = await query
+
+    if (error) {
+      throw error
+    }
 
     return NextResponse.json({ plants })
   } catch (error: any) {

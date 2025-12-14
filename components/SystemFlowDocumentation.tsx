@@ -694,15 +694,17 @@ export function SystemFlowDocumentation() {
                         </p>
                       </div>
                       <div>
-                        <h4 className="font-medium mb-2">Repository Pattern (Migration in Progress)</h4>
+                        <h4 className="font-medium mb-2">Repository Pattern (Design Phase)</h4>
                         <p className="text-sm text-muted-foreground mb-2">
-                          Centralized database access layer using JPA-style naming conventions for consistency and maintainability.
+                          Centralized database access layer using JPA-style naming conventions for consistency and maintainability. Currently in design phase - no implementation yet.
                         </p>
                         <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li><strong>Current Status:</strong> Design complete, implementation NOT started</li>
+                          <li><strong>Query Extraction:</strong> ✅ All queries extracted to <code className="bg-background px-1 rounded">lib/queries/extracted-queries.ts</code> (reference file)</li>
                           <li><strong>JPA-style Methods:</strong> <code className="bg-background px-1 rounded">save()</code> (instead of create/upsert), <code className="bg-background px-1 rounded">saveAll()</code> (instead of batchUpsert), <code className="bg-background px-1 rounded">deleteById()</code>, <code className="bg-background px-1 rounded">existsById()</code>, <code className="bg-background px-1 rounded">count()</code></li>
-                          <li><strong>Repository Structure:</strong> <code className="bg-background px-1 rounded">lib/repositories/main/</code> (Main DB) and <code className="bg-background px-1 rounded">lib/repositories/analytics/</code> (Analytics DB)</li>
-                          <li><strong>Factory Pattern:</strong> Repository factory functions provide consistent client injection</li>
-                          <li><strong>Status:</strong> Design complete (Phase 1), implementation in progress (Phases 2-10)</li>
+                          <li><strong>Repository Structure:</strong> <code className="bg-background px-1 rounded">lib/repositories/main/</code> (Main DB) and <code className="bg-background px-1 rounded">lib/repositories/analytics/</code> (Analytics DB) - Planned, not yet created</li>
+                          <li><strong>Factory Pattern:</strong> Repository factory functions provide consistent client injection - Designed, not yet implemented</li>
+                          <li><strong>Current Implementation:</strong> All API routes use direct Supabase calls (working correctly)</li>
                         </ul>
                       </div>
                       <div>
@@ -2612,12 +2614,14 @@ Unique Constraints:
                       Design repository structure considering Main DB vs Analytics DB commonality, table-by-table breakdown, and common patterns.
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>✅ Repository interface definitions for all 15 repositories</li>
-                      <li>✅ Base repository class design</li>
-                      <li>✅ Table-specific repository designs</li>
-                      <li>✅ Database adapter pattern (Main vs Analytics)</li>
+                      <li>✅ Repository interface definitions for all 15 repositories (DESIGN ONLY)</li>
+                      <li>✅ Base repository class design with JPA-style naming (DESIGN ONLY)</li>
+                      <li>✅ Table-specific repository designs (JPA: <code className="bg-background px-1 rounded">save()</code>, <code className="bg-background px-1 rounded">saveAll()</code>, <code className="bg-background px-1 rounded">deleteById()</code>) - DESIGN ONLY</li>
+                      <li>✅ Database adapter pattern (Main vs Analytics) - DESIGN ONLY</li>
                       <li>✅ Common patterns documentation (7 patterns)</li>
-                      <li>✅ Work Orders repository design with N+1 prevention</li>
+                      <li>✅ Work Orders repository design with N+1 prevention - DESIGN ONLY</li>
+                      <li>✅ JPA-style naming conventions throughout - DESIGN ONLY</li>
+                      <li>⚠️ <strong>No implementation yet</strong> - All API routes still use direct Supabase calls</li>
                     </ul>
                   </div>
 
@@ -2634,13 +2638,14 @@ Unique Constraints:
                       Create foundation: base repository class, types, interfaces, and factory pattern.
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>Create <code className="bg-background px-1 rounded">lib/repositories/types.ts</code></li>
-                      <li>Base repository interface and class</li>
+                      <li>Create <code className="bg-background px-1 rounded">lib/repositories/types.ts</code> (not yet created)</li>
+                      <li>Base repository interface and class with JPA-style methods (<code className="bg-background px-1 rounded">save()</code>, <code className="bg-background px-1 rounded">saveAll()</code>, <code className="bg-background px-1 rounded">deleteById()</code>, <code className="bg-background px-1 rounded">existsById()</code>, <code className="bg-background px-1 rounded">count()</code>)</li>
                       <li>Common types (BatchResult, RepositoryOptions, etc.)</li>
                       <li>Factory pattern implementation</li>
+                      <li>⚠️ <strong>Awaiting approval</strong> before starting implementation</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 2-3 hours
+                      <strong>Estimated Effort:</strong> 2-3 hours | <strong>Status:</strong> ⏸️ NOT STARTED - Awaiting approval
                     </div>
                   </div>
 
@@ -2657,12 +2662,12 @@ Unique Constraints:
                       Implement repositories for simple tables with minimal joins.
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>accounts - Simple CRUD, email lookup</li>
-                      <li>organizations (Main DB) - Simple CRUD</li>
-                      <li>organizations (Analytics DB) - CRUD + config operations</li>
+                      <li>accounts - Simple CRUD, email lookup (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/accounts/route.ts</code>)</li>
+                      <li>organizations (Main DB) - Simple CRUD (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/orgs/route.ts</code>)</li>
+                      <li>organizations (Analytics DB) - CRUD + config operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/analytics/orgs/route.ts</code>)</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 4-6 hours | <strong>Dependencies:</strong> Phase 2
+                      <strong>Estimated Effort:</strong> 4-6 hours | <strong>Dependencies:</strong> Phase 2 | <strong>Status:</strong> ⏸️ NOT STARTED
                     </div>
                   </div>
 
@@ -2679,13 +2684,13 @@ Unique Constraints:
                       Implement repositories for tables with simple joins (1-2 level).
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>vendors (Main DB) - CRUD + join with organizations</li>
-                      <li>vendors (Analytics DB) - CRUD + join + config operations</li>
-                      <li>wms_vendors - CRUD + join with organizations</li>
-                      <li>alerts - CRUD + join with plants, filtering</li>
+                      <li>vendors (Main DB) - CRUD + join with organizations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/vendors/route.ts</code>)</li>
+                      <li>vendors (Analytics DB) - CRUD + join + config operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/analytics/vendors/route.ts</code>)</li>
+                      <li>wms_vendors - CRUD + join with organizations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/wms-vendors/route.ts</code>)</li>
+                      <li>alerts - CRUD + join with plants, filtering (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/alerts/route.ts</code>)</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 6-8 hours | <strong>Dependencies:</strong> Phase 3
+                      <strong>Estimated Effort:</strong> 6-8 hours | <strong>Dependencies:</strong> Phase 3 | <strong>Status:</strong> ⏸️ NOT STARTED
                     </div>
                   </div>
 
@@ -2702,14 +2707,14 @@ Unique Constraints:
                       Implement repositories for complex tables with multiple relationships and batch operations.
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>plants (Main DB) - CRUD + joins + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) + production metrics</li>
-                      <li>plants (Analytics DB) - CRUD + joins + batch save (<code className="bg-background px-1 rounded">saveAll()</code>)</li>
-                      <li>wms_sites - CRUD + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) + deduplication</li>
-                      <li>wms_devices - CRUD + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) + deduplication</li>
-                      <li>insolation_readings - CRUD + save (<code className="bg-background px-1 rounded">save()</code>) by device/date</li>
+                      <li>plants (Main DB) - CRUD + joins + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) + production metrics (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/plants/route.ts</code>, <code className="bg-background px-1 rounded">lib/services/plantSyncService.ts</code>)</li>
+                      <li>plants (Analytics DB) - CRUD + joins + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/analytics/plants/route.ts</code>, <code className="bg-background px-1 rounded">lib/services/analyticsMirrorService.ts</code>)</li>
+                      <li>wms_sites - CRUD + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) + deduplication (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/wmsSyncService.ts</code>)</li>
+                      <li>wms_devices - CRUD + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) + deduplication (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/wmsSyncService.ts</code>)</li>
+                      <li>insolation_readings - CRUD + save (<code className="bg-background px-1 rounded">save()</code>) by device/date (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/wmsSyncService.ts</code>)</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 10-12 hours | <strong>Dependencies:</strong> Phase 4
+                      <strong>Estimated Effort:</strong> 10-12 hours | <strong>Dependencies:</strong> Phase 4 | <strong>Status:</strong> ⏸️ NOT STARTED
                     </div>
                   </div>
 
@@ -2726,12 +2731,12 @@ Unique Constraints:
                       Implement repositories for analytics-specific tables and operations.
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>plant_energy_readings - CRUD + date filtering + batch save (<code className="bg-background px-1 rounded">saveAll()</code>)</li>
-                      <li>plant_grid_downtime_readings - CRUD + date filtering + baseline queries + batch save (<code className="bg-background px-1 rounded">saveAll()</code>)</li>
-                      <li>analytics_snapshot_runs - CRUD + vendor grouping + status tracking (uses <code className="bg-background px-1 rounded">save()</code> instead of create())</li>
+                      <li>plant_energy_readings - CRUD + date filtering + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/analytics/plants/[id]/energy/route.ts</code>, <code className="bg-background px-1 rounded">lib/services/analyticsSnapshotService.ts</code>)</li>
+                      <li>plant_grid_downtime_readings - CRUD + date filtering + baseline queries + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/analytics/plants/[id]/grid-downtime/route.ts</code>, <code className="bg-background px-1 rounded">lib/services/gridDowntimeAnalyticsService.ts</code>)</li>
+                      <li>analytics_snapshot_runs - CRUD + vendor grouping + status tracking (uses <code className="bg-background px-1 rounded">save()</code> instead of create()) (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/analytics/vendors/route.ts</code>, <code className="bg-background px-1 rounded">lib/services/analyticsSnapshotService.ts</code>)</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 6-8 hours | <strong>Dependencies:</strong> Phase 5
+                      <strong>Estimated Effort:</strong> 6-8 hours | <strong>Dependencies:</strong> Phase 5 | <strong>Status:</strong> ⏸️ NOT STARTED
                     </div>
                   </div>
 
@@ -2748,15 +2753,15 @@ Unique Constraints:
                       Migrate all services to use repositories instead of direct Supabase calls.
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>analyticsMirrorService - Cross-database operations</li>
-                      <li>analyticsSnapshotService - Analytics operations</li>
-                      <li>gridDowntimeAnalyticsService - Complex calculations</li>
-                      <li>plantSyncService - Batch operations</li>
-                      <li>alertSyncService - Batch operations</li>
-                      <li>wmsSyncService - WMS operations</li>
+                      <li>analyticsMirrorService - Cross-database operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/analyticsMirrorService.ts</code>)</li>
+                      <li>analyticsSnapshotService - Analytics operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/analyticsSnapshotService.ts</code>)</li>
+                      <li>gridDowntimeAnalyticsService - Complex calculations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/gridDowntimeAnalyticsService.ts</code>)</li>
+                      <li>plantSyncService - Batch operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/plantSyncService.ts</code>)</li>
+                      <li>alertSyncService - Batch operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/alertSyncService.ts</code>)</li>
+                      <li>wmsSyncService - WMS operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/wmsSyncService.ts</code>)</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 8-10 hours | <strong>Dependencies:</strong> Phases 3-6
+                      <strong>Estimated Effort:</strong> 8-10 hours | <strong>Dependencies:</strong> Phases 3-6 | <strong>Status:</strong> ⏸️ NOT STARTED
                     </div>
                   </div>
 
@@ -2773,14 +2778,14 @@ Unique Constraints:
                       Comprehensive testing and validation of all migrations.
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>Unit tests for repositories</li>
-                      <li>Integration tests for API routes</li>
-                      <li>End-to-end tests for services</li>
-                      <li>Performance validation</li>
-                      <li>Regression testing</li>
+                      <li>Unit tests for repositories (⏸️ Not implemented)</li>
+                      <li>Integration tests for API routes (⏸️ Not implemented)</li>
+                      <li>End-to-end tests for services (⏸️ Not implemented)</li>
+                      <li>Performance validation (⏸️ Not implemented)</li>
+                      <li>Regression testing (⏸️ Not implemented)</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 4-6 hours | <strong>Dependencies:</strong> Phase 7
+                      <strong>Estimated Effort:</strong> 4-6 hours | <strong>Dependencies:</strong> Phase 7 | <strong>Status:</strong> ⏸️ NOT STARTED
                     </div>
                   </div>
 
@@ -2797,13 +2802,13 @@ Unique Constraints:
                       Final cleanup and documentation.
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>Remove <code className="bg-background px-1 rounded">lib/queries/extracted-queries.ts</code> (reference file)</li>
-                      <li>Update documentation</li>
-                      <li>Code review</li>
-                      <li>Final validation</li>
+                      <li>Remove <code className="bg-background px-1 rounded">lib/queries/extracted-queries.ts</code> (reference file) (⏸️ Not implemented - file still exists as reference)</li>
+                      <li>Update documentation (⏸️ Not implemented)</li>
+                      <li>Code review (⏸️ Not implemented)</li>
+                      <li>Final validation (⏸️ Not implemented)</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 2-3 hours | <strong>Dependencies:</strong> Phase 8
+                      <strong>Estimated Effort:</strong> 2-3 hours | <strong>Dependencies:</strong> Phase 8 | <strong>Status:</strong> ⏸️ NOT STARTED
                     </div>
                   </div>
 
@@ -2826,13 +2831,13 @@ Unique Constraints:
                       </p>
                     </div>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>WorkOrdersRepository - Aggregate root with nested joins</li>
-                      <li>WorkOrderPlantsRepository - Junction table operations</li>
-                      <li>WorkLogsRepository - Work logs with user join</li>
-                      <li>WorkOrderProductionRepository - Production metrics aggregation</li>
+                      <li>WorkOrdersRepository - Aggregate root with nested joins (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/workorders/route.ts</code>)</li>
+                      <li>WorkOrderPlantsRepository - Junction table operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/workorders/route.ts</code>)</li>
+                      <li>WorkLogsRepository - Work logs with user join (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/workorders/[id]/logs/route.ts</code>)</li>
+                      <li>WorkOrderProductionRepository - Production metrics aggregation (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/workorders/[id]/production/route.ts</code>)</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 8-10 hours | <strong>Dependencies:</strong> Phase 5 (PlantsRepository), Phase 4 (OrganizationsRepository, VendorsRepository)
+                      <strong>Estimated Effort:</strong> 8-10 hours | <strong>Dependencies:</strong> Phase 5 (PlantsRepository), Phase 4 (OrganizationsRepository, VendorsRepository) | <strong>Status:</strong> ⏸️ NOT STARTED
                     </div>
                   </div>
                 </div>

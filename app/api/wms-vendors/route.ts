@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getWmsVendorsRepository, getOrganizationsRepository } from "@/lib/repositories/main"
+import { getMainClient } from "@/lib/supabase/pooled"
 import { requirePermission } from "@/lib/rbac"
 
 /**
@@ -26,11 +26,29 @@ export async function GET(request: NextRequest) {
 
     requirePermission(accountType as any, "wms_vendors", "read")
 
-    // Use repository to fetch WMS vendors
-    const wmsVendorsRepo = getWmsVendorsRepository()
+    // Fetch WMS vendors with organizations join directly from Supabase
+    const supabase = getMainClient()
 
-    const filters = accountType === "ORG" && orgId ? { orgId } : undefined
-    const vendors = await wmsVendorsRepo.findAllWithOrganizations(filters)
+    let query = supabase
+      .from("wms_vendors")
+      .select(`
+        *,
+        organizations (
+          id,
+          name
+        )
+      `)
+      .order("name", { ascending: true })
+
+    if (accountType === "ORG" && orgId) {
+      query = query.eq("org_id", orgId)
+    }
+
+    const { data: vendors, error } = await query
+
+    if (error) {
+      throw error
+    }
 
     return NextResponse.json({ vendors })
   } catch (error: any) {
@@ -99,13 +117,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Use repositories to verify org and create WMS vendor
-    const orgsRepo = getOrganizationsRepository()
-    const wmsVendorsRepo = getWmsVendorsRepository()
+    // Verify org and create WMS vendor directly in Supabase
+    const supabase = getMainClient()
 
     // Verify organization exists
-    const org = await orgsRepo.findById(org_id)
-    if (!org) {
+    const { data: org, error: orgError } = await supabase
+      .from("organizations")
+      .select("id")
+      .eq("id", org_id)
+      .single()
+
+    if (orgError || !org) {
       return NextResponse.json(
         { error: "Organization not found" },
         { status: 404 }
@@ -113,13 +135,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Create WMS vendor
-    const vendor = await wmsVendorsRepo.create({
-      name,
-      vendor_type: vendor_type as "INTELLO" | "SCADA" | "TRACKSO",
-      credentials,
-      org_id,
-      is_active,
-    })
+    const { data: vendor, error: insertError } = await supabase
+      .from("wms_vendors")
+      .insert({
+        name,
+        vendor_type: vendor_type as "INTELLO" | "SCADA" | "TRACKSO",
+        credentials,
+        org_id,
+        is_active,
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      throw insertError
+    }
 
     return NextResponse.json({ vendor }, { status: 201 })
   } catch (error: any) {

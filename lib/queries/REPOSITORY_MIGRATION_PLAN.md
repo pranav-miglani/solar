@@ -4,7 +4,14 @@
 
 This document outlines a phased approach to migrate all database queries from direct Supabase calls to a centralized repository pattern. The migration will improve maintainability, testability, and enable future database portability.
 
-**Status**: Planning Phase - Awaiting approval before implementation
+**Status**: Design Phase Complete - Ready for implementation approval
+
+**Current State**:
+- ✅ Phase 0: Query Extraction - COMPLETED (all queries extracted to `lib/queries/extracted-queries.ts`)
+- ✅ Phase 1: Repository Design - COMPLETED (designs documented in this file)
+- ⏸️ Phase 2+: Implementation - NOT STARTED (awaiting approval to proceed)
+
+**Important**: No repository code has been implemented yet. All API routes currently use direct Supabase calls. The `extracted-queries.ts` file is a reference document only.
 
 ---
 
@@ -720,10 +727,19 @@ Create foundation: base repository class, types, interfaces.
 ### Objective
 Implement repositories for simple tables with minimal joins.
 
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 2 completion
+
 ### Tables (Priority Order)
 1. **accounts** - Simple CRUD, email lookup
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/accounts/route.ts`
 2. **organizations** (Main DB) - Simple CRUD
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/orgs/route.ts`
 3. **organizations** (Analytics DB) - CRUD + config operations
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/analytics/orgs/route.ts`
 
 ### Migration Strategy
 - Create repository
@@ -738,7 +754,7 @@ Implement repositories for simple tables with minimal joins.
 - 4-6 hours
 
 ### Approval Required
-- ✅ Proceed with Phase 3?
+- ⏸️ **AWAITING PHASE 2** - Proceed after Phase 2 completion?
 
 ---
 
@@ -747,11 +763,22 @@ Implement repositories for simple tables with minimal joins.
 ### Objective
 Implement repositories for tables with simple joins (1-2 level).
 
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 3 completion
+
 ### Tables (Priority Order)
 1. **vendors** (Main DB) - CRUD + join with organizations
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/vendors/route.ts`
 2. **vendors** (Analytics DB) - CRUD + join + config operations
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/analytics/vendors/route.ts`
 3. **wms_vendors** - CRUD + join with organizations
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/wms-vendors/route.ts`
 4. **alerts** - CRUD + join with plants, filtering
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/alerts/route.ts`
 
 ### Migration Strategy
 - Create repository with join methods
@@ -766,7 +793,7 @@ Implement repositories for tables with simple joins (1-2 level).
 - 6-8 hours
 
 ### Approval Required
-- ✅ Proceed with Phase 4?
+- ⏸️ **AWAITING PHASE 3** - Proceed after Phase 3 completion?
 
 ---
 
@@ -775,12 +802,25 @@ Implement repositories for tables with simple joins (1-2 level).
 ### Objective
 Implement repositories for complex tables with multiple relationships and batch operations.
 
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 4 completion
+
 ### Tables (Priority Order)
-1. **plants** (Main DB) - CRUD + joins + batch upsert + production metrics
-2. **plants** (Analytics DB) - CRUD + joins + batch upsert
-3. **wms_sites** - CRUD + batch upsert + deduplication
-4. **wms_devices** - CRUD + batch upsert + deduplication
-5. **insolation_readings** - CRUD + upsert by device/date
+1. **plants** (Main DB) - CRUD + joins + batch save (`saveAll()`) + production metrics
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/plants/route.ts`, `app/api/plants/[id]/route.ts`, `lib/services/plantSyncService.ts`
+2. **plants** (Analytics DB) - CRUD + joins + batch save (`saveAll()`)
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/analytics/plants/route.ts`, `lib/services/analyticsMirrorService.ts`
+3. **wms_sites** - CRUD + batch save (`saveAll()`) + deduplication
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `lib/services/wmsSyncService.ts`
+4. **wms_devices** - CRUD + batch save (`saveAll()`) + deduplication
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `lib/services/wmsSyncService.ts`
+5. **insolation_readings** - CRUD + save (`save()`) by device/date
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `lib/services/wmsSyncService.ts`
 
 ### Migration Strategy
 - Create repository with all query patterns
@@ -796,7 +836,7 @@ Implement repositories for complex tables with multiple relationships and batch 
 - 10-12 hours
 
 ### Approval Required
-- ✅ Proceed with Phase 5?
+- ⏸️ **AWAITING PHASE 4** - Proceed after Phase 4 completion?
 
 ---
 
@@ -805,10 +845,19 @@ Implement repositories for complex tables with multiple relationships and batch 
 ### Objective
 Implement repositories for analytics-specific tables and operations.
 
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 5 completion
+
 ### Tables (Priority Order)
-1. **plant_energy_readings** - CRUD + date filtering + batch upsert
-2. **plant_grid_downtime_readings** - CRUD + date filtering + baseline queries + batch upsert
+1. **plant_energy_readings** - CRUD + date filtering + batch save (`saveAll()`)
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/analytics/plants/[id]/energy/route.ts`, `lib/services/analyticsSnapshotService.ts`
+2. **plant_grid_downtime_readings** - CRUD + date filtering + baseline queries + batch save (`saveAll()`)
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/analytics/plants/[id]/grid-downtime/route.ts`, `lib/services/gridDowntimeAnalyticsService.ts`
 3. **analytics_snapshot_runs** - CRUD + vendor grouping + status tracking
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/analytics/vendors/route.ts`, `lib/services/analyticsSnapshotService.ts`
 
 ### Migration Strategy
 - Create repositories
@@ -824,7 +873,7 @@ Implement repositories for analytics-specific tables and operations.
 - 6-8 hours
 
 ### Approval Required
-- ✅ Proceed with Phase 6?
+- ⏸️ **AWAITING PHASE 5** - Proceed after Phase 5 completion?
 
 ---
 
@@ -833,13 +882,28 @@ Implement repositories for analytics-specific tables and operations.
 ### Objective
 Migrate all services to use repositories instead of direct Supabase calls.
 
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phases 3-6 completion
+
 ### Services (Priority Order)
 1. **analyticsMirrorService** - Cross-database operations
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `lib/services/analyticsMirrorService.ts`
 2. **analyticsSnapshotService** - Analytics operations
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `lib/services/analyticsSnapshotService.ts`
 3. **gridDowntimeAnalyticsService** - Complex calculations
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `lib/services/gridDowntimeAnalyticsService.ts`
 4. **plantSyncService** - Batch operations
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `lib/services/plantSyncService.ts`
 5. **alertSyncService** - Batch operations
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `lib/services/alertSyncService.ts`
 6. **wmsSyncService** - WMS operations
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `lib/services/wmsSyncService.ts`
 
 ### Migration Strategy
 - Update services one at a time
@@ -855,7 +919,7 @@ Migrate all services to use repositories instead of direct Supabase calls.
 - 8-10 hours
 
 ### Approval Required
-- ✅ Proceed with Phase 7?
+- ⏸️ **AWAITING PHASES 3-6** - Proceed after all repository phases completion?
 
 ---
 
@@ -864,12 +928,20 @@ Migrate all services to use repositories instead of direct Supabase calls.
 ### Objective
 Comprehensive testing and validation of all migrations.
 
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 7 completion
+
 ### Tasks
 1. Unit tests for repositories (if applicable)
+   - **Status**: ⏸️ Not implemented
 2. Integration tests for API routes
+   - **Status**: ⏸️ Not implemented
 3. End-to-end tests for services
+   - **Status**: ⏸️ Not implemented
 4. Performance validation
+   - **Status**: ⏸️ Not implemented
 5. Regression testing
+   - **Status**: ⏸️ Not implemented
 
 ### Dependencies
 - Phase 7 (Service Migration)
@@ -878,7 +950,7 @@ Comprehensive testing and validation of all migrations.
 - 4-6 hours
 
 ### Approval Required
-- ✅ Proceed with Phase 8?
+- ⏸️ **AWAITING PHASE 7** - Proceed after Phase 7 completion?
 
 ---
 
@@ -887,11 +959,18 @@ Comprehensive testing and validation of all migrations.
 ### Objective
 Final cleanup and documentation.
 
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 8 completion
+
 ### Tasks
 1. Remove `lib/queries/extracted-queries.ts` (reference file)
+   - **Status**: ⏸️ Not implemented (file still exists as reference)
 2. Update documentation
+   - **Status**: ⏸️ Not implemented
 3. Code review
+   - **Status**: ⏸️ Not implemented
 4. Final validation
+   - **Status**: ⏸️ Not implemented
 
 ### Dependencies
 - Phase 8 (Testing)
@@ -900,7 +979,7 @@ Final cleanup and documentation.
 - 2-3 hours
 
 ### Approval Required
-- ✅ Proceed with Phase 9?
+- ⏸️ **AWAITING PHASE 8** - Proceed after Phase 8 completion?
 
 ---
 
@@ -924,6 +1003,10 @@ Final cleanup and documentation.
 
 ### Objective
 Implement repositories for work orders using aggregate root pattern with single-query nested joins to avoid N+1 query propagation.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 5 (PlantsRepository) and Phase 4 (OrganizationsRepository, VendorsRepository) completion
+- ✅ Design complete (documented below)
 
 ### Design Principle: Single Query with Nested Joins
 
@@ -1236,12 +1319,23 @@ for (const plantId of plantIds) {
 ### Migration Strategy
 
 1. **Create WorkOrdersRepository** with aggregate root methods
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/workorders/route.ts`
 2. **Create WorkOrderPlantsRepository** for junction table operations
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/workorders/route.ts`
 3. **Create WorkLogsRepository** for work logs
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/workorders/[id]/logs/route.ts`
 4. **Create WorkOrderProductionRepository** for production queries
+   - **Status**: ⏸️ Not implemented
+   - **Current**: Direct Supabase calls in `app/api/workorders/[id]/production/route.ts`
 5. **Update API routes** to use repositories
+   - **Status**: ⏸️ Not implemented
 6. **Maintain single-query pattern** - verify no N+1 introduced
+   - **Status**: ⏸️ Not implemented
 7. **Test thoroughly** - especially create/update operations
+   - **Status**: ⏸️ Not implemented
 
 ### Dependencies
 - Phase 5 (Complex Repositories) - Need PlantsRepository for validation
@@ -1251,7 +1345,7 @@ for (const plantId of plantIds) {
 - 8-10 hours (complex due to nested joins and transaction-like operations)
 
 ### Approval Required
-- ✅ Proceed with Phase 10?
+- ⏸️ **AWAITING PHASES 4 & 5** - Proceed after Phase 4 and Phase 5 completion?
 
 ---
 
@@ -1260,6 +1354,45 @@ for (const plantId of plantIds) {
 The following are **EXCLUDED** from migration per requirements:
 - `dashboard` route queries (complex aggregations, role-based logic)
 - Any queries involving work orders that are part of dashboard aggregations
+
+---
+
+## Current Implementation Status Summary
+
+### Completed Phases
+1. ✅ **Phase 0: Query Extraction** - COMPLETED
+   - All database queries extracted to `lib/queries/extracted-queries.ts`
+   - Queries categorized by table/entity
+   - Patterns identified and documented
+   - **File exists and contains all queries** (reference only, not executed)
+
+2. ✅ **Phase 1: Repository Design** - COMPLETED
+   - All repository interfaces designed
+   - Base repository pattern designed
+   - Factory pattern designed
+   - JPA-style naming conventions documented
+   - **Design documented in this file** (no code written)
+
+### Pending Phases (All NOT STARTED)
+- ⏸️ **Phase 2**: Base Repository & Types - NOT STARTED
+- ⏸️ **Phase 3**: Simple CRUD Repositories - NOT STARTED
+- ⏸️ **Phase 4**: Repositories with Simple Joins - NOT STARTED
+- ⏸️ **Phase 5**: Complex Repositories (Plants & WMS) - NOT STARTED
+- ⏸️ **Phase 6**: Analytics-Specific Repositories - NOT STARTED
+- ⏸️ **Phase 7**: Service Layer Migration - NOT STARTED
+- ⏸️ **Phase 8**: Testing & Validation - NOT STARTED
+- ⏸️ **Phase 9**: Cleanup & Documentation - NOT STARTED
+- ⏸️ **Phase 10**: Work Orders Repositories - NOT STARTED
+
+### Current Code State
+- **Repository Files**: ❌ None exist (`lib/repositories/` directory does not exist)
+- **API Routes**: ✅ All use `getMainClient()` / `getAnalyticsClient()` directly (working correctly)
+- **Services**: ✅ All use direct Supabase queries (working correctly)
+- **Database Access**: ✅ Direct Supabase calls throughout codebase (working correctly)
+- **Build Status**: ✅ Working correctly (all direct Supabase calls)
+
+### Next Action Required
+**Approval to proceed with Phase 2 implementation** - This will create the first repository files and base types.
 
 ---
 
@@ -1313,13 +1446,28 @@ Following JPA (Java Persistence API) naming conventions for consistency and fami
 - ✅ **Work Orders repository design (Phase 10)** with query propagation prevention strategy
 - ✅ **JPA-style naming conventions** - Using `save()` instead of `create()`, `saveAll()` instead of `batchUpsert()`, `deleteById()` instead of `delete()`, etc.
 
+**Note**: This is DESIGN ONLY. No repository code has been implemented. All API routes continue to use direct Supabase calls as documented in `extracted-queries.ts`.
+
 ---
 
 ## Next Steps
 
 **READY FOR PHASE 2: Base Repository & Types (Foundation)**
 
-Phase 1 design is complete and documented above, including work orders design with N+1 prevention. The next phase will implement:
+Phase 1 design is complete and documented above, including work orders design with N+1 prevention. 
+
+**Current Implementation Status**: 
+- ❌ No repository files exist (`lib/repositories/` directory does not exist)
+- ✅ All queries extracted to `lib/queries/extracted-queries.ts` (reference only)
+- ✅ All API routes use direct Supabase calls (working correctly)
+- ✅ Design complete and ready for review
+
+**Before Phase 2 Implementation**:
+1. Review and approve Phase 1 design
+2. Confirm JPA-style naming conventions are acceptable
+3. Approve proceeding with Phase 2 implementation
+
+**Phase 2 will implement**:
 1. `lib/repositories/types.ts` with base interfaces and classes
 2. Factory pattern implementation
 3. Common types and utilities

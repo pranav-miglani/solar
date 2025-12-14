@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getAlertsRepository, getPlantsRepository } from "@/lib/repositories/main"
+import { getMainClient } from "@/lib/supabase/pooled"
 import { requirePermission } from "@/lib/rbac"
 
 // For alerts API, we need to bypass RLS
@@ -33,34 +33,55 @@ export async function GET(request: NextRequest) {
     const limitParam = url.searchParams.get("limit")
     const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 100, 200) : 100
 
-    // Use repositories to fetch alerts
-    const alertsRepo = getAlertsRepository()
-    const plantsRepo = getPlantsRepository()
+    const supabase = getMainClient()
 
-    let filters: { plantId?: number; plantIds?: number[]; limit?: number } = { limit }
-
-    if (plantIdParam) {
-      const plantId = parseInt(plantIdParam, 10)
-      if (!Number.isNaN(plantId)) {
-        filters.plantId = plantId
-      }
-    }
+    // Build query for alerts with plants join
+    let query = supabase
+      .from("alerts")
+      .select(`
+        *,
+        plants (
+          id,
+          name,
+          org_id,
+          vendors (
+            id,
+            name
+          )
+        )
+      `)
+      .order("alert_time", { ascending: false })
+      .limit(limit)
 
     // Filter based on role
     if (accountType === "ORG" && orgId) {
-      // Get plant IDs for this org
-      const plantIds = await plantsRepo.getPlantIdsByOrgId(orgId)
+      // Get plant IDs for this org first
+      const { data: orgPlants } = await supabase
+        .from("plants")
+        .select("id")
+        .eq("org_id", orgId)
 
-      if (plantIds.length > 0) {
-        filters.plantIds = plantIds
-      } else {
-        // No plants, return empty
+      if (!orgPlants || orgPlants.length === 0) {
         return NextResponse.json({ alerts: [] })
       }
-    }
-    // SUPERADMIN, DEVELOPER, and GOVT see all alerts (no filtering)
 
-    const alerts = await alertsRepo.findWithPlants(filters)
+      const plantIds = orgPlants.map((p) => p.id)
+      query = query.in("plant_id", plantIds)
+    }
+
+    // Apply plantId filter if provided
+    if (plantIdParam) {
+      const plantId = parseInt(plantIdParam, 10)
+      if (!Number.isNaN(plantId)) {
+        query = query.eq("plant_id", plantId)
+      }
+    }
+
+    const { data: alerts, error } = await query
+
+    if (error) {
+      throw error
+    }
 
     return NextResponse.json({ alerts })
   } catch (error) {

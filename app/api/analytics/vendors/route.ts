@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
-import { getAnalyticsVendorsRepository, getAnalyticsSnapshotRunsRepository } from "@/lib/repositories/analytics"
+import { getAnalyticsClient } from "@/lib/supabase/pooled"
 
 export const dynamic = "force-dynamic"
 
@@ -27,27 +27,57 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const orgIdParam = searchParams.get("orgId")
 
-    // Use repositories to fetch vendors and snapshot runs
-    const vendorsRepo = getAnalyticsVendorsRepository()
-    const snapshotRunsRepo = getAnalyticsSnapshotRunsRepository()
+    const supabase = getAnalyticsClient()
 
-    const filters: { orgId?: number } = {}
+    // Build query for vendors with organizations join
+    let query = supabase
+      .from("vendors")
+      .select(`
+        *,
+        organizations (
+          id,
+          name
+        )
+      `)
+      .order("name", { ascending: true })
+
     if (orgIdParam) {
       const orgId = parseInt(orgIdParam)
       if (!isNaN(orgId)) {
-        filters.orgId = orgId
+        query = query.eq("org_id", orgId)
       }
     }
 
-    const vendorsWithOrgs = await vendorsRepo.findAllWithOrganizations(filters)
+    const { data: vendorsWithOrgs, error: vendorsError } = await query
+
+    if (vendorsError) {
+      throw vendorsError
+    }
 
     // Get last snapshot run status for each vendor
-    const vendorIds = vendorsWithOrgs.map((v) => v.id)
-    const lastRuns = await snapshotRunsRepo.findLastRunsByVendors(vendorIds)
+    const vendorIds = vendorsWithOrgs?.map((v) => v.id) || []
+    let lastRunsMap = new Map()
 
-    const vendorsWithStatus = vendorsWithOrgs.map((vendor) => ({
+    if (vendorIds.length > 0) {
+      const { data: lastRuns, error: runsError } = await supabase
+        .from("analytics_snapshot_runs")
+        .select("*")
+        .in("vendor_id", vendorIds)
+        .order("created_at", { ascending: false })
+
+      if (!runsError && lastRuns) {
+        // Group by vendor_id and get the most recent for each
+        for (const run of lastRuns) {
+          if (!lastRunsMap.has(run.vendor_id)) {
+            lastRunsMap.set(run.vendor_id, run)
+          }
+        }
+      }
+    }
+
+    const vendorsWithStatus = (vendorsWithOrgs || []).map((vendor) => ({
       ...vendor,
-      lastRun: lastRuns.get(vendor.id) || null,
+      lastRun: lastRunsMap.get(vendor.id) || null,
     }))
 
     return NextResponse.json({ vendors: vendorsWithStatus })

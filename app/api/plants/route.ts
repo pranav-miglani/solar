@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
-import { getPlantsRepository } from "@/lib/repositories/main"
 import { getMainClient } from "@/lib/supabase/pooled"
 import { logApiRequest, logApiResponse, withMDCContext, jsonResponse } from "@/lib/api-logger"
 
@@ -37,15 +36,28 @@ export async function GET(request: NextRequest) {
 
       requirePermission(accountType as any, "plants", "read")
 
-      // Use repository to fetch plants
-      const plantsRepo = getPlantsRepository()
       const supabase = getMainClient()
 
-      let filters: { orgId?: number; plantIds?: number[] } | undefined
+      // Build query with joins
+      let query = supabase
+        .from("plants")
+        .select(`
+          *,
+          vendors (
+            id,
+            name,
+            vendor_type
+          ),
+          organizations (
+            id,
+            name
+          )
+        `)
+        .order("name", { ascending: true })
 
       // Apply role-based filtering
       if (accountType === "ORG" && orgId) {
-        filters = { orgId }
+        query = query.eq("org_id", orgId)
       } else if (accountType === "GOVT") {
         // GOVT users can only see plants that are mapped to work orders
         // Get plant IDs from active work orders
@@ -56,15 +68,19 @@ export async function GET(request: NextRequest) {
 
         if (workOrderPlants && workOrderPlants.length > 0) {
           const plantIds = workOrderPlants.map((wop) => wop.plant_id)
-          filters = { plantIds }
+          query = query.in("id", plantIds)
         } else {
           // No plants in work orders, return empty array
-          filters = { plantIds: [-1] } // This will return no results
+          query = query.eq("id", -1) // This will return no results
         }
       }
       // SUPERADMIN can see all plants (no filters)
 
-      const plants = await plantsRepo.findAllWithRelations(filters)
+      const { data: plants, error } = await query
+
+      if (error) {
+        throw error
+      }
 
       logApiResponse(request, 200, Date.now() - startTime)
       return jsonResponse({ plants })
@@ -111,16 +127,24 @@ export async function POST(request: NextRequest) {
       const { org_id, vendor_id, vendor_plant_id, name, capacity_kw, location } =
         body
 
-      // Use repository to create plant
-      const plantsRepo = getPlantsRepository()
-      const plant = await plantsRepo.create({
-        org_id,
-        vendor_id,
-        vendor_plant_id,
-        name,
-        capacity_kw,
-        location: location || {},
-      })
+      // Create plant directly in Supabase
+      const supabase = getMainClient()
+      const { data: plant, error: insertError } = await supabase
+        .from("plants")
+        .insert({
+          org_id,
+          vendor_id,
+          vendor_plant_id,
+          name,
+          capacity_kw,
+          location: location || {},
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        throw insertError
+      }
 
       logApiResponse(request, 201, Date.now() - startTime, { plantId: plant.id, name: plant.name })
       return jsonResponse({ plant }, { status: 201 })
