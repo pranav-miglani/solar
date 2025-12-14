@@ -2442,116 +2442,6 @@ Unique Constraints:
               </div>
             )}
           </Card>
-        </TabsContent>
-
-        {/* Vendors Tab */}
-        <TabsContent value="vendors" className="space-y-6">
-          <Card className="overflow-hidden">
-            <SectionHeader id="vendors" title="Vendor Capabilities Matrix" icon={Factory} />
-            {expandedSections.has("vendors") && (
-              <div className="p-6 pt-0 border-t">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-3 font-semibold">Vendor</th>
-                        <th className="text-center p-3 font-semibold">Auth</th>
-                        <th className="text-center p-3 font-semibold">listPlants</th>
-                        <th className="text-center p-3 font-semibold">listPlant</th>
-                        <th className="text-center p-3 font-semibold">Telemetry</th>
-                        <th className="text-center p-3 font-semibold">Alerts</th>
-                        <th className="text-center p-3 font-semibold">Default Mode</th>
-                        <th className="text-center p-3 font-semibold">Mapping</th>
-                        <th className="text-left p-3 font-semibold">APIs Invoked</th>
-                        <th className="text-left p-3 font-semibold">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {vendorCapabilities.map((vendor, idx) => (
-                        <tr key={idx} className="border-b hover:bg-muted/50">
-                          <td className="p-3 font-medium">
-                            <div>{vendor.name}</div>
-                            <div className="text-xs text-muted-foreground">{vendor.type}</div>
-                          </td>
-                          <td className="p-3 text-center">
-                            {vendor.auth ? (
-                              <div title={vendor.authApi} className="cursor-help">
-                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
-                              </div>
-                            ) : (
-                              <XCircle className="h-5 w-5 text-red-500 mx-auto" />
-                            )}
-                          </td>
-                          <td className="p-3 text-center">
-                            {vendor.listPlants ? (
-                              <div title={vendor.listPlantsApi} className="cursor-help">
-                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
-                              </div>
-                            ) : (
-                              <XCircle className="h-5 w-5 text-red-500 mx-auto" />
-                            )}
-                          </td>
-                          <td className="p-3 text-center">
-                            {vendor.listPlant ? (
-                              <div title={vendor.listPlantApi} className="cursor-help">
-                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
-                              </div>
-                            ) : (
-                              <XCircle className="h-5 w-5 text-red-500 mx-auto" />
-                            )}
-                          </td>
-                          <td className="p-3 text-center">
-                            {vendor.telemetry ? (
-                              <div title={vendor.telemetryApi} className="cursor-help">
-                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
-                              </div>
-                            ) : (
-                              <XCircle className="h-5 w-5 text-red-500 mx-auto" />
-                            )}
-                          </td>
-                          <td className="p-3 text-center">
-                            {vendor.alerts ? (
-                              <div title={vendor.alertsApi} className="cursor-help">
-                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
-                              </div>
-                            ) : (
-                              <XCircle className="h-5 w-5 text-red-500 mx-auto" />
-                            )}
-                          </td>
-                          <td className="p-3 text-center">
-                            <Badge variant={vendor.defaultMode === "LIST_PLANTS" ? "default" : "secondary"}>
-                              {vendor.defaultMode}
-                            </Badge>
-                          </td>
-                          <td className="p-3 text-center">
-                            <Badge 
-                              variant={
-                                vendor.mappingStatus === "Complete" ? "default" : 
-                                vendor.mappingStatus === "Partial" ? "secondary" : 
-                                "destructive"
-                              }
-                            >
-                              {vendor.mappingStatus}
-                            </Badge>
-                          </td>
-                          <td className="p-3 text-xs text-muted-foreground max-w-xs">
-                            <div className="space-y-1">
-                              {vendor.auth && <div>✓ {vendor.authApi}</div>}
-                              {vendor.listPlants && <div>✓ {vendor.listPlantsApi}</div>}
-                              {vendor.listPlant && <div>✓ {vendor.listPlantApi}</div>}
-                              {vendor.telemetry && <div>✓ {vendor.telemetryApi}</div>}
-                              {vendor.alerts && <div>✓ {vendor.alertsApi}</div>}
-                            </div>
-                          </td>
-                          <td className="p-3 text-sm text-muted-foreground">{vendor.notes}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </Card>
           {/* Repository Migration Plan */}
           <Card className="overflow-hidden">
             <SectionHeader id="repository-migration" title="Repository Pattern Migration Plan" icon={Layers} />
@@ -2990,16 +2880,115 @@ Unique Constraints:
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
 
-                {/* Documentation Link */}
-                <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900 mt-6">
-                  <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Full Documentation</h4>
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                    Complete migration plan with detailed repository designs, interfaces, and implementation strategies available at:
-                  </p>
-                  <code className="block mt-2 bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded text-xs">
-                    lib/queries/REPOSITORY_MIGRATION_PLAN.md
-                  </code>
+        {/* Vendors Tab */}
+        <TabsContent value="vendors" className="space-y-6">
+          <Card className="overflow-hidden">
+            <SectionHeader id="vendors" title="Vendor Capabilities Matrix" icon={Factory} />
+            {expandedSections.has("vendors") && (
+              <div className="p-6 pt-0 border-t">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-3 font-semibold">Vendor</th>
+                        <th className="text-center p-3 font-semibold">Auth</th>
+                        <th className="text-center p-3 font-semibold">listPlants</th>
+                        <th className="text-center p-3 font-semibold">listPlant</th>
+                        <th className="text-center p-3 font-semibold">Telemetry</th>
+                        <th className="text-center p-3 font-semibold">Alerts</th>
+                        <th className="text-center p-3 font-semibold">Default Mode</th>
+                        <th className="text-center p-3 font-semibold">Mapping</th>
+                        <th className="text-left p-3 font-semibold">APIs Invoked</th>
+                        <th className="text-left p-3 font-semibold">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vendorCapabilities.map((vendor, idx) => (
+                        <tr key={idx} className="border-b hover:bg-muted/50">
+                          <td className="p-3 font-medium">
+                            <div>{vendor.name}</div>
+                            <div className="text-xs text-muted-foreground">{vendor.type}</div>
+                          </td>
+                          <td className="p-3 text-center">
+                            {vendor.auth ? (
+                              <div title={vendor.authApi} className="cursor-help">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              </div>
+                            ) : (
+                              <XCircle className="h-5 w-5 text-red-500 mx-auto" />
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            {vendor.listPlants ? (
+                              <div title={vendor.listPlantsApi} className="cursor-help">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              </div>
+                            ) : (
+                              <XCircle className="h-5 w-5 text-red-500 mx-auto" />
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            {vendor.listPlant ? (
+                              <div title={vendor.listPlantApi} className="cursor-help">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              </div>
+                            ) : (
+                              <XCircle className="h-5 w-5 text-red-500 mx-auto" />
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            {vendor.telemetry ? (
+                              <div title={vendor.telemetryApi} className="cursor-help">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              </div>
+                            ) : (
+                              <XCircle className="h-5 w-5 text-red-500 mx-auto" />
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            {vendor.alerts ? (
+                              <div title={vendor.alertsApi} className="cursor-help">
+                                <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                              </div>
+                            ) : (
+                              <XCircle className="h-5 w-5 text-red-500 mx-auto" />
+                            )}
+                          </td>
+                          <td className="p-3 text-center">
+                            <Badge variant={vendor.defaultMode === "LIST_PLANTS" ? "default" : "secondary"}>
+                              {vendor.defaultMode}
+                            </Badge>
+                          </td>
+                          <td className="p-3 text-center">
+                            <Badge 
+                              variant={
+                                vendor.mappingStatus === "Complete" ? "default" : 
+                                vendor.mappingStatus === "Partial" ? "secondary" : 
+                                "destructive"
+                              }
+                            >
+                              {vendor.mappingStatus}
+                            </Badge>
+                          </td>
+                          <td className="p-3 text-xs text-muted-foreground max-w-xs">
+                            <div className="space-y-1">
+                              {vendor.auth && <div>✓ {vendor.authApi}</div>}
+                              {vendor.listPlants && <div>✓ {vendor.listPlantsApi}</div>}
+                              {vendor.listPlant && <div>✓ {vendor.listPlantApi}</div>}
+                              {vendor.telemetry && <div>✓ {vendor.telemetryApi}</div>}
+                              {vendor.alerts && <div>✓ {vendor.alertsApi}</div>}
+                            </div>
+                          </td>
+                          <td className="p-3 text-sm text-muted-foreground">{vendor.notes}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
