@@ -53,7 +53,7 @@ export interface SaveAlertData {
 // =============================================================================
 
 export interface IAlertsRepository {
-  findWithPlants(filters?: { plantId?: number; plantIds?: number[]; limit?: number }): Promise<AlertWithPlant[]>
+  findWithPlants(filters?: { plantId?: number; plantIds?: number[]; limit?: number; status?: string }): Promise<AlertWithPlant[]>
   findById(id: number): Promise<Alert | null>
   save(entity: SaveAlertData): Promise<Alert>
   saveAll(entities: SaveAlertData[]): Promise<Alert[]>
@@ -67,7 +67,7 @@ export interface IAlertsRepository {
 export class AlertsRepository implements IAlertsRepository {
   constructor(private readonly client: SupabaseClient) {}
 
-  async findWithPlants(filters?: { plantId?: number; plantIds?: number[]; limit?: number }): Promise<AlertWithPlant[]> {
+  async findWithPlants(filters?: { plantId?: number; plantIds?: number[]; limit?: number; status?: string }): Promise<AlertWithPlant[]> {
     let query = this.client
       .from("alerts")
       .select(`*, plants (id, name, org_id, vendors (id, name))`)
@@ -79,6 +79,10 @@ export class AlertsRepository implements IAlertsRepository {
 
     if (filters?.plantIds && filters.plantIds.length > 0) {
       query = query.in("plant_id", filters.plantIds)
+    }
+
+    if (filters?.status) {
+      query = query.eq("status", filters.status)
     }
 
     if (filters?.limit) {

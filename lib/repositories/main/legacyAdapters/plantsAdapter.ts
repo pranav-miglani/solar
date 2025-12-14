@@ -90,7 +90,10 @@ export class LegacyPlantsAdapter implements IPlantsRepository {
     if (data.capacity_kw !== undefined) updateData.capacity_kw = data.capacity_kw
     if (data.location !== undefined) updateData.location = data.location
     if (data.today_energy_kwh !== undefined) updateData.today_energy_kwh = data.today_energy_kwh
-    if (data.total_energy_kwh !== undefined) updateData.total_energy_kwh = data.total_energy_kwh
+    if (data.daily_energy_kwh !== undefined) updateData.daily_energy_kwh = data.daily_energy_kwh
+    if (data.monthly_energy_mwh !== undefined) updateData.monthly_energy_mwh = data.monthly_energy_mwh
+    if (data.yearly_energy_mwh !== undefined) updateData.yearly_energy_mwh = data.yearly_energy_mwh
+    if (data.total_energy_mwh !== undefined) updateData.total_energy_mwh = data.total_energy_mwh
     if (data.current_power_kw !== undefined) updateData.current_power_kw = data.current_power_kw
     if (data.network_status !== undefined) updateData.network_status = data.network_status
     if (data.last_refreshed_at !== undefined) updateData.last_refreshed_at = data.last_refreshed_at

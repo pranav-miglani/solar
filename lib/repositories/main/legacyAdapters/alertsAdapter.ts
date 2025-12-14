@@ -10,10 +10,11 @@ import type { Alert, AlertWithPlant, SaveAlertData, IAlertsRepository } from "..
 export class LegacyAlertsAdapter implements IAlertsRepository {
   constructor(private readonly client: SupabaseClient) {}
 
-  async findWithPlants(filters?: { plantId?: number; plantIds?: number[]; limit?: number }): Promise<AlertWithPlant[]> {
+  async findWithPlants(filters?: { plantId?: number; plantIds?: number[]; limit?: number; status?: string }): Promise<AlertWithPlant[]> {
     let query = this.client.from("alerts").select(`*, plants (id, name, org_id, vendors (id, name))`).order("alert_time", { ascending: false })
     if (filters?.plantId) query = query.eq("plant_id", filters.plantId)
     if (filters?.plantIds && filters.plantIds.length > 0) query = query.in("plant_id", filters.plantIds)
+    if (filters?.status) query = query.eq("status", filters.status)
     if (filters?.limit) query = query.limit(filters.limit)
     const { data, error } = await query
     if (error) throw error

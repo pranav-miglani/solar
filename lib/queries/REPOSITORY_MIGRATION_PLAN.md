@@ -28,6 +28,7 @@ This document outlines a **model-by-model incremental approach** to migrate all 
 - ✅ Phase 18: `work_orders` - COMPLETED
 - ✅ Phase 19: `work_order_plants` - COMPLETED
 - ✅ Phase 20: `work_logs` - COMPLETED
+- ✅ Phase 21: Dashboard Service - COMPLETED
 - 🔜 Phase 21+: Dashboard & Cleanup - READY
 
 **Migration Strategy**: Model-by-model with dependency-aware ordering:
@@ -2414,7 +2415,8 @@ The following are **EXCLUDED** from repository migration:
 | 18 | Work Orders | ✅ | ✅ | ✅ | `USE_WORKORDERS_REPO` |
 | 19 | Work Order Plants | ✅ | ✅ | ✅ | `USE_WORKORDER_PLANTS_REPO` |
 | 20 | Work Logs | ✅ | ✅ | ✅ | `USE_WORKLOGS_REPO` |
-| 21+ | Dashboard & Cleanup | ⏸️ | ⏸️ | ⏸️ | Various |
+| 21 | Dashboard Service | ✅ | ✅ | ✅ | `USE_DASHBOARD_SERVICE` |
+| 22-23 | Cleanup & Archive | ⏸️ | N/A | N/A | N/A |
 
 ### Completed Phases
 

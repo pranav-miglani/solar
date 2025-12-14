@@ -23,6 +23,20 @@ export class LegacyWorkOrderPlantsAdapter implements IWorkOrderPlantsRepository 
     return (data || []) as WorkOrderPlant[]
   }
 
+  async getActivePlantIds(): Promise<number[]> {
+    const { data, error } = await this.client.from("work_order_plants").select("plant_id").eq("is_active", true)
+    if (error) throw error
+    const uniqueIds = [...new Set((data || []).map(wop => wop.plant_id))]
+    return uniqueIds
+  }
+
+  async getWorkOrderIdsByPlantIds(plantIds: number[]): Promise<number[]> {
+    if (plantIds.length === 0) return []
+    const { data, error } = await this.client.from("work_order_plants").select("work_order_id").in("plant_id", plantIds)
+    if (error) throw error
+    return (data || []).map(wop => wop.work_order_id)
+  }
+
   async deactivateByPlantIds(plantIds: number[]): Promise<void> {
     if (plantIds.length === 0) return
     const { error } = await this.client.from("work_order_plants").update({ is_active: false }).in("plant_id", plantIds).eq("is_active", true)

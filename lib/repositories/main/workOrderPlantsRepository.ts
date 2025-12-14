@@ -34,6 +34,8 @@ export interface SaveWorkOrderPlantData {
 export interface IWorkOrderPlantsRepository {
   findByWorkOrderId(workOrderId: number): Promise<WorkOrderPlant[]>
   findActiveByPlantIds(plantIds: number[]): Promise<WorkOrderPlant[]>
+  getActivePlantIds(): Promise<number[]>
+  getWorkOrderIdsByPlantIds(plantIds: number[]): Promise<number[]>
   deactivateByPlantIds(plantIds: number[]): Promise<void>
   deactivateByWorkOrderAndPlantIds(workOrderId: number, plantIds: number[]): Promise<void>
   activateByWorkOrderAndPlantIds(workOrderId: number, plantIds: number[]): Promise<void>
@@ -68,6 +70,30 @@ export class WorkOrderPlantsRepository implements IWorkOrderPlantsRepository {
 
     if (error) throw error
     return (data || []) as WorkOrderPlant[]
+  }
+
+  async getActivePlantIds(): Promise<number[]> {
+    const { data, error } = await this.client
+      .from("work_order_plants")
+      .select("plant_id")
+      .eq("is_active", true)
+
+    if (error) throw error
+    // Deduplicate plant IDs
+    const uniqueIds = [...new Set((data || []).map(wop => wop.plant_id))]
+    return uniqueIds
+  }
+
+  async getWorkOrderIdsByPlantIds(plantIds: number[]): Promise<number[]> {
+    if (plantIds.length === 0) return []
+
+    const { data, error } = await this.client
+      .from("work_order_plants")
+      .select("work_order_id")
+      .in("plant_id", plantIds)
+
+    if (error) throw error
+    return (data || []).map(wop => wop.work_order_id)
   }
 
   async deactivateByPlantIds(plantIds: number[]): Promise<void> {
