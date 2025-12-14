@@ -10,7 +10,10 @@ This document outlines a **model-by-model incremental approach** to migrate all 
 - ✅ Phase 0: Query Extraction - COMPLETED (all queries extracted to `lib/queries/extracted-queries.ts`)
 - ✅ Phase 1: Repository Design - COMPLETED (designs documented in this file)
 - ✅ Phase 2: Foundation - COMPLETED (base types, interfaces, factory pattern)
-- ⏸️ Phase 3+: Implementation - NOT STARTED (awaiting approval to proceed)
+- ✅ Phase 3: `accounts` Repository - COMPLETED
+- ✅ Phase 4: `organizations` (Main) - COMPLETED
+- ✅ Phase 5: `organizations` (Analytics) - COMPLETED
+- 🔜 Phase 6+: Implementation - READY (Tier 1 complete, Tier 2 next)
 
 **Migration Strategy**: Model-by-model with dependency-aware ordering:
 - **22 Total Phases** (including design phases)
@@ -19,6 +22,64 @@ This document outlines a **model-by-model incremental approach** to migrate all 
 - **Service migration integrated** - each model phase includes API routes + services
 
 **Important**: No repository code has been implemented yet. All API routes currently use direct Supabase calls. The `extracted-queries.ts` file is a reference document only.
+
+---
+
+## ⚠️ Critical: Main DB vs Analytics DB Schema Differences
+
+The application uses **TWO separate Supabase databases** with DIFFERENT schemas:
+
+### Main DB Tables (Operational)
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `accounts` | Authentication | id, email, password_hash, account_type, org_id, is_active |
+| `organizations` | Org config | id, name, auto_sync_enabled, sync_interval_minutes |
+| `vendors` | Vendor config | id, name, vendor_type, credentials, token, token_metadata, org_id, is_active |
+| `plants` | **Full plant data** | id, name, capacity_kw, **production metrics**, **telemetry**, vendor_id, org_id |
+| `alerts` | Vendor alerts | id, plant_id, vendor_alert_id, alert_type, status |
+| `work_orders` | Work orders | id, title, description, org_id, status, priority |
+| `work_order_plants` | Junction | work_order_id, plant_id, is_active |
+| `disabled_plants` | Inactive plants | plant_id, org_id, reason |
+| `wms_vendors` | WMS config | id, name, vendor_type, credentials, token, org_id |
+| `wms_sites` | WMS sites | id, wms_vendor_id, vendor_site_id, site_name |
+| `wms_devices` | WMS devices | id, wms_site_id, vendor_device_id, device_name |
+| `insolation_readings` | Insolation data | wms_device_id, reading_date, insolation_value |
+
+### Analytics DB Tables (Mirror + Analytics-specific)
+| Table | Type | Key Differences from Main DB |
+|-------|------|------------------------------|
+| `organizations` | **MIRROR** | Has `config` (JSONB), `config_hash`, `config_ready`, `config_last_*` |
+| `vendors` | **MIRROR** | Has `config` (JSONB), `config_hash`, `analytics_ready`, `analytics_last_synced_at` |
+| `plants` | **MIRROR (simplified)** | Only: id, org_id, vendor_id, vendor_plant_id, plant_name, capacity_kw (**NO production metrics**) |
+| `analytics_snapshot_runs` | **Analytics-only** | Tracks snapshot job runs per vendor |
+| `plant_energy_readings` | **Analytics-only** | Daily energy readings (100-day retention) |
+| `plant_grid_downtime_readings` | **Analytics-only** | Grid downtime calculations |
+
+### Key Implications for Repository Design
+
+1. **Analytics tables are NOT simple copies** - They have DIFFERENT schemas
+2. **Mirror tables use `config_hash`** for change detection (not in Main DB)
+3. **Mirror tables use `config_ready`** to track sync status
+4. **Plants in Analytics** is SIMPLIFIED - no production metrics or telemetry
+5. **6 tables exist ONLY in Analytics DB** - no Main DB equivalent
+6. **8 tables exist ONLY in Main DB** - `accounts`, `work_orders`, `alerts`, `wms_*`, etc.
+
+### Repository Implications
+
+| Repository | Database | Notes |
+|------------|----------|-------|
+| `AccountsRepository` | Main ONLY | No analytics equivalent |
+| `OrganizationsRepository` | Main | Simple CRUD |
+| `AnalyticsOrganizationsRepository` | Analytics | Different schema: config_hash, config_ready |
+| `VendorsRepository` | Main | Full vendor with credentials, token |
+| `AnalyticsVendorsRepository` | Analytics | Different schema: analytics_ready |
+| `PlantsRepository` | Main | Full plant with production metrics |
+| `AnalyticsPlantsRepository` | Analytics | Simplified: no production metrics |
+| `AlertsRepository` | Main ONLY | No analytics equivalent |
+| `WmsVendorsRepository` | Main ONLY | No analytics equivalent |
+| `PlantEnergyReadingsRepository` | Analytics ONLY | No main equivalent |
+| `PlantGridDowntimeReadingsRepository` | Analytics ONLY | No main equivalent |
+| `AnalyticsSnapshotRunsRepository` | Analytics ONLY | No main equivalent |
 
 ---
 

@@ -2475,6 +2475,50 @@ Unique Constraints:
                   </div>
                 </div>
 
+                {/* Main DB vs Analytics DB Schema Differences */}
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 p-6 rounded-lg border border-amber-200 dark:border-amber-900">
+                  <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-amber-600" />
+                    Critical: Main DB vs Analytics DB Schema Differences
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    The application uses <strong>TWO separate Supabase databases</strong> with DIFFERENT schemas. Analytics DB is NOT a simple copy.
+                  </p>
+                  
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* Main DB */}
+                    <div className="bg-white dark:bg-background p-4 rounded-lg border">
+                      <h4 className="font-semibold text-sm mb-3 text-blue-700 dark:text-blue-300">Main DB (Operational)</h4>
+                      <ul className="text-xs space-y-1 text-muted-foreground">
+                        <li>• <code className="bg-muted px-1 rounded">accounts</code> - Authentication (Main ONLY)</li>
+                        <li>• <code className="bg-muted px-1 rounded">organizations</code> - Org config</li>
+                        <li>• <code className="bg-muted px-1 rounded">vendors</code> - Full vendor with credentials, token</li>
+                        <li>• <code className="bg-muted px-1 rounded">plants</code> - <strong>Full</strong> with production metrics</li>
+                        <li>• <code className="bg-muted px-1 rounded">alerts</code> - Vendor alerts (Main ONLY)</li>
+                        <li>• <code className="bg-muted px-1 rounded">work_orders</code> - Work orders (Main ONLY)</li>
+                        <li>• <code className="bg-muted px-1 rounded">wms_*</code> - WMS tables (Main ONLY)</li>
+                      </ul>
+                    </div>
+                    
+                    {/* Analytics DB */}
+                    <div className="bg-white dark:bg-background p-4 rounded-lg border">
+                      <h4 className="font-semibold text-sm mb-3 text-purple-700 dark:text-purple-300">Analytics DB (Mirror + Analytics)</h4>
+                      <ul className="text-xs space-y-1 text-muted-foreground">
+                        <li>• <code className="bg-muted px-1 rounded">organizations</code> - <strong>MIRROR</strong> + config_hash, config_ready</li>
+                        <li>• <code className="bg-muted px-1 rounded">vendors</code> - <strong>MIRROR</strong> + analytics_ready</li>
+                        <li>• <code className="bg-muted px-1 rounded">plants</code> - <strong>SIMPLIFIED</strong> (no production metrics)</li>
+                        <li>• <code className="bg-muted px-1 rounded">analytics_snapshot_runs</code> - Analytics ONLY</li>
+                        <li>• <code className="bg-muted px-1 rounded">plant_energy_readings</code> - Analytics ONLY</li>
+                        <li>• <code className="bg-muted px-1 rounded">plant_grid_downtime_readings</code> - Analytics ONLY</li>
+                      </ul>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 text-xs bg-amber-100 dark:bg-amber-900/30 p-3 rounded">
+                    <strong>⚠️ Key Implication:</strong> Analytics repositories have DIFFERENT interfaces than Main DB counterparts. They include config_hash for change detection, analytics_ready flags, and simplified plant data.
+                  </div>
+                </div>
+
                 {/* Phase Status Overview */}
                 <div className="space-y-4">
                   <h3 className="font-semibold text-lg">Migration Phases (Model-by-Model)</h3>
@@ -7313,3 +7357,4 @@ const lastUpdateTime = station.lastUpdateTime
     </div>
   )
 }
+
