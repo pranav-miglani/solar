@@ -15,14 +15,14 @@
 import { getMainClient } from "@/lib/supabase/pooled"
 
 // =============================================================================
-// Repository Imports (will be added as repositories are implemented)
+// Repository Imports
 // =============================================================================
 
 // Phase 3: accounts
-// import { AccountsRepository } from "./accountsRepository"
+import { AccountsRepository, IAccountsRepository } from "./accountsRepository"
 
 // Phase 4: organizations
-// import { OrganizationsRepository } from "./organizationsRepository"
+import { OrganizationsRepository, IOrganizationsRepository } from "./organizationsRepository"
 
 // Phase 6: vendors
 // import { VendorsRepository } from "./vendorsRepository"
@@ -69,16 +69,16 @@ export function getClient() {
 // -----------------------------------------------------------------------------
 // Phase 3: Accounts Repository
 // -----------------------------------------------------------------------------
-// export function getAccountsRepository() {
-//   return new AccountsRepository(getMainClient())
-// }
+export function getAccountsRepository(): IAccountsRepository {
+  return new AccountsRepository(getMainClient())
+}
 
 // -----------------------------------------------------------------------------
 // Phase 4: Organizations Repository
 // -----------------------------------------------------------------------------
-// export function getOrganizationsRepository() {
-//   return new OrganizationsRepository(getMainClient())
-// }
+export function getOrganizationsRepository(): IOrganizationsRepository {
+  return new OrganizationsRepository(getMainClient())
+}
 
 // -----------------------------------------------------------------------------
 // Phase 6: Vendors Repository

@@ -2,6 +2,7 @@ import crypto from "crypto"
 import { logger } from "@/lib/context/logger"
 import MDC from "@/lib/context/mdc"
 import { getMainClient, getAnalyticsClient } from "@/lib/supabase/pooled"
+import { getAnalyticsOrganizationsRepository } from "@/lib/repositories/analytics"
 
 type MirrorSummary = {
   orgsProcessed: number
@@ -59,7 +60,7 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
         plantsUpdated: 0,
       }
 
-      // Mirror organizations
+      // Mirror organizations using repository
       logger.info("[Analytics Mirror] Fetching organizations from main DB")
       const { data: orgs, error: orgError } = await main.from("organizations").select("*")
       if (orgError) {
@@ -69,50 +70,35 @@ export async function mirrorOrgVendorConfig(): Promise<MirrorSummary> {
 
       logger.info(`[Analytics Mirror] Found ${orgs?.length || 0} organizations to mirror`)
       const now = new Date().toISOString()
+      
+      // Use repository for analytics DB operations
+      const analyticsOrgsRepo = getAnalyticsOrganizationsRepository()
 
       for (const org of orgs || []) {
-    summary.orgsProcessed++
-    const clean = stripTimestamps(org as any)
-    const hash = computeHash(clean)
+        summary.orgsProcessed++
+        const clean = stripTimestamps(org as any)
+        const hash = computeHash(clean)
 
-    const { data: existing } = await analytics
-      .from("organizations")
-      .select("config_hash")
-      .eq("id", org.id)
-      .maybeSingle()
+        // Use repository method to get config hash
+        const existingHash = await analyticsOrgsRepo.findConfigHash(org.id)
 
-    if (existing?.config_hash === hash) {
-      // No change; ensure ready/status updated
-      await analytics
-        .from("organizations")
-        .update({
+        if (existingHash === hash) {
+          // No change; ensure ready/status updated using repository
+          await analyticsOrgsRepo.updateStatusNoChange(org.id, now)
+          continue
+        }
+
+        // Upsert organization using repository
+        await analyticsOrgsRepo.save({
+          id: org.id,
+          name: org.name,
+          config: clean,
+          config_hash: hash,
           config_ready: true,
           config_last_run_at: now,
           config_last_status: "success",
           config_last_error: null,
         })
-        .eq("id", org.id)
-      continue
-    }
-
-    const { error } = await analytics.from("organizations").upsert(
-      {
-        id: org.id,
-        name: org.name,
-        config: clean,
-        config_hash: hash,
-        config_ready: true,
-        config_last_run_at: now,
-        config_last_status: "success",
-        config_last_error: null,
-      },
-      { onConflict: "id" }
-    )
-
-    if (error) {
-      logger.error("[Analytics Mirror] Failed to upsert organization into analytics DB", { orgId: org.id, error: error.message })
-      throw error
-    }
 
         summary.orgsUpdated++
       }

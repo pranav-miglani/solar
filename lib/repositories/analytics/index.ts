@@ -15,11 +15,11 @@
 import { getAnalyticsClient } from "@/lib/supabase/pooled"
 
 // =============================================================================
-// Repository Imports (will be added as repositories are implemented)
+// Repository Imports
 // =============================================================================
 
 // Phase 5: organizations (Analytics)
-// import { AnalyticsOrganizationsRepository } from "./organizationsRepository"
+import { AnalyticsOrganizationsRepository, IAnalyticsOrganizationsRepository } from "./organizationsRepository"
 
 // Phase 7: vendors (Analytics)
 // import { AnalyticsVendorsRepository } from "./vendorsRepository"
@@ -51,9 +51,9 @@ export function getClient() {
 // -----------------------------------------------------------------------------
 // Phase 5: Analytics Organizations Repository
 // -----------------------------------------------------------------------------
-// export function getAnalyticsOrganizationsRepository() {
-//   return new AnalyticsOrganizationsRepository(getAnalyticsClient())
-// }
+export function getAnalyticsOrganizationsRepository(): IAnalyticsOrganizationsRepository {
+  return new AnalyticsOrganizationsRepository(getAnalyticsClient())
+}
 
 // -----------------------------------------------------------------------------
 // Phase 7: Analytics Vendors Repository

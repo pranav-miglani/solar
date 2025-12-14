@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
-import { getMainClient } from "@/lib/supabase/pooled"
+import { getAccountsRepository } from "@/lib/repositories/main"
 import { logApiRequest, logApiResponse } from "@/lib/api-logger"
 
 // Password hashing: User inputs plain text, we hash and compare with stored hash
@@ -64,18 +64,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Use service role client to bypass RLS for authentication
-    // During login, user is not authenticated yet, so RLS would block the query
-    const supabase = getMainClient()
-    console.log("🔐 [LOGIN] Supabase service client created (bypasses RLS for authentication)")
+    // Use repository for account operations
+    // Repository uses service role client to bypass RLS for authentication
+    const accountsRepo = getAccountsRepository()
+    console.log("🔐 [LOGIN] Accounts repository created (bypasses RLS for authentication)")
 
     // Test database connection
     console.log("🔐 [LOGIN] Testing database connection...")
-    const { data: connectionTest, error: connectionError, count } = await supabase
-      .from("accounts")
-      .select("*", { count: "exact", head: true })
-
-    if (connectionError) {
+    try {
+      const { success, count } = await accountsRepo.testConnection()
+      console.log("✅ [LOGIN] Database connection successful", {
+        accountsTableExists: success,
+        totalAccounts: count,
+      })
+    } catch (connectionError: any) {
       console.error("❌ [LOGIN] Database connection error:", connectionError)
       console.error("❌ [LOGIN] Connection error details:", {
         message: connectionError.message,
@@ -90,23 +92,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log("✅ [LOGIN] Database connection successful", {
-      accountsTableExists: true,
-      totalAccounts: count || 0,
-    })
-
-    // Find account by email
+    // Find account by email for login
     // Note: Using service role key bypasses RLS, allowing us to query accounts
     // during login when user is not yet authenticated
     console.log("🔐 [LOGIN] Querying accounts table for email:", email)
-    const { data: accounts, error: accountError } = await supabase
-      .from("accounts")
-      .select("*")
-      .eq("email", email)
-      .eq("is_active", true) // Only allow login for active accounts
-      .limit(1)
-
-    if (accountError) {
+    let account
+    try {
+      account = await accountsRepo.findByEmailForLogin(email)
+    } catch (accountError: any) {
       console.error("❌ [LOGIN] Database error:", accountError)
       console.error("❌ [LOGIN] Error details:", {
         message: accountError.message,
@@ -121,7 +114,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!accounts || accounts.length === 0) {
+    if (!account) {
       console.log("❌ [LOGIN] Account not found for email:", email)
       console.log("💡 [LOGIN] Hint: No users exist in database. Run user setup script:")
       console.log("💡 [LOGIN]   - Run: supabase/migrations/004_manual_user_setup.sql")
@@ -134,8 +127,6 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       )
     }
-
-    const account = accounts[0]
 
     console.log("✅ [LOGIN] Account found:", {
       id: account.id,

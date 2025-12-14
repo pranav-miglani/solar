@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
-import { getMainClient } from "@/lib/supabase/pooled"
+import { getOrganizationsRepository } from "@/lib/repositories/main"
 import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
 
-// For orgs API, we need to bypass RLS for write operations
-// We use service role key since RLS policies require auth.uid() which we don't have
+// For orgs API, repository uses service role key to bypass RLS
 
 // Mark route as dynamic to prevent static generation (uses cookies)
 export const dynamic = 'force-dynamic'
@@ -35,16 +34,9 @@ export async function GET(request: NextRequest) {
 
       requirePermission(accountType as any, "organizations", "read")
 
-      // Fetch organizations directly from Supabase
-      const supabase = getMainClient()
-      const { data: orgs, error } = await supabase
-        .from("organizations")
-        .select("*")
-        .order("name", { ascending: true })
-
-      if (error) {
-        throw error
-      }
+      // Fetch organizations using repository
+      const orgsRepo = getOrganizationsRepository()
+      const orgs = await orgsRepo.findAll()
 
       logApiResponse(request, 200, Date.now() - startTime)
       return NextResponse.json({ orgs })
@@ -97,17 +89,9 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Create organization directly in Supabase
-      const supabase = getMainClient()
-      const { data: org, error: insertError } = await supabase
-        .from("organizations")
-        .insert({ name })
-        .select()
-        .single()
-
-      if (insertError) {
-        throw insertError
-      }
+      // Create organization using repository
+      const orgsRepo = getOrganizationsRepository()
+      const org = await orgsRepo.save({ name })
 
       logApiResponse(request, 201, Date.now() - startTime)
       return NextResponse.json({ org }, { status: 201 })
