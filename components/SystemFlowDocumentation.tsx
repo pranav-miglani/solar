@@ -2450,9 +2450,9 @@ Unique Constraints:
                 <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 p-6 rounded-lg border border-blue-200 dark:border-blue-900">
                   <h3 className="font-semibold text-lg mb-4">Migration Overview</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    This migration will centralize all database queries into a repository pattern, improving maintainability, testability, and enabling future database portability.
+                    <strong>Model-by-model incremental migration</strong> - Each table/model is migrated independently, enabling better refactoring, smaller PRs, and safer rollouts.
                   </p>
-                  <div className="grid md:grid-cols-3 gap-4 mt-4">
+                  <div className="grid md:grid-cols-4 gap-4 mt-4">
                     <div className="bg-white dark:bg-background p-4 rounded-lg border">
                       <div className="text-2xl font-bold text-primary mb-1">50+</div>
                       <div className="text-sm text-muted-foreground">Query Patterns</div>
@@ -2462,15 +2462,22 @@ Unique Constraints:
                       <div className="text-sm text-muted-foreground">Tables</div>
                     </div>
                     <div className="bg-white dark:bg-background p-4 rounded-lg border">
-                      <div className="text-2xl font-bold text-primary mb-1">10</div>
+                      <div className="text-2xl font-bold text-primary mb-1">22</div>
                       <div className="text-sm text-muted-foreground">Migration Phases</div>
                     </div>
+                    <div className="bg-white dark:bg-background p-4 rounded-lg border">
+                      <div className="text-2xl font-bold text-primary mb-1">5</div>
+                      <div className="text-sm text-muted-foreground">Dependency Tiers</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 text-xs text-muted-foreground bg-blue-100 dark:bg-blue-900/30 p-3 rounded">
+                    <strong>Migration Strategy:</strong> Tiered approach with dependency-aware ordering. Leaf nodes first (accounts, organizations), then dependents (vendors → plants → alerts → WMS), finally complex (work orders). Each phase is independent and can be deployed separately.
                   </div>
                 </div>
 
                 {/* Phase Status Overview */}
                 <div className="space-y-4">
-                  <h3 className="font-semibold text-lg">Migration Phases</h3>
+                  <h3 className="font-semibold text-lg">Migration Phases (Model-by-Model)</h3>
                   
                   {/* Phase 0 */}
                   <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-green-500">
@@ -2484,18 +2491,11 @@ Unique Constraints:
                     <p className="text-sm text-muted-foreground mb-2">
                       Extract ALL database queries into a single reference file for analysis.
                     </p>
-                    <div className="mb-2 text-xs text-muted-foreground bg-green-50 dark:bg-green-950/20 p-2 rounded">
-                      <strong>Status:</strong> ✅ COMPLETED - All queries extracted and documented
-                    </div>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>✅ <code className="bg-background px-1 rounded">lib/queries/extracted-queries.ts</code> - Complete query inventory (reference file exists)</li>
+                      <li>✅ <code className="bg-background px-1 rounded">lib/queries/extracted-queries.ts</code> - Complete query inventory</li>
                       <li>✅ Query categorization by table/entity</li>
-                      <li>✅ Pattern identification</li>
-                      <li>✅ <strong>Findings:</strong> ~50+ unique query patterns, 15+ tables, Common patterns: CRUD, Joins, Batch Operations, Deduplication, Filtering</li>
+                      <li>✅ Pattern identification (~50+ patterns, 15+ tables)</li>
                     </ul>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Deliverables:</strong> Query inventory file created | <strong>Status:</strong> ✅ COMPLETED
-                    </div>
                   </div>
 
                   {/* Phase 1 */}
@@ -2508,244 +2508,250 @@ Unique Constraints:
                       <Badge variant="default" className="bg-green-500">COMPLETED</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">
-                      Design repository structure considering Main DB vs Analytics DB commonality, table-by-table breakdown, and common patterns.
+                      Design repository structure with model-by-model migration plan.
                     </p>
-                    <div className="mb-2 text-xs text-muted-foreground bg-green-50 dark:bg-green-950/20 p-2 rounded">
-                      <strong>Status:</strong> ✅ COMPLETED - Design documented, no code written | <strong>Note:</strong> This is DESIGN ONLY. All API routes continue to use direct Supabase calls.
-                    </div>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                       <li>✅ Repository interface definitions for all 15 repositories (DESIGN ONLY)</li>
-                      <li>✅ Base repository class design with JPA-style naming (DESIGN ONLY)</li>
-                      <li>✅ Table-specific repository designs (JPA: <code className="bg-background px-1 rounded">save()</code>, <code className="bg-background px-1 rounded">saveAll()</code>, <code className="bg-background px-1 rounded">deleteById()</code>) - DESIGN ONLY</li>
-                      <li>✅ Database adapter pattern (Main vs Analytics) - DESIGN ONLY</li>
-                      <li>✅ Common patterns documentation (7 patterns)</li>
-                      <li>✅ Work Orders repository design with N+1 prevention - DESIGN ONLY</li>
-                      <li>✅ JPA-style naming conventions throughout - DESIGN ONLY</li>
-                      <li>✅ Factory pattern design - DESIGN ONLY</li>
-                      <li>✅ Decision points finalized - DESIGN ONLY</li>
+                      <li>✅ JPA-style naming conventions (<code className="bg-background px-1 rounded">save()</code>, <code className="bg-background px-1 rounded">saveAll()</code>, <code className="bg-background px-1 rounded">deleteById()</code>)</li>
+                      <li>✅ Model-by-model migration plan with 22 phases</li>
                       <li>⚠️ <strong>No implementation yet</strong> - All API routes still use direct Supabase calls</li>
                     </ul>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Deliverables:</strong> Design documentation complete | <strong>Status:</strong> ✅ COMPLETED (Design Phase)
-                    </div>
                   </div>
 
-                  {/* Phase 2 */}
+                  {/* Phase 2 - Foundation */}
                   <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-blue-500">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
                         <Clock className="h-5 w-5 text-blue-500" />
-                        Phase 2: Base Repository & Types (Foundation)
+                        Phase 2: Foundation (Base Repository & Types)
                       </h4>
-                      <Badge variant="secondary">PENDING</Badge>
+                      <Badge variant="secondary">NEXT</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mb-2">
                       Create foundation: base repository class, types, interfaces, and factory pattern.
                     </p>
-                    <div className="mb-2 text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-2 rounded">
-                      <strong>Status:</strong> ⏸️ NOT STARTED - Awaiting approval to begin implementation | <strong>Dependencies:</strong> None (foundation phase)
-                    </div>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>Create <code className="bg-background px-1 rounded">lib/repositories/types.ts</code> (⏸️ Not implemented - file does not exist)</li>
-                      <li>Base repository interface and class with JPA-style methods (<code className="bg-background px-1 rounded">save()</code>, <code className="bg-background px-1 rounded">saveAll()</code>, <code className="bg-background px-1 rounded">deleteById()</code>, <code className="bg-background px-1 rounded">existsById()</code>, <code className="bg-background px-1 rounded">count()</code>) (⏸️ Not implemented)</li>
-                      <li>Common types (BatchResult, RepositoryOptions, etc.) (⏸️ Not implemented)</li>
-                      <li>Factory pattern implementation (⏸️ Not implemented)</li>
-                      <li>⚠️ <strong>Awaiting approval</strong> before starting implementation</li>
+                      <li>Create <code className="bg-background px-1 rounded">lib/repositories/types.ts</code></li>
+                      <li>Create <code className="bg-background px-1 rounded">lib/repositories/main/index.ts</code></li>
+                      <li>Create <code className="bg-background px-1 rounded">lib/repositories/analytics/index.ts</code></li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 2-3 hours | <strong>Dependencies:</strong> None | <strong>Status:</strong> ⏸️ NOT STARTED - Awaiting approval
+                      <strong>Effort:</strong> 2-3 hours | <strong>Dependencies:</strong> None
                     </div>
                   </div>
 
-                  {/* Phase 3 */}
+                  {/* Tier 1 Header */}
+                  <div className="bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-950/30 dark:to-emerald-950/30 p-3 rounded-lg border border-green-300 dark:border-green-800">
+                    <h4 className="font-semibold text-green-800 dark:text-green-200">TIER 1: Leaf Nodes (No Dependencies)</h4>
+                    <p className="text-xs text-green-700 dark:text-green-300">Phases 3-5: accounts, organizations (Main & Analytics)</p>
+                  </div>
+
+                  {/* Phase 3 - accounts */}
                   <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
                         <Clock className="h-5 w-5 text-gray-400" />
-                        Phase 3: Simple CRUD Repositories (Low Risk)
+                        Phase 3: <code className="bg-background px-1 rounded text-sm">accounts</code> Repository
                       </h4>
                       <Badge variant="outline">PENDING</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Implement repositories for simple tables with minimal joins.
-                    </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>accounts - Simple CRUD, email lookup (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/accounts/route.ts</code>)</li>
-                      <li>organizations (Main DB) - Simple CRUD (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/orgs/route.ts</code>)</li>
-                      <li>organizations (Analytics DB) - CRUD + config operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/analytics/orgs/route.ts</code>)</li>
+                      <li>Create AccountsRepository with CRUD, email lookup</li>
+                      <li>Migrate <code className="bg-background px-1 rounded">app/api/accounts/route.ts</code></li>
+                      <li>Migrate login query in <code className="bg-background px-1 rounded">app/api/auth/login/route.ts</code></li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 4-6 hours | <strong>Dependencies:</strong> Phase 2 | <strong>Status:</strong> ⏸️ NOT STARTED
+                      <strong>Effort:</strong> 1-2 hours | <strong>Dependencies:</strong> Phase 2
                     </div>
                   </div>
 
-                  {/* Phase 4 */}
+                  {/* Phase 4 - organizations (Main) */}
                   <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
                         <Clock className="h-5 w-5 text-gray-400" />
-                        Phase 4: Repositories with Simple Joins
+                        Phase 4: <code className="bg-background px-1 rounded text-sm">organizations</code> (Main DB)
                       </h4>
                       <Badge variant="outline">PENDING</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Implement repositories for tables with simple joins (1-2 level).
-                    </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>vendors (Main DB) - CRUD + join with organizations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/vendors/route.ts</code>)</li>
-                      <li>vendors (Analytics DB) - CRUD + join + config operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/analytics/vendors/route.ts</code>)</li>
-                      <li>wms_vendors - CRUD + join with organizations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/wms-vendors/route.ts</code>)</li>
-                      <li>alerts - CRUD + join with plants, filtering (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/alerts/route.ts</code>)</li>
+                      <li>Create OrganizationsRepository with simple CRUD</li>
+                      <li>Migrate <code className="bg-background px-1 rounded">app/api/orgs/route.ts</code></li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 6-8 hours | <strong>Dependencies:</strong> Phase 3 | <strong>Status:</strong> ⏸️ NOT STARTED
+                      <strong>Effort:</strong> 1-2 hours | <strong>Dependencies:</strong> Phase 2
                     </div>
                   </div>
 
-                  {/* Phase 5 */}
+                  {/* Phase 5 - organizations (Analytics) */}
                   <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
                         <Clock className="h-5 w-5 text-gray-400" />
-                        Phase 5: Complex Repositories (Plants & WMS)
+                        Phase 5: <code className="bg-background px-1 rounded text-sm">organizations</code> (Analytics DB)
                       </h4>
                       <Badge variant="outline">PENDING</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Implement repositories for complex tables with multiple relationships and batch operations.
-                    </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>plants (Main DB) - CRUD + joins + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) + production metrics (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/plants/route.ts</code>, <code className="bg-background px-1 rounded">lib/services/plantSyncService.ts</code>)</li>
-                      <li>plants (Analytics DB) - CRUD + joins + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/analytics/plants/route.ts</code>, <code className="bg-background px-1 rounded">lib/services/analyticsMirrorService.ts</code>)</li>
-                      <li>wms_sites - CRUD + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) + deduplication (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/wmsSyncService.ts</code>)</li>
-                      <li>wms_devices - CRUD + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) + deduplication (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/wmsSyncService.ts</code>)</li>
-                      <li>insolation_readings - CRUD + save (<code className="bg-background px-1 rounded">save()</code>) by device/date (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/wmsSyncService.ts</code>)</li>
+                      <li>Create AnalyticsOrganizationsRepository with config_hash operations</li>
+                      <li>Migrate <code className="bg-background px-1 rounded">app/api/analytics/orgs/route.ts</code></li>
+                      <li>Partial update to <code className="bg-background px-1 rounded">analyticsMirrorService.ts</code></li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 10-12 hours | <strong>Dependencies:</strong> Phase 4 | <strong>Status:</strong> ⏸️ NOT STARTED
+                      <strong>Effort:</strong> 2-3 hours | <strong>Dependencies:</strong> Phase 2
                     </div>
                   </div>
 
-                  {/* Phase 6 */}
+                  {/* Tier 2 Header */}
+                  <div className="bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-950/30 dark:to-cyan-950/30 p-3 rounded-lg border border-blue-300 dark:border-blue-800">
+                    <h4 className="font-semibold text-blue-800 dark:text-blue-200">TIER 2: Depends on Organizations</h4>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">Phases 6-8: vendors (Main & Analytics), wms_vendors</p>
+                  </div>
+
+                  {/* Phases 6-8 */}
                   <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
                         <Clock className="h-5 w-5 text-gray-400" />
-                        Phase 6: Analytics-Specific Repositories
+                        Phases 6-8: Vendor Repositories
                       </h4>
                       <Badge variant="outline">PENDING</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Implement repositories for analytics-specific tables and operations.
-                    </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>plant_energy_readings - CRUD + date filtering + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/analytics/plants/[id]/energy/route.ts</code>, <code className="bg-background px-1 rounded">lib/services/analyticsSnapshotService.ts</code>)</li>
-                      <li>plant_grid_downtime_readings - CRUD + date filtering + baseline queries + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/analytics/plants/[id]/grid-downtime/route.ts</code>, <code className="bg-background px-1 rounded">lib/services/gridDowntimeAnalyticsService.ts</code>)</li>
-                      <li>analytics_snapshot_runs - CRUD + vendor grouping + status tracking (uses <code className="bg-background px-1 rounded">save()</code> instead of create()) (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/analytics/vendors/route.ts</code>, <code className="bg-background px-1 rounded">lib/services/analyticsSnapshotService.ts</code>)</li>
+                      <li><strong>Phase 6:</strong> <code className="bg-background px-1 rounded">vendors</code> (Main) - CRUD + org join (2-3 hrs)</li>
+                      <li><strong>Phase 7:</strong> <code className="bg-background px-1 rounded">vendors</code> (Analytics) - CRUD + config_hash (2-3 hrs)</li>
+                      <li><strong>Phase 8:</strong> <code className="bg-background px-1 rounded">wms_vendors</code> - CRUD + token management (2-3 hrs)</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 6-8 hours | <strong>Dependencies:</strong> Phase 5 | <strong>Status:</strong> ⏸️ NOT STARTED
+                      <strong>Total Effort:</strong> 6-9 hours | <strong>Dependencies:</strong> Phases 4-5
                     </div>
                   </div>
 
-                  {/* Phase 7 */}
+                  {/* Tier 3 Header */}
+                  <div className="bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-950/30 dark:to-amber-950/30 p-3 rounded-lg border border-orange-300 dark:border-orange-800">
+                    <h4 className="font-semibold text-orange-800 dark:text-orange-200">TIER 3: Depends on Vendors</h4>
+                    <p className="text-xs text-orange-700 dark:text-orange-300">Phases 9-14: plants, alerts, WMS tables</p>
+                  </div>
+
+                  {/* Phases 9-14 */}
                   <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
                         <Clock className="h-5 w-5 text-gray-400" />
-                        Phase 7: Service Layer Migration
+                        Phases 9-14: Plants, Alerts & WMS Repositories
                       </h4>
                       <Badge variant="outline">PENDING</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Migrate all services to use repositories instead of direct Supabase calls.
-                    </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>analyticsMirrorService - Cross-database operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/analyticsMirrorService.ts</code>)</li>
-                      <li>analyticsSnapshotService - Analytics operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/analyticsSnapshotService.ts</code>)</li>
-                      <li>gridDowntimeAnalyticsService - Complex calculations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/gridDowntimeAnalyticsService.ts</code>)</li>
-                      <li>plantSyncService - Batch operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/plantSyncService.ts</code>)</li>
-                      <li>alertSyncService - Batch operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/alertSyncService.ts</code>)</li>
-                      <li>wmsSyncService - WMS operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">lib/services/wmsSyncService.ts</code>)</li>
+                      <li><strong>Phase 9:</strong> <code className="bg-background px-1 rounded">plants</code> (Main) - Complex with batch <code className="bg-background px-1 rounded">saveAll()</code> (3-4 hrs)</li>
+                      <li><strong>Phase 10:</strong> <code className="bg-background px-1 rounded">plants</code> (Analytics) - Simplified structure (2-3 hrs)</li>
+                      <li><strong>Phase 11:</strong> <code className="bg-background px-1 rounded">alerts</code> - With plant joins (2-3 hrs)</li>
+                      <li><strong>Phase 12:</strong> <code className="bg-background px-1 rounded">wms_sites</code> - Batch operations (2 hrs)</li>
+                      <li><strong>Phase 13:</strong> <code className="bg-background px-1 rounded">wms_devices</code> - Batch operations (2 hrs)</li>
+                      <li><strong>Phase 14:</strong> <code className="bg-background px-1 rounded">insolation_readings</code> - Upsert by date (1-2 hrs)</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 8-10 hours | <strong>Dependencies:</strong> Phases 3-6 | <strong>Status:</strong> ⏸️ NOT STARTED
+                      <strong>Total Effort:</strong> 12-16 hours | <strong>Dependencies:</strong> Phases 6-8
                     </div>
                   </div>
 
-                  {/* Phase 8 */}
+                  {/* Tier 4 Header */}
+                  <div className="bg-gradient-to-r from-purple-100 to-violet-100 dark:from-purple-950/30 dark:to-violet-950/30 p-3 rounded-lg border border-purple-300 dark:border-purple-800">
+                    <h4 className="font-semibold text-purple-800 dark:text-purple-200">TIER 4: Analytics-Specific</h4>
+                    <p className="text-xs text-purple-700 dark:text-purple-300">Phases 15-17: Energy readings, grid downtime, snapshot runs</p>
+                  </div>
+
+                  {/* Phases 15-17 */}
                   <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
                         <Clock className="h-5 w-5 text-gray-400" />
-                        Phase 8: Testing & Validation
+                        Phases 15-17: Analytics Readings Repositories
                       </h4>
                       <Badge variant="outline">PENDING</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Comprehensive testing and validation of all migrations.
-                    </p>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>Unit tests for repositories (⏸️ Not implemented)</li>
-                      <li>Integration tests for API routes (⏸️ Not implemented)</li>
-                      <li>End-to-end tests for services (⏸️ Not implemented)</li>
-                      <li>Performance validation (⏸️ Not implemented)</li>
-                      <li>Regression testing (⏸️ Not implemented)</li>
+                      <li><strong>Phase 15:</strong> <code className="bg-background px-1 rounded">plant_energy_readings</code> - Date filtering (2 hrs)</li>
+                      <li><strong>Phase 16:</strong> <code className="bg-background px-1 rounded">plant_grid_downtime_readings</code> - Baseline queries, batch 2000 (3 hrs)</li>
+                      <li><strong>Phase 17:</strong> <code className="bg-background px-1 rounded">analytics_snapshot_runs</code> - Status tracking (1-2 hrs)</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 4-6 hours | <strong>Dependencies:</strong> Phase 7 | <strong>Status:</strong> ⏸️ NOT STARTED
+                      <strong>Total Effort:</strong> 6-7 hours | <strong>Dependencies:</strong> Phase 10
                     </div>
                   </div>
 
-                  {/* Phase 9 */}
-                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-gray-400" />
-                        Phase 9: Cleanup & Documentation
-                      </h4>
-                      <Badge variant="outline">PENDING</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Final cleanup and documentation.
-                    </p>
-                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>Remove <code className="bg-background px-1 rounded">lib/queries/extracted-queries.ts</code> (reference file) (⏸️ Not implemented - file still exists as reference)</li>
-                      <li>Update documentation (⏸️ Not implemented)</li>
-                      <li>Code review (⏸️ Not implemented)</li>
-                      <li>Final validation (⏸️ Not implemented)</li>
-                    </ul>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 2-3 hours | <strong>Dependencies:</strong> Phase 8 | <strong>Status:</strong> ⏸️ NOT STARTED
-                    </div>
+                  {/* Tier 5 Header */}
+                  <div className="bg-gradient-to-r from-red-100 to-rose-100 dark:from-red-950/30 dark:to-rose-950/30 p-3 rounded-lg border border-red-300 dark:border-red-800">
+                    <h4 className="font-semibold text-red-800 dark:text-red-200">TIER 5: Work Orders (Complex)</h4>
+                    <p className="text-xs text-red-700 dark:text-red-300">Phases 18-20: Aggregate root with nested joins, N+1 prevention</p>
                   </div>
 
-                  {/* Phase 10 */}
+                  {/* Phases 18-20 */}
                   <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-purple-500">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
                         <Layers className="h-5 w-5 text-purple-500" />
-                        Phase 10: Work Orders Repositories (Complex Nested Joins)
+                        Phases 18-20: Work Orders Repositories
                       </h4>
                       <Badge variant="secondary" className="bg-purple-500">DESIGNED</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Implement repositories for work orders using aggregate root pattern with single-query nested joins to avoid N+1 query propagation.
-                    </p>
-                    <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg mb-2">
-                      <h5 className="font-medium text-sm mb-1">Key Design Principle: Single Query with Nested Joins</h5>
-                      <p className="text-xs text-muted-foreground">
-                        Uses Supabase PostgREST nested selects - executes a <strong>single SQL query</strong> with JOINs. This is efficient and avoids N+1 problems.
-                      </p>
+                    <div className="bg-blue-50 dark:bg-blue-950/20 p-2 rounded-lg mb-2 text-xs">
+                      <strong>Design Principle:</strong> Aggregate root pattern with single-query nested joins (N+1 prevention)
                     </div>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li>WorkOrdersRepository - Aggregate root with nested joins (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/workorders/route.ts</code>)</li>
-                      <li>WorkOrderPlantsRepository - Junction table operations (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/workorders/route.ts</code>)</li>
-                      <li>WorkLogsRepository - Work logs with user join (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/workorders/[id]/logs/route.ts</code>)</li>
-                      <li>WorkOrderProductionRepository - Production metrics aggregation (⏸️ Not implemented - uses direct Supabase in <code className="bg-background px-1 rounded">app/api/workorders/[id]/production/route.ts</code>)</li>
+                      <li><strong>Phase 18:</strong> <code className="bg-background px-1 rounded">work_orders</code> - Aggregate root (4-5 hrs)</li>
+                      <li><strong>Phase 19:</strong> <code className="bg-background px-1 rounded">work_order_plants</code> - Junction table (2-3 hrs)</li>
+                      <li><strong>Phase 20:</strong> <code className="bg-background px-1 rounded">work_logs</code> - Simple CRUD (1-2 hrs)</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Estimated Effort:</strong> 8-10 hours | <strong>Dependencies:</strong> Phase 5 (PlantsRepository), Phase 4 (OrganizationsRepository, VendorsRepository) | <strong>Status:</strong> ⏸️ NOT STARTED
+                      <strong>Total Effort:</strong> 7-10 hours | <strong>Dependencies:</strong> Phases 4, 9
+                    </div>
+                  </div>
+
+                  {/* Final Phases */}
+                  <div className="bg-gradient-to-r from-gray-100 to-slate-100 dark:from-gray-950/30 dark:to-slate-950/30 p-3 rounded-lg border border-gray-300 dark:border-gray-800">
+                    <h4 className="font-semibold text-gray-800 dark:text-gray-200">FINAL: Testing & Cleanup</h4>
+                    <p className="text-xs text-gray-700 dark:text-gray-300">Phases 21-22: Comprehensive testing and documentation</p>
+                  </div>
+
+                  {/* Phases 21-22 */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-gray-400" />
+                        Phases 21-22: Testing & Cleanup
+                      </h4>
+                      <Badge variant="outline">PENDING</Badge>
+                    </div>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li><strong>Phase 21:</strong> Testing & Validation - Unit, integration, performance tests (4-6 hrs)</li>
+                      <li><strong>Phase 22:</strong> Cleanup & Documentation - Remove extracted-queries.ts, archive docs (2-3 hrs)</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Total Effort:</strong> 6-9 hours | <strong>Dependencies:</strong> All phases
+                    </div>
+                  </div>
+
+                  {/* Total Effort Summary */}
+                  <div className="bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 p-4 rounded-lg border border-indigo-200 dark:border-indigo-900">
+                    <h4 className="font-semibold text-indigo-800 dark:text-indigo-200 mb-2">Migration Summary</h4>
+                    <div className="grid md:grid-cols-4 gap-3 text-sm">
+                      <div>
+                        <div className="font-medium">Total Phases</div>
+                        <div className="text-2xl font-bold text-primary">22</div>
+                      </div>
+                      <div>
+                        <div className="font-medium">Estimated Effort</div>
+                        <div className="text-2xl font-bold text-primary">50-60 hrs</div>
+                      </div>
+                      <div>
+                        <div className="font-medium">Repositories</div>
+                        <div className="text-2xl font-bold text-primary">15+</div>
+                      </div>
+                      <div>
+                        <div className="font-medium">Dependency Tiers</div>
+                        <div className="text-2xl font-bold text-primary">5</div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -7304,6 +7310,10 @@ const lastUpdateTime = station.lastUpdateTime
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
     </div>
   )
 }

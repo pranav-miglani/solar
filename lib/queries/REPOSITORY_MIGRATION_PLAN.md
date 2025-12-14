@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document outlines a phased approach to migrate all database queries from direct Supabase calls to a centralized repository pattern. The migration will improve maintainability, testability, and enable future database portability.
+This document outlines a **model-by-model incremental approach** to migrate all database queries from direct Supabase calls to a centralized repository pattern. Each model/table is migrated independently, enabling better refactoring, smaller PRs, and safer rollouts.
 
 **Status**: Design Phase Complete - Ready for implementation approval
 
@@ -11,7 +11,51 @@ This document outlines a phased approach to migrate all database queries from di
 - ✅ Phase 1: Repository Design - COMPLETED (designs documented in this file)
 - ⏸️ Phase 2+: Implementation - NOT STARTED (awaiting approval to proceed)
 
+**Migration Strategy**: Model-by-model with dependency-aware ordering:
+- **22 Total Phases** (including design phases)
+- **Each phase is independent** - can be deployed, tested, and rolled back separately
+- **Tiered approach** - leaf nodes first, then dependents
+- **Service migration integrated** - each model phase includes API routes + services
+
 **Important**: No repository code has been implemented yet. All API routes currently use direct Supabase calls. The `extracted-queries.ts` file is a reference document only.
+
+---
+
+## Migration Tiers & Dependencies
+
+```
+Tier 1 (No dependencies - leaf nodes):
+├── Phase 3: accounts
+├── Phase 4: organizations (Main)
+└── Phase 5: organizations (Analytics)
+
+Tier 2 (Depends on organizations):
+├── Phase 6: vendors (Main)
+├── Phase 7: vendors (Analytics)
+└── Phase 8: wms_vendors
+
+Tier 3 (Depends on vendors):
+├── Phase 9: plants (Main)
+├── Phase 10: plants (Analytics)
+├── Phase 11: alerts
+├── Phase 12: wms_sites
+├── Phase 13: wms_devices
+└── Phase 14: insolation_readings
+
+Tier 4 (Analytics-specific):
+├── Phase 15: plant_energy_readings
+├── Phase 16: plant_grid_downtime_readings
+└── Phase 17: analytics_snapshot_runs
+
+Tier 5 (Complex - Work Orders):
+├── Phase 18: work_orders (aggregate root)
+├── Phase 19: work_order_plants (junction)
+└── Phase 20: work_logs
+
+Final:
+├── Phase 21: Testing & Validation
+└── Phase 22: Cleanup & Documentation
+```
 
 ---
 
@@ -696,20 +740,26 @@ export async function POST(request: Request) {
 
 ---
 
-## Phase 2: Base Repository & Types (Foundation)
+## Phase 2: Foundation (Base Repository & Types)
 
 ### Objective
-Create foundation: base repository class, types, interfaces.
+Create foundation: base repository class, types, interfaces, and factory pattern.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting approval
 
 ### Tasks
 1. Create `lib/repositories/types.ts`:
-   - Base repository interface
+   - Base repository interface with JPA-style methods
    - Common types (BatchResult, RepositoryOptions, etc.)
    - Base repository class with common CRUD
+2. Create `lib/repositories/main/index.ts` - Factory exports
+3. Create `lib/repositories/analytics/index.ts` - Factory exports
 
-2. Create factory pattern:
-   - `getMainClient()` / `getAnalyticsClient()` usage
-   - Repository factory functions
+### Deliverables
+- [ ] `lib/repositories/types.ts`
+- [ ] `lib/repositories/main/index.ts`
+- [ ] `lib/repositories/analytics/index.ts`
 
 ### Dependencies
 - None (foundation phase)
@@ -717,269 +767,792 @@ Create foundation: base repository class, types, interfaces.
 ### Estimated Effort
 - 2-3 hours
 
-### Approval Required
-- ✅ Proceed with Phase 2?
+---
+
+## TIER 1: Leaf Nodes (No Dependencies)
 
 ---
 
-## Phase 3: Simple CRUD Repositories (Low Risk)
+## Phase 3: `accounts` Repository
 
 ### Objective
-Implement repositories for simple tables with minimal joins.
+Implement AccountsRepository and migrate all account-related queries.
 
 ### Status
-- ⏸️ **NOT STARTED** - Awaiting Phase 2 completion
+- ⏸️ **NOT STARTED** - Awaiting Phase 2
 
-### Tables (Priority Order)
-1. **accounts** - Simple CRUD, email lookup
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `app/api/accounts/route.ts`
-2. **organizations** (Main DB) - Simple CRUD
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `app/api/orgs/route.ts`
-3. **organizations** (Analytics DB) - CRUD + config operations
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `app/api/analytics/orgs/route.ts`
+### Table
+- **Table**: `accounts`
+- **Complexity**: Low
+- **Pattern**: Simple CRUD, email lookup
 
-### Migration Strategy
-- Create repository
-- Update API routes one at a time
-- Test each route
-- Verify no regressions
+### Current State
+- Direct Supabase calls in:
+  - `app/api/accounts/route.ts`
+  - `app/api/auth/login/route.ts` (for login lookup)
+
+### Tasks
+1. Create `lib/repositories/main/accountsRepository.ts`
+2. Migrate `app/api/accounts/route.ts` to use repository
+3. Migrate login query in `app/api/auth/login/route.ts`
+4. Test all account operations
+
+### Deliverables
+- [ ] `lib/repositories/main/accountsRepository.ts`
+- [ ] Update `app/api/accounts/route.ts`
+- [ ] Update `app/api/auth/login/route.ts`
+- [ ] Tests pass
 
 ### Dependencies
-- Phase 2 (Base Repository)
+- Phase 2 (Foundation)
 
 ### Estimated Effort
-- 4-6 hours
-
-### Approval Required
-- ⏸️ **AWAITING PHASE 2** - Proceed after Phase 2 completion?
+- 1-2 hours
 
 ---
 
-## Phase 4: Repositories with Simple Joins
+## Phase 4: `organizations` Repository (Main DB)
 
 ### Objective
-Implement repositories for tables with simple joins (1-2 level).
+Implement OrganizationsRepository (Main DB) and migrate all organization-related queries.
 
 ### Status
-- ⏸️ **NOT STARTED** - Awaiting Phase 3 completion
+- ⏸️ **NOT STARTED** - Awaiting Phase 3
 
-### Tables (Priority Order)
-1. **vendors** (Main DB) - CRUD + join with organizations
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `app/api/vendors/route.ts`
-2. **vendors** (Analytics DB) - CRUD + join + config operations
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `app/api/analytics/vendors/route.ts`
-3. **wms_vendors** - CRUD + join with organizations
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `app/api/wms-vendors/route.ts`
-4. **alerts** - CRUD + join with plants, filtering
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `app/api/alerts/route.ts`
+### Table
+- **Table**: `organizations` (Main DB)
+- **Complexity**: Low
+- **Pattern**: Simple CRUD, name ordering
 
-### Migration Strategy
-- Create repository with join methods
-- Update API routes
-- Update services that use these queries
-- Test thoroughly
+### Current State
+- Direct Supabase calls in:
+  - `app/api/orgs/route.ts`
+  - `app/api/orgs/[id]/route.ts`
+
+### Tasks
+1. Create `lib/repositories/main/organizationsRepository.ts`
+2. Migrate `app/api/orgs/route.ts` to use repository
+3. Migrate `app/api/orgs/[id]/route.ts` to use repository
+4. Test all organization operations
+
+### Deliverables
+- [ ] `lib/repositories/main/organizationsRepository.ts`
+- [ ] Update `app/api/orgs/route.ts`
+- [ ] Update `app/api/orgs/[id]/route.ts`
+- [ ] Tests pass
 
 ### Dependencies
-- Phase 3 (Simple CRUD)
+- Phase 2 (Foundation)
 
 ### Estimated Effort
-- 6-8 hours
-
-### Approval Required
-- ⏸️ **AWAITING PHASE 3** - Proceed after Phase 3 completion?
+- 1-2 hours
 
 ---
 
-## Phase 5: Complex Repositories (Plants & WMS)
+## Phase 5: `organizations` Repository (Analytics DB)
 
 ### Objective
-Implement repositories for complex tables with multiple relationships and batch operations.
+Implement AnalyticsOrganizationsRepository and migrate all analytics organization queries.
 
 ### Status
-- ⏸️ **NOT STARTED** - Awaiting Phase 4 completion
+- ⏸️ **NOT STARTED** - Awaiting Phase 4
 
-### Tables (Priority Order)
-1. **plants** (Main DB) - CRUD + joins + batch save (`saveAll()`) + production metrics
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `app/api/plants/route.ts`, `app/api/plants/[id]/route.ts`, `lib/services/plantSyncService.ts`
-2. **plants** (Analytics DB) - CRUD + joins + batch save (`saveAll()`)
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `app/api/analytics/plants/route.ts`, `lib/services/analyticsMirrorService.ts`
-3. **wms_sites** - CRUD + batch save (`saveAll()`) + deduplication
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `lib/services/wmsSyncService.ts`
-4. **wms_devices** - CRUD + batch save (`saveAll()`) + deduplication
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `lib/services/wmsSyncService.ts`
-5. **insolation_readings** - CRUD + save (`save()`) by device/date
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `lib/services/wmsSyncService.ts`
+### Table
+- **Table**: `organizations` (Analytics DB)
+- **Complexity**: Medium
+- **Pattern**: CRUD + config_hash, config_ready, mirror operations
 
-### Migration Strategy
-- Create repository with all query patterns
-- Update API routes
-- Update services (plantSyncService, wmsSyncService)
-- Test batch operations carefully
-- Verify deduplication logic
+### Current State
+- Direct Supabase calls in:
+  - `app/api/analytics/orgs/route.ts`
+  - `lib/services/analyticsMirrorService.ts` (partial - org mirroring)
+
+### Tasks
+1. Create `lib/repositories/analytics/organizationsRepository.ts`
+2. Migrate `app/api/analytics/orgs/route.ts` to use repository
+3. Migrate org-related queries in `analyticsMirrorService.ts`
+4. Test config hash change detection
+
+### Deliverables
+- [ ] `lib/repositories/analytics/organizationsRepository.ts`
+- [ ] Update `app/api/analytics/orgs/route.ts`
+- [ ] Partial update to `lib/services/analyticsMirrorService.ts` (org queries only)
+- [ ] Tests pass
 
 ### Dependencies
-- Phase 4 (Simple Joins)
+- Phase 2 (Foundation)
 
 ### Estimated Effort
-- 10-12 hours
-
-### Approval Required
-- ⏸️ **AWAITING PHASE 4** - Proceed after Phase 4 completion?
+- 2-3 hours
 
 ---
 
-## Phase 6: Analytics-Specific Repositories
+## TIER 2: Depends on Organizations
+
+---
+
+## Phase 6: `vendors` Repository (Main DB)
 
 ### Objective
-Implement repositories for analytics-specific tables and operations.
+Implement VendorsRepository (Main DB) and migrate all vendor-related queries.
 
 ### Status
-- ⏸️ **NOT STARTED** - Awaiting Phase 5 completion
+- ⏸️ **NOT STARTED** - Awaiting Phase 4
 
-### Tables (Priority Order)
-1. **plant_energy_readings** - CRUD + date filtering + batch save (`saveAll()`)
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `app/api/analytics/plants/[id]/energy/route.ts`, `lib/services/analyticsSnapshotService.ts`
-2. **plant_grid_downtime_readings** - CRUD + date filtering + baseline queries + batch save (`saveAll()`)
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `app/api/analytics/plants/[id]/grid-downtime/route.ts`, `lib/services/gridDowntimeAnalyticsService.ts`
-3. **analytics_snapshot_runs** - CRUD + vendor grouping + status tracking
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `app/api/analytics/vendors/route.ts`, `lib/services/analyticsSnapshotService.ts`
+### Table
+- **Table**: `vendors` (Main DB)
+- **Complexity**: Medium
+- **Pattern**: CRUD + join with organizations, active filtering
 
-### Migration Strategy
-- Create repositories
-- Update analytics API routes
-- Update services (analyticsSnapshotService, gridDowntimeAnalyticsService)
-- Test date filtering and aggregations
-- Verify baseline calculations
+### Current State
+- Direct Supabase calls in:
+  - `app/api/vendors/route.ts`
+  - `app/api/vendors/[id]/route.ts`
+  - `lib/services/plantSyncService.ts` (vendor lookups)
+  - `lib/services/alertSyncService.ts` (vendor lookups)
+
+### Tasks
+1. Create `lib/repositories/main/vendorsRepository.ts`
+2. Migrate `app/api/vendors/route.ts` to use repository
+3. Migrate `app/api/vendors/[id]/route.ts` to use repository
+4. Migrate vendor queries in `plantSyncService.ts`
+5. Migrate vendor queries in `alertSyncService.ts`
+6. Test with organization joins
+
+### Deliverables
+- [ ] `lib/repositories/main/vendorsRepository.ts`
+- [ ] Update `app/api/vendors/route.ts`
+- [ ] Update `app/api/vendors/[id]/route.ts`
+- [ ] Partial update to `lib/services/plantSyncService.ts` (vendor queries only)
+- [ ] Partial update to `lib/services/alertSyncService.ts` (vendor queries only)
+- [ ] Tests pass
 
 ### Dependencies
-- Phase 5 (Complex Repositories)
+- Phase 4 (Organizations - Main)
 
 ### Estimated Effort
-- 6-8 hours
-
-### Approval Required
-- ⏸️ **AWAITING PHASE 5** - Proceed after Phase 5 completion?
+- 2-3 hours
 
 ---
 
-## Phase 7: Service Layer Migration
+## Phase 7: `vendors` Repository (Analytics DB)
 
 ### Objective
-Migrate all services to use repositories instead of direct Supabase calls.
+Implement AnalyticsVendorsRepository and migrate all analytics vendor queries.
 
 ### Status
-- ⏸️ **NOT STARTED** - Awaiting Phases 3-6 completion
+- ⏸️ **NOT STARTED** - Awaiting Phase 5, 6
 
-### Services (Priority Order)
-1. **analyticsMirrorService** - Cross-database operations
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `lib/services/analyticsMirrorService.ts`
-2. **analyticsSnapshotService** - Analytics operations
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `lib/services/analyticsSnapshotService.ts`
-3. **gridDowntimeAnalyticsService** - Complex calculations
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `lib/services/gridDowntimeAnalyticsService.ts`
-4. **plantSyncService** - Batch operations
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `lib/services/plantSyncService.ts`
-5. **alertSyncService** - Batch operations
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `lib/services/alertSyncService.ts`
-6. **wmsSyncService** - WMS operations
-   - **Status**: ⏸️ Not implemented
-   - **Current**: Direct Supabase calls in `lib/services/wmsSyncService.ts`
+### Table
+- **Table**: `vendors` (Analytics DB)
+- **Complexity**: Medium
+- **Pattern**: CRUD + join + config_hash, analytics_ready, mirror operations
 
-### Migration Strategy
-- Update services one at a time
-- Replace direct Supabase calls with repository methods
-- Maintain existing business logic
-- Test each service thoroughly
-- Verify cron jobs still work
+### Current State
+- Direct Supabase calls in:
+  - `app/api/analytics/vendors/route.ts`
+  - `lib/services/analyticsMirrorService.ts` (vendor mirroring)
+  - `lib/services/analyticsSnapshotService.ts` (vendor lookups)
+
+### Tasks
+1. Create `lib/repositories/analytics/vendorsRepository.ts`
+2. Migrate `app/api/analytics/vendors/route.ts` to use repository
+3. Migrate vendor-related queries in `analyticsMirrorService.ts`
+4. Migrate vendor queries in `analyticsSnapshotService.ts`
+5. Test config hash change detection
+
+### Deliverables
+- [ ] `lib/repositories/analytics/vendorsRepository.ts`
+- [ ] Update `app/api/analytics/vendors/route.ts`
+- [ ] Partial update to `lib/services/analyticsMirrorService.ts` (vendor queries only)
+- [ ] Partial update to `lib/services/analyticsSnapshotService.ts` (vendor queries only)
+- [ ] Tests pass
 
 ### Dependencies
-- Phases 3-6 (All Repositories)
+- Phase 5 (Organizations - Analytics)
+- Phase 6 (Vendors - Main)
 
 ### Estimated Effort
-- 8-10 hours
-
-### Approval Required
-- ⏸️ **AWAITING PHASES 3-6** - Proceed after all repository phases completion?
+- 2-3 hours
 
 ---
 
-## Phase 8: Testing & Validation
+## Phase 8: `wms_vendors` Repository
+
+### Objective
+Implement WmsVendorsRepository and migrate all WMS vendor queries.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 4
+
+### Table
+- **Table**: `wms_vendors`
+- **Complexity**: Medium
+- **Pattern**: CRUD + join with organizations, token management, active filtering
+
+### Current State
+- Direct Supabase calls in:
+  - `app/api/wms-vendors/route.ts`
+  - `app/api/wms-vendors/[id]/route.ts`
+  - `lib/services/wmsSyncService.ts` (vendor lookups, token updates)
+  - `lib/wms/modules/tokenRepository.ts` (token operations)
+
+### Tasks
+1. Create `lib/repositories/main/wmsVendorsRepository.ts`
+2. Migrate `app/api/wms-vendors/route.ts` to use repository
+3. Migrate `app/api/wms-vendors/[id]/route.ts` to use repository
+4. Migrate WMS vendor queries in `wmsSyncService.ts`
+5. Migrate token queries in `tokenRepository.ts`
+6. Test token management operations
+
+### Deliverables
+- [ ] `lib/repositories/main/wmsVendorsRepository.ts`
+- [ ] Update `app/api/wms-vendors/route.ts`
+- [ ] Update `app/api/wms-vendors/[id]/route.ts`
+- [ ] Partial update to `lib/services/wmsSyncService.ts` (wms_vendor queries only)
+- [ ] Update `lib/wms/modules/tokenRepository.ts`
+- [ ] Tests pass
+
+### Dependencies
+- Phase 4 (Organizations - Main)
+
+### Estimated Effort
+- 2-3 hours
+
+---
+
+## TIER 3: Depends on Vendors
+
+---
+
+## Phase 9: `plants` Repository (Main DB)
+
+### Objective
+Implement PlantsRepository (Main DB) and migrate all plant-related queries.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 6
+
+### Table
+- **Table**: `plants` (Main DB)
+- **Complexity**: High
+- **Pattern**: CRUD + complex joins, batch saveAll(), production metrics, deduplication
+
+### Current State
+- Direct Supabase calls in:
+  - `app/api/plants/route.ts`
+  - `app/api/plants/[id]/route.ts`
+  - `lib/services/plantSyncService.ts` (batch upsert, deduplication, production metrics)
+
+### Tasks
+1. Create `lib/repositories/main/plantsRepository.ts`
+2. Migrate `app/api/plants/route.ts` to use repository
+3. Migrate `app/api/plants/[id]/route.ts` to use repository
+4. Migrate plant queries in `plantSyncService.ts`
+5. Test batch operations and deduplication
+6. Test production metrics updates
+
+### Deliverables
+- [ ] `lib/repositories/main/plantsRepository.ts`
+- [ ] Update `app/api/plants/route.ts`
+- [ ] Update `app/api/plants/[id]/route.ts`
+- [ ] Complete update to `lib/services/plantSyncService.ts`
+- [ ] Tests pass (batch, deduplication, metrics)
+
+### Dependencies
+- Phase 6 (Vendors - Main)
+
+### Estimated Effort
+- 3-4 hours
+
+---
+
+## Phase 10: `plants` Repository (Analytics DB)
+
+### Objective
+Implement AnalyticsPlantsRepository and migrate all analytics plant queries.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 7, 9
+
+### Table
+- **Table**: `plants` (Analytics DB)
+- **Complexity**: Medium
+- **Pattern**: CRUD + simplified structure, batch saveAll()
+
+### Current State
+- Direct Supabase calls in:
+  - `app/api/analytics/plants/route.ts`
+  - `lib/services/analyticsMirrorService.ts` (plant mirroring)
+  - `lib/services/analyticsSnapshotService.ts` (plant data)
+
+### Tasks
+1. Create `lib/repositories/analytics/plantsRepository.ts`
+2. Migrate `app/api/analytics/plants/route.ts` to use repository
+3. Migrate plant-related queries in `analyticsMirrorService.ts`
+4. Migrate plant queries in `analyticsSnapshotService.ts`
+5. Test batch operations
+
+### Deliverables
+- [ ] `lib/repositories/analytics/plantsRepository.ts`
+- [ ] Update `app/api/analytics/plants/route.ts`
+- [ ] Complete update to `lib/services/analyticsMirrorService.ts`
+- [ ] Partial update to `lib/services/analyticsSnapshotService.ts` (plant queries only)
+- [ ] Tests pass
+
+### Dependencies
+- Phase 7 (Vendors - Analytics)
+- Phase 9 (Plants - Main)
+
+### Estimated Effort
+- 2-3 hours
+
+---
+
+## Phase 11: `alerts` Repository
+
+### Objective
+Implement AlertsRepository and migrate all alert-related queries.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 9
+
+### Table
+- **Table**: `alerts`
+- **Complexity**: Medium
+- **Pattern**: CRUD + joins with plants, batch saveAll(), filtering, grid downtime queries
+
+### Current State
+- Direct Supabase calls in:
+  - `app/api/alerts/route.ts`
+  - `lib/services/alertSyncService.ts` (batch upsert, deduplication)
+  - `lib/services/gridDowntimeAnalyticsService.ts` (grid down alert queries)
+
+### Tasks
+1. Create `lib/repositories/main/alertsRepository.ts`
+2. Migrate `app/api/alerts/route.ts` to use repository
+3. Migrate alert queries in `alertSyncService.ts`
+4. Migrate grid down alert queries in `gridDowntimeAnalyticsService.ts`
+5. Test batch operations and filtering
+
+### Deliverables
+- [ ] `lib/repositories/main/alertsRepository.ts`
+- [ ] Update `app/api/alerts/route.ts`
+- [ ] Complete update to `lib/services/alertSyncService.ts`
+- [ ] Partial update to `lib/services/gridDowntimeAnalyticsService.ts` (alert queries only)
+- [ ] Tests pass
+
+### Dependencies
+- Phase 9 (Plants - Main)
+
+### Estimated Effort
+- 2-3 hours
+
+---
+
+## Phase 12: `wms_sites` Repository
+
+### Objective
+Implement WmsSitesRepository and migrate all WMS site queries.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 8
+
+### Table
+- **Table**: `wms_sites`
+- **Complexity**: Medium
+- **Pattern**: Batch saveAll(), deduplication
+
+### Current State
+- Direct Supabase calls in:
+  - `lib/services/wmsSyncService.ts` (site sync, deduplication)
+
+### Tasks
+1. Create `lib/repositories/main/wmsSitesRepository.ts`
+2. Migrate site queries in `wmsSyncService.ts`
+3. Test batch operations and deduplication
+
+### Deliverables
+- [ ] `lib/repositories/main/wmsSitesRepository.ts`
+- [ ] Partial update to `lib/services/wmsSyncService.ts` (wms_sites queries only)
+- [ ] Tests pass
+
+### Dependencies
+- Phase 8 (WMS Vendors)
+
+### Estimated Effort
+- 2 hours
+
+---
+
+## Phase 13: `wms_devices` Repository
+
+### Objective
+Implement WmsDevicesRepository and migrate all WMS device queries.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 12
+
+### Table
+- **Table**: `wms_devices`
+- **Complexity**: Medium
+- **Pattern**: Batch saveAll(), deduplication
+
+### Current State
+- Direct Supabase calls in:
+  - `lib/services/wmsSyncService.ts` (device sync, deduplication)
+
+### Tasks
+1. Create `lib/repositories/main/wmsDevicesRepository.ts`
+2. Migrate device queries in `wmsSyncService.ts`
+3. Test batch operations and deduplication
+
+### Deliverables
+- [ ] `lib/repositories/main/wmsDevicesRepository.ts`
+- [ ] Partial update to `lib/services/wmsSyncService.ts` (wms_devices queries only)
+- [ ] Tests pass
+
+### Dependencies
+- Phase 12 (WMS Sites)
+
+### Estimated Effort
+- 2 hours
+
+---
+
+## Phase 14: `insolation_readings` Repository
+
+### Objective
+Implement InsolationReadingsRepository and migrate all insolation queries.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 13
+
+### Table
+- **Table**: `insolation_readings`
+- **Complexity**: Low
+- **Pattern**: Upsert by device/date
+
+### Current State
+- Direct Supabase calls in:
+  - `lib/services/wmsSyncService.ts` (insolation data save)
+
+### Tasks
+1. Create `lib/repositories/main/insolationReadingsRepository.ts`
+2. Migrate insolation queries in `wmsSyncService.ts`
+3. Complete wmsSyncService migration (all WMS queries done)
+4. Test upsert operations
+
+### Deliverables
+- [ ] `lib/repositories/main/insolationReadingsRepository.ts`
+- [ ] Complete update to `lib/services/wmsSyncService.ts` (all queries migrated)
+- [ ] Tests pass
+
+### Dependencies
+- Phase 13 (WMS Devices)
+
+### Estimated Effort
+- 1-2 hours
+
+---
+
+## TIER 4: Analytics-Specific
+
+---
+
+## Phase 15: `plant_energy_readings` Repository
+
+### Objective
+Implement PlantEnergyReadingsRepository and migrate all energy reading queries.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 10
+
+### Table
+- **Table**: `plant_energy_readings`
+- **Complexity**: Medium
+- **Pattern**: CRUD + date filtering, batch saveAll()
+
+### Current State
+- Direct Supabase calls in:
+  - `app/api/analytics/plants/[id]/energy/route.ts`
+  - `lib/services/analyticsSnapshotService.ts` (energy readings save)
+
+### Tasks
+1. Create `lib/repositories/analytics/plantEnergyReadingsRepository.ts`
+2. Migrate `app/api/analytics/plants/[id]/energy/route.ts` to use repository
+3. Migrate energy reading queries in `analyticsSnapshotService.ts`
+4. Test date filtering and batch operations
+
+### Deliverables
+- [ ] `lib/repositories/analytics/plantEnergyReadingsRepository.ts`
+- [ ] Update `app/api/analytics/plants/[id]/energy/route.ts`
+- [ ] Partial update to `lib/services/analyticsSnapshotService.ts` (energy queries only)
+- [ ] Tests pass
+
+### Dependencies
+- Phase 10 (Plants - Analytics)
+
+### Estimated Effort
+- 2 hours
+
+---
+
+## Phase 16: `plant_grid_downtime_readings` Repository
+
+### Objective
+Implement PlantGridDowntimeReadingsRepository and migrate all grid downtime queries.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 15
+
+### Table
+- **Table**: `plant_grid_downtime_readings`
+- **Complexity**: High
+- **Pattern**: CRUD + date filtering, baseline queries, batch saveAll() (batch size 2000)
+
+### Current State
+- Direct Supabase calls in:
+  - `app/api/analytics/plants/[id]/grid-downtime/route.ts`
+  - `lib/services/gridDowntimeAnalyticsService.ts` (baseline queries, batch upsert)
+
+### Tasks
+1. Create `lib/repositories/analytics/plantGridDowntimeReadingsRepository.ts`
+2. Migrate `app/api/analytics/plants/[id]/grid-downtime/route.ts` to use repository
+3. Migrate grid downtime queries in `gridDowntimeAnalyticsService.ts`
+4. Complete gridDowntimeAnalyticsService migration
+5. Test baseline calculations and large batch operations
+
+### Deliverables
+- [ ] `lib/repositories/analytics/plantGridDowntimeReadingsRepository.ts`
+- [ ] Update `app/api/analytics/plants/[id]/grid-downtime/route.ts`
+- [ ] Complete update to `lib/services/gridDowntimeAnalyticsService.ts`
+- [ ] Tests pass (batch size 2000)
+
+### Dependencies
+- Phase 15 (Plant Energy Readings)
+
+### Estimated Effort
+- 3 hours
+
+---
+
+## Phase 17: `analytics_snapshot_runs` Repository
+
+### Objective
+Implement AnalyticsSnapshotRunsRepository and migrate all snapshot run queries.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 15
+
+### Table
+- **Table**: `analytics_snapshot_runs`
+- **Complexity**: Low
+- **Pattern**: CRUD + vendor grouping, status tracking
+
+### Current State
+- Direct Supabase calls in:
+  - `app/api/analytics/vendors/route.ts` (last run per vendor)
+  - `lib/services/analyticsSnapshotService.ts` (run tracking)
+
+### Tasks
+1. Create `lib/repositories/analytics/snapshotRunsRepository.ts`
+2. Migrate snapshot run queries in `app/api/analytics/vendors/route.ts`
+3. Migrate run tracking in `analyticsSnapshotService.ts`
+4. Complete analyticsSnapshotService migration
+5. Test status tracking
+
+### Deliverables
+- [ ] `lib/repositories/analytics/snapshotRunsRepository.ts`
+- [ ] Update `app/api/analytics/vendors/route.ts` (snapshot run queries)
+- [ ] Complete update to `lib/services/analyticsSnapshotService.ts`
+- [ ] Tests pass
+
+### Dependencies
+- Phase 15 (Plant Energy Readings)
+
+### Estimated Effort
+- 1-2 hours
+
+---
+
+## TIER 5: Complex (Work Orders)
+
+---
+
+## Phase 18: `work_orders` Repository (Aggregate Root)
+
+### Objective
+Implement WorkOrdersRepository using aggregate root pattern with single-query nested joins.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 9 (Plants), Phase 4 (Organizations)
+
+### Table
+- **Table**: `work_orders`
+- **Complexity**: High
+- **Pattern**: Aggregate Root with nested joins, transaction-like operations
+
+### Current State
+- Direct Supabase calls in:
+  - `app/api/workorders/route.ts`
+  - `app/api/workorders/[id]/route.ts`
+
+### Tasks
+1. Create `lib/repositories/main/workOrdersRepository.ts`
+2. Migrate `app/api/workorders/route.ts` to use repository
+3. Migrate `app/api/workorders/[id]/route.ts` to use repository
+4. Implement single-query nested joins (N+1 prevention)
+5. Test create/update with plants
+
+### Deliverables
+- [ ] `lib/repositories/main/workOrdersRepository.ts`
+- [ ] Update `app/api/workorders/route.ts`
+- [ ] Update `app/api/workorders/[id]/route.ts`
+- [ ] Tests pass (verify no N+1)
+
+### Dependencies
+- Phase 9 (Plants - Main)
+- Phase 4 (Organizations - Main)
+
+### Estimated Effort
+- 4-5 hours
+
+### Design Notes
+See detailed design in "Phase 10: Work Orders Repositories" section below.
+
+---
+
+## Phase 19: `work_order_plants` Repository
+
+### Objective
+Implement WorkOrderPlantsRepository for junction table operations.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 18
+
+### Table
+- **Table**: `work_order_plants`
+- **Complexity**: Medium
+- **Pattern**: Junction table operations, batch updates
+
+### Current State
+- Direct Supabase calls embedded in:
+  - `app/api/workorders/route.ts`
+  - Work order create/update logic
+
+### Tasks
+1. Create `lib/repositories/main/workOrderPlantsRepository.ts`
+2. Extract junction table operations from workorders route
+3. Test batch activate/deactivate operations
+
+### Deliverables
+- [ ] `lib/repositories/main/workOrderPlantsRepository.ts`
+- [ ] Refactor `app/api/workorders/route.ts` to use junction repository
+- [ ] Tests pass
+
+### Dependencies
+- Phase 18 (Work Orders)
+
+### Estimated Effort
+- 2-3 hours
+
+---
+
+## Phase 20: `work_logs` Repository
+
+### Objective
+Implement WorkLogsRepository for work log operations.
+
+### Status
+- ⏸️ **NOT STARTED** - Awaiting Phase 18
+
+### Table
+- **Table**: `work_logs`
+- **Complexity**: Low
+- **Pattern**: Simple CRUD with user join
+
+### Current State
+- Direct Supabase calls in:
+  - `app/api/workorders/[id]/logs/route.ts`
+
+### Tasks
+1. Create `lib/repositories/main/workLogsRepository.ts`
+2. Migrate `app/api/workorders/[id]/logs/route.ts` to use repository
+3. Test with user join
+
+### Deliverables
+- [ ] `lib/repositories/main/workLogsRepository.ts`
+- [ ] Update `app/api/workorders/[id]/logs/route.ts`
+- [ ] Tests pass
+
+### Dependencies
+- Phase 18 (Work Orders)
+
+### Estimated Effort
+- 1-2 hours
+
+---
+
+## FINAL PHASES
+
+---
+
+## Phase 21: Testing & Validation
 
 ### Objective
 Comprehensive testing and validation of all migrations.
 
 ### Status
-- ⏸️ **NOT STARTED** - Awaiting Phase 7 completion
+- ⏸️ **NOT STARTED** - Awaiting all repository phases
 
 ### Tasks
-1. Unit tests for repositories (if applicable)
-   - **Status**: ⏸️ Not implemented
+1. Unit tests for all repositories
 2. Integration tests for API routes
-   - **Status**: ⏸️ Not implemented
 3. End-to-end tests for services
-   - **Status**: ⏸️ Not implemented
-4. Performance validation
-   - **Status**: ⏸️ Not implemented
-5. Regression testing
-   - **Status**: ⏸️ Not implemented
+4. Performance validation (compare query times)
+5. Regression testing (all features still work)
+6. Verify no N+1 queries introduced
+
+### Deliverables
+- [ ] Test suite for repositories
+- [ ] Performance benchmarks
+- [ ] Regression test results
+- [ ] N+1 query audit
 
 ### Dependencies
-- Phase 7 (Service Migration)
+- Phases 3-20 (All Repositories)
 
 ### Estimated Effort
 - 4-6 hours
 
-### Approval Required
-- ⏸️ **AWAITING PHASE 7** - Proceed after Phase 7 completion?
-
 ---
 
-## Phase 9: Cleanup & Documentation
+## Phase 22: Cleanup & Documentation
 
 ### Objective
 Final cleanup and documentation.
 
 ### Status
-- ⏸️ **NOT STARTED** - Awaiting Phase 8 completion
+- ⏸️ **NOT STARTED** - Awaiting Phase 21
 
 ### Tasks
-1. Remove `lib/queries/extracted-queries.ts` (reference file)
-   - **Status**: ⏸️ Not implemented (file still exists as reference)
-2. Update documentation
-   - **Status**: ⏸️ Not implemented
-3. Code review
-   - **Status**: ⏸️ Not implemented
-4. Final validation
-   - **Status**: ⏸️ Not implemented
+1. Remove `lib/queries/extracted-queries.ts` (reference file no longer needed)
+2. Update all documentation
+3. Final code review
+4. Archive this migration plan section from SystemFlowDocumentation
+
+### Deliverables
+- [ ] Remove extracted-queries.ts
+- [ ] Updated README
+- [ ] Code review complete
+- [ ] Documentation archived
 
 ### Dependencies
-- Phase 8 (Testing)
+- Phase 21 (Testing)
 
 ### Estimated Effort
 - 2-3 hours
-
-### Approval Required
-- ⏸️ **AWAITING PHASE 8** - Proceed after Phase 8 completion?
 
 ---
 
@@ -992,14 +1565,15 @@ Final cleanup and documentation.
 4. **Transaction Handling**: Some operations may need transactions
 
 ### Mitigation Strategies
-1. **Incremental Migration**: One table/service at a time
-2. **Feature Flags**: Ability to rollback if needed
-3. **Thorough Testing**: Test each phase before proceeding
-4. **Code Review**: Review each phase before next
+1. **Model-by-Model Migration**: Each model can be tested and rolled back independently
+2. **Feature Flags**: Ability to rollback individual models if needed
+3. **Thorough Testing**: Each phase includes testing before moving to next
+4. **Tiered Approach**: Dependencies ensure stable foundation before complex migrations
+5. **Incremental Service Updates**: Services updated gradually as repositories become available
 
 ---
 
-## Phase 10: Work Orders Repositories (Complex Nested Joins)
+## Work Orders Design Reference (Phases 18-20)
 
 ### Objective
 Implement repositories for work orders using aggregate root pattern with single-query nested joins to avoid N+1 query propagation.
@@ -1371,18 +1945,45 @@ The following are **EXCLUDED** from migration per requirements:
    - Base repository pattern designed
    - Factory pattern designed
    - JPA-style naming conventions documented
+   - Model-by-model migration plan created
    - **Design documented in this file** (no code written)
 
-### Pending Phases (All NOT STARTED)
-- ⏸️ **Phase 2**: Base Repository & Types - NOT STARTED
-- ⏸️ **Phase 3**: Simple CRUD Repositories - NOT STARTED
-- ⏸️ **Phase 4**: Repositories with Simple Joins - NOT STARTED
-- ⏸️ **Phase 5**: Complex Repositories (Plants & WMS) - NOT STARTED
-- ⏸️ **Phase 6**: Analytics-Specific Repositories - NOT STARTED
-- ⏸️ **Phase 7**: Service Layer Migration - NOT STARTED
-- ⏸️ **Phase 8**: Testing & Validation - NOT STARTED
-- ⏸️ **Phase 9**: Cleanup & Documentation - NOT STARTED
-- ⏸️ **Phase 10**: Work Orders Repositories - NOT STARTED
+### Pending Phases (22 Total - All NOT STARTED)
+
+**Foundation:**
+- ⏸️ **Phase 2**: Foundation (Base Repository & Types)
+
+**Tier 1 - Leaf Nodes:**
+- ⏸️ **Phase 3**: `accounts` Repository
+- ⏸️ **Phase 4**: `organizations` Repository (Main DB)
+- ⏸️ **Phase 5**: `organizations` Repository (Analytics DB)
+
+**Tier 2 - Depends on Organizations:**
+- ⏸️ **Phase 6**: `vendors` Repository (Main DB)
+- ⏸️ **Phase 7**: `vendors` Repository (Analytics DB)
+- ⏸️ **Phase 8**: `wms_vendors` Repository
+
+**Tier 3 - Depends on Vendors:**
+- ⏸️ **Phase 9**: `plants` Repository (Main DB)
+- ⏸️ **Phase 10**: `plants` Repository (Analytics DB)
+- ⏸️ **Phase 11**: `alerts` Repository
+- ⏸️ **Phase 12**: `wms_sites` Repository
+- ⏸️ **Phase 13**: `wms_devices` Repository
+- ⏸️ **Phase 14**: `insolation_readings` Repository
+
+**Tier 4 - Analytics-Specific:**
+- ⏸️ **Phase 15**: `plant_energy_readings` Repository
+- ⏸️ **Phase 16**: `plant_grid_downtime_readings` Repository
+- ⏸️ **Phase 17**: `analytics_snapshot_runs` Repository
+
+**Tier 5 - Work Orders (Complex):**
+- ⏸️ **Phase 18**: `work_orders` Repository
+- ⏸️ **Phase 19**: `work_order_plants` Repository
+- ⏸️ **Phase 20**: `work_logs` Repository
+
+**Final:**
+- ⏸️ **Phase 21**: Testing & Validation
+- ⏸️ **Phase 22**: Cleanup & Documentation
 
 ### Current Code State
 - **Repository Files**: ❌ None exist (`lib/repositories/` directory does not exist)
@@ -1392,7 +1993,7 @@ The following are **EXCLUDED** from migration per requirements:
 - **Build Status**: ✅ Working correctly (all direct Supabase calls)
 
 ### Next Action Required
-**Approval to proceed with Phase 2 implementation** - This will create the first repository files and base types.
+**Approval to proceed with Phase 2 implementation** - This will create the foundation (base types, interfaces, factory pattern).
 
 ---
 
@@ -1443,8 +2044,9 @@ Following JPA (Java Persistence API) naming conventions for consistency and fami
 - ✅ Factory pattern design
 - ✅ Base repository pattern design
 - ✅ Decision points finalized
-- ✅ **Work Orders repository design (Phase 10)** with query propagation prevention strategy
+- ✅ **Work Orders repository design (Phases 18-20)** with query propagation prevention strategy
 - ✅ **JPA-style naming conventions** - Using `save()` instead of `create()`, `saveAll()` instead of `batchUpsert()`, `deleteById()` instead of `delete()`, etc.
+- ✅ **Model-by-model migration plan** - 22 phases with dependency-aware ordering
 
 **Note**: This is DESIGN ONLY. No repository code has been implemented. All API routes continue to use direct Supabase calls as documented in `extracted-queries.ts`.
 
@@ -1452,9 +2054,16 @@ Following JPA (Java Persistence API) naming conventions for consistency and fami
 
 ## Next Steps
 
-**READY FOR PHASE 2: Base Repository & Types (Foundation)**
+**READY FOR PHASE 2: Foundation (Base Repository & Types)**
 
-Phase 1 design is complete and documented above, including work orders design with N+1 prevention. 
+Phase 1 design is complete. Migration will proceed model-by-model with incremental deployments.
+
+**Migration Approach Benefits**:
+- ✅ **Small, focused PRs** - Each phase is 1-4 hours of work
+- ✅ **Independent deployments** - Each model can be deployed and tested separately
+- ✅ **Easy rollback** - Issues isolated to single model
+- ✅ **Parallel work possible** - Multiple developers can work on different phases
+- ✅ **Learn as you go** - Improve patterns based on earlier implementations
 
 **Current Implementation Status**: 
 - ❌ No repository files exist (`lib/repositories/` directory does not exist)
@@ -1463,14 +2072,16 @@ Phase 1 design is complete and documented above, including work orders design wi
 - ✅ Design complete and ready for review
 
 **Before Phase 2 Implementation**:
-1. Review and approve Phase 1 design
-2. Confirm JPA-style naming conventions are acceptable
-3. Approve proceeding with Phase 2 implementation
+1. ✅ Review and approve Phase 1 design
+2. ✅ Confirm JPA-style naming conventions are acceptable
+3. ⏸️ Approve proceeding with Phase 2 implementation
 
 **Phase 2 will implement**:
 1. `lib/repositories/types.ts` with base interfaces and classes
-2. Factory pattern implementation
-3. Common types and utilities
+2. `lib/repositories/main/index.ts` - Factory exports
+3. `lib/repositories/analytics/index.ts` - Factory exports
 
-**Question**: Should I proceed with Phase 2 implementation, or would you like to review/modify the Phase 1 design first?
+**Estimated Total Migration Effort**: ~50-60 hours across 22 phases
+
+**Question**: Should I proceed with Phase 2 implementation?
 
