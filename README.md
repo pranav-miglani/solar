@@ -298,6 +298,86 @@ woms/
 └── package.json                   # Dependencies
 ```
 
+## Repository Architecture
+
+The codebase uses a **Repository Pattern** for all database operations, providing:
+- **Abstraction**: Clean separation between business logic and data access
+- **Testability**: Easy mocking for unit tests
+- **Feature Toggles**: Instant rollback capability via environment variables
+
+### Repository Structure
+
+```
+lib/
+├── repositories/
+│   ├── main/                      # Main Database Repositories
+│   │   ├── index.ts               # Factory functions with feature toggles
+│   │   ├── accountsRepository.ts  # Accounts CRUD
+│   │   ├── organizationsRepository.ts
+│   │   ├── vendorsRepository.ts
+│   │   ├── plantsRepository.ts
+│   │   ├── alertsRepository.ts
+│   │   ├── workOrdersRepository.ts
+│   │   ├── workOrderPlantsRepository.ts
+│   │   ├── workLogsRepository.ts
+│   │   ├── wmsVendorsRepository.ts
+│   │   ├── wmsSitesRepository.ts
+│   │   ├── wmsDevicesRepository.ts
+│   │   ├── insolationReadingsRepository.ts
+│   │   └── legacyAdapters/        # Fallback adapters for rollback
+│   └── analytics/                 # Analytics Database Repositories
+│       ├── index.ts               # Factory functions
+│       ├── organizationsRepository.ts
+│       ├── vendorsRepository.ts
+│       ├── plantsRepository.ts
+│       ├── plantEnergyReadingsRepository.ts
+│       ├── plantGridDowntimeReadingsRepository.ts
+│       ├── snapshotRunsRepository.ts
+│       └── legacyAdapters/
+└── services/
+    ├── index.ts                   # Service factory functions
+    ├── dashboardService.ts        # Dashboard business logic
+    └── legacyDashboardAdapter.ts  # Fallback for dashboard
+```
+
+### Usage Example
+
+```typescript
+import { getPlantsRepository, getAlertsRepository } from "@/lib/repositories/main"
+import { getDashboardService } from "@/lib/services"
+
+// Get repository instance
+const plantsRepo = getPlantsRepository()
+const plants = await plantsRepo.findAllWithRelations()
+
+// Get service instance
+const dashboardService = getDashboardService()
+const data = await dashboardService.getDashboardData({ accountType: "SUPERADMIN" })
+```
+
+### Feature Toggles
+
+Each repository has an environment variable toggle for instant rollback:
+
+| Toggle | Default | Description |
+|--------|---------|-------------|
+| `USE_ACCOUNTS_REPO` | `true` | Accounts repository |
+| `USE_ORGS_REPO` | `true` | Organizations repository |
+| `USE_VENDORS_REPO` | `true` | Vendors repository |
+| `USE_PLANTS_REPO` | `true` | Plants repository |
+| `USE_ALERTS_REPO` | `true` | Alerts repository |
+| `USE_WORKORDERS_REPO` | `true` | Work orders repository |
+| `USE_WORKORDER_PLANTS_REPO` | `true` | Work order plants repository |
+| `USE_WORKLOGS_REPO` | `true` | Work logs repository |
+| `USE_DASHBOARD_SERVICE` | `true` | Dashboard service |
+
+Set any toggle to `false` to use the legacy direct Supabase queries:
+
+```bash
+# Rollback to legacy queries for plants
+USE_PLANTS_REPO=false
+```
+
 ## Database Schema
 
 ### Main Database Tables
