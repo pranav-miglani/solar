@@ -1727,6 +1727,707 @@ Unique Constraints:
               </div>
             )}
           </Card>
+
+          {/* Database Query Inventory */}
+          <Card className="overflow-hidden">
+            <SectionHeader id="db-query-inventory" title="Database Query Inventory" icon={Database} />
+            {expandedSections.has("db-query-inventory") && (
+              <div className="p-6 pt-0 space-y-6 border-t">
+                <div className="space-y-4">
+                  <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
+                    <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📊 Executive Summary</h3>
+                    <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 ml-4 list-disc">
+                      <li><strong>Total Query Locations:</strong> 63 files with database queries</li>
+                      <li><strong>Total Query Operations:</strong> ~380+ database operations</li>
+                      <li><strong>Main Database Usage:</strong> ~95% of queries (53+ files)</li>
+                      <li><strong>Analytics Database Usage:</strong> ~5% of queries (10 files)</li>
+                      <li><strong>Cross-Database Operations:</strong> 3 services (mirror, snapshot, grid downtime)</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">Main Database - API Routes</h3>
+                    
+                    {/* Accounts */}
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                      <h4 className="font-semibold">Accounts API (<code className="bg-background px-1 rounded">/api/accounts</code>)</h4>
+                      <table className="w-full text-xs border-collapse mt-2">
+                        <thead>
+                          <tr className="border-b bg-muted">
+                            <th className="text-left p-2 font-semibold">Endpoint</th>
+                            <th className="text-left p-2 font-semibold">Method</th>
+                            <th className="text-left p-2 font-semibold">Operation</th>
+                            <th className="text-left p-2 font-semibold">Table</th>
+                            <th className="text-left p-2 font-semibold">Query Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/accounts</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">accounts</td>
+                            <td className="p-2">Simple (ordered by email)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/accounts</code></td>
+                            <td className="p-2">POST</td>
+                            <td className="p-2">INSERT</td>
+                            <td className="p-2">accounts</td>
+                            <td className="p-2">Simple (with password hash)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/accounts</code></td>
+                            <td className="p-2">POST</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">accounts</td>
+                            <td className="p-2">Duplicate check (email)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/accounts/[id]</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">accounts</td>
+                            <td className="p-2">Simple (by ID)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/accounts/[id]</code></td>
+                            <td className="p-2">PATCH</td>
+                            <td className="p-2">UPDATE</td>
+                            <td className="p-2">accounts</td>
+                            <td className="p-2">Simple</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/accounts/[id]</code></td>
+                            <td className="p-2">DELETE</td>
+                            <td className="p-2">DELETE</td>
+                            <td className="p-2">accounts</td>
+                            <td className="p-2">Simple</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/accounts/import</code></td>
+                            <td className="p-2">POST</td>
+                            <td className="p-2">UPSERT</td>
+                            <td className="p-2">accounts</td>
+                            <td className="p-2">Batch</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2"><code>/api/accounts/export</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">accounts</td>
+                            <td className="p-2">Simple</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <strong>Total:</strong> 9 operations
+                      </div>
+                    </div>
+
+                    {/* Organizations */}
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                      <h4 className="font-semibold">Organizations API (<code className="bg-background px-1 rounded">/api/orgs</code>)</h4>
+                      <table className="w-full text-xs border-collapse mt-2">
+                        <thead>
+                          <tr className="border-b bg-muted">
+                            <th className="text-left p-2 font-semibold">Endpoint</th>
+                            <th className="text-left p-2 font-semibold">Method</th>
+                            <th className="text-left p-2 font-semibold">Operation</th>
+                            <th className="text-left p-2 font-semibold">Table</th>
+                            <th className="text-left p-2 font-semibold">Query Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/orgs</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">organizations</td>
+                            <td className="p-2">Simple (ordered by name)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/orgs</code></td>
+                            <td className="p-2">POST</td>
+                            <td className="p-2">INSERT</td>
+                            <td className="p-2">organizations</td>
+                            <td className="p-2">Simple</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/orgs/[id]</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">organizations</td>
+                            <td className="p-2">Simple (by ID)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/orgs/[id]/plants</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">plants</td>
+                            <td className="p-2">Join (with vendors, organizations)</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2"><code>/api/orgs/[id]/production</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">plants</td>
+                            <td className="p-2">Aggregation (sum energy metrics)</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <strong>Total:</strong> 8 operations
+                      </div>
+                    </div>
+
+                    {/* Vendors */}
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                      <h4 className="font-semibold">Vendors API (<code className="bg-background px-1 rounded">/api/vendors</code>)</h4>
+                      <table className="w-full text-xs border-collapse mt-2">
+                        <thead>
+                          <tr className="border-b bg-muted">
+                            <th className="text-left p-2 font-semibold">Endpoint</th>
+                            <th className="text-left p-2 font-semibold">Method</th>
+                            <th className="text-left p-2 font-semibold">Operation</th>
+                            <th className="text-left p-2 font-semibold">Table</th>
+                            <th className="text-left p-2 font-semibold">Query Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/vendors</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">vendors</td>
+                            <td className="p-2">Join (with organizations)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/vendors</code></td>
+                            <td className="p-2">POST</td>
+                            <td className="p-2">INSERT</td>
+                            <td className="p-2">vendors</td>
+                            <td className="p-2">Simple</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/vendors/[id]</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">vendors</td>
+                            <td className="p-2">Join (with org)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/vendors/[id]/sync-plants</code></td>
+                            <td className="p-2">POST</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">vendors</td>
+                            <td className="p-2">Simple (get vendor for sync)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/vendors/[id]/production</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">plants</td>
+                            <td className="p-2">Aggregation (sum energy)</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2"><code>/api/vendors/import</code></td>
+                            <td className="p-2">POST</td>
+                            <td className="p-2">UPSERT</td>
+                            <td className="p-2">vendors</td>
+                            <td className="p-2">Batch</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <strong>Total:</strong> 12 operations
+                      </div>
+                    </div>
+
+                    {/* Plants */}
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                      <h4 className="font-semibold">Plants API (<code className="bg-background px-1 rounded">/api/plants</code>)</h4>
+                      <table className="w-full text-xs border-collapse mt-2">
+                        <thead>
+                          <tr className="border-b bg-muted">
+                            <th className="text-left p-2 font-semibold">Endpoint</th>
+                            <th className="text-left p-2 font-semibold">Method</th>
+                            <th className="text-left p-2 font-semibold">Operation</th>
+                            <th className="text-left p-2 font-semibold">Table</th>
+                            <th className="text-left p-2 font-semibold">Query Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/plants</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">plants</td>
+                            <td className="p-2">Join (with vendors, organizations)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/plants/[id]</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">plants</td>
+                            <td className="p-2">Join (with vendor, org)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/plants/[id]/production</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">plants</td>
+                            <td className="p-2">Simple (production metrics)</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2"><code>/api/plants/unassigned</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">plants</td>
+                            <td className="p-2">Filtered (not in active work orders)</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <strong>Total:</strong> 8 operations
+                      </div>
+                    </div>
+
+                    {/* Alerts */}
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                      <h4 className="font-semibold">Alerts API (<code className="bg-background px-1 rounded">/api/alerts</code>)</h4>
+                      <table className="w-full text-xs border-collapse mt-2">
+                        <thead>
+                          <tr className="border-b bg-muted">
+                            <th className="text-left p-2 font-semibold">Endpoint</th>
+                            <th className="text-left p-2 font-semibold">Method</th>
+                            <th className="text-left p-2 font-semibold">Operation</th>
+                            <th className="text-left p-2 font-semibold">Table</th>
+                            <th className="text-left p-2 font-semibold">Query Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/alerts</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">alerts</td>
+                            <td className="p-2">Join (with plants)</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2"><code>/api/alerts</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">plants</td>
+                            <td className="p-2">Filtered (get plant IDs for org)</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <strong>Total:</strong> 3 operations
+                      </div>
+                    </div>
+
+                    {/* Work Orders */}
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                      <h4 className="font-semibold">Work Orders API (<code className="bg-background px-1 rounded">/api/workorders</code>)</h4>
+                      <table className="w-full text-xs border-collapse mt-2">
+                        <thead>
+                          <tr className="border-b bg-muted">
+                            <th className="text-left p-2 font-semibold">Endpoint</th>
+                            <th className="text-left p-2 font-semibold">Method</th>
+                            <th className="text-left p-2 font-semibold">Operation</th>
+                            <th className="text-left p-2 font-semibold">Table</th>
+                            <th className="text-left p-2 font-semibold">Query Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/workorders</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">work_orders</td>
+                            <td className="p-2">Complex nested join (work_orders → organizations → work_order_plants → plants)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/workorders</code></td>
+                            <td className="p-2">POST</td>
+                            <td className="p-2">INSERT</td>
+                            <td className="p-2">work_orders</td>
+                            <td className="p-2">Transaction (with work_order_plants)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/workorders/[id]/plants</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">work_order_plants</td>
+                            <td className="p-2">Join (with plants)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/workorders/[id]/production</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">work_order_plants</td>
+                            <td className="p-2">Complex join (production metrics)</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2"><code>/api/workorders/import</code></td>
+                            <td className="p-2">POST</td>
+                            <td className="p-2">UPSERT</td>
+                            <td className="p-2">work_orders</td>
+                            <td className="p-2">Batch (with transactions)</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <strong>Total:</strong> 16 operations
+                      </div>
+                    </div>
+
+                    {/* Dashboard */}
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                      <h4 className="font-semibold">Dashboard API (<code className="bg-background px-1 rounded">/api/dashboard</code>)</h4>
+                      <table className="w-full text-xs border-collapse mt-2">
+                        <thead>
+                          <tr className="border-b bg-muted">
+                            <th className="text-left p-2 font-semibold">Endpoint</th>
+                            <th className="text-left p-2 font-semibold">Method</th>
+                            <th className="text-left p-2 font-semibold">Operation</th>
+                            <th className="text-left p-2 font-semibold">Table</th>
+                            <th className="text-left p-2 font-semibold">Query Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/dashboard</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">plants</td>
+                            <td className="p-2">Count, Aggregation (sum energy)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/dashboard</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">alerts</td>
+                            <td className="p-2">Count (active alerts)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/dashboard</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">work_orders</td>
+                            <td className="p-2">Count</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2"><code>/api/dashboard</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">work_order_plants</td>
+                            <td className="p-2">Complex join (GOVT users)</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <strong>Total:</strong> 10 operations
+                      </div>
+                    </div>
+
+                    {/* WMS Vendors */}
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                      <h4 className="font-semibold">WMS Vendors API (<code className="bg-background px-1 rounded">/api/wms-vendors</code>)</h4>
+                      <table className="w-full text-xs border-collapse mt-2">
+                        <thead>
+                          <tr className="border-b bg-muted">
+                            <th className="text-left p-2 font-semibold">Endpoint</th>
+                            <th className="text-left p-2 font-semibold">Method</th>
+                            <th className="text-left p-2 font-semibold">Operation</th>
+                            <th className="text-left p-2 font-semibold">Table</th>
+                            <th className="text-left p-2 font-semibold">Query Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/wms-vendors</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">wms_vendors</td>
+                            <td className="p-2">Join (with organizations)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/wms-vendors/[id]/sites</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">wms_sites</td>
+                            <td className="p-2">Filtered (by vendor)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/wms-vendors/[id]/sync-sites</code></td>
+                            <td className="p-2">POST</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">wms_vendors</td>
+                            <td className="p-2">Simple (get vendor for sync)</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2"><code>/api/wms-vendors/import</code></td>
+                            <td className="p-2">POST</td>
+                            <td className="p-2">UPSERT</td>
+                            <td className="p-2">wms_vendors</td>
+                            <td className="p-2">Batch</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <strong>Total:</strong> 13 operations
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">Main Database - Services</h3>
+                    
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                      <h4 className="font-semibold">Plant Sync Service (<code className="bg-background px-1 rounded">lib/services/plantSyncService.ts</code>)</h4>
+                      <table className="w-full text-xs border-collapse mt-2">
+                        <thead>
+                          <tr className="border-b bg-muted">
+                            <th className="text-left p-2 font-semibold">Operation</th>
+                            <th className="text-left p-2 font-semibold">Table</th>
+                            <th className="text-left p-2 font-semibold">Query Type</th>
+                            <th className="text-left p-2 font-semibold">Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">organizations</td>
+                            <td className="p-2">Simple</td>
+                            <td className="p-2">Get org name</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">vendors</td>
+                            <td className="p-2">Filtered</td>
+                            <td className="p-2">Get active vendors with org settings</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">plants</td>
+                            <td className="p-2">Filtered</td>
+                            <td className="p-2">Get existing plants by vendor_plant_id</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2">UPSERT</td>
+                            <td className="p-2">plants</td>
+                            <td className="p-2">Batch</td>
+                            <td className="p-2">Batch upsert (100 per batch)</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                      <h4 className="font-semibold">Alert Sync Service (<code className="bg-background px-1 rounded">lib/services/alertSyncService.ts</code>)</h4>
+                      <table className="w-full text-xs border-collapse mt-2">
+                        <thead>
+                          <tr className="border-b bg-muted">
+                            <th className="text-left p-2 font-semibold">Operation</th>
+                            <th className="text-left p-2 font-semibold">Table</th>
+                            <th className="text-left p-2 font-semibold">Query Type</th>
+                            <th className="text-left p-2 font-semibold">Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">vendors</td>
+                            <td className="p-2">Filtered</td>
+                            <td className="p-2">Get active vendors</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">alerts</td>
+                            <td className="p-2">Filtered</td>
+                            <td className="p-2">Get existing alerts (complex deduplication)</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2">UPSERT</td>
+                            <td className="p-2">alerts</td>
+                            <td className="p-2">Batch</td>
+                            <td className="p-2">Batch upsert (100 per batch)</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                      <h4 className="font-semibold">WMS Sync Service (<code className="bg-background px-1 rounded">lib/services/wmsSyncService.ts</code>)</h4>
+                      <table className="w-full text-xs border-collapse mt-2">
+                        <thead>
+                          <tr className="border-b bg-muted">
+                            <th className="text-left p-2 font-semibold">Operation</th>
+                            <th className="text-left p-2 font-semibold">Table</th>
+                            <th className="text-left p-2 font-semibold">Query Type</th>
+                            <th className="text-left p-2 font-semibold">Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">wms_sites</td>
+                            <td className="p-2">Filtered</td>
+                            <td className="p-2">Get existing sites</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2">UPSERT</td>
+                            <td className="p-2">wms_sites</td>
+                            <td className="p-2">Batch</td>
+                            <td className="p-2">Batch upsert sites</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2">UPSERT</td>
+                            <td className="p-2">wms_devices</td>
+                            <td className="p-2">Batch</td>
+                            <td className="p-2">Batch upsert devices</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2">INSERT/UPDATE</td>
+                            <td className="p-2">insolation_readings</td>
+                            <td className="p-2">Simple</td>
+                            <td className="p-2">Create/update insolation reading</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">Analytics Database - API Routes</h3>
+                    
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                      <h4 className="font-semibold">Analytics APIs (<code className="bg-background px-1 rounded">/api/analytics</code>)</h4>
+                      <table className="w-full text-xs border-collapse mt-2">
+                        <thead>
+                          <tr className="border-b bg-muted">
+                            <th className="text-left p-2 font-semibold">Endpoint</th>
+                            <th className="text-left p-2 font-semibold">Method</th>
+                            <th className="text-left p-2 font-semibold">Operation</th>
+                            <th className="text-left p-2 font-semibold">Table</th>
+                            <th className="text-left p-2 font-semibold">Query Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/analytics/vendors</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">vendors</td>
+                            <td className="p-2">Join (with organizations)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/analytics/plants</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">plants</td>
+                            <td className="p-2">Join (with organizations, vendors)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/analytics/plants/[id]/energy</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">plant_energy_readings</td>
+                            <td className="p-2">Filtered (last 100 days)</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2"><code>/api/analytics/plants/[id]/grid-downtime</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">plant_grid_downtime_readings</td>
+                            <td className="p-2">Filtered (last 100 days)</td>
+                          </tr>
+                          <tr>
+                            <td className="p-2"><code>/api/analytics/orgs</code></td>
+                            <td className="p-2">GET</td>
+                            <td className="p-2">SELECT</td>
+                            <td className="p-2">organizations</td>
+                            <td className="p-2">Simple</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <strong>Total:</strong> 7 operations
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">Cross-Database Operations</h3>
+                    
+                    <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg border border-purple-200 dark:border-purple-900">
+                      <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">Analytics Mirror Service</h4>
+                      <p className="text-sm text-purple-800 dark:text-purple-200 mb-2">
+                        <strong>Service:</strong> <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">lib/services/analyticsMirrorService.ts</code>
+                      </p>
+                      <p className="text-sm text-purple-800 dark:text-purple-200 mb-2">
+                        <strong>API Endpoint:</strong> <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">GET /api/cron/analytics/mirror-config</code>
+                      </p>
+                      <ul className="text-sm text-purple-800 dark:text-purple-200 space-y-1 ml-4 list-disc">
+                        <li><strong>Reads from Main DB:</strong> organizations, vendors, plants</li>
+                        <li><strong>Writes to Analytics DB:</strong> organizations, vendors, plants (with hash-based change detection)</li>
+                        <li><strong>Batch Size:</strong> 500 plants per batch, 10 concurrent batches</li>
+                        <li><strong>Total Operations:</strong> 10 (5 read Main, 5 write Analytics)</li>
+                      </ul>
+                    </div>
+
+                    <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg border border-purple-200 dark:border-purple-900">
+                      <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">Analytics Snapshot Service</h4>
+                      <p className="text-sm text-purple-800 dark:text-purple-200 mb-2">
+                        <strong>Service:</strong> <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">lib/services/analyticsSnapshotService.ts</code>
+                      </p>
+                      <p className="text-sm text-purple-800 dark:text-purple-200 mb-2">
+                        <strong>API Endpoint:</strong> <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">GET /api/cron/analytics/snapshot-energy</code>
+                      </p>
+                      <ul className="text-sm text-purple-800 dark:text-purple-200 space-y-1 ml-4 list-disc">
+                        <li><strong>Reads from Main DB:</strong> plants (energy metrics, was_online_today)</li>
+                        <li><strong>Writes to Analytics DB:</strong> plants, plant_energy_readings, analytics_snapshot_runs</li>
+                        <li><strong>Batch Size:</strong> 100 plants per batch</li>
+                        <li><strong>Total Operations:</strong> 10 (2 read Main, 8 write Analytics)</li>
+                      </ul>
+                    </div>
+
+                    <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg border border-purple-200 dark:border-purple-900">
+                      <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">Grid Downtime Analytics Service</h4>
+                      <p className="text-sm text-purple-800 dark:text-purple-200 mb-2">
+                        <strong>Service:</strong> <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">lib/services/gridDowntimeAnalyticsService.ts</code>
+                      </p>
+                      <p className="text-sm text-purple-800 dark:text-purple-200 mb-2">
+                        <strong>API Endpoint:</strong> <code className="bg-purple-100 dark:bg-purple-900 px-1 rounded">GET /api/cron/analytics/grid-downtime</code>
+                      </p>
+                      <ul className="text-sm text-purple-800 dark:text-purple-200 space-y-1 ml-4 list-disc">
+                        <li><strong>Reads from Main DB:</strong> plants, alerts (GRID_DOWN alerts)</li>
+                        <li><strong>Writes to Analytics DB:</strong> plant_grid_downtime_readings</li>
+                        <li><strong>Batch Size:</strong> 2000 rows per batch</li>
+                        <li><strong>Total Operations:</strong> 5 (2 read Main, 3 write Analytics)</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-lg border border-green-200 dark:border-green-900">
+                    <h3 className="font-semibold text-green-900 dark:text-green-100 mb-2">✅ Migration Feasibility Assessment</h3>
+                    <p className="text-sm text-green-800 dark:text-green-200 mb-2">
+                      <strong>Status:</strong> ✅ FEASIBLE - Repository Pattern Can Handle All Queries
+                    </p>
+                    <ul className="text-sm text-green-800 dark:text-green-200 space-y-1 ml-4 list-disc">
+                      <li><strong>Main Database:</strong> All query patterns can be abstracted (simple, joins, complex, batches)</li>
+                      <li><strong>Analytics Database:</strong> Queries are simpler than Main DB - fully supported</li>
+                      <li><strong>Cross-DB Operations:</strong> Service layer orchestrates (reads Main repo, writes Analytics repo)</li>
+                      <li><strong>Critical Requirements:</strong> Transaction support, query builder, separate repositories</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
         </TabsContent>
 
         {/* Vendors Tab */}
