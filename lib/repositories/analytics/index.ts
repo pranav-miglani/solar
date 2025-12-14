@@ -32,7 +32,8 @@ import { AnalyticsVendorsRepository, IAnalyticsVendorsRepository } from "./vendo
 import { LegacyAnalyticsVendorsAdapter } from "./legacyAdapters/vendorsAdapter"
 
 // Phase 10: plants (Analytics)
-// import { AnalyticsPlantsRepository } from "./plantsRepository"
+import { AnalyticsPlantsRepository, IAnalyticsPlantsRepository } from "./plantsRepository"
+import { LegacyAnalyticsPlantsAdapter } from "./legacyAdapters/plantsAdapter"
 
 // Phase 15: plant_energy_readings
 // import { PlantEnergyReadingsRepository } from "./plantEnergyReadingsRepository"
@@ -87,10 +88,18 @@ export function getAnalyticsVendorsRepository(): IAnalyticsVendorsRepository {
 
 // -----------------------------------------------------------------------------
 // Phase 10: Analytics Plants Repository
+// Toggle: USE_ANALYTICS_PLANTS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getAnalyticsPlantsRepository() {
-//   return new AnalyticsPlantsRepository(getAnalyticsClient())
-// }
+export function getAnalyticsPlantsRepository(): IAnalyticsPlantsRepository {
+  const useLegacy = process.env.USE_ANALYTICS_PLANTS_REPO === 'false'
+  const client = getAnalyticsClient()
+  
+  if (useLegacy) {
+    return new LegacyAnalyticsPlantsAdapter(client)
+  }
+  return new AnalyticsPlantsRepository(client)
+}
 
 // -----------------------------------------------------------------------------
 // Phase 15: Plant Energy Readings Repository

@@ -40,19 +40,24 @@ import { WmsVendorsRepository, IWmsVendorsRepository } from "./wmsVendorsReposit
 import { LegacyWmsVendorsAdapter } from "./legacyAdapters/wmsVendorsAdapter"
 
 // Phase 9: plants
-// import { PlantsRepository } from "./plantsRepository"
+import { PlantsRepository, IPlantsRepository } from "./plantsRepository"
+import { LegacyPlantsAdapter } from "./legacyAdapters/plantsAdapter"
 
 // Phase 11: alerts
-// import { AlertsRepository } from "./alertsRepository"
+import { AlertsRepository, IAlertsRepository } from "./alertsRepository"
+import { LegacyAlertsAdapter } from "./legacyAdapters/alertsAdapter"
 
 // Phase 12: wms_sites
-// import { WmsSitesRepository } from "./wmsSitesRepository"
+import { WmsSitesRepository, IWmsSitesRepository } from "./wmsSitesRepository"
+import { LegacyWmsSitesAdapter } from "./legacyAdapters/wmsSitesAdapter"
 
 // Phase 13: wms_devices
-// import { WmsDevicesRepository } from "./wmsDevicesRepository"
+import { WmsDevicesRepository, IWmsDevicesRepository } from "./wmsDevicesRepository"
+import { LegacyWmsDevicesAdapter } from "./legacyAdapters/wmsDevicesAdapter"
 
 // Phase 14: insolation_readings
-// import { InsolationReadingsRepository } from "./insolationReadingsRepository"
+import { InsolationReadingsRepository, IInsolationReadingsRepository } from "./insolationReadingsRepository"
+import { LegacyInsolationReadingsAdapter } from "./legacyAdapters/insolationReadingsAdapter"
 
 // Phase 18: work_orders
 // import { WorkOrdersRepository } from "./workOrdersRepository"
@@ -137,38 +142,78 @@ export function getWmsVendorsRepository(): IWmsVendorsRepository {
 
 // -----------------------------------------------------------------------------
 // Phase 9: Plants Repository
+// Toggle: USE_PLANTS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getPlantsRepository() {
-//   return new PlantsRepository(getMainClient())
-// }
+export function getPlantsRepository(): IPlantsRepository {
+  const useLegacy = process.env.USE_PLANTS_REPO === 'false'
+  const client = getMainClient()
+  
+  if (useLegacy) {
+    return new LegacyPlantsAdapter(client)
+  }
+  return new PlantsRepository(client)
+}
 
 // -----------------------------------------------------------------------------
 // Phase 11: Alerts Repository
+// Toggle: USE_ALERTS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getAlertsRepository() {
-//   return new AlertsRepository(getMainClient())
-// }
+export function getAlertsRepository(): IAlertsRepository {
+  const useLegacy = process.env.USE_ALERTS_REPO === 'false'
+  const client = getMainClient()
+  
+  if (useLegacy) {
+    return new LegacyAlertsAdapter(client)
+  }
+  return new AlertsRepository(client)
+}
 
 // -----------------------------------------------------------------------------
 // Phase 12: WMS Sites Repository
+// Toggle: USE_WMS_SITES_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getWmsSitesRepository() {
-//   return new WmsSitesRepository(getMainClient())
-// }
+export function getWmsSitesRepository(): IWmsSitesRepository {
+  const useLegacy = process.env.USE_WMS_SITES_REPO === 'false'
+  const client = getMainClient()
+  
+  if (useLegacy) {
+    return new LegacyWmsSitesAdapter(client)
+  }
+  return new WmsSitesRepository(client)
+}
 
 // -----------------------------------------------------------------------------
 // Phase 13: WMS Devices Repository
+// Toggle: USE_WMS_DEVICES_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getWmsDevicesRepository() {
-//   return new WmsDevicesRepository(getMainClient())
-// }
+export function getWmsDevicesRepository(): IWmsDevicesRepository {
+  const useLegacy = process.env.USE_WMS_DEVICES_REPO === 'false'
+  const client = getMainClient()
+  
+  if (useLegacy) {
+    return new LegacyWmsDevicesAdapter(client)
+  }
+  return new WmsDevicesRepository(client)
+}
 
 // -----------------------------------------------------------------------------
 // Phase 14: Insolation Readings Repository
+// Toggle: USE_INSOLATION_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getInsolationReadingsRepository() {
-//   return new InsolationReadingsRepository(getMainClient())
-// }
+export function getInsolationReadingsRepository(): IInsolationReadingsRepository {
+  const useLegacy = process.env.USE_INSOLATION_REPO === 'false'
+  const client = getMainClient()
+  
+  if (useLegacy) {
+    return new LegacyInsolationReadingsAdapter(client)
+  }
+  return new InsolationReadingsRepository(client)
+}
 
 // -----------------------------------------------------------------------------
 // Phase 18: Work Orders Repository

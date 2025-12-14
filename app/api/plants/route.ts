@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
 import { getMainClient } from "@/lib/supabase/pooled"
+import { getPlantsRepository } from "@/lib/repositories/main"
 import { logApiRequest, logApiResponse, withMDCContext, jsonResponse } from "@/lib/api-logger"
 
 // For plants API, we need to bypass RLS for write operations
@@ -36,28 +37,14 @@ export async function GET(request: NextRequest) {
 
       requirePermission(accountType as any, "plants", "read")
 
+      const plantsRepo = getPlantsRepository()
       const supabase = getMainClient()
 
-      // Build query with joins
-      let query = supabase
-        .from("plants")
-        .select(`
-          *,
-          vendors (
-            id,
-            name,
-            vendor_type
-          ),
-          organizations (
-            id,
-            name
-          )
-        `)
-        .order("name", { ascending: true })
+      let plants: Awaited<ReturnType<typeof plantsRepo.findAllWithRelations>>
 
       // Apply role-based filtering
       if (accountType === "ORG" && orgId) {
-        query = query.eq("org_id", orgId)
+        plants = await plantsRepo.findByOrgIdWithRelations(orgId)
       } else if (accountType === "GOVT") {
         // GOVT users can only see plants that are mapped to work orders
         // Get plant IDs from active work orders
@@ -68,18 +55,13 @@ export async function GET(request: NextRequest) {
 
         if (workOrderPlants && workOrderPlants.length > 0) {
           const plantIds = workOrderPlants.map((wop) => wop.plant_id)
-          query = query.in("id", plantIds)
+          plants = await plantsRepo.findByIdsWithRelations(plantIds)
         } else {
-          // No plants in work orders, return empty array
-          query = query.eq("id", -1) // This will return no results
+          plants = []
         }
-      }
-      // SUPERADMIN can see all plants (no filters)
-
-      const { data: plants, error } = await query
-
-      if (error) {
-        throw error
+      } else {
+        // SUPERADMIN can see all plants
+        plants = await plantsRepo.findAllWithRelations()
       }
 
       logApiResponse(request, 200, Date.now() - startTime)
@@ -127,24 +109,16 @@ export async function POST(request: NextRequest) {
       const { org_id, vendor_id, vendor_plant_id, name, capacity_kw, location } =
         body
 
-      // Create plant directly in Supabase
-      const supabase = getMainClient()
-      const { data: plant, error: insertError } = await supabase
-        .from("plants")
-        .insert({
-          org_id,
-          vendor_id,
-          vendor_plant_id,
-          name,
-          capacity_kw,
-          location: location || {},
-        })
-        .select()
-        .single()
-
-      if (insertError) {
-        throw insertError
-      }
+      // Create plant using repository
+      const plantsRepo = getPlantsRepository()
+      const plant = await plantsRepo.save({
+        org_id,
+        vendor_id,
+        vendor_plant_id,
+        name,
+        capacity_kw,
+        location: location || {},
+      })
 
       logApiResponse(request, 201, Date.now() - startTime, { plantId: plant.id, name: plant.name })
       return jsonResponse({ plant }, { status: 201 })
