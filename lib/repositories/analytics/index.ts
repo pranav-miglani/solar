@@ -36,13 +36,16 @@ import { AnalyticsPlantsRepository, IAnalyticsPlantsRepository } from "./plantsR
 import { LegacyAnalyticsPlantsAdapter } from "./legacyAdapters/plantsAdapter"
 
 // Phase 15: plant_energy_readings
-// import { PlantEnergyReadingsRepository } from "./plantEnergyReadingsRepository"
+import { PlantEnergyReadingsRepository, IPlantEnergyReadingsRepository } from "./plantEnergyReadingsRepository"
+import { LegacyPlantEnergyReadingsAdapter } from "./legacyAdapters/plantEnergyReadingsAdapter"
 
 // Phase 16: plant_grid_downtime_readings
-// import { PlantGridDowntimeReadingsRepository } from "./plantGridDowntimeReadingsRepository"
+import { PlantGridDowntimeReadingsRepository, IPlantGridDowntimeReadingsRepository } from "./plantGridDowntimeReadingsRepository"
+import { LegacyPlantGridDowntimeReadingsAdapter } from "./legacyAdapters/plantGridDowntimeReadingsAdapter"
 
 // Phase 17: analytics_snapshot_runs
-// import { AnalyticsSnapshotRunsRepository } from "./snapshotRunsRepository"
+import { SnapshotRunsRepository, ISnapshotRunsRepository } from "./snapshotRunsRepository"
+import { LegacySnapshotRunsAdapter } from "./legacyAdapters/snapshotRunsAdapter"
 
 // =============================================================================
 // Factory Functions (will be uncommented as repositories are implemented)
@@ -103,22 +106,46 @@ export function getAnalyticsPlantsRepository(): IAnalyticsPlantsRepository {
 
 // -----------------------------------------------------------------------------
 // Phase 15: Plant Energy Readings Repository
+// Toggle: USE_ENERGY_READINGS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getPlantEnergyReadingsRepository() {
-//   return new PlantEnergyReadingsRepository(getAnalyticsClient())
-// }
+export function getPlantEnergyReadingsRepository(): IPlantEnergyReadingsRepository {
+  const useLegacy = process.env.USE_ENERGY_READINGS_REPO === 'false'
+  const client = getAnalyticsClient()
+  
+  if (useLegacy) {
+    return new LegacyPlantEnergyReadingsAdapter(client)
+  }
+  return new PlantEnergyReadingsRepository(client)
+}
 
 // -----------------------------------------------------------------------------
 // Phase 16: Plant Grid Downtime Readings Repository
+// Toggle: USE_GRID_DOWNTIME_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getPlantGridDowntimeReadingsRepository() {
-//   return new PlantGridDowntimeReadingsRepository(getAnalyticsClient())
-// }
+export function getPlantGridDowntimeReadingsRepository(): IPlantGridDowntimeReadingsRepository {
+  const useLegacy = process.env.USE_GRID_DOWNTIME_REPO === 'false'
+  const client = getAnalyticsClient()
+  
+  if (useLegacy) {
+    return new LegacyPlantGridDowntimeReadingsAdapter(client)
+  }
+  return new PlantGridDowntimeReadingsRepository(client)
+}
 
 // -----------------------------------------------------------------------------
 // Phase 17: Analytics Snapshot Runs Repository
+// Toggle: USE_SNAPSHOT_RUNS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getAnalyticsSnapshotRunsRepository() {
-//   return new AnalyticsSnapshotRunsRepository(getAnalyticsClient())
-// }
+export function getSnapshotRunsRepository(): ISnapshotRunsRepository {
+  const useLegacy = process.env.USE_SNAPSHOT_RUNS_REPO === 'false'
+  const client = getAnalyticsClient()
+  
+  if (useLegacy) {
+    return new LegacySnapshotRunsAdapter(client)
+  }
+  return new SnapshotRunsRepository(client)
+}
 
