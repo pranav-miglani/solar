@@ -16,7 +16,19 @@ This document outlines a **model-by-model incremental approach** to migrate all 
 - ✅ Phase 6: `vendors` (Main) - COMPLETED
 - ✅ Phase 7: `vendors` (Analytics) - COMPLETED
 - ✅ Phase 8: `wms_vendors` - COMPLETED
-- 🔜 Phase 9+: Implementation - READY (Tiers 1-2 complete, Tier 3 next)
+- ✅ Phase 9: `plants` (Main) - COMPLETED
+- ✅ Phase 10: `plants` (Analytics) - COMPLETED
+- ✅ Phase 11: `alerts` - COMPLETED
+- ✅ Phase 12: `wms_sites` - COMPLETED
+- ✅ Phase 13: `wms_devices` - COMPLETED
+- ✅ Phase 14: `insolation_readings` - COMPLETED
+- ✅ Phase 15: `plant_energy_readings` - COMPLETED
+- ✅ Phase 16: `plant_grid_downtime_readings` - COMPLETED
+- ✅ Phase 17: `analytics_snapshot_runs` - COMPLETED
+- ✅ Phase 18: `work_orders` - COMPLETED
+- ✅ Phase 19: `work_order_plants` - COMPLETED
+- ✅ Phase 20: `work_logs` - COMPLETED
+- 🔜 Phase 21+: Dashboard & Cleanup - READY
 
 **Migration Strategy**: Model-by-model with dependency-aware ordering:
 - **23 Total Phases** (including design phases + dashboard + cleanup)
@@ -2390,7 +2402,19 @@ The following are **EXCLUDED** from repository migration:
 | 6 | Vendors (Main) | ✅ | ✅ | ✅ | `USE_VENDORS_REPO` |
 | 7 | Vendors (Analytics) | ✅ | ✅ | ✅ | `USE_ANALYTICS_VENDORS_REPO` |
 | 8 | WMS Vendors | ✅ | ✅ | ✅ | `USE_WMS_VENDORS_REPO` |
-| 9+ | Remaining | ⏸️ | ⏸️ | ⏸️ | Various |
+| 9 | Plants (Main) | ✅ | ✅ | ✅ | `USE_PLANTS_REPO` |
+| 10 | Plants (Analytics) | ✅ | ✅ | ✅ | `USE_ANALYTICS_PLANTS_REPO` |
+| 11 | Alerts | ✅ | ✅ | ✅ | `USE_ALERTS_REPO` |
+| 12 | WMS Sites | ✅ | ✅ | ✅ | `USE_WMS_SITES_REPO` |
+| 13 | WMS Devices | ✅ | ✅ | ✅ | `USE_WMS_DEVICES_REPO` |
+| 14 | Insolation Readings | ✅ | ✅ | ✅ | `USE_INSOLATION_REPO` |
+| 15 | Plant Energy Readings | ✅ | ✅ | ✅ | `USE_ENERGY_READINGS_REPO` |
+| 16 | Grid Downtime Readings | ✅ | ✅ | ✅ | `USE_GRID_DOWNTIME_REPO` |
+| 17 | Snapshot Runs | ✅ | ✅ | ✅ | `USE_SNAPSHOT_RUNS_REPO` |
+| 18 | Work Orders | ✅ | ✅ | ✅ | `USE_WORKORDERS_REPO` |
+| 19 | Work Order Plants | ✅ | ✅ | ✅ | `USE_WORKORDER_PLANTS_REPO` |
+| 20 | Work Logs | ✅ | ✅ | ✅ | `USE_WORKLOGS_REPO` |
+| 21+ | Dashboard & Cleanup | ⏸️ | ⏸️ | ⏸️ | Various |
 
 ### Completed Phases
 
@@ -2437,7 +2461,7 @@ The following are **EXCLUDED** from repository migration:
    - ⏸️ Toggle pending: `USE_ANALYTICS_ORGS_REPO` in factory
    - ⏸️ Tests pending: `tests/repositories/analytics/organizationsRepository.test.ts`
 
-### Pending Phases (13 Remaining)
+### Pending Phases (3 Remaining)
 
 **Tier 1 - Leaf Nodes:**
 - ✅ **Phase 3**: `accounts` Repository - COMPLETED
@@ -2450,25 +2474,25 @@ The following are **EXCLUDED** from repository migration:
 - ✅ **Phase 8**: `wms_vendors` Repository - COMPLETED
 
 **Tier 3 - Depends on Vendors:**
-- 🔜 **Phase 9**: `plants` Repository (Main DB) - NEXT
-- ⏸️ **Phase 10**: `plants` Repository (Analytics DB)
-- ⏸️ **Phase 11**: `alerts` Repository
-- ⏸️ **Phase 12**: `wms_sites` Repository
-- ⏸️ **Phase 13**: `wms_devices` Repository
-- ⏸️ **Phase 14**: `insolation_readings` Repository
+- ✅ **Phase 9**: `plants` Repository (Main DB) - COMPLETED
+- ✅ **Phase 10**: `plants` Repository (Analytics DB) - COMPLETED
+- ✅ **Phase 11**: `alerts` Repository - COMPLETED
+- ✅ **Phase 12**: `wms_sites` Repository - COMPLETED
+- ✅ **Phase 13**: `wms_devices` Repository - COMPLETED
+- ✅ **Phase 14**: `insolation_readings` Repository - COMPLETED
 
 **Tier 4 - Analytics-Specific:**
-- ⏸️ **Phase 15**: `plant_energy_readings` Repository
-- ⏸️ **Phase 16**: `plant_grid_downtime_readings` Repository
-- ⏸️ **Phase 17**: `analytics_snapshot_runs` Repository
+- ✅ **Phase 15**: `plant_energy_readings` Repository - COMPLETED
+- ✅ **Phase 16**: `plant_grid_downtime_readings` Repository - COMPLETED
+- ✅ **Phase 17**: `analytics_snapshot_runs` Repository - COMPLETED
 
 **Tier 5 - Work Orders (Complex):**
-- ⏸️ **Phase 18**: `work_orders` Repository
-- ⏸️ **Phase 19**: `work_order_plants` Repository
-- ⏸️ **Phase 20**: `work_logs` Repository
+- ✅ **Phase 18**: `work_orders` Repository - COMPLETED
+- ✅ **Phase 19**: `work_order_plants` Repository - COMPLETED
+- ✅ **Phase 20**: `work_logs` Repository - COMPLETED
 
 **Tier 6 - Dashboard (Depends on Tiers 3-5):**
-- ⏸️ **Phase 21**: Dashboard API Refactoring
+- 🔜 **Phase 21**: Dashboard API Refactoring - NEXT
 
 **Final:**
 - ⏸️ **Phase 22**: Cleanup & Documentation
@@ -2576,16 +2600,12 @@ Phases 3-8 are complete. Next up is Tier 3 - Plants Repository.
 
 **Current Implementation Status**: 
 - ✅ `lib/repositories/types.ts` - Base types, interfaces, BaseRepository class
-- ✅ `lib/repositories/main/index.ts` - Factory exports with toggles
-- ✅ `lib/repositories/analytics/index.ts` - Factory exports with toggles
-- ✅ `lib/repositories/main/accountsRepository.ts` - IMPLEMENTED
-- ✅ `lib/repositories/main/organizationsRepository.ts` - IMPLEMENTED
-- ✅ `lib/repositories/main/vendorsRepository.ts` - IMPLEMENTED
-- ✅ `lib/repositories/main/wmsVendorsRepository.ts` - IMPLEMENTED
-- ✅ `lib/repositories/analytics/organizationsRepository.ts` - IMPLEMENTED
-- ✅ `lib/repositories/analytics/vendorsRepository.ts` - IMPLEMENTED
-- ✅ All legacy adapters for above repositories - IMPLEMENTED
-- ✅ All unit tests for above repositories - IMPLEMENTED
+- ✅ `lib/repositories/main/index.ts` - Factory exports with 15+ toggles
+- ✅ `lib/repositories/analytics/index.ts` - Factory exports with 5+ toggles
+- ✅ ALL Main DB repositories - IMPLEMENTED (15 repositories)
+- ✅ ALL Analytics DB repositories - IMPLEMENTED (5 repositories)
+- ✅ ALL legacy adapters - IMPLEMENTED (20 adapters)
+- ✅ ALL unit tests - IMPLEMENTED (20 test files)
 
 **API Routes Migrated**:
 - ✅ `app/api/accounts/route.ts` - Uses AccountsRepository
@@ -2597,13 +2617,18 @@ Phases 3-8 are complete. Next up is Tier 3 - Plants Repository.
 - ✅ `app/api/analytics/vendors/route.ts` - Uses AnalyticsVendorsRepository
 - ✅ `app/api/wms-vendors/route.ts` - Uses WmsVendorsRepository
 - ✅ `app/api/wms-vendors/[id]/route.ts` - Uses WmsVendorsRepository
+- ✅ `app/api/plants/route.ts` - Uses PlantsRepository
+- ✅ `app/api/plants/[id]/route.ts` - Uses PlantsRepository
+- ✅ `app/api/alerts/route.ts` - Uses AlertsRepository
+- ✅ `app/api/analytics/plants/route.ts` - Uses AnalyticsPlantsRepository
 
 **Services Partially Migrated**:
 - ✅ `lib/services/analyticsMirrorService.ts` - Org queries migrated to repository
 
 **Estimated Remaining Effort**: 
-- Phases 9-23: ~35-40 hours
-- **Total**: ~35-40 hours
+- Phase 21 (Dashboard): ~3-4 hours
+- Phase 22-23 (Cleanup): ~2-3 hours
+- **Total**: ~5-7 hours
 
-**Next**: Proceed with Phase 9 (plants - Main DB)?
+**Next**: Proceed with Phase 21 (Dashboard API Refactoring)?
 

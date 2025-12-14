@@ -2687,24 +2687,24 @@ Unique Constraints:
                   </div>
 
                   {/* Phases 9-14 */}
-                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-blue-500">
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-green-500">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-blue-500" />
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
                         Phases 9-14: Plants, Alerts & WMS Repositories
                       </h4>
-                      <Badge variant="secondary">NEXT</Badge>
+                      <Badge className="bg-green-500">COMPLETED</Badge>
                     </div>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li><strong>Phase 9:</strong> <code className="bg-background px-1 rounded">plants</code> (Main) - Complex with batch <code className="bg-background px-1 rounded">saveAll()</code> (3-4 hrs) <Badge variant="secondary" className="ml-1 text-xs">NEXT</Badge></li>
-                      <li><strong>Phase 10:</strong> <code className="bg-background px-1 rounded">plants</code> (Analytics) - Simplified structure (2-3 hrs)</li>
-                      <li><strong>Phase 11:</strong> <code className="bg-background px-1 rounded">alerts</code> - With plant joins (2-3 hrs)</li>
-                      <li><strong>Phase 12:</strong> <code className="bg-background px-1 rounded">wms_sites</code> - Batch operations (2 hrs)</li>
-                      <li><strong>Phase 13:</strong> <code className="bg-background px-1 rounded">wms_devices</code> - Batch operations (2 hrs)</li>
-                      <li><strong>Phase 14:</strong> <code className="bg-background px-1 rounded">insolation_readings</code> - Upsert by date (1-2 hrs)</li>
+                      <li><strong>Phase 9:</strong> <code className="bg-background px-1 rounded">plants</code> (Main) - Complex with batch <code className="bg-background px-1 rounded">saveAll()</code> ✅</li>
+                      <li><strong>Phase 10:</strong> <code className="bg-background px-1 rounded">plants</code> (Analytics) - Simplified structure ✅</li>
+                      <li><strong>Phase 11:</strong> <code className="bg-background px-1 rounded">alerts</code> - With plant joins ✅</li>
+                      <li><strong>Phase 12:</strong> <code className="bg-background px-1 rounded">wms_sites</code> - Batch operations ✅</li>
+                      <li><strong>Phase 13:</strong> <code className="bg-background px-1 rounded">wms_devices</code> - Batch operations ✅</li>
+                      <li><strong>Phase 14:</strong> <code className="bg-background px-1 rounded">insolation_readings</code> - Upsert by date ✅</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Total Effort:</strong> 12-16 hours | <strong>Dependencies:</strong> Phases 6-8 ✅
+                      <strong>Completed:</strong> All repositories + legacy adapters + tests | <strong>Toggles:</strong> USE_PLANTS_REPO, USE_ALERTS_REPO, USE_WMS_*
                     </div>
                   </div>
 
@@ -2715,49 +2715,52 @@ Unique Constraints:
                   </div>
 
                   {/* Phases 15-17 */}
-                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-green-500">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-gray-400" />
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
                         Phases 15-17: Analytics Readings Repositories
                       </h4>
-                      <Badge variant="outline">PENDING</Badge>
+                      <Badge className="bg-green-500">COMPLETED</Badge>
                     </div>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li><strong>Phase 15:</strong> <code className="bg-background px-1 rounded">plant_energy_readings</code> - Date filtering (2 hrs)</li>
-                      <li><strong>Phase 16:</strong> <code className="bg-background px-1 rounded">plant_grid_downtime_readings</code> - Baseline queries, batch 2000 (3 hrs)</li>
-                      <li><strong>Phase 17:</strong> <code className="bg-background px-1 rounded">analytics_snapshot_runs</code> - Status tracking (1-2 hrs)</li>
+                      <li><strong>Phase 15:</strong> <code className="bg-background px-1 rounded">plant_energy_readings</code> - Date filtering ✅</li>
+                      <li><strong>Phase 16:</strong> <code className="bg-background px-1 rounded">plant_grid_downtime_readings</code> - Baseline queries, batch 2000 ✅</li>
+                      <li><strong>Phase 17:</strong> <code className="bg-background px-1 rounded">analytics_snapshot_runs</code> - Status tracking ✅</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Total Effort:</strong> 6-7 hours | <strong>Dependencies:</strong> Phase 10
+                      <strong>Completed:</strong> All repositories + legacy adapters + tests | <strong>Toggles:</strong> USE_ENERGY_READINGS_REPO, USE_GRID_DOWNTIME_REPO, USE_SNAPSHOT_RUNS_REPO
                     </div>
                   </div>
 
                   {/* Tier 5 Header */}
-                  <div className="bg-gradient-to-r from-red-100 to-rose-100 dark:from-red-950/30 dark:to-rose-950/30 p-3 rounded-lg border border-red-300 dark:border-red-800">
-                    <h4 className="font-semibold text-red-800 dark:text-red-200">TIER 5: Work Orders (Complex)</h4>
-                    <p className="text-xs text-red-700 dark:text-red-300">Phases 18-20: Aggregate root with nested joins, N+1 prevention</p>
+                  <div className="bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-950/30 dark:to-emerald-950/30 p-3 rounded-lg border border-green-300 dark:border-green-800">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      <h4 className="font-semibold text-green-800 dark:text-green-200">TIER 5: Work Orders (Complex) - COMPLETED</h4>
+                    </div>
+                    <p className="text-xs text-green-700 dark:text-green-300">Phases 18-20: Aggregate root with nested joins, N+1 prevention</p>
                   </div>
 
                   {/* Phases 18-20 */}
-                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-purple-500">
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-green-500">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
-                        <Layers className="h-5 w-5 text-purple-500" />
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
                         Phases 18-20: Work Orders Repositories
                       </h4>
-                      <Badge variant="secondary" className="bg-purple-500">DESIGNED</Badge>
+                      <Badge variant="secondary" className="bg-green-500 text-white">COMPLETED</Badge>
                     </div>
-                    <div className="bg-blue-50 dark:bg-blue-950/20 p-2 rounded-lg mb-2 text-xs">
+                    <div className="bg-green-50 dark:bg-green-950/20 p-2 rounded-lg mb-2 text-xs">
                       <strong>Design Principle:</strong> Aggregate root pattern with single-query nested joins (N+1 prevention)
                     </div>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li><strong>Phase 18:</strong> <code className="bg-background px-1 rounded">work_orders</code> - Aggregate root (4-5 hrs)</li>
-                      <li><strong>Phase 19:</strong> <code className="bg-background px-1 rounded">work_order_plants</code> - Junction table (2-3 hrs)</li>
-                      <li><strong>Phase 20:</strong> <code className="bg-background px-1 rounded">work_logs</code> - Simple CRUD (1-2 hrs)</li>
+                      <li><strong>Phase 18:</strong> <code className="bg-background px-1 rounded">work_orders</code> - WorkOrdersRepository with findAllWithPlants, nested joins ✅</li>
+                      <li><strong>Phase 19:</strong> <code className="bg-background px-1 rounded">work_order_plants</code> - WorkOrderPlantsRepository with batch ops ✅</li>
+                      <li><strong>Phase 20:</strong> <code className="bg-background px-1 rounded">work_logs</code> - WorkLogsRepository with findByWorkOrderId ✅</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Total Effort:</strong> 7-10 hours | <strong>Dependencies:</strong> Phases 4, 9
+                      <strong>Deliverables:</strong> 3 repositories, 3 legacy adapters, 3 test files, API routes migrated
                     </div>
                   </div>
 
@@ -2768,13 +2771,13 @@ Unique Constraints:
                   </div>
 
                   {/* Phase 21: Dashboard */}
-                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-amber-400">
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-blue-500">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-amber-400" />
+                        <Clock className="h-5 w-5 text-blue-500" />
                         Phase 21: Dashboard API
                       </h4>
-                      <Badge variant="outline">PENDING</Badge>
+                      <Badge variant="secondary">NEXT</Badge>
                     </div>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                       <li>Create DashboardService using existing repositories</li>
@@ -2783,7 +2786,7 @@ Unique Constraints:
                       <li>Unit tests for DashboardService</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Effort:</strong> 3-4 hours | <strong>Dependencies:</strong> Phases 9, 11, 18, 19
+                      <strong>Effort:</strong> 3-4 hours | <strong>Dependencies:</strong> Phases 9, 11, 18, 19 ✅
                     </div>
                   </div>
 
@@ -2849,19 +2852,19 @@ Unique Constraints:
                       </div>
                       <div>
                         <div className="font-medium">Completed</div>
-                        <div className="text-2xl font-bold text-green-600">8</div>
+                        <div className="text-2xl font-bold text-green-600">20</div>
                       </div>
                       <div>
-                        <div className="font-medium">Remaining Effort</div>
-                        <div className="text-2xl font-bold text-primary">35-40 hrs</div>
+                        <div className="font-medium">Remaining</div>
+                        <div className="text-2xl font-bold text-orange-500">3</div>
                       </div>
                       <div>
                         <div className="font-medium">Repositories</div>
-                        <div className="text-2xl font-bold text-primary">15+</div>
+                        <div className="text-2xl font-bold text-green-600">18 ✓</div>
                       </div>
                       <div>
                         <div className="font-medium">Feature Toggles</div>
-                        <div className="text-2xl font-bold text-primary">15+</div>
+                        <div className="text-2xl font-bold text-green-600">18 ✓</div>
                       </div>
                       <div>
                         <div className="font-medium">Dependency Tiers</div>
