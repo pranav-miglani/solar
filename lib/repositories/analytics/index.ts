@@ -28,7 +28,8 @@ import { AnalyticsOrganizationsRepository, IAnalyticsOrganizationsRepository } f
 import { LegacyAnalyticsOrganizationsAdapter } from "./legacyAdapters/organizationsAdapter"
 
 // Phase 7: vendors (Analytics)
-// import { AnalyticsVendorsRepository } from "./vendorsRepository"
+import { AnalyticsVendorsRepository, IAnalyticsVendorsRepository } from "./vendorsRepository"
+import { LegacyAnalyticsVendorsAdapter } from "./legacyAdapters/vendorsAdapter"
 
 // Phase 10: plants (Analytics)
 // import { AnalyticsPlantsRepository } from "./plantsRepository"
@@ -71,10 +72,18 @@ export function getAnalyticsOrganizationsRepository(): IAnalyticsOrganizationsRe
 
 // -----------------------------------------------------------------------------
 // Phase 7: Analytics Vendors Repository
+// Toggle: USE_ANALYTICS_VENDORS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getAnalyticsVendorsRepository() {
-//   return new AnalyticsVendorsRepository(getAnalyticsClient())
-// }
+export function getAnalyticsVendorsRepository(): IAnalyticsVendorsRepository {
+  const useLegacy = process.env.USE_ANALYTICS_VENDORS_REPO === 'false'
+  const client = getAnalyticsClient()
+  
+  if (useLegacy) {
+    return new LegacyAnalyticsVendorsAdapter(client)
+  }
+  return new AnalyticsVendorsRepository(client)
+}
 
 // -----------------------------------------------------------------------------
 // Phase 10: Analytics Plants Repository

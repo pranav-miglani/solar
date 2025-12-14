@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
-import { getMainClient } from "@/lib/supabase/pooled"
+import { getVendorsRepository, getOrganizationsRepository } from "@/lib/repositories/main"
 import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
 
 // For vendors API, we need to bypass RLS for write operations
@@ -40,34 +40,14 @@ export async function GET(request: NextRequest) {
 
       requirePermission(accountType as any, "vendors", "read")
 
-      // Fetch vendors and organizations directly from Supabase
-      const supabase = getMainClient()
+      // Fetch vendors and organizations using repositories
+      const vendorsRepo = getVendorsRepository()
+      const orgsRepo = getOrganizationsRepository()
 
-      // Fetch vendors with organizations join
-      const { data: vendors, error: vendorsError } = await supabase
-        .from("vendors")
-        .select(`
-          *,
-          organizations (
-            id,
-            name
-          )
-        `)
-        .order("name", { ascending: true })
-
-      if (vendorsError) {
-        throw vendorsError
-      }
-
-      // Fetch organizations separately
-      const { data: orgs, error: orgsError } = await supabase
-        .from("organizations")
-        .select("*")
-        .order("name", { ascending: true })
-
-      if (orgsError) {
-        throw orgsError
-      }
+      const [vendors, orgs] = await Promise.all([
+        vendorsRepo.findAllWithOrganizations(),
+        orgsRepo.findAll(),
+      ])
 
       logApiResponse(request, 200, Date.now() - startTime)
       return NextResponse.json({
@@ -147,28 +127,20 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Create vendor directly in Supabase
-      const supabase = getMainClient()
-      const { data: vendor, error: insertError } = await supabase
-        .from("vendors")
-        .insert({
-          name,
-          vendor_type,
-          credentials,
-          org_id,
-          is_active: is_active ?? true,
-          plant_sync_mode: plant_sync_mode || null,
-          per_plant_sync_interval_minutes: per_plant_sync_interval_minutes ?? 15,
-          plant_sync_time_ist: plant_sync_time_ist || '02:00',
-          telemetry_sync_mode: telemetry_sync_mode || 'LIST_PLANTS',
-          telemetry_sync_interval: telemetry_sync_interval ?? 15,
-        })
-        .select()
-        .single()
-
-      if (insertError) {
-        throw insertError
-      }
+      // Create vendor using repository
+      const vendorsRepo = getVendorsRepository()
+      const vendor = await vendorsRepo.save({
+        name,
+        vendor_type,
+        credentials,
+        org_id,
+        is_active: is_active ?? true,
+        plant_sync_mode: plant_sync_mode || null,
+        per_plant_sync_interval_minutes: per_plant_sync_interval_minutes ?? 15,
+        plant_sync_time_ist: plant_sync_time_ist || '02:00',
+        telemetry_sync_mode: telemetry_sync_mode || 'LIST_PLANTS',
+        telemetry_sync_interval: telemetry_sync_interval ?? 15,
+      })
 
       logApiResponse(request, 201, Date.now() - startTime, { vendorId: vendor.id, name: vendor.name })
       return NextResponse.json({ vendor }, { status: 201 })

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getMainClient } from "@/lib/supabase/pooled"
+import { getWmsVendorsRepository } from "@/lib/repositories/main"
 import { requirePermission } from "@/lib/rbac"
 
 /**
@@ -38,36 +38,25 @@ export async function GET(
       )
     }
 
-    const supabase = getMainClient()
-    let query = supabase
-      .from("wms_vendors")
-      .select(`
-        *,
-        organizations (
-          id,
-          name
-        )
-      `)
-      .eq("id", vendorId)
+    const wmsVendorsRepo = getWmsVendorsRepository()
+    const vendor = await wmsVendorsRepo.findByIdWithOrganization(vendorId)
+
+    if (!vendor) {
+      return NextResponse.json(
+        { error: "WMS vendor not found" },
+        { status: 404 }
+      )
+    }
 
     // ORG users can only see their own org's vendors
-    if (accountType === "ORG" && orgId) {
-      query = query.eq("org_id", orgId)
+    if (accountType === "ORG" && orgId && vendor.org_id !== orgId) {
+      return NextResponse.json(
+        { error: "WMS vendor not found" },
+        { status: 404 }
+      )
     }
 
-    const { data, error } = await query.single()
-
-    if (error) {
-      if (error.code === "PGRST116") {
-        return NextResponse.json(
-          { error: "WMS vendor not found" },
-          { status: 404 }
-        )
-      }
-      throw error
-    }
-
-    return NextResponse.json({ vendor: data })
+    return NextResponse.json({ vendor })
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Failed to fetch WMS vendor" },
@@ -113,41 +102,25 @@ export async function PUT(
     const body = await request.json()
     const { name, vendor_type, credentials, org_id, is_active } = body
 
-    const supabase = getMainClient()
-
-    // Build update object
-    const updateData: any = {}
-    if (name !== undefined) updateData.name = name
-    if (vendor_type !== undefined) updateData.vendor_type = vendor_type
-    if (credentials !== undefined) updateData.credentials = credentials
-    if (org_id !== undefined) updateData.org_id = org_id
-    if (is_active !== undefined) updateData.is_active = is_active
-
-    if (Object.keys(updateData).length === 0) {
+    // Check if any fields to update
+    if (name === undefined && vendor_type === undefined && credentials === undefined && 
+        org_id === undefined && is_active === undefined) {
       return NextResponse.json(
         { error: "No fields to update" },
         { status: 400 }
       )
     }
 
-    const { data, error } = await supabase
-      .from("wms_vendors")
-      .update(updateData)
-      .eq("id", vendorId)
-      .select()
-      .single()
+    const wmsVendorsRepo = getWmsVendorsRepository()
+    const vendor = await wmsVendorsRepo.update(vendorId, {
+      name,
+      vendor_type,
+      credentials,
+      org_id,
+      is_active,
+    })
 
-    if (error) {
-      if (error.code === "PGRST116") {
-        return NextResponse.json(
-          { error: "WMS vendor not found" },
-          { status: 404 }
-        )
-      }
-      throw error
-    }
-
-    return NextResponse.json({ vendor: data })
+    return NextResponse.json({ vendor })
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Failed to update WMS vendor" },
@@ -190,22 +163,8 @@ export async function DELETE(
       )
     }
 
-    const supabase = getMainClient()
-
-    const { error } = await supabase
-      .from("wms_vendors")
-      .delete()
-      .eq("id", vendorId)
-
-    if (error) {
-      if (error.code === "PGRST116") {
-        return NextResponse.json(
-          { error: "WMS vendor not found" },
-          { status: 404 }
-        )
-      }
-      throw error
-    }
+    const wmsVendorsRepo = getWmsVendorsRepository()
+    await wmsVendorsRepo.deleteById(vendorId)
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

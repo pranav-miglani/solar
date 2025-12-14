@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
-import { getMainClient } from "@/lib/supabase/pooled"
-
-// For vendors API, we need to bypass RLS
+import { getVendorsRepository } from "@/lib/repositories/main"
 
 // Mark route as dynamic to prevent static generation (uses cookies)
 export const dynamic = 'force-dynamic'
@@ -29,17 +27,11 @@ export async function GET(
 
     requirePermission(accountType as any, "vendors", "read")
 
-    // Use service role client to bypass RLS
-    const supabase = getMainClient()
+    const vendorsRepo = getVendorsRepository()
+    const vendor = await vendorsRepo.findByIdWithOrganization(parseInt(params.id))
 
-    const { data: vendor, error } = await supabase
-      .from("vendors")
-      .select("*, organizations(id, name)")
-      .eq("id", params.id)
-      .single()
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (!vendor) {
+      return NextResponse.json({ error: "Vendor not found" }, { status: 404 })
     }
 
     return NextResponse.json({ vendor })
@@ -83,46 +75,18 @@ export async function PUT(
       telemetry_sync_interval,
     } = body
 
-    // Use service role client to bypass RLS
-    const supabase = getMainClient()
-
-    const updateData: any = {
+    const vendorsRepo = getVendorsRepository()
+    const vendor = await vendorsRepo.update(parseInt(params.id), {
       name,
-      // api_base_url removed - now stored in environment variables
       credentials,
       is_active,
-    }
-
-    if (org_id !== undefined) {
-      updateData.org_id = org_id
-    }
-
-    if (plant_sync_mode !== undefined) {
-      updateData.plant_sync_mode = plant_sync_mode
-    }
-    if (per_plant_sync_interval_minutes !== undefined) {
-      updateData.per_plant_sync_interval_minutes = per_plant_sync_interval_minutes
-    }
-    if (plant_sync_time_ist !== undefined) {
-      updateData.plant_sync_time_ist = plant_sync_time_ist
-    }
-    if (telemetry_sync_mode !== undefined) {
-      updateData.telemetry_sync_mode = telemetry_sync_mode
-    }
-    if (telemetry_sync_interval !== undefined) {
-      updateData.telemetry_sync_interval = telemetry_sync_interval
-    }
-
-    const { data: vendor, error } = await supabase
-      .from("vendors")
-      .update(updateData)
-      .eq("id", params.id)
-      .select()
-      .single()
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+      org_id,
+      plant_sync_mode,
+      per_plant_sync_interval_minutes,
+      plant_sync_time_ist,
+      telemetry_sync_mode,
+      telemetry_sync_interval,
+    })
 
     return NextResponse.json({ vendor })
   } catch (error: any) {
@@ -152,17 +116,8 @@ export async function DELETE(
 
     requirePermission(accountType as any, "vendors", "delete")
 
-    // Use service role client to bypass RLS
-    const supabase = getMainClient()
-
-    const { error } = await supabase
-      .from("vendors")
-      .delete()
-      .eq("id", params.id)
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    const vendorsRepo = getVendorsRepository()
+    await vendorsRepo.deleteById(parseInt(params.id))
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

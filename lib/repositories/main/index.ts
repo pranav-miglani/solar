@@ -32,10 +32,12 @@ import { OrganizationsRepository, IOrganizationsRepository } from "./organizatio
 import { LegacyOrganizationsAdapter } from "./legacyAdapters/organizationsAdapter"
 
 // Phase 6: vendors
-// import { VendorsRepository } from "./vendorsRepository"
+import { VendorsRepository, IVendorsRepository } from "./vendorsRepository"
+import { LegacyVendorsAdapter } from "./legacyAdapters/vendorsAdapter"
 
 // Phase 8: wms_vendors
-// import { WmsVendorsRepository } from "./wmsVendorsRepository"
+import { WmsVendorsRepository, IWmsVendorsRepository } from "./wmsVendorsRepository"
+import { LegacyWmsVendorsAdapter } from "./legacyAdapters/wmsVendorsAdapter"
 
 // Phase 9: plants
 // import { PlantsRepository } from "./plantsRepository"
@@ -105,17 +107,33 @@ export function getOrganizationsRepository(): IOrganizationsRepository {
 
 // -----------------------------------------------------------------------------
 // Phase 6: Vendors Repository
+// Toggle: USE_VENDORS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getVendorsRepository() {
-//   return new VendorsRepository(getMainClient())
-// }
+export function getVendorsRepository(): IVendorsRepository {
+  const useLegacy = process.env.USE_VENDORS_REPO === 'false'
+  const client = getMainClient()
+  
+  if (useLegacy) {
+    return new LegacyVendorsAdapter(client)
+  }
+  return new VendorsRepository(client)
+}
 
 // -----------------------------------------------------------------------------
 // Phase 8: WMS Vendors Repository
+// Toggle: USE_WMS_VENDORS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getWmsVendorsRepository() {
-//   return new WmsVendorsRepository(getMainClient())
-// }
+export function getWmsVendorsRepository(): IWmsVendorsRepository {
+  const useLegacy = process.env.USE_WMS_VENDORS_REPO === 'false'
+  const client = getMainClient()
+  
+  if (useLegacy) {
+    return new LegacyWmsVendorsAdapter(client)
+  }
+  return new WmsVendorsRepository(client)
+}
 
 // -----------------------------------------------------------------------------
 // Phase 9: Plants Repository
