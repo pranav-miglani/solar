@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getMainClient } from "@/lib/supabase/pooled"
+import { getPlantsRepository } from "@/lib/repositories/main"
 
 // Mark route as dynamic to prevent static generation (uses cookies)
 export const dynamic = 'force-dynamic'
@@ -22,27 +22,11 @@ export async function GET(
       return NextResponse.json({ error: "Invalid session" }, { status: 401 })
     }
 
-    const supabase = getMainClient()
+    // Use repository to fetch plant with relations
+    const plantsRepo = getPlantsRepository()
+    const plant = await plantsRepo.findByIdWithRelations(parseInt(params.id))
 
-    // Fetch plant with related data
-    const { data: plant, error } = await supabase
-      .from("plants")
-      .select(`
-        *,
-        vendors (
-          id,
-          name,
-          vendor_type
-        ),
-        organizations (
-          id,
-          name
-        )
-      `)
-      .eq("id", params.id)
-      .single()
-
-    if (error || !plant) {
+    if (!plant) {
       return NextResponse.json(
         { error: "Plant not found" },
         { status: 404 }

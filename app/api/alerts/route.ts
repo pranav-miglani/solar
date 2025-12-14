@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getMainClient } from "@/lib/supabase/pooled"
+import { getAlertsRepository, getPlantsRepository } from "@/lib/repositories/main"
 import { requirePermission } from "@/lib/rbac"
 
 // For alerts API, we need to bypass RLS
@@ -33,37 +33,26 @@ export async function GET(request: NextRequest) {
     const limitParam = url.searchParams.get("limit")
     const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 100, 200) : 100
 
-    // Use service role client to bypass RLS
-    const supabase = getMainClient()
+    // Use repositories to fetch alerts
+    const alertsRepo = getAlertsRepository()
+    const plantsRepo = getPlantsRepository()
 
-    let query = supabase.from("alerts").select(`
-      *,
-      plants:plant_id (
-        id,
-        name,
-        org_id
-      )
-    `)
+    let filters: { plantId?: number; plantIds?: number[]; limit?: number } = { limit }
 
     if (plantIdParam) {
       const plantId = parseInt(plantIdParam, 10)
       if (!Number.isNaN(plantId)) {
-        query = query.eq("plant_id", plantId)
+        filters.plantId = plantId
       }
     }
 
     // Filter based on role
     if (accountType === "ORG" && orgId) {
       // Get plant IDs for this org
-      const { data: orgPlants } = await supabase
-        .from("plants")
-        .select("id")
-        .eq("org_id", orgId)
-
-      const plantIds = orgPlants?.map((p) => p.id) || []
+      const plantIds = await plantsRepo.getPlantIdsByOrgId(orgId)
 
       if (plantIds.length > 0) {
-        query = query.in("plant_id", plantIds)
+        filters.plantIds = plantIds
       } else {
         // No plants, return empty
         return NextResponse.json({ alerts: [] })
@@ -71,19 +60,9 @@ export async function GET(request: NextRequest) {
     }
     // SUPERADMIN, DEVELOPER, and GOVT see all alerts (no filtering)
 
-    const { data: alerts, error } = await query
-      .order("created_at", { ascending: false })
-      .limit(limit)
+    const alerts = await alertsRepo.findWithPlants(filters)
 
-    if (error) {
-      console.error("Alerts query error:", error)
-      return NextResponse.json(
-        { error: "Failed to fetch alerts" },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ alerts: alerts || [] })
+    return NextResponse.json({ alerts })
   } catch (error) {
     console.error("Alerts error:", error)
     return NextResponse.json(

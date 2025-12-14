@@ -694,6 +694,18 @@ export function SystemFlowDocumentation() {
                         </p>
                       </div>
                       <div>
+                        <h4 className="font-medium mb-2">Repository Pattern (Migration in Progress)</h4>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Centralized database access layer using JPA-style naming conventions for consistency and maintainability.
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                          <li><strong>JPA-style Methods:</strong> <code className="bg-background px-1 rounded">save()</code> (instead of create/upsert), <code className="bg-background px-1 rounded">saveAll()</code> (instead of batchUpsert), <code className="bg-background px-1 rounded">deleteById()</code>, <code className="bg-background px-1 rounded">existsById()</code>, <code className="bg-background px-1 rounded">count()</code></li>
+                          <li><strong>Repository Structure:</strong> <code className="bg-background px-1 rounded">lib/repositories/main/</code> (Main DB) and <code className="bg-background px-1 rounded">lib/repositories/analytics/</code> (Analytics DB)</li>
+                          <li><strong>Factory Pattern:</strong> Repository factory functions provide consistent client injection</li>
+                          <li><strong>Status:</strong> Design complete (Phase 1), implementation in progress (Phases 2-10)</li>
+                        </ul>
+                      </div>
+                      <div>
                         <h4 className="font-medium mb-2">Sync Services</h4>
                         <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                           <li><code className="bg-background px-1 rounded">plantSyncService.ts</code> - Plant synchronization (once daily at configured time, default: 02:00 IST)</li>
@@ -2534,6 +2546,437 @@ Unique Constraints:
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+          </Card>
+          {/* Repository Migration Plan */}
+          <Card className="overflow-hidden">
+            <SectionHeader id="repository-migration" title="Repository Pattern Migration Plan" icon={Layers} />
+            {expandedSections.has("repository-migration") && (
+              <div className="p-6 pt-0 space-y-6 border-t">
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 p-6 rounded-lg border border-blue-200 dark:border-blue-900">
+                  <h3 className="font-semibold text-lg mb-4">Migration Overview</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    This migration will centralize all database queries into a repository pattern, improving maintainability, testability, and enabling future database portability.
+                  </p>
+                  <div className="grid md:grid-cols-3 gap-4 mt-4">
+                    <div className="bg-white dark:bg-background p-4 rounded-lg border">
+                      <div className="text-2xl font-bold text-primary mb-1">50+</div>
+                      <div className="text-sm text-muted-foreground">Query Patterns</div>
+                    </div>
+                    <div className="bg-white dark:bg-background p-4 rounded-lg border">
+                      <div className="text-2xl font-bold text-primary mb-1">15+</div>
+                      <div className="text-sm text-muted-foreground">Tables</div>
+                    </div>
+                    <div className="bg-white dark:bg-background p-4 rounded-lg border">
+                      <div className="text-2xl font-bold text-primary mb-1">10</div>
+                      <div className="text-sm text-muted-foreground">Migration Phases</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Phase Status Overview */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Migration Phases</h3>
+                  
+                  {/* Phase 0 */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-green-500">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        Phase 0: Query Extraction
+                      </h4>
+                      <Badge variant="default" className="bg-green-500">COMPLETED</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Extract ALL database queries into a single reference file for analysis.
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>✅ <code className="bg-background px-1 rounded">lib/queries/extracted-queries.ts</code> - Complete query inventory</li>
+                      <li>✅ Query categorization by table/entity</li>
+                      <li>✅ Pattern identification</li>
+                    </ul>
+                  </div>
+
+                  {/* Phase 1 */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-green-500">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        Phase 1: Repository Design & Architecture
+                      </h4>
+                      <Badge variant="default" className="bg-green-500">COMPLETED</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Design repository structure considering Main DB vs Analytics DB commonality, table-by-table breakdown, and common patterns.
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>✅ Repository interface definitions for all 15 repositories</li>
+                      <li>✅ Base repository class design</li>
+                      <li>✅ Table-specific repository designs</li>
+                      <li>✅ Database adapter pattern (Main vs Analytics)</li>
+                      <li>✅ Common patterns documentation (7 patterns)</li>
+                      <li>✅ Work Orders repository design with N+1 prevention</li>
+                    </ul>
+                  </div>
+
+                  {/* Phase 2 */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-blue-500">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-blue-500" />
+                        Phase 2: Base Repository & Types (Foundation)
+                      </h4>
+                      <Badge variant="secondary">PENDING</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Create foundation: base repository class, types, interfaces, and factory pattern.
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>Create <code className="bg-background px-1 rounded">lib/repositories/types.ts</code></li>
+                      <li>Base repository interface and class</li>
+                      <li>Common types (BatchResult, RepositoryOptions, etc.)</li>
+                      <li>Factory pattern implementation</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Estimated Effort:</strong> 2-3 hours
+                    </div>
+                  </div>
+
+                  {/* Phase 3 */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-gray-400" />
+                        Phase 3: Simple CRUD Repositories (Low Risk)
+                      </h4>
+                      <Badge variant="outline">PENDING</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Implement repositories for simple tables with minimal joins.
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>accounts - Simple CRUD, email lookup</li>
+                      <li>organizations (Main DB) - Simple CRUD</li>
+                      <li>organizations (Analytics DB) - CRUD + config operations</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Estimated Effort:</strong> 4-6 hours | <strong>Dependencies:</strong> Phase 2
+                    </div>
+                  </div>
+
+                  {/* Phase 4 */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-gray-400" />
+                        Phase 4: Repositories with Simple Joins
+                      </h4>
+                      <Badge variant="outline">PENDING</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Implement repositories for tables with simple joins (1-2 level).
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>vendors (Main DB) - CRUD + join with organizations</li>
+                      <li>vendors (Analytics DB) - CRUD + join + config operations</li>
+                      <li>wms_vendors - CRUD + join with organizations</li>
+                      <li>alerts - CRUD + join with plants, filtering</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Estimated Effort:</strong> 6-8 hours | <strong>Dependencies:</strong> Phase 3
+                    </div>
+                  </div>
+
+                  {/* Phase 5 */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-gray-400" />
+                        Phase 5: Complex Repositories (Plants & WMS)
+                      </h4>
+                      <Badge variant="outline">PENDING</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Implement repositories for complex tables with multiple relationships and batch operations.
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>plants (Main DB) - CRUD + joins + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) + production metrics</li>
+                      <li>plants (Analytics DB) - CRUD + joins + batch save (<code className="bg-background px-1 rounded">saveAll()</code>)</li>
+                      <li>wms_sites - CRUD + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) + deduplication</li>
+                      <li>wms_devices - CRUD + batch save (<code className="bg-background px-1 rounded">saveAll()</code>) + deduplication</li>
+                      <li>insolation_readings - CRUD + save (<code className="bg-background px-1 rounded">save()</code>) by device/date</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Estimated Effort:</strong> 10-12 hours | <strong>Dependencies:</strong> Phase 4
+                    </div>
+                  </div>
+
+                  {/* Phase 6 */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-gray-400" />
+                        Phase 6: Analytics-Specific Repositories
+                      </h4>
+                      <Badge variant="outline">PENDING</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Implement repositories for analytics-specific tables and operations.
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>plant_energy_readings - CRUD + date filtering + batch save (<code className="bg-background px-1 rounded">saveAll()</code>)</li>
+                      <li>plant_grid_downtime_readings - CRUD + date filtering + baseline queries + batch save (<code className="bg-background px-1 rounded">saveAll()</code>)</li>
+                      <li>analytics_snapshot_runs - CRUD + vendor grouping + status tracking (uses <code className="bg-background px-1 rounded">save()</code> instead of create())</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Estimated Effort:</strong> 6-8 hours | <strong>Dependencies:</strong> Phase 5
+                    </div>
+                  </div>
+
+                  {/* Phase 7 */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-gray-400" />
+                        Phase 7: Service Layer Migration
+                      </h4>
+                      <Badge variant="outline">PENDING</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Migrate all services to use repositories instead of direct Supabase calls.
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>analyticsMirrorService - Cross-database operations</li>
+                      <li>analyticsSnapshotService - Analytics operations</li>
+                      <li>gridDowntimeAnalyticsService - Complex calculations</li>
+                      <li>plantSyncService - Batch operations</li>
+                      <li>alertSyncService - Batch operations</li>
+                      <li>wmsSyncService - WMS operations</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Estimated Effort:</strong> 8-10 hours | <strong>Dependencies:</strong> Phases 3-6
+                    </div>
+                  </div>
+
+                  {/* Phase 8 */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-gray-400" />
+                        Phase 8: Testing & Validation
+                      </h4>
+                      <Badge variant="outline">PENDING</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Comprehensive testing and validation of all migrations.
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>Unit tests for repositories</li>
+                      <li>Integration tests for API routes</li>
+                      <li>End-to-end tests for services</li>
+                      <li>Performance validation</li>
+                      <li>Regression testing</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Estimated Effort:</strong> 4-6 hours | <strong>Dependencies:</strong> Phase 7
+                    </div>
+                  </div>
+
+                  {/* Phase 9 */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-gray-400" />
+                        Phase 9: Cleanup & Documentation
+                      </h4>
+                      <Badge variant="outline">PENDING</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Final cleanup and documentation.
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>Remove <code className="bg-background px-1 rounded">lib/queries/extracted-queries.ts</code> (reference file)</li>
+                      <li>Update documentation</li>
+                      <li>Code review</li>
+                      <li>Final validation</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Estimated Effort:</strong> 2-3 hours | <strong>Dependencies:</strong> Phase 8
+                    </div>
+                  </div>
+
+                  {/* Phase 10 */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-purple-500">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Layers className="h-5 w-5 text-purple-500" />
+                        Phase 10: Work Orders Repositories (Complex Nested Joins)
+                      </h4>
+                      <Badge variant="secondary" className="bg-purple-500">DESIGNED</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Implement repositories for work orders using aggregate root pattern with single-query nested joins to avoid N+1 query propagation.
+                    </p>
+                    <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg mb-2">
+                      <h5 className="font-medium text-sm mb-1">Key Design Principle: Single Query with Nested Joins</h5>
+                      <p className="text-xs text-muted-foreground">
+                        Uses Supabase PostgREST nested selects - executes a <strong>single SQL query</strong> with JOINs. This is efficient and avoids N+1 problems.
+                      </p>
+                    </div>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li>WorkOrdersRepository - Aggregate root with nested joins</li>
+                      <li>WorkOrderPlantsRepository - Junction table operations</li>
+                      <li>WorkLogsRepository - Work logs with user join</li>
+                      <li>WorkOrderProductionRepository - Production metrics aggregation</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Estimated Effort:</strong> 8-10 hours | <strong>Dependencies:</strong> Phase 5 (PlantsRepository), Phase 4 (OrganizationsRepository, VendorsRepository)
+                    </div>
+                  </div>
+                </div>
+
+                {/* Design Principles */}
+                <div className="space-y-4 mt-6">
+                  <h3 className="font-semibold text-lg">Design Principles</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Database className="h-4 w-4" />
+                        Common Repository Interface
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        Main DB and Analytics DB share similar schemas for organizations, vendors, and plants. Common interfaces allow same methods to work with both databases. Uses JPA-style naming: <code className="bg-background px-1 rounded">save()</code> instead of <code className="bg-background px-1 rounded">create()</code>, <code className="bg-background px-1 rounded">saveAll()</code> instead of <code className="bg-background px-1 rounded">batchUpsert()</code>.
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Layers className="h-4 w-4" />
+                        Base Repository Pattern (JPA-style)
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        Optional base class for common CRUD operations with JPA-style methods: <code className="bg-background px-1 rounded">save()</code>, <code className="bg-background px-1 rounded">saveAll()</code>, <code className="bg-background px-1 rounded">findById()</code>, <code className="bg-background px-1 rounded">deleteById()</code>, <code className="bg-background px-1 rounded">existsById()</code>, <code className="bg-background px-1 rounded">count()</code>. Custom implementations for complex patterns (batch operations, joins).
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Zap className="h-4 w-4" />
+                        Factory Pattern
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        Repository factory functions use <code className="bg-background px-1 rounded">getMainClient()</code> / <code className="bg-background px-1 rounded">getAnalyticsClient()</code> for consistency. Returns repository instances with JPA-style method naming.
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <GitBranch className="h-4 w-4" />
+                        Query Propagation Prevention
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        Work orders use single queries with nested joins. Batch operations via <code className="bg-background px-1 rounded">saveAll()</code> prevent N+1 queries. In-memory aggregation for calculations.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Common Patterns */}
+                <div className="space-y-4 mt-6">
+                  <h3 className="font-semibold text-lg">Common Patterns Identified</h3>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <Badge variant="outline" className="mb-2">Pattern 1</Badge>
+                      <h4 className="font-medium text-sm">Simple CRUD</h4>
+                      <p className="text-xs text-muted-foreground mt-1">accounts, organizations (Main), insolation_readings</p>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <Badge variant="outline" className="mb-2">Pattern 2</Badge>
+                      <h4 className="font-medium text-sm">CRUD with Simple Joins</h4>
+                      <p className="text-xs text-muted-foreground mt-1">vendors, wms_vendors, alerts</p>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <Badge variant="outline" className="mb-2">Pattern 3</Badge>
+                      <h4 className="font-medium text-sm">Batch Save with Deduplication (JPA-style)</h4>
+                      <p className="text-xs text-muted-foreground mt-1">plants, alerts, wms_sites, wms_devices, analytics tables - Uses <code className="bg-background px-1 rounded">saveAll()</code> instead of batchUpsert()</p>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <Badge variant="outline" className="mb-2">Pattern 4</Badge>
+                      <h4 className="font-medium text-sm">Cross-Database Operations</h4>
+                      <p className="text-xs text-muted-foreground mt-1">analyticsMirrorService (Main → Analytics)</p>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <Badge variant="outline" className="mb-2">Pattern 5</Badge>
+                      <h4 className="font-medium text-sm">Date Filtering</h4>
+                      <p className="text-xs text-muted-foreground mt-1">plant_energy_readings, plant_grid_downtime_readings</p>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <Badge variant="outline" className="mb-2">Pattern 6</Badge>
+                      <h4 className="font-medium text-sm">Status Tracking</h4>
+                      <p className="text-xs text-muted-foreground mt-1">analytics_snapshot_runs</p>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <Badge variant="outline" className="mb-2">Pattern 7</Badge>
+                      <h4 className="font-medium text-sm">Config Hash Change Detection</h4>
+                      <p className="text-xs text-muted-foreground mt-1">analytics organizations, analytics vendors</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Exclusions */}
+                <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-900 mt-6">
+                  <h4 className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">Exclusions</h4>
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    The following are <strong>EXCLUDED</strong> from migration per requirements:
+                  </p>
+                  <ul className="text-sm text-yellow-800 dark:text-yellow-200 space-y-1 ml-4 list-disc mt-2">
+                    <li><code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded">dashboard</code> route queries (complex aggregations, role-based logic)</li>
+                    <li>Any queries involving work orders that are part of dashboard aggregations</li>
+                  </ul>
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200 mt-2">
+                    <strong>Note:</strong> Work orders themselves are included in Phase 10, but dashboard-specific aggregations remain as direct queries.
+                  </p>
+                </div>
+
+                {/* Success Criteria */}
+                <div className="space-y-4 mt-6">
+                  <h3 className="font-semibold text-lg">Success Criteria</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">All queries (except exclusions) migrated to repositories</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">All API routes use repositories</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">All services use repositories</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">No regressions in functionality</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">Code is more maintainable and testable</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">Database abstraction enables future portability</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Documentation Link */}
+                <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900 mt-6">
+                  <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Full Documentation</h4>
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    Complete migration plan with detailed repository designs, interfaces, and implementation strategies available at:
+                  </p>
+                  <code className="block mt-2 bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded text-xs">
+                    lib/queries/REPOSITORY_MIGRATION_PLAN.md
+                  </code>
                 </div>
               </div>
             )}

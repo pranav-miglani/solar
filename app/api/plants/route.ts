@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
+import { getPlantsRepository } from "@/lib/repositories/main"
 import { getMainClient } from "@/lib/supabase/pooled"
 import { logApiRequest, logApiResponse, withMDCContext, jsonResponse } from "@/lib/api-logger"
 
@@ -36,16 +37,15 @@ export async function GET(request: NextRequest) {
 
       requirePermission(accountType as any, "plants", "read")
 
-      // Use service role client to bypass RLS
+      // Use repository to fetch plants
+      const plantsRepo = getPlantsRepository()
       const supabase = getMainClient()
 
-      let query = supabase
-        .from("plants")
-        .select("*, vendors(*), organizations(*)")
+      let filters: { orgId?: number; plantIds?: number[] } | undefined
 
       // Apply role-based filtering
       if (accountType === "ORG" && orgId) {
-        query = query.eq("org_id", orgId)
+        filters = { orgId }
       } else if (accountType === "GOVT") {
         // GOVT users can only see plants that are mapped to work orders
         // Get plant IDs from active work orders
@@ -56,23 +56,18 @@ export async function GET(request: NextRequest) {
 
         if (workOrderPlants && workOrderPlants.length > 0) {
           const plantIds = workOrderPlants.map((wop) => wop.plant_id)
-          query = query.in("id", plantIds)
+          filters = { plantIds }
         } else {
           // No plants in work orders, return empty array
-          query = query.eq("id", -1) // This will return no results
+          filters = { plantIds: [-1] } // This will return no results
         }
       }
-      // SUPERADMIN can see all plants
+      // SUPERADMIN can see all plants (no filters)
 
-      const { data: plants, error } = await query
-
-      if (error) {
-        logApiResponse(request, 500, Date.now() - startTime, error)
-        return jsonResponse({ error: error.message }, { status: 500 })
-      }
+      const plants = await plantsRepo.findAllWithRelations(filters)
 
       logApiResponse(request, 200, Date.now() - startTime)
-      return jsonResponse({ plants: plants || [] })
+      return jsonResponse({ plants })
     } catch (error: any) {
       console.error("Plants GET error:", error)
       logApiResponse(request, error.message?.includes("permission") ? 403 : 500, Date.now() - startTime, error)
@@ -116,26 +111,16 @@ export async function POST(request: NextRequest) {
       const { org_id, vendor_id, vendor_plant_id, name, capacity_kw, location } =
         body
 
-      // Use MAIN client - plants are stored in the main database
-      const supabase = getMainClient()
-
-      const { data: plant, error } = await supabase
-        .from("plants")
-        .insert({
-          org_id,
-          vendor_id,
-          vendor_plant_id,
-          name,
-          capacity_kw,
-          location: location || {},
-        })
-        .select()
-        .single()
-
-      if (error) {
-        logApiResponse(request, 500, Date.now() - startTime, error)
-        return jsonResponse({ error: error.message }, { status: 500 })
-      }
+      // Use repository to create plant
+      const plantsRepo = getPlantsRepository()
+      const plant = await plantsRepo.create({
+        org_id,
+        vendor_id,
+        vendor_plant_id,
+        name,
+        capacity_kw,
+        location: location || {},
+      })
 
       logApiResponse(request, 201, Date.now() - startTime, { plantId: plant.id, name: plant.name })
       return jsonResponse({ plant }, { status: 201 })

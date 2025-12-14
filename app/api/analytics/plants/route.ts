@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
-import { getAnalyticsClient } from "@/lib/supabase/pooled"
+import { getAnalyticsPlantsRepository } from "@/lib/repositories/analytics"
 
 export const dynamic = "force-dynamic"
 
@@ -24,49 +24,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const analytics = getAnalyticsClient()
     const { searchParams } = new URL(request.url)
     const orgIdParam = searchParams.get("orgId")
     const vendorIdParam = searchParams.get("vendorId")
 
-    // Fetch plants with organizations and vendors (FK relationships now exist)
-    let query = analytics
-      .from("plants")
-      .select(`
-        *,
-        organizations (
-          id,
-          name
-        ),
-        vendors (
-          id,
-          name,
-          vendor_type
-        )
-      `)
-      .order("id", { ascending: true })
+    // Use repository to fetch plants
+    const plantsRepo = getAnalyticsPlantsRepository()
 
+    const filters: { orgId?: number; vendorId?: number } = {}
     if (orgIdParam) {
       const orgId = parseInt(orgIdParam)
       if (!isNaN(orgId)) {
-        query = query.eq("org_id", orgId)
+        filters.orgId = orgId
       }
     }
-
     if (vendorIdParam) {
       const vendorId = parseInt(vendorIdParam)
       if (!isNaN(vendorId)) {
-        query = query.eq("vendor_id", vendorId)
+        filters.vendorId = vendorId
       }
     }
 
-    const { data: plants, error: plantsError } = await query
+    const plants = await plantsRepo.findAllWithRelations(filters)
 
-    if (plantsError) {
-      return NextResponse.json({ error: "Failed to fetch plants", details: plantsError.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ plants: plants || [] })
+    return NextResponse.json({ plants })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 })
   }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
-import { getMainClient } from "@/lib/supabase/pooled"
+import { getVendorsRepository, getOrganizationsRepository } from "@/lib/repositories/main"
 import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
 
 // For vendors API, we need to bypass RLS for write operations
@@ -40,43 +40,20 @@ export async function GET(request: NextRequest) {
 
       requirePermission(accountType as any, "vendors", "read")
 
-      // Use service role client to bypass RLS
-      const supabase = getMainClient()
+      // Use repositories to fetch vendors and organizations
+      const vendorsRepo = getVendorsRepository()
+      const orgsRepo = getOrganizationsRepository()
 
       // Fetch vendors and organizations in parallel for better performance
-      const [vendorsResult, orgsResult] = await Promise.all([
-        supabase
-          .from("vendors")
-          .select("*, organizations(id, name, auto_sync_enabled)")
-          .order("name"),
-        supabase
-          .from("organizations")
-          .select("*")
-          .order("name"),
+      const [vendors, orgs] = await Promise.all([
+        vendorsRepo.findAllWithOrganizations(),
+        orgsRepo.findAll(),
       ])
-
-      if (vendorsResult.error) {
-        console.error("Vendors query error:", vendorsResult.error)
-        logApiResponse(request, 500, Date.now() - startTime, vendorsResult.error)
-        return NextResponse.json(
-          { error: "Failed to fetch vendors" },
-          { status: 500 }
-        )
-      }
-
-      if (orgsResult.error) {
-        console.error("Orgs query error:", orgsResult.error)
-        logApiResponse(request, 500, Date.now() - startTime, orgsResult.error)
-        return NextResponse.json(
-          { error: "Failed to fetch organizations" },
-          { status: 500 }
-        )
-      }
 
       logApiResponse(request, 200, Date.now() - startTime)
       return NextResponse.json({
-        vendors: vendorsResult.data || [],
-        orgs: orgsResult.data || [],
+        vendors,
+        orgs,
       })
     } catch (error: any) {
       console.error("Vendors error:", error)
@@ -151,35 +128,20 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Use service role client to bypass RLS for insert
-      const supabase = getMainClient()
-
-      const { data: vendor, error } = await supabase
-        .from("vendors")
-        .insert({
-          name,
-          vendor_type,
-          // api_base_url removed - now stored in environment variables
-          credentials,
-          is_active: is_active ?? true,
-          org_id,
-          plant_sync_mode: plant_sync_mode || null,
-          per_plant_sync_interval_minutes: per_plant_sync_interval_minutes ?? 15,
-          plant_sync_time_ist: plant_sync_time_ist || '02:00',
-          telemetry_sync_mode: telemetry_sync_mode || 'LIST_PLANTS',
-          telemetry_sync_interval: telemetry_sync_interval ?? 15,
-        })
-        .select()
-        .single()
-
-      if (error) {
-        console.error("Vendor creation error:", error)
-        logApiResponse(request, 500, Date.now() - startTime, error)
-        return NextResponse.json(
-          { error: "Failed to create vendor" },
-          { status: 500 }
-        )
-      }
+      // Use repository to create vendor
+      const vendorsRepo = getVendorsRepository()
+      const vendor = await vendorsRepo.create({
+        name,
+        vendor_type,
+        credentials,
+        org_id,
+        is_active: is_active ?? true,
+        plant_sync_mode: plant_sync_mode || null,
+        per_plant_sync_interval_minutes: per_plant_sync_interval_minutes ?? 15,
+        plant_sync_time_ist: plant_sync_time_ist || '02:00',
+        telemetry_sync_mode: telemetry_sync_mode || 'LIST_PLANTS',
+        telemetry_sync_interval: telemetry_sync_interval ?? 15,
+      })
 
       logApiResponse(request, 201, Date.now() - startTime, { vendorId: vendor.id, name: vendor.name })
       return NextResponse.json({ vendor }, { status: 201 })

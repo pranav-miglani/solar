@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requirePermission } from "@/lib/rbac"
 import bcrypt from "bcryptjs"
-import { getMainClient } from "@/lib/supabase/pooled"
+import { getAccountsRepository } from "@/lib/repositories/main"
 import { logApiRequest, logApiResponse, withMDCContext } from "@/lib/api-logger"
 
 // For accounts API, we need to bypass RLS for write operations
@@ -36,25 +36,12 @@ export async function GET(request: NextRequest) {
       // Only SUPERADMIN can view all accounts
       requirePermission(accountType as any, "accounts", "read")
 
-      // Use service role client to bypass RLS
-      const supabase = getMainClient()
-
-      const { data: accounts, error } = await supabase
-        .from("accounts")
-        .select("id, email, account_type, org_id, created_at, display_name, logo_url, is_active")
-        .order("email")
-
-      if (error) {
-        console.error("Accounts query error:", error)
-        logApiResponse(request, 500, Date.now() - startTime, error)
-        return NextResponse.json(
-          { error: "Failed to fetch accounts" },
-          { status: 500 }
-        )
-      }
+      // Use repository to fetch accounts
+      const accountsRepo = getAccountsRepository()
+      const accounts = await accountsRepo.findAll()
 
       logApiResponse(request, 200, Date.now() - startTime)
-      return NextResponse.json({ accounts: accounts || [] })
+      return NextResponse.json({ accounts })
     } catch (error: any) {
       console.error("Accounts error:", error)
       logApiResponse(request, 403, Date.now() - startTime, error)
@@ -149,16 +136,11 @@ export async function POST(request: NextRequest) {
       // Hash password before storing
       const passwordHash = await bcrypt.hash(password, 10)
 
-      // Use service role client to bypass RLS
-      const supabase = getMainClient()
+      // Use repository to create account
+      const accountsRepo = getAccountsRepository()
 
       // Check if account already exists
-      const { data: existingAccount } = await supabase
-        .from("accounts")
-        .select("id")
-        .eq("email", email)
-        .single()
-
+      const existingAccount = await accountsRepo.findByEmail(email)
       if (existingAccount) {
         logApiResponse(request, 409, Date.now() - startTime, { email })
         return NextResponse.json(
@@ -169,13 +151,7 @@ export async function POST(request: NextRequest) {
 
       // For ORG accounts, check if org already has an account
       if (account_type === "ORG" && org_id) {
-        const { data: existingOrgAccount } = await supabase
-          .from("accounts")
-          .select("id")
-          .eq("org_id", org_id)
-          .eq("account_type", "ORG")
-          .single()
-
+        const existingOrgAccount = await accountsRepo.existsByOrgId(org_id)
         if (existingOrgAccount) {
           logApiResponse(request, 409, Date.now() - startTime, { org_id })
           return NextResponse.json(
@@ -185,26 +161,13 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const { data: account, error } = await supabase
-        .from("accounts")
-        .insert({
-          email,
-          password_hash: passwordHash,
-          account_type,
-          org_id: account_type === "ORG" ? org_id : null,
-          display_name: display_name || null,
-        })
-        .select("id, email, account_type, org_id, created_at, display_name")
-        .single()
-
-      if (error) {
-        console.error("Account creation error:", error)
-        logApiResponse(request, 500, Date.now() - startTime, error)
-        return NextResponse.json(
-          { error: "Failed to create account", details: error.message },
-          { status: 500 }
-        )
-      }
+      const account = await accountsRepo.create({
+        email,
+        password_hash: passwordHash,
+        account_type,
+        org_id: account_type === "ORG" ? org_id : null,
+        display_name: display_name || null,
+      })
 
       logApiResponse(request, 201, Date.now() - startTime, { accountId: account.id, email: account.email })
       return NextResponse.json({ account }, { status: 201 })
