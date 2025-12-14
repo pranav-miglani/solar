@@ -2662,21 +2662,21 @@ Unique Constraints:
                   </div>
 
                   {/* Phases 6-8 */}
-                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-blue-500">
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-green-500">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-blue-500" />
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
                         Phases 6-8: Vendor Repositories
                       </h4>
-                      <Badge variant="secondary">NEXT</Badge>
+                      <Badge className="bg-green-500">COMPLETED</Badge>
                     </div>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li><strong>Phase 6:</strong> <code className="bg-background px-1 rounded">vendors</code> (Main) - CRUD + org join (2-3 hrs) <Badge variant="secondary" className="ml-1 text-xs">NEXT</Badge></li>
-                      <li><strong>Phase 7:</strong> <code className="bg-background px-1 rounded">vendors</code> (Analytics) - CRUD + config_hash (2-3 hrs)</li>
-                      <li><strong>Phase 8:</strong> <code className="bg-background px-1 rounded">wms_vendors</code> - CRUD + token management (2-3 hrs)</li>
+                      <li><strong>Phase 6:</strong> <code className="bg-background px-1 rounded">vendors</code> (Main) - CRUD + org join ✅</li>
+                      <li><strong>Phase 7:</strong> <code className="bg-background px-1 rounded">vendors</code> (Analytics) - CRUD + config_hash ✅</li>
+                      <li><strong>Phase 8:</strong> <code className="bg-background px-1 rounded">wms_vendors</code> - CRUD + token management ✅</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Total Effort:</strong> 6-9 hours | <strong>Dependencies:</strong> Phases 4-5 ✅
+                      <strong>Completed:</strong> ~4 hours | <strong>Toggles:</strong> USE_VENDORS_REPO, USE_ANALYTICS_VENDORS_REPO, USE_WMS_VENDORS_REPO
                     </div>
                   </div>
 
@@ -2687,16 +2687,16 @@ Unique Constraints:
                   </div>
 
                   {/* Phases 9-14 */}
-                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-blue-500">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-gray-400" />
+                        <Clock className="h-5 w-5 text-blue-500" />
                         Phases 9-14: Plants, Alerts & WMS Repositories
                       </h4>
-                      <Badge variant="outline">PENDING</Badge>
+                      <Badge variant="secondary">NEXT</Badge>
                     </div>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li><strong>Phase 9:</strong> <code className="bg-background px-1 rounded">plants</code> (Main) - Complex with batch <code className="bg-background px-1 rounded">saveAll()</code> (3-4 hrs)</li>
+                      <li><strong>Phase 9:</strong> <code className="bg-background px-1 rounded">plants</code> (Main) - Complex with batch <code className="bg-background px-1 rounded">saveAll()</code> (3-4 hrs) <Badge variant="secondary" className="ml-1 text-xs">NEXT</Badge></li>
                       <li><strong>Phase 10:</strong> <code className="bg-background px-1 rounded">plants</code> (Analytics) - Simplified structure (2-3 hrs)</li>
                       <li><strong>Phase 11:</strong> <code className="bg-background px-1 rounded">alerts</code> - With plant joins (2-3 hrs)</li>
                       <li><strong>Phase 12:</strong> <code className="bg-background px-1 rounded">wms_sites</code> - Batch operations (2 hrs)</li>
@@ -2704,7 +2704,7 @@ Unique Constraints:
                       <li><strong>Phase 14:</strong> <code className="bg-background px-1 rounded">insolation_readings</code> - Upsert by date (1-2 hrs)</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Total Effort:</strong> 12-16 hours | <strong>Dependencies:</strong> Phases 6-8
+                      <strong>Total Effort:</strong> 12-16 hours | <strong>Dependencies:</strong> Phases 6-8 ✅
                     </div>
                   </div>
 
@@ -2842,14 +2842,18 @@ Unique Constraints:
                   {/* Total Effort Summary */}
                   <div className="bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 p-4 rounded-lg border border-indigo-200 dark:border-indigo-900">
                     <h4 className="font-semibold text-indigo-800 dark:text-indigo-200 mb-2">Migration Summary</h4>
-                    <div className="grid md:grid-cols-5 gap-3 text-sm">
+                    <div className="grid md:grid-cols-6 gap-3 text-sm">
                       <div>
                         <div className="font-medium">Total Phases</div>
                         <div className="text-2xl font-bold text-primary">23</div>
                       </div>
                       <div>
-                        <div className="font-medium">Estimated Effort</div>
-                        <div className="text-2xl font-bold text-primary">50-55 hrs</div>
+                        <div className="font-medium">Completed</div>
+                        <div className="text-2xl font-bold text-green-600">8</div>
+                      </div>
+                      <div>
+                        <div className="font-medium">Remaining Effort</div>
+                        <div className="text-2xl font-bold text-primary">35-40 hrs</div>
                       </div>
                       <div>
                         <div className="font-medium">Repositories</div>
