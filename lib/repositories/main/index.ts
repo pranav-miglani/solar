@@ -60,13 +60,16 @@ import { InsolationReadingsRepository, IInsolationReadingsRepository } from "./i
 import { LegacyInsolationReadingsAdapter } from "./legacyAdapters/insolationReadingsAdapter"
 
 // Phase 18: work_orders
-// import { WorkOrdersRepository } from "./workOrdersRepository"
+import { WorkOrdersRepository, IWorkOrdersRepository } from "./workOrdersRepository"
+import { LegacyWorkOrdersAdapter } from "./legacyAdapters/workOrdersAdapter"
 
 // Phase 19: work_order_plants
-// import { WorkOrderPlantsRepository } from "./workOrderPlantsRepository"
+import { WorkOrderPlantsRepository, IWorkOrderPlantsRepository } from "./workOrderPlantsRepository"
+import { LegacyWorkOrderPlantsAdapter } from "./legacyAdapters/workOrderPlantsAdapter"
 
 // Phase 20: work_logs
-// import { WorkLogsRepository } from "./workLogsRepository"
+import { WorkLogsRepository, IWorkLogsRepository } from "./workLogsRepository"
+import { LegacyWorkLogsAdapter } from "./legacyAdapters/workLogsAdapter"
 
 // =============================================================================
 // Factory Functions (will be uncommented as repositories are implemented)
@@ -217,22 +220,46 @@ export function getInsolationReadingsRepository(): IInsolationReadingsRepository
 
 // -----------------------------------------------------------------------------
 // Phase 18: Work Orders Repository
+// Toggle: USE_WORKORDERS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getWorkOrdersRepository() {
-//   return new WorkOrdersRepository(getMainClient())
-// }
+export function getWorkOrdersRepository(): IWorkOrdersRepository {
+  const useLegacy = process.env.USE_WORKORDERS_REPO === 'false'
+  const client = getMainClient()
+  
+  if (useLegacy) {
+    return new LegacyWorkOrdersAdapter(client)
+  }
+  return new WorkOrdersRepository(client)
+}
 
 // -----------------------------------------------------------------------------
 // Phase 19: Work Order Plants Repository
+// Toggle: USE_WORKORDER_PLANTS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getWorkOrderPlantsRepository() {
-//   return new WorkOrderPlantsRepository(getMainClient())
-// }
+export function getWorkOrderPlantsRepository(): IWorkOrderPlantsRepository {
+  const useLegacy = process.env.USE_WORKORDER_PLANTS_REPO === 'false'
+  const client = getMainClient()
+  
+  if (useLegacy) {
+    return new LegacyWorkOrderPlantsAdapter(client)
+  }
+  return new WorkOrderPlantsRepository(client)
+}
 
 // -----------------------------------------------------------------------------
 // Phase 20: Work Logs Repository
+// Toggle: USE_WORKLOGS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
-// export function getWorkLogsRepository() {
-//   return new WorkLogsRepository(getMainClient())
-// }
+export function getWorkLogsRepository(): IWorkLogsRepository {
+  const useLegacy = process.env.USE_WORKLOGS_REPO === 'false'
+  const client = getMainClient()
+  
+  if (useLegacy) {
+    return new LegacyWorkLogsAdapter(client)
+  }
+  return new WorkLogsRepository(client)
+}
 
