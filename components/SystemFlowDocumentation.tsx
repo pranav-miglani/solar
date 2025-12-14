@@ -7313,7 +7313,3 @@ const lastUpdateTime = station.lastUpdateTime
     </div>
   )
 }
-
-    </div>
-  )
-}
