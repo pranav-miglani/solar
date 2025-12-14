@@ -10,6 +10,11 @@
  * ```
  * 
  * Each factory function returns a repository instance connected to the Main DB.
+ * 
+ * Feature Toggle Support:
+ * - Each repository has an environment variable toggle (e.g., USE_ACCOUNTS_REPO)
+ * - When set to 'false', returns the legacy adapter instead
+ * - Allows instant rollback without code deployment
  */
 
 import { getMainClient } from "@/lib/supabase/pooled"
@@ -20,9 +25,11 @@ import { getMainClient } from "@/lib/supabase/pooled"
 
 // Phase 3: accounts
 import { AccountsRepository, IAccountsRepository } from "./accountsRepository"
+import { LegacyAccountsAdapter } from "./legacyAdapters/accountsAdapter"
 
 // Phase 4: organizations
 import { OrganizationsRepository, IOrganizationsRepository } from "./organizationsRepository"
+import { LegacyOrganizationsAdapter } from "./legacyAdapters/organizationsAdapter"
 
 // Phase 6: vendors
 // import { VendorsRepository } from "./vendorsRepository"
@@ -68,16 +75,32 @@ export function getClient() {
 
 // -----------------------------------------------------------------------------
 // Phase 3: Accounts Repository
+// Toggle: USE_ACCOUNTS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
 export function getAccountsRepository(): IAccountsRepository {
-  return new AccountsRepository(getMainClient())
+  const useLegacy = process.env.USE_ACCOUNTS_REPO === 'false'
+  const client = getMainClient()
+  
+  if (useLegacy) {
+    return new LegacyAccountsAdapter(client)
+  }
+  return new AccountsRepository(client)
 }
 
 // -----------------------------------------------------------------------------
 // Phase 4: Organizations Repository
+// Toggle: USE_ORGS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
 export function getOrganizationsRepository(): IOrganizationsRepository {
-  return new OrganizationsRepository(getMainClient())
+  const useLegacy = process.env.USE_ORGS_REPO === 'false'
+  const client = getMainClient()
+  
+  if (useLegacy) {
+    return new LegacyOrganizationsAdapter(client)
+  }
+  return new OrganizationsRepository(client)
 }
 
 // -----------------------------------------------------------------------------

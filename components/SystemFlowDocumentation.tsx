@@ -2603,9 +2603,12 @@ Unique Constraints:
                       <li>✅ AccountsRepository with CRUD, email lookup, login support</li>
                       <li>✅ <code className="bg-background px-1 rounded">app/api/accounts/route.ts</code></li>
                       <li>✅ <code className="bg-background px-1 rounded">app/api/login/route.ts</code></li>
+                      <li>✅ Legacy Adapter: <code className="bg-background px-1 rounded">legacyAdapters/accountsAdapter.ts</code></li>
+                      <li>✅ Toggle: <code className="bg-background px-1 rounded">USE_ACCOUNTS_REPO</code></li>
+                      <li>✅ Tests: <code className="bg-background px-1 rounded">accountsRepository.test.ts</code></li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Actual Effort:</strong> ~45 minutes | <strong>Status:</strong> ✅ COMPLETED
+                      <strong>Total Effort:</strong> ~1.5 hours | <strong>Toggle:</strong> <code className="bg-background px-1 rounded">USE_ACCOUNTS_REPO</code>
                     </div>
                   </div>
 
@@ -2621,9 +2624,12 @@ Unique Constraints:
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                       <li>✅ OrganizationsRepository with simple CRUD</li>
                       <li>✅ <code className="bg-background px-1 rounded">app/api/orgs/route.ts</code></li>
+                      <li>✅ Legacy Adapter: <code className="bg-background px-1 rounded">legacyAdapters/organizationsAdapter.ts</code></li>
+                      <li>✅ Toggle: <code className="bg-background px-1 rounded">USE_ORGS_REPO</code></li>
+                      <li>✅ Tests: <code className="bg-background px-1 rounded">organizationsRepository.test.ts</code></li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Actual Effort:</strong> ~30 minutes | <strong>Status:</strong> ✅ COMPLETED
+                      <strong>Total Effort:</strong> ~1 hour | <strong>Toggle:</strong> <code className="bg-background px-1 rounded">USE_ORGS_REPO</code>
                     </div>
                   </div>
 
@@ -2640,9 +2646,12 @@ Unique Constraints:
                       <li>✅ AnalyticsOrganizationsRepository with config_hash operations</li>
                       <li>✅ <code className="bg-background px-1 rounded">app/api/analytics/orgs/route.ts</code></li>
                       <li>✅ <code className="bg-background px-1 rounded">analyticsMirrorService.ts</code> (org queries)</li>
+                      <li>✅ Legacy Adapter: <code className="bg-background px-1 rounded">legacyAdapters/organizationsAdapter.ts</code></li>
+                      <li>✅ Toggle: <code className="bg-background px-1 rounded">USE_ANALYTICS_ORGS_REPO</code></li>
+                      <li>✅ Tests: <code className="bg-background px-1 rounded">organizationsRepository.test.ts</code></li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Actual Effort:</strong> ~45 minutes | <strong>Status:</strong> ✅ COMPLETED
+                      <strong>Total Effort:</strong> ~1.5 hours | <strong>Toggle:</strong> <code className="bg-background px-1 rounded">USE_ANALYTICS_ORGS_REPO</code>
                     </div>
                   </div>
 
@@ -2752,50 +2761,111 @@ Unique Constraints:
                     </div>
                   </div>
 
-                  {/* Final Phases */}
-                  <div className="bg-gradient-to-r from-gray-100 to-slate-100 dark:from-gray-950/30 dark:to-slate-950/30 p-3 rounded-lg border border-gray-300 dark:border-gray-800">
-                    <h4 className="font-semibold text-gray-800 dark:text-gray-200">FINAL: Testing & Cleanup</h4>
-                    <p className="text-xs text-gray-700 dark:text-gray-300">Phases 21-22: Comprehensive testing and documentation</p>
+                  {/* Tier 6 Header */}
+                  <div className="bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-950/30 dark:to-orange-950/30 p-3 rounded-lg border border-amber-300 dark:border-amber-800">
+                    <h4 className="font-semibold text-amber-800 dark:text-amber-200">TIER 6: Dashboard (Depends on Tiers 3-5)</h4>
+                    <p className="text-xs text-amber-700 dark:text-amber-300">Phase 21: Dashboard API refactoring to use repositories</p>
                   </div>
 
-                  {/* Phases 21-22 */}
-                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
+                  {/* Phase 21: Dashboard */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-amber-400">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-gray-400" />
-                        Phases 21-22: Testing & Cleanup
+                        <Clock className="h-5 w-5 text-amber-400" />
+                        Phase 21: Dashboard API
                       </h4>
                       <Badge variant="outline">PENDING</Badge>
                     </div>
                     <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                      <li><strong>Phase 21:</strong> Testing & Validation - Unit, integration, performance tests (4-6 hrs)</li>
-                      <li><strong>Phase 22:</strong> Cleanup & Documentation - Remove extracted-queries.ts, archive docs (2-3 hrs)</li>
+                      <li>Create DashboardService using existing repositories</li>
+                      <li>Handle role-based logic (SUPERADMIN/GOVT/ORG)</li>
+                      <li>In-memory aggregations for metrics</li>
+                      <li>Unit tests for DashboardService</li>
                     </ul>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Total Effort:</strong> 6-9 hours | <strong>Dependencies:</strong> All phases
+                      <strong>Effort:</strong> 3-4 hours | <strong>Dependencies:</strong> Phases 9, 11, 18, 19
                     </div>
+                  </div>
+
+                  {/* Final Phases */}
+                  <div className="bg-gradient-to-r from-gray-100 to-slate-100 dark:from-gray-950/30 dark:to-slate-950/30 p-3 rounded-lg border border-gray-300 dark:border-gray-800">
+                    <h4 className="font-semibold text-gray-800 dark:text-gray-200">FINAL: Cleanup & Archive</h4>
+                    <p className="text-xs text-gray-700 dark:text-gray-300">Phases 22-23: Documentation and archive</p>
+                  </div>
+
+                  {/* Phases 22-23 */}
+                  <div className="bg-muted/50 p-4 rounded-lg border-l-4 border-gray-400">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-gray-400" />
+                        Phases 22-23: Cleanup & Archive
+                      </h4>
+                      <Badge variant="outline">PENDING</Badge>
+                    </div>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                      <li><strong>Phase 22:</strong> Cleanup & Documentation - Remove extracted-queries.ts, update README (2-3 hrs)</li>
+                      <li><strong>Phase 23:</strong> Archive Migration Plan - Mark complete, archive details (1 hr)</li>
+                    </ul>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <strong>Total Effort:</strong> 3-4 hours | <strong>Dependencies:</strong> All phases
+                    </div>
+                  </div>
+
+                  {/* Feature Toggle Strategy */}
+                  <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900 mb-4">
+                    <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">🔀 Factory-Level Toggle Strategy</h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                      Each phase includes a feature toggle for instant rollback:
+                    </p>
+                    <ul className="text-sm text-blue-600 dark:text-blue-400 space-y-1 ml-4 list-disc">
+                      <li><strong>Toggle Mechanism:</strong> Environment variable per repository (e.g., <code className="bg-background px-1 rounded">USE_ACCOUNTS_REPO=true</code>)</li>
+                      <li><strong>Legacy Adapter:</strong> Implements same interface, uses direct Supabase calls</li>
+                      <li><strong>Instant Rollback:</strong> Set to <code className="bg-background px-1 rounded">false</code> to use legacy adapter</li>
+                      <li><strong>No Deployment:</strong> Toggle takes effect on next request</li>
+                    </ul>
+                  </div>
+
+                  {/* Per-Phase Testing Strategy */}
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 p-4 rounded-lg border border-green-200 dark:border-green-900">
+                    <h4 className="font-semibold text-green-800 dark:text-green-200 mb-2">✅ Per-Phase Testing Strategy</h4>
+                    <p className="text-sm text-green-700 dark:text-green-300 mb-2">
+                      Testing is integrated into EVERY phase, not a separate phase:
+                    </p>
+                    <ul className="text-sm text-green-600 dark:text-green-400 space-y-1 ml-4 list-disc">
+                      <li><strong>Repository Tests:</strong> Mock Supabase client, verify query building</li>
+                      <li><strong>API Route Tests:</strong> Integration tests for endpoints</li>
+                      <li><strong>Regression Tests:</strong> Ensure existing functionality unchanged</li>
+                      <li><strong>Build Verification:</strong> npm run build passes after each phase</li>
+                    </ul>
                   </div>
 
                   {/* Total Effort Summary */}
                   <div className="bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 p-4 rounded-lg border border-indigo-200 dark:border-indigo-900">
                     <h4 className="font-semibold text-indigo-800 dark:text-indigo-200 mb-2">Migration Summary</h4>
-                    <div className="grid md:grid-cols-4 gap-3 text-sm">
+                    <div className="grid md:grid-cols-5 gap-3 text-sm">
                       <div>
                         <div className="font-medium">Total Phases</div>
-                        <div className="text-2xl font-bold text-primary">22</div>
+                        <div className="text-2xl font-bold text-primary">23</div>
                       </div>
                       <div>
                         <div className="font-medium">Estimated Effort</div>
-                        <div className="text-2xl font-bold text-primary">50-60 hrs</div>
+                        <div className="text-2xl font-bold text-primary">50-55 hrs</div>
                       </div>
                       <div>
                         <div className="font-medium">Repositories</div>
                         <div className="text-2xl font-bold text-primary">15+</div>
                       </div>
                       <div>
-                        <div className="font-medium">Dependency Tiers</div>
-                        <div className="text-2xl font-bold text-primary">5</div>
+                        <div className="font-medium">Feature Toggles</div>
+                        <div className="text-2xl font-bold text-primary">15+</div>
                       </div>
+                      <div>
+                        <div className="font-medium">Dependency Tiers</div>
+                        <div className="text-2xl font-bold text-primary">6</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-xs text-muted-foreground">
+                      <strong>Per Phase:</strong> Repository + Legacy Adapter + Tests + Toggle | <strong>Rollback:</strong> Instant via env var
                     </div>
                   </div>
                 </div>

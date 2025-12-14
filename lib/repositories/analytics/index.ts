@@ -10,6 +10,11 @@
  * ```
  * 
  * Each factory function returns a repository instance connected to the Analytics DB.
+ * 
+ * Feature Toggle Support:
+ * - Each repository has an environment variable toggle (e.g., USE_ANALYTICS_ORGS_REPO)
+ * - When set to 'false', returns the legacy adapter instead
+ * - Allows instant rollback without code deployment
  */
 
 import { getAnalyticsClient } from "@/lib/supabase/pooled"
@@ -20,6 +25,7 @@ import { getAnalyticsClient } from "@/lib/supabase/pooled"
 
 // Phase 5: organizations (Analytics)
 import { AnalyticsOrganizationsRepository, IAnalyticsOrganizationsRepository } from "./organizationsRepository"
+import { LegacyAnalyticsOrganizationsAdapter } from "./legacyAdapters/organizationsAdapter"
 
 // Phase 7: vendors (Analytics)
 // import { AnalyticsVendorsRepository } from "./vendorsRepository"
@@ -50,9 +56,17 @@ export function getClient() {
 
 // -----------------------------------------------------------------------------
 // Phase 5: Analytics Organizations Repository
+// Toggle: USE_ANALYTICS_ORGS_REPO (default: true)
+// Set to 'false' to use legacy adapter for instant rollback
 // -----------------------------------------------------------------------------
 export function getAnalyticsOrganizationsRepository(): IAnalyticsOrganizationsRepository {
-  return new AnalyticsOrganizationsRepository(getAnalyticsClient())
+  const useLegacy = process.env.USE_ANALYTICS_ORGS_REPO === 'false'
+  const client = getAnalyticsClient()
+  
+  if (useLegacy) {
+    return new LegacyAnalyticsOrganizationsAdapter(client)
+  }
+  return new AnalyticsOrganizationsRepository(client)
 }
 
 // -----------------------------------------------------------------------------
