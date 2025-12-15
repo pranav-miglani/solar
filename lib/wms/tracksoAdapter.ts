@@ -294,7 +294,6 @@ export class TracksoAdapter extends BaseWmsAdapter {
     deviceName?: string
   ): Promise<InsolationReading[]> {
     const apiBaseUrl = this.getApiBaseUrl()
-    const authToken = await this.authenticate()
 
     // Convert dates to epoch milliseconds in IST (Asia/Kolkata) timezone
     // For TRACKSO, if fromDate === toDate, use that single day's start and end in IST
@@ -333,109 +332,123 @@ export class TracksoAdapter extends BaseWmsAdapter {
     }
 
     const insolationUrl = `${apiBaseUrl}/dataquery/site`
-    
-    logger.info(`[TracksoAdapter] Calling insolation data API: POST ${insolationUrl}`)
-    logger.info(`[TracksoAdapter] Request params: deviceId=${deviceId}, fromDate=${fromDate}, toDate=${toDate}, startTime=${startTime}, endTime=${endTime}`)
-    
-    const requestBody = {
-      startTime,
-      endTime,
-      timeGrouping: "DAY",
-      limit: 1,
-      provideBufferData: false,
-      suppressErrors: true,
-      bufferInterval: null,
-      cumulate: false,
-      siteParameterAggregationType: {
-        [deviceId]: [
-          {
-            parameterName: "Solar Insolation",
-            dataQueryOperation: "LAST",
-          },
-        ],
-      },
-    }
 
-    logger.info(`[TracksoAdapter] Request body: ${JSON.stringify(requestBody, null, 2)}`)
+    // We may need to retry once or twice on authentication errors,
+    // but we must avoid unbounded recursion / infinite loops.
+    const maxAuthRetries = 3
+    let attempt = 0
 
-    const requestStartTime = Date.now()
-    const response = await fetch(insolationUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "accept": "application/json",
-        "x-auth-token": authToken,
-      },
-      body: JSON.stringify(requestBody),
-    })
+    while (true) {
+      const authToken = await this.authenticate()
 
-    const requestDuration = Date.now() - requestStartTime
-    logger.info(`[TracksoAdapter] Insolation data API response: ${response.status} ${response.statusText} (${requestDuration}ms)`)
+      logger.info(`[TracksoAdapter] Calling insolation data API: POST ${insolationUrl}`)
+      logger.info(`[TracksoAdapter] Request params: deviceId=${deviceId}, fromDate=${fromDate}, toDate=${toDate}, startTime=${startTime}, endTime=${endTime}`)
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      logger.error(`[TracksoAdapter] Insolation data API failed: ${response.status} ${errorText}`)
-      
-      // If authentication error, try refreshing token
-      if (response.status === 401 || response.status === 403) {
-        logger.info(`[TracksoAdapter] Authentication error detected, refreshing token`)
-        // Clear cached token and retry
-        if (this.vendorId && this.supabaseClient) {
-          await this.supabaseClient
-            .from("wms_vendors")
-            .update({ access_token: null, token_expires_at: null })
-            .eq("id", this.vendorId)
+      const requestBody = {
+        startTime,
+        endTime,
+        timeGrouping: "DAY",
+        limit: 1,
+        provideBufferData: false,
+        suppressErrors: true,
+        bufferInterval: null,
+        cumulate: false,
+        siteParameterAggregationType: {
+          [deviceId]: [
+            {
+              parameterName: "Solar Insolation",
+              dataQueryOperation: "LAST",
+            },
+          ],
+        },
+      }
+
+      logger.info(`[TracksoAdapter] Request body: ${JSON.stringify(requestBody, null, 2)}`)
+
+      const requestStartTime = Date.now()
+      const response = await fetch(insolationUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "accept": "application/json",
+          "x-auth-token": authToken,
+        },
+        body: JSON.stringify(requestBody),
+      })
+
+      const requestDuration = Date.now() - requestStartTime
+      logger.info(`[TracksoAdapter] Insolation data API response: ${response.status} ${response.statusText} (${requestDuration}ms)`)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        logger.error(`[TracksoAdapter] Insolation data API failed: ${response.status} ${errorText}`)
+
+        // If authentication error, try refreshing token with bounded retries
+        if ((response.status === 401 || response.status === 403) && attempt < maxAuthRetries) {
+          attempt++
+          logger.info(`[TracksoAdapter] Authentication error detected (attempt ${attempt}/${maxAuthRetries}), refreshing token`)
+
+          // Clear cached token so next authenticate() call fetches a fresh one
+          if (this.vendorId && this.supabaseClient) {
+            await this.supabaseClient
+              .from("wms_vendors")
+              .update({ access_token: null, token_expires_at: null })
+              .eq("id", this.vendorId)
+          }
+
+          // Small delay before retry to avoid hammering the auth endpoint
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          continue
         }
-        // Retry with fresh authentication
-        return this.getInsolationData(deviceId, fromDate, toDate, deviceName)
-      }
-      
-      throw new Error(
-        `Failed to fetch TRACKSO insolation data: ${response.status} ${errorText}`
-      )
-    }
 
-    const result = await response.json() as any
-    logger.info(`[TracksoAdapter] Response body: ${JSON.stringify(result, null, 2)}`)
-    
-    const resultData = result.result?.result as any[]
-
-    if (!resultData || resultData.length === 0) {
-      logger.warn(`[TracksoAdapter] No insolation data in response for device ${deviceId}`)
-      return []
-    }
-
-    // Extract insolation values from response
-    const readings: InsolationReading[] = []
-
-    for (const siteData of resultData) {
-      const dataArray = siteData.data as any[]
-      if (!dataArray || dataArray.length === 0) {
-        continue
+        // After exhausting retries (or for non-auth errors), throw
+        throw new Error(
+          `Failed to fetch TRACKSO insolation data after ${attempt} auth retries: ${response.status} ${errorText}`
+        )
       }
 
-      for (const dataPoint of dataArray) {
-        if (dataPoint.parameter_name === "Solar Insolation") {
-          const insolationValue = parseFloat(dataPoint.value) || 0
-          const timestamp = dataPoint.timestamp || dataPoint.latest_timestamp
+      const result = await response.json() as any
+      logger.info(`[TracksoAdapter] Response body: ${JSON.stringify(result, null, 2)}`)
 
-          // Convert timestamp to date string
-          const date = new Date(timestamp)
-          const dateStr = date.toISOString().split("T")[0]
+      const resultData = result.result?.result as any[]
 
-          readings.push({
-            deviceId: deviceId,
-            date: dateStr,
-            hour: "00:00:00", // Daily reading, use midnight
-            generation: insolationValue, // Store kWh/m² directly (pre-calculated)
-          } as InsolationReading & { generation?: number })
+      if (!resultData || resultData.length === 0) {
+        logger.warn(`[TracksoAdapter] No insolation data in response for device ${deviceId}`)
+        return []
+      }
+
+      // Extract insolation values from response
+      const readings: InsolationReading[] = []
+
+      for (const siteData of resultData) {
+        const dataArray = siteData.data as any[]
+        if (!dataArray || dataArray.length === 0) {
+          continue
+        }
+
+        for (const dataPoint of dataArray) {
+          if (dataPoint.parameter_name === "Solar Insolation") {
+            const insolationValue = parseFloat(dataPoint.value) || 0
+            const timestamp = dataPoint.timestamp || dataPoint.latest_timestamp
+
+            // Convert timestamp to date string
+            const date = new Date(timestamp)
+            const dateStr = date.toISOString().split("T")[0]
+
+            readings.push({
+              deviceId: deviceId,
+              date: dateStr,
+              hour: "00:00:00", // Daily reading, use midnight
+              generation: insolationValue, // Store kWh/m² directly (pre-calculated)
+            } as InsolationReading & { generation?: number })
+          }
         }
       }
+
+      logger.info(`[TracksoAdapter] Mapped ${readings.length} insolation readings`)
+
+      return readings
     }
-
-    logger.info(`[TracksoAdapter] Mapped ${readings.length} insolation readings`)
-
-    return readings
   }
 
   /**
