@@ -1112,7 +1112,9 @@ async function syncSolarDmVendorAlerts(vendor: any, supabase: any): Promise<Aler
             }
           )
           // Don't increment updated count, but still count as synced (processed)
+          // Also track as "skipped" for consistency with Solarman vendors
           result.synced += 1
+          result.skipped += 1
         } else {
           logger.debug(`🔄 Updating existing alert ${existing.id} (vendor_alert_id: ${vendorAlertId})`)
           const { error: updateError } = await supabase
