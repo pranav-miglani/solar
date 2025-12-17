@@ -22,9 +22,12 @@ import {
   HelpCircle,
   ChevronLeft,
   ChevronRight,
+  Database,
 } from "lucide-react"
 import Link from "next/link"
 import { TelemetryChart } from "@/components/TelemetryChart"
+import { PlantEnergyAnalytics } from "@/components/PlantEnergyAnalytics"
+import { useUser } from "@/context/UserContext"
 import { format, addDays, subDays, addMonths, subMonths, startOfMonth, addYears, subYears, startOfYear } from "date-fns"
 
 // Main plant payload for detail view. Energy values follow our kWh/MWh schema:
@@ -87,6 +90,7 @@ interface PlantAlert {
 
 export function PlantDetailView({ plantId }: { plantId: string }) {
   const router = useRouter()
+  const { account } = useUser()
   const [plant, setPlant] = useState<Plant | null>(null)
   const [telemetry, setTelemetry] = useState<TelemetryData[]>([])
   const [telemetryStats, setTelemetryStats] = useState<TelemetryStatistics | null>(null)
@@ -94,6 +98,9 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
   const [alertsLoading, setAlertsLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Check if user is SUPERADMIN or DEVELOPER to show analytics section
+  const showAnalytics = account?.accountType === "SUPERADMIN" || account?.accountType === "DEVELOPER"
   
   // Date selection for day view
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
@@ -731,6 +738,26 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
           </Card>
         </div>
       </div>
+
+      {/* Analytics Section - Only visible to SUPERADMIN and DEVELOPER */}
+      {showAnalytics && (
+        <div className="space-y-4 md:space-y-6">
+          <Card className="border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5 text-primary" />
+                Analytics Comparison
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Compare analytics captured data vs actual plant data for verification
+              </p>
+            </CardHeader>
+            <CardContent>
+              <PlantEnergyAnalytics plantId={plantId} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
