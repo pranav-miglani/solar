@@ -3,14 +3,16 @@ import { randomUUID } from "crypto"
 import MDC from "@/lib/context/mdc"
 import { logger } from "@/lib/context/logger"
 import { runGridDowntimeAnalytics } from "@/lib/services/gridDowntimeAnalyticsService"
+import { logApiRequestResponse } from "@/lib/middleware/api-logging"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 300 // 5 minutes for processing 8000+ plants
 
 export async function POST(request: NextRequest) {
-  const requestId = randomUUID()
+  return logApiRequestResponse(request, async () => {
+    const requestId = randomUUID()
 
-  return MDC.runAsync(
+    return MDC.runAsync(
     {
       source: "cron",
       requestId,
@@ -58,7 +60,7 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         )
       }
-    }
-  )
+    })
+  })
 }
 

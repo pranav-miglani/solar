@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { runAnalyticsSnapshot } from "@/lib/services/analyticsSnapshotService"
 import { logger } from "@/lib/context/logger"
+import { logApiRequestResponse } from "@/lib/middleware/api-logging"
 
 export const dynamic = "force-dynamic"
 
@@ -56,17 +57,19 @@ function checkAuth(request: NextRequest): { authorized: boolean; error?: string 
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    const authCheck = checkAuth(request)
-    if (!authCheck.authorized) {
-      return NextResponse.json({ error: authCheck.error || "Unauthorized" }, { status: 401 })
-    }
+  return logApiRequestResponse(request, async () => {
+    try {
+      const authCheck = checkAuth(request)
+      if (!authCheck.authorized) {
+        return NextResponse.json({ error: authCheck.error || "Unauthorized" }, { status: 401 })
+      }
 
-    const summary = await runAnalyticsSnapshot()
-    return NextResponse.json({ success: true, summary })
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
-  }
+      const summary = await runAnalyticsSnapshot()
+      return NextResponse.json({ success: true, summary })
+    } catch (error: any) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
+  })
 }
 
 export async function POST(request: NextRequest) {

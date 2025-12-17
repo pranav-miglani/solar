@@ -3,6 +3,7 @@ import { backfillAllWmsInsolation } from "@/lib/services/wmsSyncService"
 import MDC from "@/lib/context/mdc"
 import { logger } from "@/lib/context/logger"
 import { randomUUID } from "crypto"
+import { logApiRequestResponse } from "@/lib/middleware/api-logging"
 
 /**
  * Cron/Manual endpoint for backfilling WMS insolation data (last 100 days)
@@ -12,9 +13,10 @@ import { randomUUID } from "crypto"
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
-  const requestId = randomUUID()
-  
-  return MDC.runAsync(
+  return logApiRequestResponse(request, async () => {
+    const requestId = randomUUID()
+    
+    return MDC.runAsync(
     {
       source: "cron",
       requestId,
@@ -103,7 +105,7 @@ export async function GET(request: NextRequest) {
           { status: 500 }
         )
       }
-    }
-  )
+    })
+  })
 }
 

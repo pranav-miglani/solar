@@ -4,6 +4,7 @@ import { mirrorOrgVendorConfig } from "@/lib/services/analyticsMirrorService"
 import { logger } from "@/lib/context/logger"
 import MDC from "@/lib/context/mdc"
 import { randomUUID } from "crypto"
+import { logApiRequestResponse } from "@/lib/middleware/api-logging"
 
 export const dynamic = "force-dynamic"
 // Increase timeout for long-running mirror operations (up to 60 seconds)
@@ -61,15 +62,16 @@ function checkAuth(request: NextRequest): { authorized: boolean; error?: string 
 }
 
 export async function GET(request: NextRequest) {
-  const requestId = randomUUID()
-  
-  // Determine source: if called via CRON_SECRET, it's "cron", otherwise "user" (UI trigger)
-  const authHeader = request.headers.get("authorization") || ""
-  const secret = process.env.CRON_SECRET_V2
-  const isCronCall = secret && authHeader.replace("Bearer ", "") === secret
-  const source = isCronCall ? "cron" : "user"
-  
-  return MDC.runAsync(
+  return logApiRequestResponse(request, async () => {
+    const requestId = randomUUID()
+    
+    // Determine source: if called via CRON_SECRET, it's "cron", otherwise "user" (UI trigger)
+    const authHeader = request.headers.get("authorization") || ""
+    const secret = process.env.CRON_SECRET_V2
+    const isCronCall = secret && authHeader.replace("Bearer ", "") === secret
+    const source = isCronCall ? "cron" : "user"
+    
+    return MDC.runAsync(
     {
       source,
       requestId,
@@ -104,8 +106,8 @@ export async function GET(request: NextRequest) {
         })
         return NextResponse.json({ success: false, error: error.message }, { status: 500 })
       }
-    }
-  )
+    })
+  })
 }
 
 export async function POST(request: NextRequest) {

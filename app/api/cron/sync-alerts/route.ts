@@ -3,6 +3,7 @@ import { randomUUID } from "crypto"
 import MDC from "@/lib/context/mdc"
 import { logger } from "@/lib/context/logger"
 import { syncAllAlerts } from "@/lib/services/alertSyncService"
+import { logApiRequestResponse } from "@/lib/middleware/api-logging"
 
 // Alerts cron is always dynamic
 export const dynamic = "force-dynamic"
@@ -17,9 +18,10 @@ export const dynamic = "force-dynamic"
  * Protected by CRON_SECRET (if configured), same as plant sync.
  */
 export async function GET(request: NextRequest) {
-  const requestId = randomUUID()
+  return logApiRequestResponse(request, async () => {
+    const requestId = randomUUID()
 
-  return MDC.runAsync(
+    return MDC.runAsync(
     {
       source: "cron",
       requestId,
@@ -70,9 +72,10 @@ export async function GET(request: NextRequest) {
  * POST: manual trigger for SUPERADMIN users (session cookie-based)
  */
 export async function POST(request: NextRequest) {
-  const requestId = randomUUID()
+  return logApiRequestResponse(request, async () => {
+    const requestId = randomUUID()
 
-  return MDC.runAsync(
+    return MDC.runAsync(
     {
       source: "user",
       requestId,
@@ -139,8 +142,8 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         )
       }
-    }
-  )
+    })
+  })
 }
 
 

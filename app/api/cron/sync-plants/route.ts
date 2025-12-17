@@ -3,6 +3,7 @@ import { syncAllPlants } from "@/lib/services/plantSyncService"
 import MDC from "@/lib/context/mdc"
 import { logger } from "@/lib/context/logger"
 import { randomUUID } from "crypto"
+import { logApiRequestResponse } from "@/lib/middleware/api-logging"
 
 /**
  * Cron endpoint for syncing plant data from all vendors
@@ -19,35 +20,37 @@ import { randomUUID } from "crypto"
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
-  const requestId = randomUUID()
-  
-  return MDC.runAsync(
-    {
-      source: "cron",
-      requestId,
-      operation: "sync-plants",
-    },
-    async () => {
-      try {
-        // Verify cron secret (if configured)
-        const cronSecret = process.env.CRON_SECRET
-        const authHeader = request.headers.get("authorization")
+  // Use enhanced logging middleware that logs full request/response
+  return logApiRequestResponse(request, async () => {
+    const requestId = randomUUID()
+    
+    return MDC.runAsync(
+      {
+        source: "cron",
+        requestId,
+        operation: "sync-plants",
+      },
+      async () => {
+        try {
+          // Verify cron secret (if configured)
+          const cronSecret = process.env.CRON_SECRET
+          const authHeader = request.headers.get("authorization")
 
-        if (cronSecret) {
-          if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
-            logger.warn("[Auth Check] Sync Plants: CRON_SECRET mismatch or missing", {
-              hasAuthHeader: !!authHeader,
-              authHeaderPrefix: authHeader?.substring(0, 10),
-            })
-            return NextResponse.json(
-              { error: "Unauthorized" },
-              { status: 401 }
-            )
+          if (cronSecret) {
+            if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+              logger.warn("[Auth Check] Sync Plants: CRON_SECRET mismatch or missing", {
+                hasAuthHeader: !!authHeader,
+                authHeaderPrefix: authHeader?.substring(0, 10),
+              })
+              return NextResponse.json(
+                { error: "Unauthorized" },
+                { status: 401 }
+              )
+            }
+            logger.info("[Auth Check] Sync Plants: Authorized via CRON_SECRET")
+          } else {
+            logger.debug("[Auth Check] Sync Plants: CRON_SECRET not configured, allowing request")
           }
-          logger.info("[Auth Check] Sync Plants: Authorized via CRON_SECRET")
-        } else {
-          logger.debug("[Auth Check] Sync Plants: CRON_SECRET not configured, allowing request")
-        }
 
         // Log current IST time for debugging
         // Note: Plant sync is NOT restricted by the sync window (can run at 2 AM)
@@ -101,22 +104,23 @@ export async function GET(request: NextRequest) {
           { status: 500 }
         )
       }
-    }
-  )
+    })
+  })
 }
 
 /**
  * POST endpoint for manual trigger (with authentication)
  */
 export async function POST(request: NextRequest) {
-  const requestId = randomUUID()
-  
-  return MDC.runAsync(
-    {
-      source: "user",
-      requestId,
-      operation: "sync-plants-manual",
-    },
+  return logApiRequestResponse(request, async () => {
+    const requestId = randomUUID()
+    
+    return MDC.runAsync(
+      {
+        source: "user",
+        requestId,
+        operation: "sync-plants-manual",
+      },
     async () => {
       try {
         // Verify authentication
@@ -201,7 +205,7 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         )
       }
-    }
-  )
+    })
+  })
 }
 

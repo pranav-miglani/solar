@@ -3,6 +3,7 @@ import { getMainClient } from "@/lib/supabase/pooled"
 import { logger } from "@/lib/context/logger"
 import MDC from "@/lib/context/mdc"
 import { randomUUID } from "crypto"
+import { logApiRequestResponse } from "@/lib/middleware/api-logging"
 
 export const dynamic = "force-dynamic"
 
@@ -69,31 +70,32 @@ function checkAuth(request: NextRequest): { authorized: boolean; error?: string;
 }
 
 export async function POST(request: NextRequest) {
-  const requestId = randomUUID()
-  
-  // Determine source: if called via CRON_SECRET, it's "cron", otherwise "user" (UI trigger)
-  const authHeader = request.headers.get("authorization") || ""
-  const secret = process.env.CRON_SECRET_V2
-  const isCronCall = secret && authHeader.replace("Bearer ", "") === secret
-  const source = isCronCall ? "cron" : "user"
-  
-  // Get user info for context if available (before auth check)
-  let accountType: string | undefined
-  let userId: string | undefined
-  if (source === "user") {
-    const session = request.cookies.get("session")?.value
-    if (session) {
-      try {
-        const sessionData = JSON.parse(Buffer.from(session, "base64").toString())
-        accountType = sessionData.accountType
-        userId = sessionData.accountId
-      } catch {
-        // Ignore parse errors, will be caught in checkAuth
+  return logApiRequestResponse(request, async () => {
+    const requestId = randomUUID()
+    
+    // Determine source: if called via CRON_SECRET, it's "cron", otherwise "user" (UI trigger)
+    const authHeader = request.headers.get("authorization") || ""
+    const secret = process.env.CRON_SECRET_V2
+    const isCronCall = secret && authHeader.replace("Bearer ", "") === secret
+    const source = isCronCall ? "cron" : "user"
+    
+    // Get user info for context if available (before auth check)
+    let accountType: string | undefined
+    let userId: string | undefined
+    if (source === "user") {
+      const session = request.cookies.get("session")?.value
+      if (session) {
+        try {
+          const sessionData = JSON.parse(Buffer.from(session, "base64").toString())
+          accountType = sessionData.accountType
+          userId = sessionData.accountId
+        } catch {
+          // Ignore parse errors, will be caught in checkAuth
+        }
       }
     }
-  }
-  
-  return MDC.runAsync(
+    
+    return MDC.runAsync(
     {
       source,
       requestId,
@@ -189,8 +191,8 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         )
       }
-    }
-  )
+    })
+  })
 }
 
 export async function GET(request: NextRequest) {
