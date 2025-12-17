@@ -7,8 +7,15 @@
 
 // Load New Relic APM early when enabled so it can instrument HTTP, cron jobs, etc.
 if (process.env.NEW_RELIC_ENABLED === 'true') {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require('newrelic')
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    require('newrelic')
+    console.log('[INFO] [Server] New Relic APM agent loaded successfully')
+  } catch (error) {
+    console.error('[ERROR] [Server] Failed to load New Relic agent:', error instanceof Error ? error.message : String(error))
+  }
+} else {
+  console.log('[INFO] [Server] New Relic APM is disabled (NEW_RELIC_ENABLED != true)')
 }
 
 const { createServer } = require('http')
