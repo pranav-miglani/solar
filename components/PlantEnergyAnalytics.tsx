@@ -223,11 +223,11 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
     if (active && payload && payload.length) {
       const data = payload[0].payload
       return (
-        <div className="bg-background border rounded-lg p-3 shadow-lg">
-          <p className="font-medium">{data.dateLabel}</p>
+        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+          <p className="text-sm font-semibold mb-1">{data.dateLabel}</p>
           <p className="text-sm">
-            <span className="text-muted-foreground">{valueLabel}: </span>
-            <span className="font-medium">{typeof data.value === 'number' ? data.value.toFixed(3) : '0'}</span>
+            <span className="font-medium text-blue-600 dark:text-blue-400">{valueLabel}: </span>
+            {typeof data.value === 'number' ? data.value.toFixed(2) : '0.00'}
           </p>
         </div>
       )
@@ -290,29 +290,37 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
           {dailyChartData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No data available</div>
           ) : (
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={300}>
               <BarChart
                 data={dailyChartData}
                 onClick={(data) => data && handleDataPointClick(data)}
                 style={{ cursor: "pointer" }}
               >
-                <CartesianGrid strokeDasharray="3 3" />
+                <defs>
+                  <linearGradient id="dailyEnergyGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.7} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                 <XAxis
                   dataKey="dateLabel"
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
                   angle={-45}
                   textAnchor="end"
                   height={80}
                 />
                 <YAxis
-                  label={{ value: "Daily Energy (kWh)", angle: -90, position: "insideLeft" }}
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
+                  label={{ value: "Daily Energy (kWh)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
                 />
                 <Tooltip content={<CustomTooltip valueLabel="Daily Energy" />} />
                 <Legend />
                 <Bar
                   dataKey="value"
-                  fill="#3b82f6"
+                  fill="url(#dailyEnergyGradient)"
                   name="Daily Energy (kWh)"
                   radius={[4, 4, 0, 0]}
                 />
@@ -334,33 +342,36 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
           {totalChartData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No data available</div>
           ) : (
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={300}>
               <LineChart
                 data={totalChartData}
                 onClick={(data) => data && handleDataPointClick(data)}
                 style={{ cursor: "pointer" }}
               >
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                 <XAxis
                   dataKey="dateLabel"
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
                   angle={-45}
                   textAnchor="end"
                   height={80}
                 />
                 <YAxis
-                  label={{ value: "Total Energy (MWh)", angle: -90, position: "insideLeft" }}
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
+                  label={{ value: "Total Energy (MWh)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
                 />
                 <Tooltip content={<CustomTooltip valueLabel="Total Energy" />} />
                 <Legend />
                 <Line
                   type="monotone"
                   dataKey="value"
-                  stroke="#10b981"
-                  strokeWidth={2}
+                  stroke="#3b82f6"
+                  strokeWidth={3}
                   name="Total Energy (MWh)"
-                  dot={{ r: 3 }}
+                  dot={false}
+                  activeDot={{ r: 6, fill: "#3b82f6" }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -380,33 +391,36 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
           {monthlyChartData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No data available</div>
           ) : (
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={300}>
               <LineChart
                 data={monthlyChartData}
                 onClick={(data) => data && handleDataPointClick(data)}
                 style={{ cursor: "pointer" }}
               >
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                 <XAxis
                   dataKey="dateLabel"
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
                   angle={-45}
                   textAnchor="end"
                   height={80}
                 />
                 <YAxis
-                  label={{ value: "Monthly Energy (kWh)", angle: -90, position: "insideLeft" }}
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
+                  label={{ value: "Monthly Energy (kWh)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
                 />
                 <Tooltip content={<CustomTooltip valueLabel="Monthly Energy" />} />
                 <Legend />
                 <Line
                   type="monotone"
                   dataKey="value"
-                  stroke="#f59e0b"
-                  strokeWidth={2}
+                  stroke="#3b82f6"
+                  strokeWidth={3}
                   name="Monthly Energy (kWh)"
-                  dot={{ r: 3 }}
+                  dot={false}
+                  activeDot={{ r: 6, fill: "#3b82f6" }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -426,33 +440,36 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
           {yearlyChartData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No data available</div>
           ) : (
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={300}>
               <LineChart
                 data={yearlyChartData}
                 onClick={(data) => data && handleDataPointClick(data)}
                 style={{ cursor: "pointer" }}
               >
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                 <XAxis
                   dataKey="dateLabel"
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
                   angle={-45}
                   textAnchor="end"
                   height={80}
                 />
                 <YAxis
-                  label={{ value: "Yearly Energy (MWh)", angle: -90, position: "insideLeft" }}
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
+                  label={{ value: "Yearly Energy (MWh)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
                 />
                 <Tooltip content={<CustomTooltip valueLabel="Yearly Energy" />} />
                 <Legend />
                 <Line
                   type="monotone"
                   dataKey="value"
-                  stroke="#8b5cf6"
-                  strokeWidth={2}
+                  stroke="#3b82f6"
+                  strokeWidth={3}
                   name="Yearly Energy (MWh)"
-                  dot={{ r: 3 }}
+                  dot={false}
+                  activeDot={{ r: 6, fill: "#3b82f6" }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -472,33 +489,41 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
           {dailyGridDowntimeChartData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No data available</div>
           ) : (
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={300}>
               <BarChart
                 data={dailyGridDowntimeChartData}
                 style={{ cursor: "pointer" }}
               >
-                <CartesianGrid strokeDasharray="3 3" />
+                <defs>
+                  <linearGradient id="dailyGridDownGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.7} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                 <XAxis
                   dataKey="dateLabel"
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
                   angle={-45}
                   textAnchor="end"
                   height={80}
                 />
                 <YAxis
-                  label={{ value: "Grid Downtime (seconds)", angle: -90, position: "insideLeft" }}
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
+                  label={{ value: "Grid Downtime (seconds)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
                 />
                 <Tooltip
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const data = payload[0].payload
                       return (
-                        <div className="bg-background border rounded-lg p-3 shadow-lg">
-                          <p className="font-medium">{data.dateLabel}</p>
+                        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+                          <p className="text-sm font-semibold mb-1">{data.dateLabel}</p>
                           <p className="text-sm">
-                            <span className="text-muted-foreground">Grid Downtime: </span>
-                            <span className="font-medium">{data.value} seconds ({data.hours} hours)</span>
+                            <span className="font-medium text-blue-600 dark:text-blue-400">Grid Downtime: </span>
+                            {data.value} seconds ({data.hours} hours)
                           </p>
                         </div>
                       )
@@ -509,7 +534,7 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
                 <Legend />
                 <Bar
                   dataKey="value"
-                  fill="#ef4444"
+                  fill="url(#dailyGridDownGradient)"
                   name="Daily Grid Downtime (seconds)"
                   radius={[4, 4, 0, 0]}
                 />
@@ -531,33 +556,35 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
           {totalGridDowntimeChartData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No data available</div>
           ) : (
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={300}>
               <LineChart
                 data={totalGridDowntimeChartData}
                 style={{ cursor: "pointer" }}
               >
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                 <XAxis
                   dataKey="dateLabel"
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
                   angle={-45}
                   textAnchor="end"
                   height={80}
                 />
                 <YAxis
-                  label={{ value: "Total Grid Downtime (seconds)", angle: -90, position: "insideLeft" }}
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
+                  label={{ value: "Total Grid Downtime (seconds)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
                 />
                 <Tooltip
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const data = payload[0].payload
                       return (
-                        <div className="bg-background border rounded-lg p-3 shadow-lg">
-                          <p className="font-medium">{data.dateLabel}</p>
+                        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+                          <p className="text-sm font-semibold mb-1">{data.dateLabel}</p>
                           <p className="text-sm">
-                            <span className="text-muted-foreground">Total Grid Downtime: </span>
-                            <span className="font-medium">{data.value} seconds ({data.hours} hours)</span>
+                            <span className="font-medium text-blue-600 dark:text-blue-400">Total Grid Downtime: </span>
+                            {data.value} seconds ({data.hours} hours)
                           </p>
                         </div>
                       )
@@ -569,10 +596,11 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
                 <Line
                   type="monotone"
                   dataKey="value"
-                  stroke="#ef4444"
-                  strokeWidth={2}
+                  stroke="#3b82f6"
+                  strokeWidth={3}
                   name="Total Grid Downtime (seconds)"
-                  dot={{ r: 3 }}
+                  dot={false}
+                  activeDot={{ r: 6, fill: "#3b82f6" }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -592,15 +620,16 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
           {wasOnlineChartData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">No data available</div>
           ) : (
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={300}>
               <BarChart
                 data={wasOnlineChartData}
                 style={{ cursor: "pointer" }}
               >
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                 <XAxis
                   dataKey="dateLabel"
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
                   angle={-45}
                   textAnchor="end"
                   height={80}
@@ -609,18 +638,19 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
                   domain={[0, 1]}
                   ticks={[0, 1]}
                   tickFormatter={(value) => value === 1 ? "Online" : "Offline"}
-                  label={{ value: "Status", angle: -90, position: "insideLeft" }}
-                  tick={{ fontSize: 12 }}
+                  tick={{ fill: "currentColor", fontSize: 12 }}
+                  className="text-xs"
+                  label={{ value: "Status", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
                 />
                 <Tooltip
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const data = payload[0].payload
                       return (
-                        <div className="bg-background border rounded-lg p-3 shadow-lg">
-                          <p className="font-medium">{data.dateLabel}</p>
+                        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+                          <p className="text-sm font-semibold mb-1">{data.dateLabel}</p>
                           <p className="text-sm">
-                            <span className="text-muted-foreground">Status: </span>
+                            <span className="font-medium text-blue-600 dark:text-blue-400">Status: </span>
                             <span className={`font-medium ${data.value === 1 ? "text-green-600" : "text-red-600"}`}>
                               {data.status}
                             </span>
