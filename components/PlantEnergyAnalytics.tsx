@@ -198,6 +198,19 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
     }
   }, [gridDowntimeReadings])
 
+  // Calculate date range for display
+  const dateRange = useMemo(() => {
+    if (readings.length === 0) {
+      return null
+    }
+    const sortedReadings = [...readings].sort((a, b) => 
+      new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime()
+    )
+    const startDate = sortedReadings[0]?.reading_date
+    const endDate = sortedReadings[sortedReadings.length - 1]?.reading_date
+    return { startDate, endDate, count: readings.length }
+  }, [readings])
+
   const formatSeconds = (seconds: number | null) => {
     if (seconds === null || seconds === undefined) return "N/A"
     const hours = Math.floor(seconds / 3600)
@@ -209,14 +222,6 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
       return `${minutes}m ${secs}s`
     }
     return `${secs}s`
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    )
   }
 
   const CustomTooltip = ({ active, payload, label, valueLabel }: any) => {
@@ -235,18 +240,13 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
     return null
   }
 
-  // Calculate date range for display
-  const dateRange = useMemo(() => {
-    if (readings.length === 0) {
-      return null
-    }
-    const sortedReadings = [...readings].sort((a, b) => 
-      new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime()
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
     )
-    const startDate = sortedReadings[0]?.reading_date
-    const endDate = sortedReadings[sortedReadings.length - 1]?.reading_date
-    return { startDate, endDate, count: readings.length }
-  }, [readings])
+  }
 
   return (
     <div className="space-y-6">
