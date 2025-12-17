@@ -8,7 +8,7 @@ import { AsyncLocalStorage } from "async_hooks"
 
 interface MDCContext {
   // Request/Source identification
-  source: "user" | "cron" | "system" | "api"
+  source: "user" | "cron" | "system" | "api" | "github-actions"
   requestId?: string
   userId?: string
   userEmail?: string
@@ -77,9 +77,9 @@ class MDC {
   }
 
   /**
-   * Get source of current operation (user, cron, system, api)
+   * Get source of current operation (user, cron, system, api, github-actions)
    */
-  static getSource(): "user" | "cron" | "system" | "api" | undefined {
+  static getSource(): "user" | "cron" | "system" | "api" | "github-actions" | undefined {
     return this.get("source")
   }
 

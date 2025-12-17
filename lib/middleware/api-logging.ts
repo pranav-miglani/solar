@@ -183,6 +183,7 @@ export async function logApiRequestResponse(
     userId: userInfo?.accountId,
     accountType: userInfo?.accountType,
     orgId: userInfo?.orgId,
+    timestamp: new Date().toISOString(),
   }
   
   // Log request within MDC context
