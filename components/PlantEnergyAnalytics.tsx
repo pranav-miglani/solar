@@ -235,8 +235,40 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
     return null
   }
 
+  // Calculate date range for display
+  const dateRange = useMemo(() => {
+    if (readings.length === 0) {
+      return null
+    }
+    const sortedReadings = [...readings].sort((a, b) => 
+      new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime()
+    )
+    const startDate = sortedReadings[0]?.reading_date
+    const endDate = sortedReadings[sortedReadings.length - 1]?.reading_date
+    return { startDate, endDate, count: readings.length }
+  }, [readings])
+
   return (
     <div className="space-y-6">
+      {/* Date Range Info */}
+      {dateRange && (
+        <div className="bg-muted/50 border border-border rounded-lg p-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                Showing last 100 days of analytics data
+              </span>
+            </div>
+            {dateRange.startDate && dateRange.endDate && (
+              <div className="text-xs text-muted-foreground">
+                {format(new Date(dateRange.startDate), "MMM dd, yyyy")} - {format(new Date(dateRange.endDate), "MMM dd, yyyy")} ({dateRange.count} days)
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Grid Downtime Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900">
