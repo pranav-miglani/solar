@@ -107,9 +107,12 @@ exports.config = {
 
   /**
    * Optional labels to help group this app in New Relic UI.
-   * Example: environment:production,team:engineering
+   * Format: 'key1:value1;key2:value2' (semicolon-separated, not comma)
+   * Example: 'environment:production;deployment:ec2'
    */
-  labels: process.env.NEW_RELIC_LABELS || 'environment:production',
+  labels: process.env.NEW_RELIC_LABELS 
+    ? process.env.NEW_RELIC_LABELS.replace(/,/g, ';') // Convert commas to semicolons
+    : 'environment:production',
 }
 
 
