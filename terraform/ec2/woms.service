@@ -1,0 +1,51 @@
+[Unit]
+Description=Solar Information System (WOMS) - Next.js Application
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/woms
+Environment="NODE_ENV=production"
+Environment="PORT=3000"
+Environment="HOSTNAME=0.0.0.0"
+
+# Supabase Configuration
+EnvironmentFile=/home/ec2-user/woms/.env.production
+
+# New Relic Configuration
+Environment="NEW_RELIC_ENABLED=true"
+EnvironmentFile=/home/ec2-user/woms/.env.production
+
+# Restart configuration
+Restart=always
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=4G
+CPUQuota=200%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=woms
+
+# Pre-start: Load New Relic before starting the app
+ExecStartPre=/bin/bash -c 'if [ "$NEW_RELIC_ENABLED" = "true" ]; then export NODE_OPTIONS="--require newrelic"; fi'
+ExecStart=/usr/bin/node server.js
+
+# Graceful shutdown
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
+

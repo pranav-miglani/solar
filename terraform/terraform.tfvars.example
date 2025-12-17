@@ -1,0 +1,31 @@
+# Copy this file to terraform.tfvars and update with your values
+# DO NOT commit terraform.tfvars to version control
+
+aws_region   = "us-east-1"
+project_name = "woms"
+environment  = "prod"  # or "dev", "staging"
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+
+# ECS Task Configuration
+task_cpu    = 2048  # 2 vCPU
+task_memory = 4096  # 4 GB
+
+# Scaling Configuration
+desired_task_count = 2
+min_task_count     = 1
+max_task_count     = 10
+
+# Logging
+log_retention_days = 30
+
+# Docker Image Configuration
+ecr_repository_url = "123456789012.dkr.ecr.us-east-1.amazonaws.com/woms"  # Replace with your ECR URL
+image_tag          = "latest"
+
+# Domain Configuration (optional)
+domain_name    = ""  # e.g., "app.example.com"
+certificate_arn = ""  # ACM certificate ARN for HTTPS
+enable_https   = false
+

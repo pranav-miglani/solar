@@ -3,6 +3,9 @@ const nextConfig = {
   // Disable Turbopack — Webpack is more stable and uses far less disk
   experimental: {},
 
+  // Enable standalone output for Docker deployment
+  output: 'standalone',
+
   eslint: {
     ignoreDuringBuilds: false,
   },
