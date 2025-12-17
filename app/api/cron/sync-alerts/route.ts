@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
           success: true,
           message: "Alert sync completed",
           summary,
-        })
+        }        )
       } catch (error: any) {
         logger.error("❌ Alert sync cron error", error)
         return NextResponse.json(
@@ -64,8 +64,8 @@ export async function GET(request: NextRequest) {
           { status: 500 }
         )
       }
-    }
-  )
+    })
+  })
 }
 
 /**
