@@ -9,6 +9,18 @@
  * https://docs.newrelic.com/docs/apm/agents/nodejs-agent/configuration/nodejs-agent-configuration
  */
 
+// Validate critical configuration
+const isEnabled = process.env.NEW_RELIC_ENABLED === 'true'
+const licenseKey = process.env.NEW_RELIC_LICENSE_KEY
+
+// Warn if enabled but license key is missing
+if (isEnabled && !licenseKey) {
+  console.warn(
+    '[WARN] New Relic is enabled but NEW_RELIC_LICENSE_KEY is not set. ' +
+    'New Relic agent will not function properly.'
+  )
+}
+
 exports.config = {
   /**
    * Application name as it should appear in the New Relic UI.
@@ -22,13 +34,13 @@ exports.config = {
    * NEVER hard-code this; always provide it via NEW_RELIC_LICENSE_KEY
    * in the deployment environment.
    */
-  license_key: process.env.NEW_RELIC_LICENSE_KEY,
+  license_key: licenseKey,
 
   /**
    * Toggle agent based on environment. We only enable it when
    * NEW_RELIC_ENABLED=true. In local development this can remain off.
    */
-  agent_enabled: process.env.NEW_RELIC_ENABLED === 'true',
+  agent_enabled: isEnabled,
 
   /**
    * Enable distributed tracing so that vendor sync cron jobs and
@@ -52,6 +64,7 @@ exports.config = {
   error_collector: {
     enabled: true,
     capture_events: true,
+    max_event_samples_stored: 100,
   },
 
   /**
@@ -68,6 +81,7 @@ exports.config = {
    */
   custom_insights_events: {
     enabled: true,
+    max_samples_stored: 10000,
   },
 
   /**
@@ -77,7 +91,18 @@ exports.config = {
     enabled: true,
     forwarding: {
       enabled: true,
+      max_samples_stored: 10000,
     },
+    local_decorating: {
+      enabled: false,
+    },
+  },
+
+  /**
+   * Browser monitoring (disabled for API-only application).
+   */
+  browser_monitoring: {
+    enable: false,
   },
 
   /**
