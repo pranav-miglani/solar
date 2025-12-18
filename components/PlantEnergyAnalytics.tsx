@@ -20,9 +20,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
-import { Zap, TrendingUp, Calendar, Clock, AlertTriangle, Wifi, WifiOff } from "lucide-react"
+import { Zap, TrendingUp, Calendar, Clock, AlertTriangle, Wifi } from "lucide-react"
 
 interface EnergyReading {
   id: number
@@ -50,9 +49,10 @@ interface WasOnlineReading {
 
 interface PlantEnergyAnalyticsProps {
   plantId: string
+  showGridOnly?: boolean
 }
 
-export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
+export function PlantEnergyAnalytics({ plantId, showGridOnly = false }: PlantEnergyAnalyticsProps) {
   const [readings, setReadings] = useState<EnergyReading[]>([])
   const [gridDowntimeReadings, setGridDowntimeReadings] = useState<GridDowntimeReading[]>([])
   const [wasOnlineReadings, setWasOnlineReadings] = useState<WasOnlineReading[]>([])
@@ -121,7 +121,7 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
       .sort((a, b) => a.timestamp - b.timestamp)
   }, [readings])
 
-  // Monthly Energy Chart Data (Line Chart - last 100 days showing monthly trend)
+  // Monthly Energy Chart Data (Line Chart)
   const monthlyChartData = useMemo(() => {
     return readings
       .map((r) => ({
@@ -133,7 +133,7 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
       .sort((a, b) => a.timestamp - b.timestamp)
   }, [readings])
 
-  // Yearly Energy Chart Data (Line Chart - increasing)
+  // Yearly Energy Chart Data (Line Chart)
   const yearlyChartData = useMemo(() => {
     return readings
       .map((r) => ({
@@ -200,16 +200,17 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
 
   // Calculate date range for display
   const dateRange = useMemo(() => {
-    if (readings.length === 0) {
+    const activeReadings = showGridOnly ? gridDowntimeReadings : readings
+    if (activeReadings.length === 0) {
       return null
     }
-    const sortedReadings = [...readings].sort((a, b) => 
+    const sortedReadings = [...activeReadings].sort((a, b) => 
       new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime()
     )
     const startDate = sortedReadings[0]?.reading_date
     const endDate = sortedReadings[sortedReadings.length - 1]?.reading_date
-    return { startDate, endDate, count: readings.length }
-  }, [readings])
+    return { startDate, endDate, count: activeReadings.length }
+  }, [readings, gridDowntimeReadings, showGridOnly])
 
   const formatSeconds = (seconds: number | null) => {
     if (seconds === null || seconds === undefined) return "N/A"
@@ -310,204 +311,208 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
         </Card>
       </div>
 
-      {/* Daily Energy - Bar Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" />
-            Daily Energy Trend
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {dailyChartData.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No data available</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart
-                data={dailyChartData}
-                onClick={(data) => data && handleDataPointClick(data)}
-                style={{ cursor: "pointer" }}
-              >
-                <defs>
-                  <linearGradient id="dailyEnergyGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
-                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.7} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis
-                  dataKey="dateLabel"
-                  tick={{ fill: "currentColor", fontSize: 12 }}
-                  className="text-xs"
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis
-                  tick={{ fill: "currentColor", fontSize: 12 }}
-                  className="text-xs"
-                  label={{ value: "Daily Energy (kWh)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
-                />
-                <Tooltip content={<CustomTooltip valueLabel="Daily Energy" />} />
-                <Legend />
-                <Bar
-                  dataKey="value"
-                  fill="url(#dailyEnergyGradient)"
-                  name="Daily Energy (kWh)"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
+      {!showGridOnly && (
+        <>
+          {/* Daily Energy - Bar Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5" />
+                Daily Energy Trend
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {dailyChartData.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No data available</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart
+                    data={dailyChartData}
+                    onClick={(data) => data && handleDataPointClick(data)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <defs>
+                      <linearGradient id="dailyEnergyGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={1} />
+                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.7} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis
+                      dataKey="dateLabel"
+                      tick={{ fill: "currentColor", fontSize: 12 }}
+                      className="text-xs"
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis
+                      tick={{ fill: "currentColor", fontSize: 12 }}
+                      className="text-xs"
+                      label={{ value: "Daily Energy (kWh)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
+                    />
+                    <Tooltip content={<CustomTooltip valueLabel="Daily Energy" />} />
+                    <Legend />
+                    <Bar
+                      dataKey="value"
+                      fill="url(#dailyEnergyGradient)"
+                      name="Daily Energy (kWh)"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Total Energy - Line Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Total Energy Trend
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {totalChartData.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No data available</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart
-                data={totalChartData}
-                onClick={(data) => data && handleDataPointClick(data)}
-                style={{ cursor: "pointer" }}
-              >
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis
-                  dataKey="dateLabel"
-                  tick={{ fill: "currentColor", fontSize: 12 }}
-                  className="text-xs"
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis
-                  tick={{ fill: "currentColor", fontSize: 12 }}
-                  className="text-xs"
-                  label={{ value: "Total Energy (MWh)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
-                />
-                <Tooltip content={<CustomTooltip valueLabel="Total Energy" />} />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke="#3b82f6"
-                  strokeWidth={3}
-                  name="Total Energy (MWh)"
-                  dot={false}
-                  activeDot={{ r: 6, fill: "#3b82f6" }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
+          {/* Total Energy - Line Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Total Energy Trend
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {totalChartData.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No data available</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart
+                    data={totalChartData}
+                    onClick={(data) => data && handleDataPointClick(data)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis
+                      dataKey="dateLabel"
+                      tick={{ fill: "currentColor", fontSize: 12 }}
+                      className="text-xs"
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis
+                      tick={{ fill: "currentColor", fontSize: 12 }}
+                      className="text-xs"
+                      label={{ value: "Total Energy (MWh)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
+                    />
+                    <Tooltip content={<CustomTooltip valueLabel="Total Energy" />} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#3b82f6"
+                      strokeWidth={3}
+                      name="Total Energy (MWh)"
+                      dot={false}
+                      activeDot={{ r: 6, fill: "#3b82f6" }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Monthly Energy - Line Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Monthly Energy Trend
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {monthlyChartData.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No data available</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart
-                data={monthlyChartData}
-                onClick={(data) => data && handleDataPointClick(data)}
-                style={{ cursor: "pointer" }}
-              >
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis
-                  dataKey="dateLabel"
-                  tick={{ fill: "currentColor", fontSize: 12 }}
-                  className="text-xs"
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis
-                  tick={{ fill: "currentColor", fontSize: 12 }}
-                  className="text-xs"
-                  label={{ value: "Monthly Energy (kWh)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
-                />
-                <Tooltip content={<CustomTooltip valueLabel="Monthly Energy" />} />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke="#3b82f6"
-                  strokeWidth={3}
-                  name="Monthly Energy (kWh)"
-                  dot={false}
-                  activeDot={{ r: 6, fill: "#3b82f6" }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
+          {/* Monthly Energy - Line Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Monthly Energy Trend
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {monthlyChartData.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No data available</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart
+                    data={monthlyChartData}
+                    onClick={(data) => data && handleDataPointClick(data)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis
+                      dataKey="dateLabel"
+                      tick={{ fill: "currentColor", fontSize: 12 }}
+                      className="text-xs"
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis
+                      tick={{ fill: "currentColor", fontSize: 12 }}
+                      className="text-xs"
+                      label={{ value: "Monthly Energy (kWh)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
+                    />
+                    <Tooltip content={<CustomTooltip valueLabel="Monthly Energy" />} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#3b82f6"
+                      strokeWidth={3}
+                      name="Monthly Energy (kWh)"
+                      dot={false}
+                      activeDot={{ r: 6, fill: "#3b82f6" }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Yearly Energy - Line Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Yearly Energy Trend
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {yearlyChartData.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No data available</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart
-                data={yearlyChartData}
-                onClick={(data) => data && handleDataPointClick(data)}
-                style={{ cursor: "pointer" }}
-              >
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis
-                  dataKey="dateLabel"
-                  tick={{ fill: "currentColor", fontSize: 12 }}
-                  className="text-xs"
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis
-                  tick={{ fill: "currentColor", fontSize: 12 }}
-                  className="text-xs"
-                  label={{ value: "Yearly Energy (MWh)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
-                />
-                <Tooltip content={<CustomTooltip valueLabel="Yearly Energy" />} />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke="#3b82f6"
-                  strokeWidth={3}
-                  name="Yearly Energy (MWh)"
-                  dot={false}
-                  activeDot={{ r: 6, fill: "#3b82f6" }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
+          {/* Yearly Energy - Line Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Yearly Energy Trend
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {yearlyChartData.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No data available</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart
+                    data={yearlyChartData}
+                    onClick={(data) => data && handleDataPointClick(data)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis
+                      dataKey="dateLabel"
+                      tick={{ fill: "currentColor", fontSize: 12 }}
+                      className="text-xs"
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis
+                      tick={{ fill: "currentColor", fontSize: 12 }}
+                      className="text-xs"
+                      label={{ value: "Yearly Energy (MWh)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
+                    />
+                    <Tooltip content={<CustomTooltip valueLabel="Yearly Energy" />} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#3b82f6"
+                      strokeWidth={3}
+                      name="Yearly Energy (MWh)"
+                      dot={false}
+                      activeDot={{ r: 6, fill: "#3b82f6" }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Daily Grid Downtime - Bar Chart */}
       <Card>
@@ -767,4 +772,3 @@ export function PlantEnergyAnalytics({ plantId }: PlantEnergyAnalyticsProps) {
     </div>
   )
 }
-

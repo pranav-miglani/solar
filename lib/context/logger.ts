@@ -249,23 +249,27 @@ class ContextLogger {
 class ConsoleLogger {
   debug(message: string, ...args: any[]): void {
     if (process.env.NODE_ENV === "development") {
-      console.debug(`[DEBUG] ${message}`, ...args)
+      const timestamp = formatISTTimestamp()
+      console.debug(`[${timestamp}] [DEBUG] ${message}`, ...args)
     }
   }
 
   info(message: string, ...args: any[]): void {
-    console.log(`[INFO] ${message}`, ...args)
+    const timestamp = formatISTTimestamp()
+    console.log(`[${timestamp}] [INFO] ${message}`, ...args)
   }
 
   warn(message: string, ...args: any[]): void {
-    console.warn(`[WARN] ${message}`, ...args)
+    const timestamp = formatISTTimestamp()
+    console.warn(`[${timestamp}] [WARN] ${message}`, ...args)
   }
 
   error(message: string, error?: Error | any, ...args: any[]): void {
+    const timestamp = formatISTTimestamp()
     if (error instanceof Error) {
-      console.error(`[ERROR] ${message}`, error.message, error.stack, ...args)
+      console.error(`[${timestamp}] [ERROR] ${message}`, error.message, error.stack, ...args)
     } else {
-      console.error(`[ERROR] ${message}`, error, ...args)
+      console.error(`[${timestamp}] [ERROR] ${message}`, error, ...args)
     }
   }
 }

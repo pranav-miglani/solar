@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Leaf, ArrowLeft, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import { DashboardSidebar } from "@/components/DashboardSidebar"
+import { PlantEnergyAnalytics } from "@/components/PlantEnergyAnalytics"
 
 export const dynamic = "force-dynamic"
 
@@ -136,6 +137,13 @@ export default async function PlantAlertsPage({ params, searchParams }: PageProp
             </div>
           </CardHeader>
         </Card>
+
+        {(accountType === "SUPERADMIN" || accountType === "DEVELOPER") && (
+          <div className="mb-8">
+            <h2 className="text-xl md:text-2xl font-bold mb-4">Plant Analytics</h2>
+            <PlantEnergyAnalytics plantId={plant.id.toString()} showGridOnly={true} />
+          </div>
+        )}
 
         <div className="mb-4 flex items-center justify-between gap-2">
           <div className="flex gap-2">
