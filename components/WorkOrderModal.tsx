@@ -19,10 +19,23 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { PlantSelector } from "@/components/PlantSelector"
+import { useUser } from "@/context/UserContext"
 
 interface Org {
   id: number
   name: string
+}
+
+interface WmsDevice {
+  id: number
+  device_name: string | null
+  vendor_device_id: string
+  wms_sites: {
+    site_name: string
+    wms_vendors: {
+      name: string
+    }
+  }
 }
 
 interface WorkOrderModalProps {
@@ -39,9 +52,13 @@ export function WorkOrderModal({
   organizationName,
 }: WorkOrderModalProps) {
   const router = useRouter()
+  const { account } = useUser()
   const [orgs, setOrgs] = useState<Org[]>([])
   const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null)
   const [selectedPlantIds, setSelectedPlantIds] = useState<number[]>([])
+  const [wmsDevices, setWmsDevices] = useState<WmsDevice[]>([])
+  const [selectedWmsDeviceId, setSelectedWmsDeviceId] = useState<number | null | "">(null)
+  const [loadingWmsDevices, setLoadingWmsDevices] = useState(false)
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -50,6 +67,7 @@ export function WorkOrderModal({
   const [loading, setLoading] = useState(false)
 
   const isEditMode = !!workOrderId
+  const isSuperAdmin = account?.accountType === "SUPERADMIN" || account?.accountType === "DEVELOPER"
 
   useEffect(() => {
     if (open) {
@@ -62,9 +80,22 @@ export function WorkOrderModal({
       setFormData({ title: "", description: "", location: "" })
       setSelectedOrgId(null)
       setSelectedPlantIds([])
+      setSelectedWmsDeviceId(null)
+      setWmsDevices([])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, workOrderId])
+
+  // Fetch WMS devices when org is selected (only for SUPERADMIN/DEVELOPER)
+  useEffect(() => {
+    if (selectedOrgId && isSuperAdmin) {
+      fetchWmsDevices()
+    } else {
+      setWmsDevices([])
+      setSelectedWmsDeviceId(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedOrgId, isSuperAdmin])
 
   async function fetchOrgs() {
     try {
@@ -75,6 +106,24 @@ export function WorkOrderModal({
       }
     } catch (error) {
       console.error("Error fetching orgs:", error)
+    }
+  }
+
+  async function fetchWmsDevices() {
+    if (!selectedOrgId) return
+
+    try {
+      setLoadingWmsDevices(true)
+      const response = await fetch(`/api/wms-devices?orgId=${selectedOrgId}`)
+      const data = await response.json()
+
+      if (data.devices) {
+        setWmsDevices(data.devices)
+      }
+    } catch (error) {
+      console.error("Error fetching WMS devices:", error)
+    } finally {
+      setLoadingWmsDevices(false)
     }
   }
 
@@ -93,16 +142,23 @@ export function WorkOrderModal({
           location: wo.location || "",
         })
 
-        // Get organization from first plant
-        const firstPlant = wo.work_order_plants?.[0]?.plants
-        if (firstPlant?.organizations) {
-          setSelectedOrgId(firstPlant.organizations.id)
+        // Get organization from first plant or org_id
+        const orgId = wo.org_id || wo.work_order_plants?.[0]?.plants?.organizations?.id
+        if (orgId) {
+          setSelectedOrgId(orgId)
           
           // Set selected plant IDs
           const plantIds = wo.work_order_plants
             ?.filter((wop: any) => wop.is_active)
             .map((wop: any) => wop.plants.id) || []
           setSelectedPlantIds(plantIds)
+
+          // Set selected WMS device if assigned
+          if (wo.wms_device?.id) {
+            setSelectedWmsDeviceId(wo.wms_device.id)
+          } else {
+            setSelectedWmsDeviceId("")
+          }
         }
       }
     } catch (error) {
@@ -127,11 +183,20 @@ export function WorkOrderModal({
     setLoading(true)
 
     try {
-      const payload = {
+      const payload: any = {
         title: formData.title,
         description: formData.description,
         location: formData.location,
         plantIds: selectedPlantIds,
+      }
+
+      // Include WMS device ID if selected (only for SUPERADMIN/DEVELOPER)
+      if (isSuperAdmin) {
+        if (selectedWmsDeviceId === "" || selectedWmsDeviceId === null) {
+          payload.wmsDeviceId = null
+        } else if (selectedWmsDeviceId) {
+          payload.wmsDeviceId = selectedWmsDeviceId
+        }
       }
 
       const url = isEditMode
@@ -240,6 +305,7 @@ export function WorkOrderModal({
               onValueChange={(value) => {
                 setSelectedOrgId(parseInt(value))
                 setSelectedPlantIds([]) // Reset selection when org changes
+                setSelectedWmsDeviceId(null) // Reset WMS device selection when org changes
               }}
               disabled={isEditMode}
             >
@@ -265,6 +331,61 @@ export function WorkOrderModal({
               </SelectContent>
             </Select>
           </div>
+
+          {/* WMS Device Assignment Section (only for SUPERADMIN/DEVELOPER) */}
+          {isSuperAdmin && selectedOrgId && (
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+              <Label htmlFor="wms-device" className="text-sm font-semibold">
+                WMS Device Assignment
+              </Label>
+              {loadingWmsDevices ? (
+                <div className="text-sm text-muted-foreground">Loading WMS devices...</div>
+              ) : wmsDevices.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No WMS devices available for this organization</div>
+              ) : (
+                <Select
+                  value={selectedWmsDeviceId === null || selectedWmsDeviceId === "" ? "none" : selectedWmsDeviceId.toString()}
+                  onValueChange={(value) => {
+                    if (value === "none") {
+                      setSelectedWmsDeviceId("")
+                    } else {
+                      setSelectedWmsDeviceId(parseInt(value))
+                    }
+                  }}
+                >
+                  <SelectTrigger 
+                    id="wms-device"
+                    className="w-full transition-all duration-200 hover:border-primary/50 hover:shadow-sm bg-background text-foreground"
+                  >
+                    <SelectValue placeholder="Select WMS device (optional)" />
+                  </SelectTrigger>
+                  <SelectContent 
+                    className="bg-background border-2 border-border shadow-xl z-[9999] max-h-[300px]"
+                    position="popper"
+                  >
+                    <SelectItem 
+                      value="none"
+                      className="cursor-pointer transition-all duration-150 hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary text-foreground font-medium"
+                    >
+                      None
+                    </SelectItem>
+                    {wmsDevices.map((device) => {
+                      const displayName = `${device.wms_sites.site_name} > ${device.device_name || device.vendor_device_id} (${device.wms_sites.wms_vendors.name})`
+                      return (
+                        <SelectItem 
+                          key={device.id} 
+                          value={device.id.toString()}
+                          className="cursor-pointer transition-all duration-150 hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary text-foreground font-medium"
+                        >
+                          {displayName}
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
 
           {selectedOrgId && (
             <div className="animate-in fade-in slide-in-from-top-2 duration-300">

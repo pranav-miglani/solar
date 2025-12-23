@@ -143,9 +143,12 @@ export interface Database {
           id: number
           title: string
           description: string | null
+          location: string | null
+          org_id: number
+          wms_device_id: number | null
           priority: work_order_priority
           status: work_order_status
-          created_by: string
+          created_by: string | null
           created_at: string
           updated_at: string
         }
@@ -153,9 +156,12 @@ export interface Database {
           id?: number
           title: string
           description?: string | null
+          location?: string | null
+          org_id: number
+          wms_device_id?: number | null
           priority?: work_order_priority
           status?: work_order_status
-          created_by: string
+          created_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -163,9 +169,12 @@ export interface Database {
           id?: number
           title?: string
           description?: string | null
+          location?: string | null
+          org_id?: number
+          wms_device_id?: number | null
           priority?: work_order_priority
           status?: work_order_status
-          created_by?: string
+          created_by?: string | null
           created_at?: string
           updated_at?: string
         }

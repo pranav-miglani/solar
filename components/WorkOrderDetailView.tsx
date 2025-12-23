@@ -21,10 +21,13 @@ import {
   ExternalLink,
   AlertCircle,
   Trash2,
+  Wifi,
+  WifiOff,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ProductionOverview } from "@/components/ProductionOverview"
+import { WorkOrderModal } from "@/components/WorkOrderModal"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,6 +71,15 @@ interface WorkOrder {
   title: string
   description: string | null
   created_at: string
+  wms_device?: {
+    id: number
+    device_name: string
+    vendor_device_id: string
+    site_name: string
+    site_address: string | null
+    vendor_name: string
+    vendor_type: string
+  } | null
   work_order_plants: Array<{
     id: number
     is_active: boolean
@@ -89,6 +101,7 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
   const [productionData, setProductionData] = useState<any>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
 
   const isSuperAdmin = accountType === "SUPERADMIN" || accountType === "DEVELOPER"
   const isGovt = accountType === "GOVT"
@@ -271,7 +284,7 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
       </div>
 
       {/* Organization & Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className={`grid grid-cols-1 gap-4 ${isSuperAdmin ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -327,6 +340,54 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
             </div>
           </CardContent>
         </Card>
+
+        {/* WMS Device Mapping Card (only for SUPERADMIN/DEVELOPER) */}
+        {isSuperAdmin && (
+          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border-orange-200 dark:border-orange-800">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                    WMS Device Mapping
+                  </p>
+                  {workOrder?.wms_device ? (
+                    <div className="mt-2">
+                      <p className="text-sm font-semibold text-orange-900 dark:text-orange-100 truncate">
+                        {workOrder.wms_device.site_name} &gt; {workOrder.wms_device.device_name || workOrder.wms_device.vendor_device_id} ({workOrder.wms_device.vendor_name})
+                      </p>
+                      {workOrder.wms_device.site_address && (
+                        <p className="text-xs text-muted-foreground mt-1 truncate">
+                          {workOrder.wms_device.site_address}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-2">
+                      <p className="text-sm font-semibold text-red-600 dark:text-red-400">
+                        No WMS mapping
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {workOrder?.wms_device ? (
+                  <Wifi className="h-8 w-8 text-orange-500" />
+                ) : (
+                  <WifiOff className="h-8 w-8 text-red-500" />
+                )}
+              </div>
+              {!workOrder?.wms_device && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 w-full"
+                  onClick={() => setEditModalOpen(true)}
+                >
+                  Assign WMS Device
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Production Overview */}
@@ -493,6 +554,22 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Modal for WMS Device Assignment */}
+      {isSuperAdmin && (
+        <WorkOrderModal
+          open={editModalOpen}
+          onOpenChange={(open) => {
+            setEditModalOpen(open)
+            if (!open) {
+              // Refresh work order data when modal closes
+              fetchWorkOrder()
+            }
+          }}
+          workOrderId={workOrder?.id}
+          organizationName={organization?.name}
+        />
+      )}
     </div>
   )
 }
