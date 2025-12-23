@@ -521,8 +521,7 @@ export function WorkOrdersList({ accountType, orgId, organizationName }: WorkOrd
                       <li><strong>Vendor Plant ID</strong> - Vendor-specific plant identifier (must exist, unique per vendor type)</li>
                       <li><strong>Vendor Type</strong> - Vendor type (e.g., SOLARMAN, SOLARDM, PVBLINK, SHINEMONITOR, FOXESSCLOUD)</li>
                       <li><strong>Plant Name</strong> (optional) - Plant name (for reference only, not used for matching)</li>
-                      <li><strong>Description</strong> (optional) - Work order description</li>
-                      <li><strong>Location</strong> (optional) - Work order location</li>
+                      <li><strong>Foot Notes</strong> (optional) - Additional notes about the work order</li>
                     </ul>
                     <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
                       <strong>Note:</strong> Plants are identified by Vendor Plant ID and Vendor Type combination. Vendor Plant ID is unique per vendor type. Plant Name is optional and not used for matching (names can be duplicate).

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -294,6 +295,22 @@ export function WorkOrderModal({
                   required
                   placeholder="Enter workorder title"
                   className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 bg-background"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-sm font-semibold">
+                  Foot Notes
+                </Label>
+                <Textarea
+                  id="description"
+                  value={formData.description || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  rows={4}
+                  placeholder="Enter foot notes (optional)"
+                  className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 resize-none bg-background"
                 />
               </div>
             </div>

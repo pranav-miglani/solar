@@ -399,14 +399,14 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
         />
       )}
 
-      {/* Description */}
+      {/* Foot Notes */}
       {workOrder.description && (
         <Card>
           <CardHeader>
-            <CardTitle>Description</CardTitle>
+            <CardTitle>Foot Notes</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">{workOrder.description}</p>
+            <p className="text-muted-foreground whitespace-pre-wrap">{workOrder.description}</p>
           </CardContent>
         </Card>
       )}
