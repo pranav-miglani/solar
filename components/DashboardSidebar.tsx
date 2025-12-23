@@ -15,7 +15,6 @@ import {
   X,
   RefreshCw,
   BookOpen,
-  BookMarked,
   CloudSun,
   Database,
 } from "lucide-react"
@@ -74,21 +73,9 @@ export function DashboardSidebar() {
       roles: ["SUPERADMIN", "DEVELOPER"],
     },
     {
-      title: "System Flow",
-      href: "/superadmin/system-flow",
+      title: "Developer Docs",
+      href: "/superadmin/developer-docs",
       icon: BookOpen,
-      roles: ["DEVELOPER"],
-    },
-    {
-      title: "Release Notes",
-      href: "/superadmin/release-notes",
-      icon: FileText,
-      roles: ["DEVELOPER"],
-    },
-    {
-      title: "Documentation & Runbooks",
-      href: "/superadmin/documentation-runbooks",
-      icon: BookMarked,
       roles: ["DEVELOPER"],
     },
     {
