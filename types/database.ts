@@ -143,7 +143,6 @@ export interface Database {
           id: number
           title: string
           description: string | null
-          location: string | null
           org_id: number
           wms_device_id: number | null
           priority: work_order_priority
@@ -156,7 +155,6 @@ export interface Database {
           id?: number
           title: string
           description?: string | null
-          location?: string | null
           org_id: number
           wms_device_id?: number | null
           priority?: work_order_priority
@@ -169,7 +167,6 @@ export interface Database {
           id?: number
           title?: string
           description?: string | null
-          location?: string | null
           org_id?: number
           wms_device_id?: number | null
           priority?: work_order_priority

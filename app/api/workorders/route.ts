@@ -39,7 +39,6 @@ export async function GET(request: NextRequest) {
         id,
         title,
         description,
-        location,
         created_at,
         updated_at,
         org_id,
@@ -138,7 +137,7 @@ export async function POST(request: NextRequest) {
     requirePermission(accountType as any, "work_orders", "create")
 
     const body = await request.json()
-    const { title, description, location, plantIds, wmsDeviceId } = body
+    const { title, description, plantIds, wmsDeviceId } = body
 
     if (!title || !plantIds || plantIds.length === 0) {
       return NextResponse.json(
@@ -230,7 +229,6 @@ export async function POST(request: NextRequest) {
       .insert({
         title,
         description,
-        location,
         org_id: orgId, // Set the organization ID for cascade delete
         wms_device_id: validatedWmsDeviceId,
         priority: "MEDIUM", // Default value for existing schema, but not used in UI

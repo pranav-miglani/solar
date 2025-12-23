@@ -36,7 +36,6 @@ export async function GET(
         id,
         title,
         description,
-        location,
         created_at,
         updated_at,
         org_id,
@@ -156,7 +155,7 @@ export async function PUT(
     requirePermission(accountType as any, "work_orders", "update")
 
     const body = await request.json()
-    const { title, description, location, plantIds, wmsDeviceId } = body
+    const { title, description, plantIds, wmsDeviceId } = body
 
     if (!title || !plantIds || plantIds.length === 0) {
       return NextResponse.json(
@@ -269,7 +268,6 @@ export async function PUT(
     const updateData: any = {
       title,
       description,
-      location,
       org_id: orgId, // Update the organization ID for cascade delete
     }
 

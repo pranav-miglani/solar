@@ -62,7 +62,6 @@ export function WorkOrderModal({
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    location: "",
   })
   const [loading, setLoading] = useState(false)
 
@@ -77,7 +76,7 @@ export function WorkOrderModal({
       }
     } else {
       // Reset form when modal closes
-      setFormData({ title: "", description: "", location: "" })
+      setFormData({ title: "", description: "" })
       setSelectedOrgId(null)
       setSelectedPlantIds([])
       setSelectedWmsDeviceId(null)
@@ -139,7 +138,6 @@ export function WorkOrderModal({
         setFormData({
           title: wo.title || "",
           description: wo.description || "",
-          location: wo.location || "",
         })
 
         // Get organization from first plant or org_id
@@ -186,7 +184,6 @@ export function WorkOrderModal({
       const payload: any = {
         title: formData.title,
         description: formData.description,
-        location: formData.location,
         plantIds: selectedPlantIds,
       }
 
@@ -296,21 +293,6 @@ export function WorkOrderModal({
                   }
                   required
                   placeholder="Enter workorder title"
-                  className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 bg-background"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="location" className="text-sm font-semibold">
-                  Location
-                </Label>
-                <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) =>
-                    setFormData({ ...formData, location: e.target.value })
-                  }
-                  placeholder="Enter location"
                   className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 bg-background"
                 />
               </div>

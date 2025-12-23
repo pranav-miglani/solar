@@ -232,7 +232,6 @@ CREATE TABLE work_orders (
   id SERIAL PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT,
-  location TEXT, -- Physical location of the work order
   org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, -- Organization this work order belongs to (required for cascade delete)
   wms_device_id INTEGER NULL REFERENCES wms_devices(id) ON DELETE SET NULL, -- Optional WMS device assigned to this work order. Only SUPERADMIN/DEVELOPER can assign. Device must belong to same organization as work order.
   priority work_order_priority DEFAULT 'MEDIUM', -- DEPRECATED: No longer used in UI, kept for backward compatibility
