@@ -279,7 +279,7 @@ export function WorkOrderModal({
           </div>
         </DialogHeader>
 
-        <form id="workorder-form" onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden space-y-4 md:space-y-6 px-4 md:px-6 py-4">
+        <form id="workorder-form" onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-y-auto space-y-3 md:space-y-4 px-4 md:px-6 py-3 md:py-4">
           <div className="space-y-2">
             <Label htmlFor="title" className="text-sm font-semibold">
               Workorder Title *
@@ -388,7 +388,7 @@ export function WorkOrderModal({
           )}
 
           {selectedOrgId && (
-            <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="animate-in fade-in slide-in-from-top-2 duration-300 flex-shrink-0">
               <PlantSelector
                 orgIds={[selectedOrgId]}
                 selectedPlantIds={selectedPlantIds}

@@ -235,31 +235,37 @@ export function PlantSelector({
   }
 
   return (
-    <Card className="shadow-lg border-2 border-border w-full">
-      <CardHeader className="border-b border-border bg-gradient-to-r from-muted/50 to-muted/30 p-4 md:p-6">
+    <Card className="shadow-lg border-2 border-border w-full flex flex-col max-h-[500px] md:max-h-[600px]">
+      <CardHeader className="border-b border-border bg-gradient-to-r from-muted/50 to-muted/30 p-3 md:p-4 flex-shrink-0">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          <CardTitle className="text-base md:text-lg font-bold">Select Plants</CardTitle>
-          <div className="text-sm text-muted-foreground">
+          <CardTitle className="text-sm md:text-base font-bold">Select Plants</CardTitle>
+          <div className="text-xs md:text-sm text-muted-foreground">
             <span className="font-medium text-primary">{selectedPlantIds.length}</span> selected
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="p-0 flex flex-col flex-1 min-h-0 overflow-hidden">
         {/* Search Bar */}
-        <div className="p-3 md:p-4 border-b border-border bg-background/50">
+        <div className="p-2 md:p-3 border-b border-border bg-background/50 flex-shrink-0">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Search plants..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 transition-all duration-200 focus:ring-2 focus:ring-primary/20 text-sm md:text-base"
+              className="pl-8 h-9 text-sm transition-all duration-200 focus:ring-2 focus:ring-primary/20"
             />
           </div>
         </div>
 
         {/* Plants List */}
-        <div className="max-h-64 md:max-h-96 overflow-y-auto p-3 md:p-4 space-y-2">
+        <div 
+          className="flex-1 overflow-y-auto overscroll-contain p-2 md:p-3 space-y-1.5 min-h-0"
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(0, 0, 0, 0.2) transparent',
+          }}
+        >
           {filteredSelected.length === 0 && filteredUnselected.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
               {searchQuery ? "No plants found matching your search" : "No plants available"}
@@ -268,17 +274,17 @@ export function PlantSelector({
             <>
               {/* Selected Plants Section */}
               {filteredSelected.length > 0 && (
-                <div className="mb-4">
-                  <div className="text-xs font-semibold text-primary mb-2 px-1 uppercase tracking-wide">
+                <div className="mb-3">
+                  <div className="text-xs font-semibold text-primary mb-1.5 px-1 uppercase tracking-wide">
                     Selected Plants ({filteredSelected.length})
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {filteredSelected.map((plant) => (
                       <div
                         key={plant.id}
                         className={cn(
-                          "flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer",
-                          "bg-primary/10 border-primary/50 dark:border-primary/60 shadow-sm",
+                          "flex items-center gap-2 p-2 rounded-md border transition-all duration-200 cursor-pointer",
+                          "bg-primary/10 border-primary/50 dark:border-primary/60",
                           "hover:bg-primary/15 hover:border-primary/60 dark:hover:border-primary/70"
                         )}
                         onClick={() => {
@@ -293,19 +299,19 @@ export function PlantSelector({
                               onSelectionChange(selectedPlantIds.filter((id) => id !== plant.id))
                             }
                           }}
-                          className="transition-all duration-200"
+                          className="h-4 w-4 transition-all duration-200"
                           onClick={(e) => e.stopPropagation()}
                         />
                         <Label
                           htmlFor={`plant-selected-${plant.id}`}
-                          className="flex-1 cursor-pointer"
+                          className="flex-1 cursor-pointer min-w-0"
                           onClick={(e) => {
                             e.preventDefault()
                             onSelectionChange(selectedPlantIds.filter((id) => id !== plant.id))
                           }}
                         >
-                          <div className="font-medium text-sm">{plant.name}</div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="font-medium text-xs md:text-sm truncate">{plant.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">
                             {plant.capacity_kw} kW
                             {plant.vendors && ` • ${plant.vendors.name} (${plant.vendors.vendor_type})`}
                           </div>
@@ -320,17 +326,17 @@ export function PlantSelector({
               {filteredUnselected.length > 0 && (
                 <div>
                   {filteredSelected.length > 0 && (
-                    <div className="text-xs font-semibold text-muted-foreground mb-2 px-1 uppercase tracking-wide">
+                    <div className="text-xs font-semibold text-muted-foreground mb-1.5 px-1 uppercase tracking-wide">
                       Available Plants ({filteredUnselected.length})
                     </div>
                   )}
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {filteredUnselected.map((plant) => (
                       <div
                         key={plant.id}
                         className={cn(
-                          "flex items-center gap-3 p-3 rounded-lg border border-border transition-all duration-200 cursor-pointer",
-                          "hover:bg-primary/5 hover:border-primary/30 dark:hover:border-primary/40 hover:shadow-sm"
+                          "flex items-center gap-2 p-2 rounded-md border border-border transition-all duration-200 cursor-pointer",
+                          "hover:bg-primary/5 hover:border-primary/30 dark:hover:border-primary/40"
                         )}
                         onClick={() => {
                           onSelectionChange([...selectedPlantIds, plant.id])
@@ -344,19 +350,19 @@ export function PlantSelector({
                               onSelectionChange([...selectedPlantIds, plant.id])
                             }
                           }}
-                          className="transition-all duration-200"
+                          className="h-4 w-4 transition-all duration-200"
                           onClick={(e) => e.stopPropagation()}
                         />
                         <Label
                           htmlFor={`plant-${plant.id}`}
-                          className="flex-1 cursor-pointer"
+                          className="flex-1 cursor-pointer min-w-0"
                           onClick={(e) => {
                             e.preventDefault()
                             onSelectionChange([...selectedPlantIds, plant.id])
                           }}
                         >
-                          <div className="font-medium text-sm">{plant.name}</div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="font-medium text-xs md:text-sm truncate">{plant.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">
                             {plant.capacity_kw} kW
                             {plant.vendors && ` • ${plant.vendors.name} (${plant.vendors.vendor_type})`}
                           </div>
