@@ -23,11 +23,14 @@ import {
   Trash2,
   Wifi,
   WifiOff,
+  Sun,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ProductionOverview } from "@/components/ProductionOverview"
 import { WorkOrderModal } from "@/components/WorkOrderModal"
+import { InsolationChart } from "@/components/InsolationChart"
+import { subDays } from "date-fns"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -88,6 +91,16 @@ interface WorkOrder {
   }>
 }
 
+interface InsolationReading {
+  reading_date: string
+  insolation_value: number
+  reading_count?: number
+  metadata?: {
+    min_irr?: number
+    max_irr?: number
+  }
+}
+
 interface WorkOrderDetailViewProps {
   workOrderId: string
   accountType: string
@@ -102,6 +115,9 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
+  const [insolationReadings, setInsolationReadings] = useState<InsolationReading[]>([])
+  const [insolationLoading, setInsolationLoading] = useState(false)
+  const [insolationDateRange, setInsolationDateRange] = useState(30) // Default to last 30 days
 
   const isSuperAdmin = accountType === "SUPERADMIN" || accountType === "DEVELOPER"
   const isGovt = accountType === "GOVT"
@@ -111,6 +127,14 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
     fetchProductionData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workOrderId])
+
+  // Fetch insolation data when WMS device is assigned (only for SUPERADMIN/DEVELOPER)
+  useEffect(() => {
+    if (isSuperAdmin && workOrder?.wms_device?.id) {
+      fetchInsolationData(workOrder.wms_device.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workOrder?.wms_device?.id, isSuperAdmin, insolationDateRange])
 
   async function fetchWorkOrder() {
     try {
@@ -139,6 +163,30 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
       }
     } catch (err) {
       console.error("Failed to fetch production data:", err)
+    }
+  }
+
+  async function fetchInsolationData(deviceId: number) {
+    try {
+      setInsolationLoading(true)
+      const endDate = new Date().toISOString().split("T")[0]
+      const startDate = subDays(new Date(), insolationDateRange).toISOString().split("T")[0]
+      
+      const response = await fetch(
+        `/api/insolation-readings?deviceId=${deviceId}&startDate=${startDate}&endDate=${endDate}`
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        setInsolationReadings(data.readings || [])
+      } else {
+        setInsolationReadings([])
+      }
+    } catch (err) {
+      console.error("Failed to fetch insolation data:", err)
+      setInsolationReadings([])
+    } finally {
+      setInsolationLoading(false)
     }
   }
 
@@ -407,6 +455,69 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground whitespace-pre-wrap">{workOrder.description}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* WMS Device Insolation Graph (only for SUPERADMIN/DEVELOPER) */}
+      {isSuperAdmin && workOrder?.wms_device && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sun className="h-5 w-5 text-yellow-500" />
+                <CardTitle>WMS Device Insolation Data</CardTitle>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={insolationDateRange === 7 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setInsolationDateRange(7)}
+                >
+                  7 Days
+                </Button>
+                <Button
+                  variant={insolationDateRange === 30 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setInsolationDateRange(30)}
+                >
+                  30 Days
+                </Button>
+                <Button
+                  variant={insolationDateRange === 100 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setInsolationDateRange(100)}
+                >
+                  100 Days
+                </Button>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              {workOrder.wms_device.site_name} &gt; {workOrder.wms_device.device_name || workOrder.wms_device.vendor_device_id} ({workOrder.wms_device.vendor_name})
+            </p>
+          </CardHeader>
+          <CardContent>
+            {insolationLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-muted-foreground">Loading insolation data...</div>
+              </div>
+            ) : insolationReadings.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                No insolation data available for the selected period
+              </div>
+            ) : (
+              <InsolationChart
+                data={insolationReadings}
+                title="Insolation Readings"
+                statistics={{
+                  averageInsolation: insolationReadings.reduce((sum, r) => sum + r.insolation_value, 0) / insolationReadings.length,
+                  minInsolation: Math.min(...insolationReadings.map(r => r.insolation_value)),
+                  maxInsolation: Math.max(...insolationReadings.map(r => r.insolation_value)),
+                  totalDays: insolationReadings.length,
+                }}
+                period="range"
+              />
+            )}
           </CardContent>
         </Card>
       )}
