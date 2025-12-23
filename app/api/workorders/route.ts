@@ -212,7 +212,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Validate device belongs to same org as plants
-      if (wmsDevice.wms_sites.org_id !== orgId) {
+      // Handle wms_sites as either object or array (TypeScript inference issue)
+      const site = Array.isArray(wmsDevice.wms_sites) ? wmsDevice.wms_sites[0] : wmsDevice.wms_sites
+      if (!site || site.org_id !== orgId) {
         return NextResponse.json(
           { error: "WMS device must belong to the same organization as the plants" },
           { status: 400 }

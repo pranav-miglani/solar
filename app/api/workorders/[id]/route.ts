@@ -101,14 +101,21 @@ export async function GET(
         .single()
 
       if (!deviceError && device) {
-        wmsDevice = {
-          id: device.id,
-          device_name: device.device_name,
-          vendor_device_id: device.vendor_device_id,
-          site_name: device.wms_sites.site_name,
-          site_address: device.wms_sites.address,
-          vendor_name: device.wms_sites.wms_vendors.name,
-          vendor_type: device.wms_sites.wms_vendors.vendor_type,
+        // Handle wms_sites as either object or array (TypeScript inference issue)
+        const site = Array.isArray(device.wms_sites) ? device.wms_sites[0] : device.wms_sites
+        if (site) {
+          const vendor = Array.isArray(site.wms_vendors) ? site.wms_vendors[0] : site.wms_vendors
+          if (vendor) {
+            wmsDevice = {
+              id: device.id,
+              device_name: device.device_name,
+              vendor_device_id: device.vendor_device_id,
+              site_name: site.site_name,
+              site_address: site.address,
+              vendor_name: vendor.name,
+              vendor_type: vendor.vendor_type,
+            }
+          }
         }
       }
     }
@@ -243,7 +250,9 @@ export async function PUT(
       }
 
       // Validate device belongs to same org as work order
-      if (wmsDevice.wms_sites.org_id !== orgId) {
+      // Handle wms_sites as either object or array (TypeScript inference issue)
+      const site = Array.isArray(wmsDevice.wms_sites) ? wmsDevice.wms_sites[0] : wmsDevice.wms_sites
+      if (!site || site.org_id !== orgId) {
         return NextResponse.json(
           { error: "WMS device must belong to the same organization as the work order" },
           { status: 400 }
