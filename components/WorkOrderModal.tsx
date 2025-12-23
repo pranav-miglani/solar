@@ -279,116 +279,141 @@ export function WorkOrderModal({
           </div>
         </DialogHeader>
 
-        <form id="workorder-form" onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-y-auto space-y-3 md:space-y-4 px-4 md:px-6 py-3 md:py-4">
-          <div className="space-y-2">
-            <Label htmlFor="title" className="text-sm font-semibold">
-              Workorder Title *
-            </Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
-              required
-              placeholder="Enter workorder title"
-              className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 bg-background"
-            />
-          </div>
+        <form id="workorder-form" onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-y-auto px-4 md:px-6 py-3 md:py-4">
+          {/* Two-column grid for form fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-4">
+            {/* Left Column */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="title" className="text-sm font-semibold">
+                  Workorder Title *
+                </Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) =>
+                    setFormData({ ...formData, title: e.target.value })
+                  }
+                  required
+                  placeholder="Enter workorder title"
+                  className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 bg-background"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="organization" className="text-sm font-semibold">
-              Organization *
-            </Label>
-            <Select
-              value={selectedOrgId?.toString() || ""}
-              onValueChange={(value) => {
-                setSelectedOrgId(parseInt(value))
-                setSelectedPlantIds([]) // Reset selection when org changes
-                setSelectedWmsDeviceId(null) // Reset WMS device selection when org changes
-              }}
-              disabled={isEditMode}
-            >
-              <SelectTrigger 
-                id="organization"
-                className="w-full transition-all duration-200 hover:border-primary/50 hover:shadow-sm bg-background text-foreground"
-              >
-                <SelectValue placeholder="Select an organization" />
-              </SelectTrigger>
-              <SelectContent 
-                className="bg-background border-2 border-border shadow-xl z-[9999] max-h-[300px]"
-                position="popper"
-              >
-                {orgs.map((org) => (
-                  <SelectItem 
-                    key={org.id} 
-                    value={org.id.toString()}
-                    className="cursor-pointer transition-all duration-150 hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary text-foreground font-medium"
-                  >
-                    {org.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="location" className="text-sm font-semibold">
+                  Location
+                </Label>
+                <Input
+                  id="location"
+                  value={formData.location}
+                  onChange={(e) =>
+                    setFormData({ ...formData, location: e.target.value })
+                  }
+                  placeholder="Enter location"
+                  className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 bg-background"
+                />
+              </div>
+            </div>
 
-          {/* WMS Device Assignment Section (only for SUPERADMIN/DEVELOPER) */}
-          {isSuperAdmin && selectedOrgId && (
-            <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-              <Label htmlFor="wms-device" className="text-sm font-semibold">
-                WMS Device Assignment
-              </Label>
-              {loadingWmsDevices ? (
-                <div className="text-sm text-muted-foreground">Loading WMS devices...</div>
-              ) : wmsDevices.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No WMS devices available for this organization</div>
-              ) : (
+            {/* Right Column */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="organization" className="text-sm font-semibold">
+                  Organization *
+                </Label>
                 <Select
-                  value={selectedWmsDeviceId === null || selectedWmsDeviceId === "" ? "none" : selectedWmsDeviceId.toString()}
+                  value={selectedOrgId?.toString() || ""}
                   onValueChange={(value) => {
-                    if (value === "none") {
-                      setSelectedWmsDeviceId("")
-                    } else {
-                      setSelectedWmsDeviceId(parseInt(value))
-                    }
+                    setSelectedOrgId(parseInt(value))
+                    setSelectedPlantIds([]) // Reset selection when org changes
+                    setSelectedWmsDeviceId(null) // Reset WMS device selection when org changes
                   }}
+                  disabled={isEditMode}
                 >
                   <SelectTrigger 
-                    id="wms-device"
+                    id="organization"
                     className="w-full transition-all duration-200 hover:border-primary/50 hover:shadow-sm bg-background text-foreground"
                   >
-                    <SelectValue placeholder="Select WMS device (optional)" />
+                    <SelectValue placeholder="Select an organization" />
                   </SelectTrigger>
                   <SelectContent 
                     className="bg-background border-2 border-border shadow-xl z-[9999] max-h-[300px]"
                     position="popper"
                   >
-                    <SelectItem 
-                      value="none"
-                      className="cursor-pointer transition-all duration-150 hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary text-foreground font-medium"
-                    >
-                      None
-                    </SelectItem>
-                    {wmsDevices.map((device) => {
-                      const displayName = `${device.wms_sites.site_name} > ${device.device_name || device.vendor_device_id} (${device.wms_sites.wms_vendors.name})`
-                      return (
-                        <SelectItem 
-                          key={device.id} 
-                          value={device.id.toString()}
-                          className="cursor-pointer transition-all duration-150 hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary text-foreground font-medium"
-                        >
-                          {displayName}
-                        </SelectItem>
-                      )
-                    })}
+                    {orgs.map((org) => (
+                      <SelectItem 
+                        key={org.id} 
+                        value={org.id.toString()}
+                        className="cursor-pointer transition-all duration-150 hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary text-foreground font-medium"
+                      >
+                        {org.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* WMS Device Assignment Section (only for SUPERADMIN/DEVELOPER) */}
+              {isSuperAdmin && selectedOrgId && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <Label htmlFor="wms-device" className="text-sm font-semibold">
+                    WMS Device Assignment
+                  </Label>
+                  {loadingWmsDevices ? (
+                    <div className="text-sm text-muted-foreground py-2">Loading WMS devices...</div>
+                  ) : wmsDevices.length === 0 ? (
+                    <div className="text-sm text-muted-foreground py-2">No WMS devices available</div>
+                  ) : (
+                    <Select
+                      value={selectedWmsDeviceId === null || selectedWmsDeviceId === "" ? "none" : selectedWmsDeviceId.toString()}
+                      onValueChange={(value) => {
+                        if (value === "none") {
+                          setSelectedWmsDeviceId("")
+                        } else {
+                          setSelectedWmsDeviceId(parseInt(value))
+                        }
+                      }}
+                    >
+                      <SelectTrigger 
+                        id="wms-device"
+                        className="w-full transition-all duration-200 hover:border-primary/50 hover:shadow-sm bg-background text-foreground"
+                      >
+                        <SelectValue placeholder="Select WMS device (optional)" />
+                      </SelectTrigger>
+                      <SelectContent 
+                        className="bg-background border-2 border-border shadow-xl z-[9999] max-h-[300px]"
+                        position="popper"
+                      >
+                        <SelectItem 
+                          value="none"
+                          className="cursor-pointer transition-all duration-150 hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary text-foreground font-medium"
+                        >
+                          None
+                        </SelectItem>
+                        {wmsDevices.map((device) => {
+                          const displayName = `${device.wms_sites.site_name} > ${device.device_name || device.vendor_device_id} (${device.wms_sites.wms_vendors.name})`
+                          return (
+                            <SelectItem 
+                              key={device.id} 
+                              value={device.id.toString()}
+                              className="cursor-pointer transition-all duration-150 hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary text-foreground font-medium"
+                            >
+                              {displayName}
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
               )}
             </div>
-          )}
+          </div>
 
+          {/* Full-width Plant Selector */}
           {selectedOrgId && (
-            <div className="animate-in fade-in slide-in-from-top-2 duration-300 flex-shrink-0">
+            <div className="animate-in fade-in slide-in-from-top-2 duration-300 flex-shrink-0 mb-4">
               <PlantSelector
                 orgIds={[selectedOrgId]}
                 selectedPlantIds={selectedPlantIds}
@@ -397,21 +422,6 @@ export function WorkOrderModal({
               />
             </div>
           )}
-
-          <div className="space-y-2">
-            <Label htmlFor="location" className="text-sm font-semibold">
-              Location
-            </Label>
-            <Input
-              id="location"
-              value={formData.location}
-              onChange={(e) =>
-                setFormData({ ...formData, location: e.target.value })
-              }
-              placeholder="Enter location"
-              className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 bg-background"
-            />
-          </div>
 
           <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-border px-4 md:px-6 pb-4 md:pb-6">
             <Button
