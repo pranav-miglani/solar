@@ -607,7 +607,7 @@ async listPlants(): Promise<Plant[]> {
     // Format date as YYYY-MM-DD
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     
-    // SolarDM endpoint: /dms/data_panel/history/stats/daily_v2/{plantId}?plantId={plantId}&type=date&time=YYYY-MM-DD
+    // SolarDM endpoint: /dms/data_panel/history/stats/daily/{plantId}?plantId={plantId}&type=date&time=YYYY-MM-DD
     const url = `${baseUrl}/dms/data_panel/history/stats/daily_v2/${plantIdStr}?plantId=${plantIdStr}&type=date&time=${dateStr}`
 
     console.log("[SolarDM] Fetching daily telemetry records:", {
@@ -659,7 +659,7 @@ async listPlants(): Promise<Plant[]> {
         dateTime = Math.floor(Date.now() / 1000) // Fallback to current time
       }
 
-      // generationPower is already in W (watts) - keep as is for now, will be converted to kW in API route
+      // generationPower is already in kW (watts) - keep as is for now, 
       // Note: SolarDM provides 20-minute intervals, not 15-minute like Solarman
       return {
         systemId: plantIdStr,
@@ -677,7 +677,7 @@ async listPlants(): Promise<Plant[]> {
     let dailyGenerationKwh = 0
 
     records.forEach((record: any) => {
-      const powerKw = record.generationPower / 1000 // Convert W to kW
+      const powerKw = record.generationPower  // Already in kW
       const energyKwh = powerKw * intervalHours
       dailyGenerationKwh += energyKwh
     })
