@@ -659,11 +659,11 @@ async listPlants(): Promise<Plant[]> {
         dateTime = Math.floor(Date.now() / 1000) // Fallback to current time
       }
 
-      // generationPower is already in kW (watts) - keep as is for now, 
+      // generationPower from API is in kW; passed through as-is (route uses it as kW for SOLARDM)
       // Note: SolarDM provides 20-minute intervals, not 15-minute like Solarman
       return {
         systemId: plantIdStr,
-        generationPower: item.generationPower || 0, // Power in W
+        generationPower: item.generationPower || 0, // kW
         dateTime, // Unix timestamp in seconds
         generationCapacity: null, // Not provided by SolarDM
         timeZoneOffset: null, // Not provided by SolarDM

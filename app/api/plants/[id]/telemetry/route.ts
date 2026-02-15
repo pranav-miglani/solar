@@ -500,11 +500,11 @@ export async function GET(
             }
 
             // Convert power from W to kW if needed, or use as-is if already in kW
-            // PVBlink provides power in kW, Solarman provides in W
+            // PVBlink & SolarDM: already in kW. Solarman & ShineMonitor: in W
             const powerKw = record.generationPower
-              ? (vendor.vendor_type === "PVBLINK" 
-                  ? record.generationPower // PVBlink: already in kW
-                  : record.generationPower / 1000) // Solarman: convert W to kW
+              ? (vendor.vendor_type === "PVBLINK" || vendor.vendor_type === "SOLARDM"
+                  ? record.generationPower // already in kW
+                  : record.generationPower / 1000) // convert W to kW
               : record.power_kw || record.generation_power_kw || 0
 
             return {
