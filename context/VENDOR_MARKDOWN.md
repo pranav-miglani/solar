@@ -63,7 +63,6 @@ Plant devices	/station/v1.0/device	POST
 Realtime data	/device/v1.0/currentData	POST
 Historical data	/device/v1.0/historical	POST
 Alerts	/device/v1.0/alertList	POST
-Control	/device/v1.0/remoteControl	POST
 ⚡ B. Shinemonitor Vendor Configuration
 Required Fields
 Field	Description
@@ -126,12 +125,6 @@ interface VendorDriver {
 
   // alerts
   getDeviceAlerts(deviceVendorId: string, from?: string, to?: string): Promise<Alert[]>
-
-  // commands (if available)
-  sendCommand?(deviceVendorId: string, command: string, params?: any): Promise<CommandTask>
-
-  // callbacks / webhooks
-  handleCallback?(payload: any): Promise<void>
 }
 
 5. Normalized Internal Data Schema
@@ -233,8 +226,6 @@ realtime telemetry
 historical telemetry
 
 alerts
-
-commands (if supported)
 
 7. Example: Vendor Creation JSON
 

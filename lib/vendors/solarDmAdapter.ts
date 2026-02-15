@@ -607,8 +607,8 @@ async listPlants(): Promise<Plant[]> {
     // Format date as YYYY-MM-DD
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     
-    // SolarDM endpoint: /dms/data_panel/history/stats/daily/{plantId}?plantId={plantId}&type=date&time=YYYY-MM-DD
-    const url = `${baseUrl}/dms/data_panel/history/stats/daily/${plantIdStr}?plantId=${plantIdStr}&type=date&time=${dateStr}`
+    // SolarDM endpoint: /dms/data_panel/history/stats/daily_v2/{plantId}?plantId={plantId}&type=date&time=YYYY-MM-DD
+    const url = `${baseUrl}/dms/data_panel/history/stats/daily_v2/${plantIdStr}?plantId=${plantIdStr}&type=date&time=${dateStr}`
 
     console.log("[SolarDM] Fetching daily telemetry records:", {
       plantId: plantIdStr,
