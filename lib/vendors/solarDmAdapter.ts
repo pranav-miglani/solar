@@ -315,11 +315,11 @@ export class SolarDmAdapter extends BaseVendorAdapter {
                 lastUpdateTime = date.toISOString()
               }
             } catch (parseError) {
-              console.warn(`[SolarDM] Failed to parse lastUpdateTime: ${plantData.lastUpdateTime}`, parseError)
+              console.warn(`[SolarDM] Failed to parse ${vendorPlantId} lastUpdateTime: ${plantData.lastUpdateTime}`, parseError)
             }
           }
 
-          console.log(`[SolarDM] Plant info fetched:`, {
+          console.log(`[SolarDM] Plant info ${vendorPlantId} fetched:`, {
             plantName,
             communicateStatus: plantData.communicateStatus,
             networkStatus,
@@ -345,7 +345,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
     // Fetch live telemetry data from metering endpoint
     try {
       const meteringUrl = `${baseUrl}/dms/data_panel/metering/sub_v2/${vendorPlantId}`
-      console.log(`[SolarDM] Fetching live telemetry for plant ${vendorPlantId} from: ${meteringUrl}`)
+      console.log(`[SolarDM] Fetching live telemetry for ${plantName} plant with id ${vendorPlantId} from: ${meteringUrl}`)
 
       const response = await this.loggedFetch(
         meteringUrl,
@@ -354,7 +354,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
         },
         {
           operation: "GET_PLANT_LIVE_TELEMETRY",
-          description: `Fetch SolarDM live telemetry for plant ${vendorPlantId}`,
+          description: `Fetch SolarDM live telemetry for plant ${plantName} with id ${vendorPlantId}`,
         }
       )
 
@@ -370,11 +370,17 @@ export class SolarDmAdapter extends BaseVendorAdapter {
 
       const data = await response.json()
 
+      // Log full response for telemetry sync debugging
+      console.log(`[SolarDM] Full metering API response for ${plantName} with id ${vendorPlantId}:`, JSON.stringify(data, null, 2))
+
       if (data.code !== 0 || !data.data?.energy) {
         throw new Error(`SolarDM API error: ${data.message || "Unknown error"}`)
       }
 
       const energy = data.data.energy
+      
+      // Log full energy object
+      console.log(`[SolarDM] Full energy object for ${plantName} with id ${vendorPlantId}:`, JSON.stringify(energy, null, 2))
 
       // Parse values from strings like "12.8_kWh", "0_KW", "3_kWp"
       // currDay, currMonth, currYear, total are in kWh format: "12.8_kWh"
@@ -397,7 +403,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
         lastUpdateTime = new Date().toISOString()
       }
 
-      console.log(`[SolarDM] Successfully fetched live telemetry for plant ${vendorPlantId}:`, {
+      console.log(`[SolarDM] Successfully fetched live telemetry for ${plantName} with id ${vendorPlantId}:`, {
         capacityKw,
         currentPowerKw,
         dailyEnergyKwh,
@@ -427,7 +433,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
         },
       }
     } catch (error: any) {
-      console.error(`[SolarDM] Error fetching live telemetry for plant ${vendorPlantId}:`, error.message)
+      console.error(`[SolarDM] Error fetching live telemetry for ${plantName} with id ${vendorPlantId}:`, error.message)
       // If we have plant name from plant info, return minimal plant object
       // Otherwise return null (plant doesn't exist or both endpoints failed)
       // Note: capacityKw is required by Plant interface but NOT used by live telemetry sync (only metadata is used)
@@ -1147,7 +1153,19 @@ async listPlants(): Promise<Plant[]> {
     const responseClone = response.clone()
     try {
       const responseText = await responseClone.text()
-      console.log(`[SolarDM] Response body (first 500 chars):`, responseText.substring(0, 500))
+      // For telemetry operations, log full response (no limit)
+      if (operation === "GET_PLANT_LIVE_TELEMETRY" || operation === "GET_PLANT_INFO") {
+        console.log(`[SolarDM] Response body (full):`, responseText)
+        try {
+          const responseJson = JSON.parse(responseText)
+          console.log(`[SolarDM] Response body (parsed JSON):`, JSON.stringify(responseJson, null, 2))
+        } catch (parseError) {
+          console.log(`[SolarDM] Response body is not valid JSON, logged as text above`)
+        }
+      } else {
+        // For other operations, limit to 500 chars to avoid log spam
+        console.log(`[SolarDM] Response body (first 500 chars):`, responseText.substring(0, 500))
+      }
     } catch (e) {
       console.log(`[SolarDM] Could not read response body for logging`)
     }
