@@ -7,6 +7,7 @@ import type {
   VendorConfig,
 } from "./types"
 import { pooledFetch } from "./httpClient"
+import { logger } from "@/lib/context/logger"
 
 interface SolarmanAuthResponse {
   access_token: string
@@ -160,7 +161,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       }
     }
 
-    console.log(`📤 [Solarman API Request] ${requestId}`, JSON.stringify(requestLog, null, 2))
+    logger.debug(`📤 [Solarman API Request] ${requestId}`, JSON.stringify(requestLog, null, 2))
 
     const startTime = Date.now()
 
@@ -226,7 +227,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       }
 
       if (response.ok) {
-        console.log(`✅ [Solarman API Response] ${requestId}`, JSON.stringify(responseLog, null, 2))
+        logger.debug(`✅ [Solarman API Response] ${requestId}`, JSON.stringify(responseLog, null, 2))
       } else {
         console.error(`❌ [Solarman API Error Response] ${requestId}`, JSON.stringify(responseLog, null, 2))
       }
@@ -256,7 +257,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     // First try PRO API base URL
     const proApiUrl = process.env.SOLARMAN_PRO_API_BASE_URL
     if (proApiUrl) {
-      console.log('🔵 [Solarman] Using PRO API base URL from SOLARMAN_PRO_API_BASE_URL:', proApiUrl)
+      logger.debug('🔵 [Solarman] Using PRO API base URL from SOLARMAN_PRO_API_BASE_URL:', proApiUrl)
       return { url: proApiUrl, isExplicit: true }
     }
     
@@ -264,18 +265,18 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     const regularApiUrl = this.getApiBaseUrl()
     if (regularApiUrl.includes('globalapi')) {
       const convertedUrl = regularApiUrl.replace('globalapi', 'globalpro')
-      console.log('🟡 [Solarman] PRO API base URL not set, auto-converting from regular API:', regularApiUrl, '→', convertedUrl)
+      logger.debug('🟡 [Solarman] PRO API base URL not set, auto-converting from regular API:', regularApiUrl, '→', convertedUrl)
       return { url: convertedUrl, isExplicit: false }
     }
     
     // If already globalpro, return as is
     if (regularApiUrl.includes('globalpro')) {
-      console.log('🟡 [Solarman] Using regular API URL (already globalpro):', regularApiUrl)
+      logger.debug('🟡 [Solarman] Using regular API URL (already globalpro):', regularApiUrl)
       return { url: regularApiUrl, isExplicit: false }
     }
     
     // Default fallback
-    console.log('🟠 [Solarman] Using default PRO API base URL:', 'https://globalpro.solarmanpv.com')
+    logger.debug('🟠 [Solarman] Using default PRO API base URL:', 'https://globalpro.solarmanpv.com')
     return { url: 'https://globalpro.solarmanpv.com', isExplicit: false }
   }
 
@@ -334,7 +335,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
           return vendor.access_token
         } else {
           // Token expired - return null to trigger regeneration
-          console.log('⚠️ [Solarman] Token from DB is expired (token_expires_at check)')
+          logger.debug('⚠️ [Solarman] Token from DB is expired (token_expires_at check)')
           return null
         }
       }
@@ -346,12 +347,12 @@ export class SolarmanAdapter extends BaseVendorAdapter {
         return vendor.access_token
       } else if (jwtExpiry) {
         // JWT token expired
-        console.log('⚠️ [Solarman] Token from DB is expired (JWT expiry check)')
+        logger.debug('⚠️ [Solarman] Token from DB is expired (JWT expiry check)')
         return null
       }
 
       // If we can't determine expiry, assume it's invalid for safety
-      console.log('⚠️ [Solarman] Cannot determine token expiry - treating as expired')
+      logger.debug('⚠️ [Solarman] Cannot determine token expiry - treating as expired')
       return null
     } catch (error) {
       console.error('❌ [Solarman] Error fetching token from DB:', error)
@@ -403,12 +404,12 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     // getTokenFromDB() already validates expiry, so if it returns a token, it's valid
     const dbToken = await this.getTokenFromDB()
     if (dbToken) {
-      console.log('✅ [Solarman] Using valid token from DB')
+      logger.debug('✅ [Solarman] Using valid token from DB')
       return dbToken
     }
 
     // Token not found or expired - regenerate it
-    console.log('🔄 [Solarman] Token expired or not found - regenerating token')
+    logger.debug('🔄 [Solarman] Token expired or not found - regenerating token')
 
     // Need to authenticate
     const credentials = this.getCredentials() as {
@@ -427,7 +428,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       username: credentials.username,
       password: credentials.password || credentials.passwordSha256,
     }
-    console.log("[SOLARMAN] Request body:", requestBody);
+    logger.debug("[SOLARMAN] Request body:", requestBody);
     if (!requestBody.password) {
       throw new Error('Solarman authentication failed: Password or passwordSha256 is required')
     }
@@ -455,8 +456,8 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     // appId goes in query parameter, not body
     const url = `${baseDomain}/account/v1.0/token?appId=${credentials.appId}`
 
-    console.log('🔐 [Solarman] Authenticating with URL:', url)
-    console.log('🔐 [Solarman] Request body (without password):', { ...requestBody, password: '***' })
+    logger.debug('🔐 [Solarman] Authenticating with URL:', url)
+    logger.debug('🔐 [Solarman] Request body (without password):', { ...requestBody, password: '***' })
 
     const response = await this.loggedFetch(url, {
       method: "POST",
@@ -494,12 +495,12 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     const { url: proApiUrl, isExplicit } = this.getProApiBaseUrl()
     
     if (isExplicit) {
-      console.log('✅ [Solarman] PRO API explicitly configured - using PRO API endpoint')
+      logger.debug('✅ [Solarman] PRO API explicitly configured - using PRO API endpoint')
     } else {
-      console.log('⚠️ [Solarman] PRO API not explicitly configured - auto-converted to PRO API endpoint')
+      logger.debug('⚠️ [Solarman] PRO API not explicitly configured - auto-converted to PRO API endpoint')
     }
     
-    console.log('📊 [Solarman] Fetching plants from PRO API:', proApiUrl)
+    logger.debug('📊 [Solarman] Fetching plants from PRO API:', proApiUrl)
     return await this.listPlantsFromProApi(token, proApiUrl)
   }
 
@@ -683,8 +684,8 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       }
     }
 
-    console.log('🚀 [Solarman PRO API] Triggered - Endpoint:', url)
-    console.log('🚀 [Solarman PRO API] Request body:', JSON.stringify(requestBody, null, 2))
+    logger.debug('🚀 [Solarman PRO API] Triggered - Endpoint:', url)
+    logger.debug('🚀 [Solarman PRO API] Request body:', JSON.stringify(requestBody, null, 2))
 
     const response = await this.loggedFetch(url, {
       method: "POST",
@@ -718,11 +719,11 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     }
 
     const total = data.total || 0
-    console.log(`✅ [Solarman PRO API] Successfully fetched data - Total stations: ${total}`)
+    logger.debug(`✅ [Solarman PRO API] Successfully fetched data - Total stations: ${total}`)
 
     // Extract stations from nested structure
     const allStations = data.data.map((item: any) => item.station).filter((s: any) => s !== undefined)
-    console.log(`✅ [Solarman PRO API] Processed ${allStations.length} stations from response`)
+    logger.debug(`✅ [Solarman PRO API] Processed ${allStations.length} stations from response`)
 
     // Map stations to Plant format
     return allStations.map((station: any) => {
@@ -856,7 +857,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     let total = 0
     let hasMore = true
 
-    console.log('📊 [Solarman] Starting paginated fetch from:', url)
+    logger.debug('📊 [Solarman] Starting paginated fetch from:', url)
 
     // Fetch all pages
     while (hasMore) {
@@ -865,7 +866,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
         size: pageSize,
       }
       
-      console.log(`📊 [Solarman] Fetching page ${currentPage} with size ${pageSize}`)
+      logger.debug(`📊 [Solarman] Fetching page ${currentPage} with size ${pageSize}`)
       
       const response = await this.loggedFetch(url, {
         method: "POST",
@@ -905,12 +906,12 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       // Get total from first page
       if (currentPage === 1) {
         total = data.total || 0
-        console.log(`📊 [Solarman] Total stations available: ${total}`)
+        logger.debug(`📊 [Solarman] Total stations available: ${total}`)
       }
 
       // Add stations from this page
       allStations = allStations.concat(data.stationList)
-      console.log(`📊 [Solarman] Page ${currentPage}: Fetched ${data.stationList.length} stations (Total so far: ${allStations.length}/${total})`)
+      logger.debug(`📊 [Solarman] Page ${currentPage}: Fetched ${data.stationList.length} stations (Total so far: ${allStations.length}/${total})`)
 
       // Check if we need to fetch more pages
       // If we got fewer stations than requested, or we've fetched all stations, we're done
@@ -923,7 +924,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
       }
     }
 
-    console.log(`✅ [Solarman] Completed fetching all stations: ${allStations.length} total`)
+    logger.debug(`✅ [Solarman] Completed fetching all stations: ${allStations.length} total`)
 
     // Map stations to Plant format
     return allStations.map((station: any) => {
@@ -1159,7 +1160,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     const { url: proApiUrl } = this.getProApiBaseUrl()
     const url = `${proApiUrl}/maintain-s/history/power/${systemId}/record?year=${year}&month=${month}&day=${day}`
 
-    console.log('📊 [Solarman PRO API] Fetching daily telemetry records:', {
+    logger.debug('📊 [Solarman PRO API] Fetching daily telemetry records:', {
       systemId,
       year,
       month,
@@ -1225,7 +1226,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     const { url: proApiUrl } = this.getProApiBaseUrl()
     const url = `${proApiUrl}/maintain-s/history/power/${systemId}/stats/month?year=${year}&month=${month}`
 
-    console.log('📊 [Solarman PRO API] Fetching monthly telemetry records:', {
+    logger.debug('📊 [Solarman PRO API] Fetching monthly telemetry records:', {
       systemId,
       year,
       month,
@@ -1288,7 +1289,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     const { url: proApiUrl } = this.getProApiBaseUrl()
     const url = `${proApiUrl}/maintain-s/history/power/${systemId}/stats/year?year=${year}`
 
-    console.log('📊 [Solarman PRO API] Fetching yearly telemetry records:', {
+    logger.debug('📊 [Solarman PRO API] Fetching yearly telemetry records:', {
       systemId,
       year,
       url,
@@ -1362,7 +1363,7 @@ export class SolarmanAdapter extends BaseVendorAdapter {
     const { url: proApiUrl } = this.getProApiBaseUrl()
     const url = `${proApiUrl}/maintain-s/history/power/${systemId}/stats/total?startYear=${startYear}&endYear=${endYear}`
 
-    console.log('📊 [Solarman PRO API] Fetching total telemetry records:', {
+    logger.debug('📊 [Solarman PRO API] Fetching total telemetry records:', {
       systemId,
       startYear,
       endYear,

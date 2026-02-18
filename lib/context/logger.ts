@@ -16,6 +16,33 @@ type LogLevel = "debug" | "info" | "warn" | "error"
 // Check if structured logger should be used (default: true for backward compatibility)
 const USE_STRUCTURED_LOGGER = process.env.USE_STRUCTURED_LOGGER !== "false"
 
+// Log level configuration (default: "info" - shows info, warn, and error logs)
+// Set LOG_LEVEL=debug|info|warn|error to control verbosity
+// Only logs at or above the configured level will be shown:
+//   - debug: shows all logs (debug, info, warn, error)
+//   - info: shows info, warn, error (default)
+//   - warn: shows warn, error only
+//   - error: shows error only
+// Note: error logs always show regardless of LOG_LEVEL setting
+const LOG_LEVEL_CONFIG = (process.env.LOG_LEVEL?.toLowerCase() || "info") as LogLevel
+
+// Log level priority: debug < info < warn < error
+const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+}
+
+/**
+ * Check if a log level should be logged based on LOG_LEVEL configuration
+ */
+function shouldLog(level: LogLevel): boolean {
+  const configPriority = LOG_LEVEL_PRIORITY[LOG_LEVEL_CONFIG] ?? 1
+  const messagePriority = LOG_LEVEL_PRIORITY[level] ?? 1
+  return messagePriority >= configPriority
+}
+
 // Ensure logs directory exists
 const LOGS_DIR = path.join(process.cwd(), "logs")
 if (!fs.existsSync(LOGS_DIR)) {
@@ -210,7 +237,7 @@ class ContextLogger {
   }
 
   debug(message: string, ...args: any[]): void {
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NODE_ENV === "development" && shouldLog("debug")) {
       const formatted = this.formatMessage("debug", message, ...args)
       console.debug(formatted, ...args)
       writeToFile("debug", formatted, args)
@@ -218,15 +245,19 @@ class ContextLogger {
   }
 
   info(message: string, ...args: any[]): void {
-    const formatted = this.formatMessage("info", message, ...args)
-    console.log(formatted, ...args)
-    writeToFile("info", formatted, args)
+    if (shouldLog("info")) {
+      const formatted = this.formatMessage("info", message, ...args)
+      console.log(formatted, ...args)
+      writeToFile("info", formatted, args)
+    }
   }
 
   warn(message: string, ...args: any[]): void {
-    const formatted = this.formatMessage("warn", message, ...args)
-    console.warn(formatted, ...args)
-    writeToFile("warn", formatted, args)
+    if (shouldLog("warn")) {
+      const formatted = this.formatMessage("warn", message, ...args)
+      console.warn(formatted, ...args)
+      writeToFile("warn", formatted, args)
+    }
   }
 
   error(message: string, error?: Error | any, ...args: any[]): void {
@@ -248,20 +279,24 @@ class ContextLogger {
  */
 class ConsoleLogger {
   debug(message: string, ...args: any[]): void {
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NODE_ENV === "development" && shouldLog("debug")) {
       const timestamp = formatISTTimestamp()
       console.debug(`[${timestamp}] [DEBUG] ${message}`, ...args)
     }
   }
 
   info(message: string, ...args: any[]): void {
-    const timestamp = formatISTTimestamp()
-    console.log(`[${timestamp}] [INFO] ${message}`, ...args)
+    if (shouldLog("info")) {
+      const timestamp = formatISTTimestamp()
+      console.log(`[${timestamp}] [INFO] ${message}`, ...args)
+    }
   }
 
   warn(message: string, ...args: any[]): void {
-    const timestamp = formatISTTimestamp()
-    console.warn(`[${timestamp}] [WARN] ${message}`, ...args)
+    if (shouldLog("warn")) {
+      const timestamp = formatISTTimestamp()
+      console.warn(`[${timestamp}] [WARN] ${message}`, ...args)
+    }
   }
 
   error(message: string, error?: Error | any, ...args: any[]): void {

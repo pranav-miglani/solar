@@ -7,6 +7,7 @@ import type {
   VendorConfig,
 } from "./types"
 import { pooledFetch } from "./httpClient"
+import { logger } from "@/lib/context/logger"
 
 interface PvBlinkAuthResponse {
   data: {
@@ -188,7 +189,7 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
       if (error) {
         console.error("[PVBlink] Error storing token:", error)
       } else {
-        console.log(`[PVBlink] Token stored with expiration: ${expiresAt.toISOString()}`)
+        logger.info(`[PVBlink] Token stored with expiration: ${expiresAt.toISOString()}`)
       }
     } catch (error) {
       console.error("[PVBlink] Error storing token:", error)
@@ -204,7 +205,7 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
     // Check for cached token first
     const cachedToken = await this.getTokenFromDB()
     if (cachedToken) {
-      console.log("[PVBlink] Returning cached token")
+      logger.info("[PVBlink] Returning cached token")
       return cachedToken
     }
 
@@ -237,8 +238,8 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
       rememberMe: false,
     }
 
-    console.log("[PVBlink] Authenticating with:", url)
-    console.log("[PVBlink] Attempt:", this.retryCount + 1, "of", this.MAX_RETRIES)
+    logger.info("[PVBlink] Authenticating with:", url)
+    logger.info("[PVBlink] Attempt:", this.retryCount + 1, "of", this.MAX_RETRIES)
 
     try {
       const response = await pooledFetch(url, {
@@ -266,7 +267,7 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
         // Retry if we haven't exceeded max retries
         if (this.retryCount < this.MAX_RETRIES - 1) {
           this.retryCount++
-          console.log(`[PVBlink] Retrying authentication (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})...`)
+          logger.info(`[PVBlink] Retrying authentication (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})...`)
           // Wait a bit before retrying (exponential backoff)
           await new Promise(resolve => setTimeout(resolve, 1000 * this.retryCount))
           return this.authenticateWithRetry()
@@ -281,7 +282,7 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
         // Retry if we haven't exceeded max retries
         if (this.retryCount < this.MAX_RETRIES - 1) {
           this.retryCount++
-          console.log(`[PVBlink] No accessToken in response, retrying (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})...`)
+          logger.info(`[PVBlink] No accessToken in response, retrying (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})...`)
           await new Promise(resolve => setTimeout(resolve, 1000 * this.retryCount))
           return this.authenticateWithRetry()
         }
@@ -293,14 +294,14 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
       const defaultExpiresIn = 11.5 * 60 * 60 // 11 hours 30 minutes in seconds
       await this.storeTokenInDB(data.data.accessToken, defaultExpiresIn)
 
-      console.log("[PVBlink] Authentication successful")
+      logger.info("[PVBlink] Authentication successful")
       this.retryCount = 0 // Reset retry count on success
       return data.data.accessToken
     } catch (error: any) {
       // Retry on network errors if we haven't exceeded max retries
       if (this.retryCount < this.MAX_RETRIES - 1 && error.message?.includes("fetch")) {
         this.retryCount++
-        console.log(`[PVBlink] Network error, retrying (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})...`)
+        logger.info(`[PVBlink] Network error, retrying (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})...`)
         await new Promise(resolve => setTimeout(resolve, 1000 * this.retryCount))
         return this.authenticateWithRetry()
       }
@@ -347,11 +348,11 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
     let pageNo = 0
     let hasMore = true
 
-    console.log("[PVBlink] Fetching plants from:", url)
+    logger.info("[PVBlink] Fetching plants from:", url)
 
     while (hasMore) {
       const pageUrl = `${url}?pageNo=${pageNo}`
-      console.log(`[PVBlink] Fetching page ${pageNo}...`)
+      logger.info(`[PVBlink] Fetching page ${pageNo}...`)
 
       const response = await pooledFetch(pageUrl, {
         method: "GET",
@@ -380,12 +381,12 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
 
       // Check if we have plants in this page
       if (!data.data || data.data.length === 0) {
-        console.log(`[PVBlink] No more plants found on page ${pageNo}, stopping pagination`)
+        logger.info(`[PVBlink] No more plants found on page ${pageNo}, stopping pagination`)
         hasMore = false
         break
       }
 
-      console.log(`[PVBlink] Page ${pageNo}: Received ${data.data.length} plants`)
+      logger.info(`[PVBlink] Page ${pageNo}: Received ${data.data.length} plants`)
 
       // Map PVBlink plants to Plant format
       const mappedPlants = data.data.map((plant) => {
@@ -421,7 +422,7 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
       pageNo++
     }
 
-    console.log(`[PVBlink] Successfully fetched ${allPlants.length} total plants across ${pageNo} pages`)
+    logger.info(`[PVBlink] Successfully fetched ${allPlants.length} total plants across ${pageNo} pages`)
     return allPlants
   }
 
@@ -455,7 +456,7 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
     const baseUrl = this.getApiBaseUrl()
     const url = `${baseUrl}/api/pvblink/plant/s/production/detail/${vendorPlantId}/day?year=${year}&month=${month}&day=${day}`
 
-    console.log("[PVBlink] Fetching daily telemetry records:", {
+    logger.info("[PVBlink] Fetching daily telemetry records:", {
       vendorPlantId,
       year,
       month,
@@ -536,7 +537,7 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
     const baseUrl = this.getApiBaseUrl()
     const url = `${baseUrl}/api/pvblink/plant/s/production/detail/${vendorPlantId}/daily?year=${year}&month=${month}`
 
-    console.log("[PVBlink] Fetching monthly telemetry records:", {
+    logger.info("[PVBlink] Fetching monthly telemetry records:", {
       vendorPlantId,
       year,
       month,
@@ -618,7 +619,7 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
     const baseUrl = this.getApiBaseUrl()
     const url = `${baseUrl}/api/pvblink/plant/s/production/detail/${vendorPlantId}/monthly?year=${year}`
 
-    console.log("[PVBlink] Fetching yearly telemetry records:", {
+    logger.info("[PVBlink] Fetching yearly telemetry records:", {
       vendorPlantId,
       year,
       url,
@@ -699,7 +700,7 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
     const token = await this.authenticate()
     const baseUrl = this.getApiBaseUrl()
     
-    console.log("[PVBlink] Fetching total telemetry records:", {
+    logger.info("[PVBlink] Fetching total telemetry records:", {
       vendorPlantId,
       startYear,
       endYear,
@@ -722,7 +723,7 @@ export class PvBlinkAdapter extends BaseVendorAdapter {
       try {
         const url = `${baseUrl}/api/pvblink/plant/s/production/detail/${vendorPlantId}/yearly?year=${year}`
         
-        console.log(`[PVBlink] Fetching year ${year}...`)
+        logger.info(`[PVBlink] Fetching year ${year}...`)
 
         const response = await pooledFetch(url, {
           method: "GET",

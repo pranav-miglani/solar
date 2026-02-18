@@ -7,6 +7,7 @@ import type {
   VendorConfig,
 } from "./types"
 import { pooledFetch } from "./httpClient"
+import { logger } from "@/lib/context/logger"
 
 interface FoxesscloudAuthResponse {
   errno: number
@@ -113,7 +114,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       if (error) {
         console.error("[Foxesscloud] Error storing token:", error)
       } else {
-        console.log(`[Foxesscloud] Token stored with expiration: ${expiresAt.toISOString()}`)
+        logger.info(`[Foxesscloud] Token stored with expiration: ${expiresAt.toISOString()}`)
       }
     } catch (error) {
       console.error("[Foxesscloud] Error storing token:", error)
@@ -129,7 +130,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     // Check for cached token first
     const cachedToken = await this.getTokenFromDB()
     if (cachedToken) {
-      console.log("[Foxesscloud] Returning cached token")
+      logger.info("[Foxesscloud] Returning cached token")
       return cachedToken
     }
 
@@ -162,8 +163,8 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     // Generate timestamp for headers
     const timestamp = Date.now().toString()
 
-    console.log("[Foxesscloud] Authenticating with:", url)
-    console.log("[Foxesscloud] Attempt:", this.retryCount + 1, "of", this.MAX_RETRIES)
+    logger.info("[Foxesscloud] Authenticating with:", url)
+    logger.info("[Foxesscloud] Attempt:", this.retryCount + 1, "of", this.MAX_RETRIES)
 
     try {
       const response = await pooledFetch(url, {
@@ -195,7 +196,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
         // Retry if we haven't exceeded max retries
         if (this.retryCount < this.MAX_RETRIES - 1) {
           this.retryCount++
-          console.log(`[Foxesscloud] Retrying authentication (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})...`)
+          logger.info(`[Foxesscloud] Retrying authentication (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})...`)
           // Wait a bit before retrying (exponential backoff)
           await new Promise(resolve => setTimeout(resolve, 1000 * this.retryCount))
           return this.authenticateWithRetry()
@@ -210,7 +211,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
         // Retry if we haven't exceeded max retries
         if (this.retryCount < this.MAX_RETRIES - 1) {
           this.retryCount++
-          console.log(`[Foxesscloud] API returned error (errno: ${data.errno}), retrying (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})...`)
+          logger.info(`[Foxesscloud] API returned error (errno: ${data.errno}), retrying (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})...`)
           await new Promise(resolve => setTimeout(resolve, 1000 * this.retryCount))
           return this.authenticateWithRetry()
         }
@@ -222,14 +223,14 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       const defaultExpiresIn = 23.5 * 60 * 60 // 23 hours 30 minutes in seconds
       await this.storeTokenInDB(data.result.token, defaultExpiresIn)
 
-      console.log("[Foxesscloud] Authentication successful")
+      logger.info("[Foxesscloud] Authentication successful")
       this.retryCount = 0 // Reset retry count on success
       return data.result.token
     } catch (error: any) {
       // Retry on network errors if we haven't exceeded max retries
       if (this.retryCount < this.MAX_RETRIES - 1 && error.message?.includes("fetch")) {
         this.retryCount++
-        console.log(`[Foxesscloud] Network error, retrying (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})...`)
+        logger.info(`[Foxesscloud] Network error, retrying (attempt ${this.retryCount + 1}/${this.MAX_RETRIES})...`)
         await new Promise(resolve => setTimeout(resolve, 1000 * this.retryCount))
         return this.authenticateWithRetry()
       }

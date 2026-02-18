@@ -8,6 +8,7 @@ import type {
 } from "./types"
 import { pooledFetch } from "./httpClient"
 import { createHash } from "crypto"
+import { logger } from "@/lib/context/logger"
 
 interface ShineMonitorAuthResponse {
   err: number
@@ -200,14 +201,14 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
 
     // Generate sign: SHA1(salt + secret + token + finalQueryString)
     const signInput = salt + secret + token + finalQueryString
-    console.log(`[ShineMonitor] Sign generation input:`, {
+    logger.debug(`[ShineMonitor] Sign generation input:`, {
       salt,
       secret: secret, // Complete secret for debugging
       token: token, // Complete token for debugging
       finalQueryString,
       signInputLength: signInput.length,
     })
-    console.log(`[ShineMonitor] Sign input (full, for debugging):`, {
+    logger.debug(`[ShineMonitor] Sign input (full, for debugging):`, {
       salt,
       secret,
       token,
@@ -215,7 +216,7 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       concatenated: signInput,
     })
     const generatedSign = this.sha1(signInput)
-    console.log(`[ShineMonitor] Generated sign (complete): ${generatedSign}`)
+    logger.debug(`[ShineMonitor] Generated sign (complete): ${generatedSign}`)
     return generatedSign
   }
 
@@ -312,7 +313,7 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     // Check for cached token first
     const cached = await this.getTokenFromDB()
     if (cached) {
-      console.log("[ShineMonitor] Returning cached token")
+      logger.debug("[ShineMonitor] Returning cached token")
       return cached.token
     }
 
@@ -334,15 +335,15 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     const baseUrl = this.getApiBaseUrl()
     const url = `${baseUrl}/?sign=${sign}&salt=${salt}&action=auth&usr=${userName}&company-key=${companyKey}`
 
-    console.log("[ShineMonitor] ========== AUTHENTICATION REQUEST ==========")
-    console.log("[ShineMonitor] Request URL:", url)
-    console.log("[ShineMonitor] Request Method: GET")
-    console.log("[ShineMonitor] Request Headers:", JSON.stringify({
+    logger.debug("[ShineMonitor] ========== AUTHENTICATION REQUEST ==========")
+    logger.debug("[ShineMonitor] Request URL:", url)
+    logger.debug("[ShineMonitor] Request Method: GET")
+    logger.debug("[ShineMonitor] Request Headers:", JSON.stringify({
       Accept: "application/json",
       Origin: "https://kstar.shinemonitor.com",
       Referer: "https://kstar.shinemonitor.com/",
     }, null, 2))
-    console.log("[ShineMonitor] Sign Generation Details:", {
+    logger.debug("[ShineMonitor] Sign Generation Details:", {
       salt,
       passHash: passHash, // Complete passHash for debugging
       userName,
@@ -360,8 +361,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       },
     })
 
-    console.log("[ShineMonitor] Response Status:", response.status, response.statusText)
-    console.log("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
+    logger.debug("[ShineMonitor] Response Status:", response.status, response.statusText)
+    logger.debug("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -376,12 +377,12 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     }
 
     const responseText = await response.text()
-    console.log("[ShineMonitor] Response Body (raw):", responseText)
+    logger.debug("[ShineMonitor] Response Body (raw):", responseText)
     
     let data: ShineMonitorAuthResponse
     try {
       data = JSON.parse(responseText)
-      console.log("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
+      logger.debug("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
     } catch (parseError) {
       console.error("[ShineMonitor] Failed to parse response JSON:", parseError)
       console.error("[ShineMonitor] Raw response:", responseText)
@@ -403,11 +404,11 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     // Store token and secret in database
     await this.storeTokenInDB(data.dat.token, data.dat.secret, data.dat.expire)
 
-    console.log("[ShineMonitor] Authentication successful")
-    console.log("[ShineMonitor] Token (complete):", data.dat.token)
-    console.log("[ShineMonitor] Secret (complete):", data.dat.secret)
-    console.log("[ShineMonitor] Expires in:", data.dat.expire, "seconds")
-    console.log("[ShineMonitor] ========== AUTHENTICATION COMPLETE ==========")
+    logger.debug("[ShineMonitor] Authentication successful")
+    logger.debug("[ShineMonitor] Token (complete):", data.dat.token)
+    logger.debug("[ShineMonitor] Secret (complete):", data.dat.secret)
+    logger.debug("[ShineMonitor] Expires in:", data.dat.expire, "seconds")
+    logger.debug("[ShineMonitor] ========== AUTHENTICATION COMPLETE ==========")
     return data.dat.token
   }
 
@@ -465,7 +466,7 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     let totalPages = 1
     const allPlants: Plant[] = []
 
-    console.log("[ShineMonitor] Fetching plants from:", baseUrl)
+    logger.debug("[ShineMonitor] Fetching plants from:", baseUrl)
 
     while (currentPage <= totalPages) {
       // Generate salt for this request
@@ -480,8 +481,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       queryParamsForSign.append("pagesize", pageSize.toString())
 
       // Generate sign using query params without sign, salt, token
-      console.log("[ShineMonitor] Generating sign for API call (page " + currentPage + ")")
-      console.log("[ShineMonitor] Query params for sign generation:", {
+      logger.debug("[ShineMonitor] Generating sign for API call (page " + currentPage + ")")
+      logger.debug("[ShineMonitor] Query params for sign generation:", {
         action: queryParamsForSign.get("action"),
         orderBy: queryParamsForSign.get("orderBy"),
         page: queryParamsForSign.get("page"),
@@ -502,10 +503,10 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
 
       const url = `${baseUrl}/?${finalQueryParams.toString()}`
 
-      console.log("[ShineMonitor] ========== PLANT LIST REQUEST (Page " + currentPage + ") ==========")
-      console.log("[ShineMonitor] Request URL:", url)
-      console.log("[ShineMonitor] Request Method: GET")
-      console.log("[ShineMonitor] Request Headers:", JSON.stringify({
+      logger.debug("[ShineMonitor] ========== PLANT LIST REQUEST (Page " + currentPage + ") ==========")
+      logger.debug("[ShineMonitor] Request URL:", url)
+      logger.debug("[ShineMonitor] Request Method: GET")
+      logger.debug("[ShineMonitor] Request Headers:", JSON.stringify({
         Accept: "application/json, text/javascript, */*; q=0.01",
         "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
         Connection: "keep-alive",
@@ -513,7 +514,7 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
         Referer: "https://kstar.shinemonitor.com/",
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
       }, null, 2))
-      console.log("[ShineMonitor] Query Parameters:", {
+      logger.debug("[ShineMonitor] Query Parameters:", {
         action: "webQueryPlants",
         orderBy: "ascPlantId",
         page: currentPage.toString(),
@@ -522,7 +523,7 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
         token: token, // Complete token for debugging
         sign: sign, // Complete sign for debugging
       })
-      console.log("[ShineMonitor] Sign Generation Details:", {
+      logger.debug("[ShineMonitor] Sign Generation Details:", {
         salt,
         secret: secret, // Complete secret for debugging
         token: token, // Complete token for debugging
@@ -542,8 +543,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
         },
       })
 
-      console.log("[ShineMonitor] Response Status:", response.status, response.statusText)
-      console.log("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
+      logger.debug("[ShineMonitor] Response Status:", response.status, response.statusText)
+      logger.debug("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -558,12 +559,12 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       }
 
       const responseText = await response.text()
-      console.log("[ShineMonitor] Response Body (raw, first 500 chars):", responseText.substring(0, 500))
+      logger.debug("[ShineMonitor] Response Body (raw, first 500 chars):", responseText.substring(0, 500))
       
       let data: ShineMonitorPlantResponse
       try {
         data = JSON.parse(responseText)
-        console.log("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
+        logger.debug("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
       } catch (parseError) {
         console.error("[ShineMonitor] Failed to parse response JSON:", parseError)
         console.error("[ShineMonitor] Raw response:", responseText)
@@ -585,14 +586,14 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       if (currentPage === 0) {
         // Calculate total pages from first response
         totalPages = Math.ceil(total / pageSize) - 1 // -1 because page is 0-indexed
-        console.log(
+        logger.debug(
           `[ShineMonitor] Total plants: ${total}, pages: ${totalPages + 1} (page size: ${pageSize})`
         )
       }
 
-      console.log(`[ShineMonitor] Page ${currentPage}: Received ${plants.length} plants`)
+      logger.debug(`[ShineMonitor] Page ${currentPage}: Received ${plants.length} plants`)
       if (plants.length > 0) {
-        console.log("[ShineMonitor] Sample plant (first):", JSON.stringify({
+        logger.debug("[ShineMonitor] Sample plant (first):", JSON.stringify({
           pid: plants[0].pid,
           name: plants[0].name,
           nominalPower: plants[0].nominalPower,
@@ -600,7 +601,7 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
           address: plants[0].address,
         }, null, 2))
       }
-      console.log("[ShineMonitor] ========== PLANT LIST RESPONSE (Page " + currentPage + ") COMPLETE ==========")
+      logger.debug("[ShineMonitor] ========== PLANT LIST RESPONSE (Page " + currentPage + ") COMPLETE ==========")
 
       // Map ShineMonitor plants to Plant format
       const mappedPlants = plants.map((plant) => {
@@ -728,8 +729,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       currentPage++
     }
 
-    console.log(`[ShineMonitor] ========== PLANT LIST COMPLETE ==========`)
-    console.log(`[ShineMonitor] Successfully fetched ${allPlants.length} plants across ${currentPage + 1} pages`)
+    logger.debug(`[ShineMonitor] ========== PLANT LIST COMPLETE ==========`)
+    logger.debug(`[ShineMonitor] Successfully fetched ${allPlants.length} plants across ${currentPage + 1} pages`)
     return allPlants
   }
 
@@ -817,8 +818,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     queryParamsForSign.append("date", dateStr)
 
     // Generate sign using query params without sign, salt, token
-    console.log("[ShineMonitor] Generating sign for daily telemetry API call")
-    console.log("[ShineMonitor] Query params for sign generation:", {
+    logger.debug("[ShineMonitor] Generating sign for daily telemetry API call")
+    logger.debug("[ShineMonitor] Query params for sign generation:", {
       action: queryParamsForSign.get("action"),
       plantid: queryParamsForSign.get("plantid"),
       date: queryParamsForSign.get("date"),
@@ -836,10 +837,10 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
 
     const url = `${baseUrl}/?${finalQueryParams.toString()}`
 
-    console.log("[ShineMonitor] ========== DAILY TELEMETRY REQUEST ==========")
-    console.log("[ShineMonitor] Request URL:", url)
-    console.log("[ShineMonitor] Request Method: GET")
-    console.log("[ShineMonitor] Request Headers:", JSON.stringify({
+    logger.debug("[ShineMonitor] ========== DAILY TELEMETRY REQUEST ==========")
+    logger.debug("[ShineMonitor] Request URL:", url)
+    logger.debug("[ShineMonitor] Request Method: GET")
+    logger.debug("[ShineMonitor] Request Headers:", JSON.stringify({
       Accept: "application/json, text/javascript, */*; q=0.01",
       "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
       Connection: "keep-alive",
@@ -847,7 +848,7 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       Referer: "https://kstar.shinemonitor.com/",
       "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
     }, null, 2))
-    console.log("[ShineMonitor] Query Parameters:", {
+    logger.debug("[ShineMonitor] Query Parameters:", {
       sign: sign, // Complete sign for debugging
       salt,
       token: token, // Complete token for debugging
@@ -855,7 +856,7 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       plantid: vendorPlantId,
       date: dateStr,
     })
-    console.log("[ShineMonitor] Sign Generation Details:", {
+    logger.debug("[ShineMonitor] Sign Generation Details:", {
       salt,
       secret: secret, // Complete secret for debugging
       token: token, // Complete token for debugging
@@ -875,8 +876,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       },
     })
 
-    console.log("[ShineMonitor] Response Status:", response.status, response.statusText)
-    console.log("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
+    logger.debug("[ShineMonitor] Response Status:", response.status, response.statusText)
+    logger.debug("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -891,12 +892,12 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     }
 
     const responseText = await response.text()
-    console.log("[ShineMonitor] Response Body (raw, first 500 chars):", responseText.substring(0, 500))
+    logger.debug("[ShineMonitor] Response Body (raw, first 500 chars):", responseText.substring(0, 500))
     
     let data: ShineMonitorDailyTelemetryResponse
     try {
       data = JSON.parse(responseText)
-      console.log("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
+      logger.debug("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
     } catch (parseError) {
       console.error("[ShineMonitor] Failed to parse response JSON:", parseError)
       console.error("[ShineMonitor] Raw response:", responseText)
@@ -913,8 +914,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     }
 
     const outputPower = data.dat?.outputPower || []
-    console.log(`[ShineMonitor] Successfully fetched ${outputPower.length} daily telemetry records`)
-    console.log("[ShineMonitor] ========== DAILY TELEMETRY RESPONSE COMPLETE ==========")
+    logger.debug(`[ShineMonitor] Successfully fetched ${outputPower.length} daily telemetry records`)
+    logger.debug("[ShineMonitor] ========== DAILY TELEMETRY RESPONSE COMPLETE ==========")
 
     // Transform ShineMonitor response to match Solarman format
     // ShineMonitor provides 5-minute intervals
@@ -1041,8 +1042,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     queryParamsForSign.append("date", dateStr)
 
     // Generate sign using query params without sign, salt, token
-    console.log("[ShineMonitor] Generating sign for monthly telemetry API call")
-    console.log("[ShineMonitor] Query params for sign generation:", {
+    logger.debug("[ShineMonitor] Generating sign for monthly telemetry API call")
+    logger.debug("[ShineMonitor] Query params for sign generation:", {
       action: queryParamsForSign.get("action"),
       plantid: queryParamsForSign.get("plantid"),
       date: queryParamsForSign.get("date"),
@@ -1060,10 +1061,10 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
 
     const url = `${baseUrl}/?${finalQueryParams.toString()}`
 
-    console.log("[ShineMonitor] ========== MONTHLY TELEMETRY REQUEST ==========")
-    console.log("[ShineMonitor] Request URL:", url)
-    console.log("[ShineMonitor] Request Method: GET")
-    console.log("[ShineMonitor] Request Headers:", JSON.stringify({
+    logger.debug("[ShineMonitor] ========== MONTHLY TELEMETRY REQUEST ==========")
+    logger.debug("[ShineMonitor] Request URL:", url)
+    logger.debug("[ShineMonitor] Request Method: GET")
+    logger.debug("[ShineMonitor] Request Headers:", JSON.stringify({
       Accept: "application/json, text/javascript, */*; q=0.01",
       "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
       Connection: "keep-alive",
@@ -1071,7 +1072,7 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       Referer: "https://kstar.shinemonitor.com/",
       "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
     }, null, 2))
-    console.log("[ShineMonitor] Query Parameters:", {
+    logger.debug("[ShineMonitor] Query Parameters:", {
       sign: sign, // Complete sign for debugging
       salt,
       token: token, // Complete token for debugging
@@ -1079,7 +1080,7 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       plantid: vendorPlantId,
       date: dateStr,
     })
-    console.log("[ShineMonitor] Sign Generation Details:", {
+    logger.debug("[ShineMonitor] Sign Generation Details:", {
       salt,
       secret: secret, // Complete secret for debugging
       token: token, // Complete token for debugging
@@ -1099,8 +1100,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       },
     })
 
-    console.log("[ShineMonitor] Response Status:", response.status, response.statusText)
-    console.log("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
+    logger.debug("[ShineMonitor] Response Status:", response.status, response.statusText)
+    logger.debug("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -1115,12 +1116,12 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     }
 
     const responseText = await response.text()
-    console.log("[ShineMonitor] Response Body (raw, first 500 chars):", responseText.substring(0, 500))
+    logger.debug("[ShineMonitor] Response Body (raw, first 500 chars):", responseText.substring(0, 500))
     
     let data: ShineMonitorMonthlyTelemetryResponse
     try {
       data = JSON.parse(responseText)
-      console.log("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
+      logger.debug("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
     } catch (parseError) {
       console.error("[ShineMonitor] Failed to parse response JSON:", parseError)
       console.error("[ShineMonitor] Raw response:", responseText)
@@ -1137,8 +1138,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     }
 
     const perday = data.dat?.perday || []
-    console.log(`[ShineMonitor] Successfully fetched ${perday.length} monthly telemetry records`)
-    console.log("[ShineMonitor] ========== MONTHLY TELEMETRY RESPONSE COMPLETE ==========")
+    logger.debug(`[ShineMonitor] Successfully fetched ${perday.length} monthly telemetry records`)
+    logger.debug("[ShineMonitor] ========== MONTHLY TELEMETRY RESPONSE COMPLETE ==========")
 
     // Transform ShineMonitor response to match Solarman format
     const records = perday.map((item: any) => {
@@ -1260,8 +1261,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     queryParamsForSign.append("date", dateStr)
 
     // Generate sign using query params without sign, salt, token
-    console.log("[ShineMonitor] Generating sign for yearly telemetry API call")
-    console.log("[ShineMonitor] Query params for sign generation:", {
+    logger.debug("[ShineMonitor] Generating sign for yearly telemetry API call")
+    logger.debug("[ShineMonitor] Query params for sign generation:", {
       action: queryParamsForSign.get("action"),
       plantid: queryParamsForSign.get("plantid"),
       date: queryParamsForSign.get("date"),
@@ -1279,10 +1280,10 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
 
     const url = `${baseUrl}/?${finalQueryParams.toString()}`
 
-    console.log("[ShineMonitor] ========== YEARLY TELEMETRY REQUEST ==========")
-    console.log("[ShineMonitor] Request URL:", url)
-    console.log("[ShineMonitor] Request Method: GET")
-    console.log("[ShineMonitor] Request Headers:", JSON.stringify({
+    logger.debug("[ShineMonitor] ========== YEARLY TELEMETRY REQUEST ==========")
+    logger.debug("[ShineMonitor] Request URL:", url)
+    logger.debug("[ShineMonitor] Request Method: GET")
+    logger.debug("[ShineMonitor] Request Headers:", JSON.stringify({
       Accept: "application/json, text/javascript, */*; q=0.01",
       "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
       Connection: "keep-alive",
@@ -1290,7 +1291,7 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       Referer: "https://kstar.shinemonitor.com/",
       "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
     }, null, 2))
-    console.log("[ShineMonitor] Query Parameters:", {
+    logger.debug("[ShineMonitor] Query Parameters:", {
       sign: sign, // Complete sign for debugging
       salt,
       token: token, // Complete token for debugging
@@ -1298,7 +1299,7 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       plantid: vendorPlantId,
       date: dateStr,
     })
-    console.log("[ShineMonitor] Sign Generation Details:", {
+    logger.debug("[ShineMonitor] Sign Generation Details:", {
       salt,
       secret: secret, // Complete secret for debugging
       token: token, // Complete token for debugging
@@ -1318,8 +1319,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       },
     })
 
-    console.log("[ShineMonitor] Response Status:", response.status, response.statusText)
-    console.log("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
+    logger.debug("[ShineMonitor] Response Status:", response.status, response.statusText)
+    logger.debug("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -1334,12 +1335,12 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     }
 
     const responseText = await response.text()
-    console.log("[ShineMonitor] Response Body (raw, first 500 chars):", responseText.substring(0, 500))
+    logger.debug("[ShineMonitor] Response Body (raw, first 500 chars):", responseText.substring(0, 500))
     
     let data: ShineMonitorYearlyTelemetryResponse
     try {
       data = JSON.parse(responseText)
-      console.log("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
+      logger.debug("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
     } catch (parseError) {
       console.error("[ShineMonitor] Failed to parse response JSON:", parseError)
       console.error("[ShineMonitor] Raw response:", responseText)
@@ -1356,8 +1357,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     }
 
     const permonth = data.dat?.permonth || []
-    console.log(`[ShineMonitor] Successfully fetched ${permonth.length} yearly telemetry records`)
-    console.log("[ShineMonitor] ========== YEARLY TELEMETRY RESPONSE COMPLETE ==========")
+    logger.debug(`[ShineMonitor] Successfully fetched ${permonth.length} yearly telemetry records`)
+    logger.debug("[ShineMonitor] ========== YEARLY TELEMETRY RESPONSE COMPLETE ==========")
 
     // Transform ShineMonitor response to match Solarman format
     const records = permonth.map((item: any) => {
@@ -1470,8 +1471,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     queryParamsForSign.append("plantid", vendorPlantId)
 
     // Generate sign using query params without sign, salt, token
-    console.log("[ShineMonitor] Generating sign for total telemetry API call")
-    console.log("[ShineMonitor] Query params for sign generation:", {
+    logger.debug("[ShineMonitor] Generating sign for total telemetry API call")
+    logger.debug("[ShineMonitor] Query params for sign generation:", {
       action: queryParamsForSign.get("action"),
       plantid: queryParamsForSign.get("plantid"),
     })
@@ -1487,10 +1488,10 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
 
     const url = `${baseUrl}/?${finalQueryParams.toString()}`
 
-    console.log("[ShineMonitor] ========== TOTAL TELEMETRY REQUEST ==========")
-    console.log("[ShineMonitor] Request URL:", url)
-    console.log("[ShineMonitor] Request Method: GET")
-    console.log("[ShineMonitor] Request Headers:", JSON.stringify({
+    logger.debug("[ShineMonitor] ========== TOTAL TELEMETRY REQUEST ==========")
+    logger.debug("[ShineMonitor] Request URL:", url)
+    logger.debug("[ShineMonitor] Request Method: GET")
+    logger.debug("[ShineMonitor] Request Headers:", JSON.stringify({
       Accept: "application/json, text/javascript, */*; q=0.01",
       "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
       Connection: "keep-alive",
@@ -1498,21 +1499,21 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       Referer: "https://kstar.shinemonitor.com/",
       "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
     }, null, 2))
-    console.log("[ShineMonitor] Query Parameters:", {
+    logger.debug("[ShineMonitor] Query Parameters:", {
       sign: sign, // Complete sign for debugging
       salt,
       token: token, // Complete token for debugging
       action: "queryPlantEnergyTotalPerYear",
       plantid: vendorPlantId,
     })
-    console.log("[ShineMonitor] Sign Generation Details:", {
+    logger.debug("[ShineMonitor] Sign Generation Details:", {
       salt,
       secret: secret, // Complete secret for debugging
       token: token, // Complete token for debugging
       finalQueryString: `&action=queryPlantEnergyTotalPerYear&plantid=${vendorPlantId}`,
       generatedSign: sign, // Complete sign for debugging
     })
-    console.log("[ShineMonitor] Year range filter (client-side):", {
+    logger.debug("[ShineMonitor] Year range filter (client-side):", {
       startYear,
       endYear,
     })
@@ -1529,8 +1530,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
       },
     })
 
-    console.log("[ShineMonitor] Response Status:", response.status, response.statusText)
-    console.log("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
+    logger.debug("[ShineMonitor] Response Status:", response.status, response.statusText)
+    logger.debug("[ShineMonitor] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -1545,12 +1546,12 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     }
 
     const responseText = await response.text()
-    console.log("[ShineMonitor] Response Body (raw, first 500 chars):", responseText.substring(0, 500))
+    logger.debug("[ShineMonitor] Response Body (raw, first 500 chars):", responseText.substring(0, 500))
     
     let data: ShineMonitorTotalTelemetryResponse
     try {
       data = JSON.parse(responseText)
-      console.log("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
+      logger.debug("[ShineMonitor] Response Body (parsed):", JSON.stringify(data, null, 2))
     } catch (parseError) {
       console.error("[ShineMonitor] Failed to parse response JSON:", parseError)
       console.error("[ShineMonitor] Raw response:", responseText)
@@ -1567,7 +1568,7 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
     }
 
     const peryear = data.dat?.peryear || []
-    console.log(`[ShineMonitor] Successfully fetched ${peryear.length} total telemetry records (before filtering)`)
+    logger.debug(`[ShineMonitor] Successfully fetched ${peryear.length} total telemetry records (before filtering)`)
 
     // Transform ShineMonitor response to match Solarman format
     // Filter by year range on client-side (ShineMonitor API doesn't support year filtering)
@@ -1601,8 +1602,8 @@ export class ShineMonitorAdapter extends BaseVendorAdapter {
         return record.year >= startYear && record.year <= endYear
       })
 
-    console.log(`[ShineMonitor] Filtered to ${records.length} records for year range ${startYear}-${endYear}`)
-    console.log("[ShineMonitor] ========== TOTAL TELEMETRY RESPONSE COMPLETE ==========")
+    logger.debug(`[ShineMonitor] Filtered to ${records.length} records for year range ${startYear}-${endYear}`)
+    logger.debug("[ShineMonitor] ========== TOTAL TELEMETRY RESPONSE COMPLETE ==========")
 
     // Calculate statistics from filtered records
     // Total generation: sum of all yearly generation values in the filtered range
