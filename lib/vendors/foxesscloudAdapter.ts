@@ -142,20 +142,25 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
 
   /**
    * Build FoxESS request headers: token (apiKey), timestamp, signature (MD5), lang.
-   * path = URL path only (e.g. /op/v0/plant/list), not full URL.
-   *
-   * Single source of truth: all API calls (plant/list, device/list, device/generation,
-   * device/history/query, device/report/query, device/real/query, device/error/query)
-   * use this method and thus the same credentials.apiKey from config.
+   * Matches Postman: signature = MD5(path + "\r\n" + token + "\r\n" + timestamp).
+   * pathForSignature must be pathname only (no query string), e.g. /op/v0/device/generation
+   * not /op/v0/device/generation?sn=XYZ — per FoxESS Open API and Postman collection.
    */
-  private buildFoxHeaders(path: string): Record<string, string> {
+  private buildFoxHeaders(pathOrUrl: string): Record<string, string> {
     const credentials = this.getCredentials()
     const apiKey = credentials.apiKey as string
     if (!apiKey) {
       throw new Error("[FoxESS] credentials.apiKey is required")
     }
+    // Path for signature: pathname only, no query (same as Postman urlObj.pathname)
+    let pathForSignature: string
+    if (pathOrUrl.startsWith("http")) {
+      pathForSignature = new URL(pathOrUrl).pathname
+    } else {
+      pathForSignature = pathOrUrl.includes("?") ? pathOrUrl.split("?")[0] : pathOrUrl
+    }
     const timestamp = Date.now().toString()
-    const rawSig = path + "\r\n" + apiKey + "\r\n" + timestamp
+    const rawSig = pathForSignature + "\r\n" + apiKey + "\r\n" + timestamp
     const signature = createHash("md5").update(rawSig, "utf8").digest("hex")
     return {
       token: apiKey,
@@ -168,7 +173,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
 
   /**
    * Log request/response for FoxESS API call (similar to SolarDM loggedFetch).
-   * Redacts token and signature in headers.
+   * Logs full headers (token, signature) for debugging; redact in production if needed.
    */
   private async loggedFoxGet(
     path: string,
@@ -184,11 +189,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     logger.info(`[FoxESS] ${operation}: ${description}`)
     logger.info(`[FoxESS] Request URL: ${url}`)
     logger.info("[FoxESS] Request method: GET")
-    logger.info("[FoxESS] Request headers:", JSON.stringify({
-      ...headers,
-      token: "[REDACTED]",
-      signature: "[REDACTED]",
-    }, null, 2))
+    logger.info("[FoxESS] Request headers:", JSON.stringify(headers, null, 2))
 
     const res = await pooledFetch(url, { method: "GET", headers })
 
@@ -218,7 +219,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
 
   /**
    * Log request/response for FoxESS API POST (similar to SolarDM loggedFetch).
-   * Redacts token and signature in headers; sanitizes body (array lengths).
+   * Logs full headers for debugging; sanitizes body (array lengths for large arrays).
    */
   private async loggedFoxPost(
     path: string,
@@ -239,11 +240,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     logger.info(`[FoxESS] ${operation}: ${description}`)
     logger.info(`[FoxESS] Request URL: ${url}`)
     logger.info("[FoxESS] Request method: POST")
-    logger.info("[FoxESS] Request headers:", JSON.stringify({
-      ...headers,
-      token: "[REDACTED]",
-      signature: "[REDACTED]",
-    }, null, 2))
+    logger.info("[FoxESS] Request headers:", JSON.stringify(headers, null, 2))
     logger.info("[FoxESS] Request body:", JSON.stringify(logBody, null, 2))
 
     const res = await pooledFetch(url, {
@@ -290,7 +287,8 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     if (!apiKey) {
       throw new Error("[FoxESS] credentials.apiKey is required")
     }
-    logger.info("[FoxESS] Using API key authentication (no login required)")
+    const baseUrl = this.getApiBaseUrl()
+    logger.info("[FoxESS] Using API key authentication (no login required)", { baseUrl })
     return apiKey
   }
 
