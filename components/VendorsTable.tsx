@@ -52,6 +52,9 @@ import {
 } from "@/components/ui/tooltip"
 import { Loader2, Factory, Plus, Pencil, Trash2, RefreshCw, Building2, CheckCircle2, XCircle, Settings, Clock, Zap, AlertCircle, Download, Upload } from "lucide-react"
 import type { AccountType } from "@/lib/rbac"
+import { logger } from "@/lib/context/loggerClient"
+
+const VENDORS_LOG = "[Vendors]"
 
 interface Organization {
   id: number
@@ -158,18 +161,23 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
   })
 
   useEffect(() => {
+    logger.info(`${VENDORS_LOG} Vendors page loaded`, { accountType })
     fetchVendors()
   }, [])
 
   // Load vendors + org metadata for display. Keeps local state in sync after every mutation.
   async function fetchVendors() {
+    logger.info(`${VENDORS_LOG} Fetching vendors and orgs...`)
     try {
       const response = await fetch("/api/vendors")
       const data = await response.json()
-      setVendors(data.vendors || [])
-      setOrgs(data.orgs || [])
+      const list = data.vendors || []
+      const orgList = data.orgs || []
+      setVendors(list)
+      setOrgs(orgList)
+      logger.info(`${VENDORS_LOG} Vendors loaded`, { vendorsCount: list.length, orgsCount: orgList.length })
     } catch (error) {
-      console.error("Error fetching vendors:", error)
+      logger.error(`${VENDORS_LOG} Error fetching vendors`, error)
     } finally {
       setLoading(false)
     }
@@ -214,7 +222,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
   // Persist updated auto-sync toggles/intervals back to the org via API.
   async function saveSyncSettings() {
     if (!selectedOrgForSync) return
-    
+
+    logger.info(`${VENDORS_LOG} Saving sync settings`, { orgId: selectedOrgForSync.id, orgName: selectedOrgForSync.name, vendorId: selectedVendorForSyncId })
     try {
       // First, update organization-level auto-sync settings.
       // Note: sync_interval_minutes removed - telemetry sync uses vendor-level telemetry_sync_interval
@@ -262,12 +271,14 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         }
       }
 
+        logger.info(`${VENDORS_LOG} Sync settings saved`, { orgId: selectedOrgForSync.id, orgName: selectedOrgForSync.name })
         setSyncSettingsDialogOpen(false)
         setSelectedOrgForSync(null)
       setSelectedVendorForSyncId(null)
       // Refresh vendors to get updated org + vendor data
         fetchVendors()
     } catch (error: any) {
+      logger.error(`${VENDORS_LOG} Save sync settings failed`, error)
       alert(`Error updating sync settings: ${error.message}`)
     }
   }
@@ -339,6 +350,11 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         plant_sync_time_ist: "02:00",
       })
     }
+    if (editingVendor) {
+      logger.info(`${VENDORS_LOG} Open edit vendor`, { vendorId: editingVendor.id, name: editingVendor.name, vendor_type: editingVendor.vendor_type })
+    } else {
+      logger.info(`${VENDORS_LOG} Open add vendor`)
+    }
     setDialogOpen(true)
   }
 
@@ -350,6 +366,14 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       alert("Please select an organization")
       return
     }
+
+    const isUpdate = !!editingVendor
+    logger.info(`${VENDORS_LOG} ${isUpdate ? "Saving vendor (update)" : "Creating vendor"}`, {
+      name: formData.name,
+      vendor_type: formData.vendor_type,
+      org_id: formData.org_id,
+      vendorId: editingVendor?.id,
+    })
 
     // Build credentials based on vendor type
     const credentials: any = {}
@@ -409,31 +433,39 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     })
 
     if (response.ok) {
+      logger.info(`${VENDORS_LOG} ${isUpdate ? "Vendor updated" : "Vendor created"}`, { name: formData.name, vendor_type: formData.vendor_type })
       setDialogOpen(false)
       fetchVendors()
     } else {
       const error = await response.json()
+      logger.error(`${VENDORS_LOG} Save vendor failed`, { status: response.status, error: error.error })
       alert(error.error || "Failed to save vendor")
     }
   }
 
   // Remove a vendor and refresh table once the backend confirms deletion.
   async function handleDelete(id: number) {
+    const vendor = vendors.find((v) => v.id === id)
+    logger.info(`${VENDORS_LOG} Deleting vendor`, { vendorId: id, name: vendor?.name })
     const response = await fetch(`/api/vendors/${id}`, {
       method: "DELETE",
     })
 
     if (response.ok) {
+      logger.info(`${VENDORS_LOG} Vendor deleted`, { vendorId: id })
       fetchVendors()
       setDeletingVendorId(null)
     } else {
       const error = await response.json()
+      logger.error(`${VENDORS_LOG} Delete vendor failed`, { vendorId: id, error: error.error })
       alert(error.error || "Failed to delete vendor")
     }
   }
 
   // Full sync action used by "Plants" button: first plants, then alerts. Tracks progress for UI.
   async function handleSyncPlants(vendorId: number) {
+    const vendor = vendors.find((v) => v.id === vendorId)
+    logger.info(`${VENDORS_LOG} Sync plants + alerts started`, { vendorId, name: vendor?.name })
     setSyncingVendorId(vendorId)
     setSyncProgress({ current: 0, total: 0 })
 
@@ -445,12 +477,14 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       const plantsData = await plantsResponse.json()
 
       if (!plantsResponse.ok) {
+        logger.error(`${VENDORS_LOG} Sync plants failed`, { vendorId, error: plantsData.error })
         alert(plantsData.error || "Failed to sync plants")
         setSyncingVendorId(null)
         setSyncProgress(null)
         return
       }
 
+      logger.info(`${VENDORS_LOG} Sync plants completed`, { vendorId, synced: plantsData.synced, created: plantsData.created, updated: plantsData.updated })
       setSyncProgress({ current: plantsData.synced, total: plantsData.total })
 
       // Step 2: once plants are synced, trigger alert sync for the same vendor
@@ -460,12 +494,18 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       const alertsData = await alertsResponse.json()
 
       if (!alertsResponse.ok) {
+        logger.error(`${VENDORS_LOG} Sync alerts failed (after plants synced)`, { vendorId, error: alertsData.error })
         alert(
           `Plants synced (${plantsData.synced} plants, ${plantsData.created} created, ${plantsData.updated} updated), but alert sync failed: ${
             alertsData.error || "Unknown error"
           }`
         )
       } else {
+        logger.info(`${VENDORS_LOG} Sync plants + alerts completed`, {
+          vendorId,
+          plants: { synced: plantsData.synced, created: plantsData.created, updated: plantsData.updated },
+          alerts: { synced: alertsData.synced, created: alertsData.created, updated: alertsData.updated },
+        })
         alert(
           `Successfully synced ${plantsData.synced} plants (${plantsData.created} created, ${plantsData.updated} updated)\n` +
             `and ${alertsData.synced} alerts (${alertsData.created} created, ${alertsData.updated} updated).`
@@ -475,6 +515,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       setSyncingVendorId(null)
       setSyncProgress(null)
     } catch (error: any) {
+      logger.error(`${VENDORS_LOG} Sync plants/alerts error`, error)
       alert(`Error syncing plants/alerts: ${error.message}`)
       setSyncingVendorId(null)
       setSyncProgress(null)
@@ -483,6 +524,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
 
   // Alert-only sync (separate button) so admins can re-run the alert cron independently.
   async function handleSyncAlerts(vendorId: number) {
+    const vendor = vendors.find((v) => v.id === vendorId)
+    logger.info(`${VENDORS_LOG} Sync alerts started`, { vendorId, name: vendor?.name })
     setSyncingAlertsVendorId(vendorId)
     setAlertsSyncProgress({ current: 0, total: 0 })
     try {
@@ -492,15 +535,18 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       const data = await response.json()
 
       if (response.ok) {
+        logger.info(`${VENDORS_LOG} Sync alerts completed`, { vendorId, synced: data.synced, created: data.created, updated: data.updated })
         setAlertsSyncProgress({ current: data.synced || 0, total: data.total || data.synced || 0 })
         alert(
           `Alert sync completed for vendor ${data.vendorName || vendorId}.\n` +
             `Alerts synced: ${data.synced} (${data.created} created, ${data.updated} updated).`
         )
       } else {
+        logger.error(`${VENDORS_LOG} Sync alerts failed`, { vendorId, error: data.error })
         alert(data.error || "Failed to sync alerts")
       }
     } catch (error: any) {
+      logger.error(`${VENDORS_LOG} Sync alerts error`, error)
       alert(`Error syncing alerts: ${error.message}`)
     } finally {
       setSyncingAlertsVendorId(null)
@@ -525,11 +571,13 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
 
   async function handleExport() {
     if (!isSuperAdmin) return
+    logger.info(`${VENDORS_LOG} Exporting vendors...`)
     try {
       const response = await fetch("/api/vendors/export")
       
       if (!response.ok) {
         const error = await response.json()
+        logger.error(`${VENDORS_LOG} Export vendors failed`, { error: error.error })
         alert(error.error || "Failed to export vendors")
         return
       }
@@ -543,15 +591,17 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(downloadUrl)
+      logger.info(`${VENDORS_LOG} Vendors exported`, { filename: link.download })
     } catch (error) {
-      console.error("Error exporting vendors:", error)
+      logger.error(`${VENDORS_LOG} Export vendors error`, error)
       alert("Failed to export vendors")
     }
   }
 
   async function handleImport() {
     if (!isSuperAdmin || !importFile) return
-    
+
+    logger.info(`${VENDORS_LOG} Importing vendors`, { filename: importFile.name })
     setImportLoading(true)
     setImportResult(null)
     
@@ -567,6 +617,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       const data = await response.json()
 
       if (!response.ok) {
+        logger.error(`${VENDORS_LOG} Import vendors failed`, { error: data.error })
         alert(data.error || "Failed to import vendors")
         setImportLoading(false)
         return
@@ -574,13 +625,18 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
 
       setImportResult(data)
       setImportLoading(false)
-      
+      logger.info(`${VENDORS_LOG} Vendors import completed`, {
+        totalProcessed: data.summary?.totalProcessed,
+        totalCreated: data.summary?.totalCreated,
+        totalUpdated: data.summary?.totalUpdated,
+        errors: data.summary?.totalErrors,
+      })
       // Refresh the list if any were processed
-      if (data.summary.totalCreated > 0) {
+      if (data.summary?.totalCreated > 0) {
         fetchVendors()
       }
     } catch (error) {
-      console.error("Error importing vendors:", error)
+      logger.error(`${VENDORS_LOG} Import vendors error`, error)
       alert("Failed to import vendors")
       setImportLoading(false)
     }

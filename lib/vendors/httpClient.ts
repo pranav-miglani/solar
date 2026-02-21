@@ -4,6 +4,7 @@
  */
 
 import type { Agent, Dispatcher } from 'undici'
+import { logger } from "@/lib/context/logger"
 
 // Dynamic import to handle both Node.js and Edge runtime
 let undiciModule: typeof import('undici') | null = null
@@ -65,27 +66,38 @@ const getPooledAgent = (url: string): Agent | undefined => {
  * Pooled fetch function that reuses HTTP connections
  * This is a drop-in replacement for native fetch with connection pooling
  * Falls back to native fetch in Edge runtime or if undici is unavailable
+ * Logs every request and response status for vendor API calls.
  */
 export async function pooledFetch(
   url: string | URL,
   options?: RequestInit
 ): Promise<Response> {
-  // If undici is available, use it with connection pooling
+  const urlStr = typeof url === "string" ? url : url.toString()
+  const method = options?.method ?? "GET"
+  logger.info("[API] Request", { url: urlStr, method })
+
+  let response: Response
   if (undiciModule) {
-    const agent = getPooledAgent(url.toString())
+    const agent = getPooledAgent(urlStr)
     if (agent) {
-      // Use undici's fetch which respects the agent's connection pooling
-      // Cast through unknown to ensure compatibility with standard fetch API
-      const response = await undiciModule.fetch(url, {
+      response = (await undiciModule.fetch(url, {
         ...options,
         dispatcher: agent as Dispatcher,
-      } as any)
-      return response as unknown as Response
+      } as any)) as unknown as Response
+    } else {
+      response = await fetch(url, options)
     }
+  } else {
+    response = await fetch(url, options)
   }
-  
-  // Fall back to native fetch (Edge runtime or undici unavailable)
-  return fetch(url, options)
+
+  logger.info("[API] Response", {
+    url: urlStr,
+    method,
+    status: response.status,
+    statusText: response.statusText,
+  })
+  return response
 }
 
 /**
