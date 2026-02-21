@@ -17,7 +17,7 @@ import {
   BookOpen,
   CloudSun,
   Database,
-  Cable,
+  Search,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -82,7 +82,7 @@ export function DashboardSidebar() {
     {
       title: "Plants",
       href: "/plants",
-      icon: Cable,
+      icon: Search,
       roles: ["SUPERADMIN", "DEVELOPER", "ORG", "GOVT"],
     },
     {
