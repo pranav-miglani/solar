@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
 
     const govtRestrictToWorkOrders = accountType === "GOVT"
     const onlyInWorkOrdersEffective = govtRestrictToWorkOrders || onlyInWorkOrders
+    const pathKind = onlyInWorkOrdersEffective ? "work-order-restricted" : "normal"
     console.log("[Plants search] params:", {
       accountType,
       name: name || "(empty)",
@@ -53,6 +54,10 @@ export async function GET(request: NextRequest) {
       onlyInWorkOrders,
       govtRestrictToWorkOrders,
       onlyInWorkOrdersEffective,
+      pathKind,
+      debug: onlyInWorkOrdersEffective
+        ? `${accountType} → work-order path (GOVT always; SUPERADMIN/ORG only when onlyInWorkOrders=true)`
+        : `${accountType} → normal plants query (no work-order filter)`,
     })
 
     if (name.length === 0) {
@@ -79,18 +84,23 @@ export async function GET(request: NextRequest) {
     }
 
     if (onlyInWorkOrdersEffective) {
+      console.log("[Plants search] work-order path start:", { accountType, pathKind: "work-order-restricted" })
       const { data: plantIdsInWo, error: wopError } = await supabase
         .from("work_order_plants")
         .select("plant_id")
         .eq("is_active", true)
       const rowCount = plantIdsInWo?.length ?? 0
-      console.log("[Plants search] work_order_plants result:", { rowCount, wopError: wopError ? { message: wopError.message, code: wopError.code, details: wopError.details } : null })
+      console.log("[Plants search] work_order_plants result:", {
+        accountType,
+        rowCount,
+        wopError: wopError ? { message: wopError.message, code: wopError.code, details: wopError.details } : null,
+      })
       const rawIds = (plantIdsInWo ?? []).map((r) => r.plant_id).filter((id): id is number => typeof id === "number" && Number.isInteger(id))
       const ids = [...new Set(rawIds)]
       const dropped = rowCount - rawIds.length
-      if (dropped > 0) console.log("[Plants search] dropped non-integer plant_id(s):", dropped)
+      if (dropped > 0) console.log("[Plants search] dropped non-integer plant_id(s):", { accountType, dropped })
       if (ids.length === 0) {
-        console.log("[Plants search] no valid plant ids from work_order_plants, returning empty")
+        console.log("[Plants search] no valid plant ids from work_order_plants, returning empty:", { accountType })
         return NextResponse.json({
           plants: [],
           total: 0,
@@ -100,19 +110,23 @@ export async function GET(request: NextRequest) {
       }
       const MAX_IN_CLAUSE = 500
       const idsToUse = ids.length > MAX_IN_CLAUSE ? ids.slice(0, MAX_IN_CLAUSE) : ids
-      if (ids.length > MAX_IN_CLAUSE) console.log("[Plants search] capped plant ids:", { total: ids.length, using: idsToUse.length })
-      console.log("[Plants search] applying .in('id', idsToUse):", { count: idsToUse.length, sample: idsToUse.slice(0, 5) })
+      if (ids.length > MAX_IN_CLAUSE) {
+        console.log("[Plants search] capped plant ids:", { accountType, total: ids.length, using: idsToUse.length })
+      }
+      console.log("[Plants search] applying .in('id', idsToUse):", { accountType, count: idsToUse.length, sample: idsToUse.slice(0, 5) })
       plantsQuery = plantsQuery.in("id", idsToUse)
     }
 
     plantsQuery = plantsQuery.order("name", { ascending: true })
 
     const offset = (page - 1) * limit
-    console.log("[Plants search] querying plants: offset=", offset, "limit=", limit)
+    console.log("[Plants search] querying plants:", { accountType, pathKind, offset, limit })
     const { data: plants, error: plantsError, count } = await plantsQuery.range(offset, offset + limit - 1)
 
     if (plantsError) {
       console.error("Plants search error (full):", {
+        accountType,
+        pathKind,
         message: plantsError.message,
         code: plantsError.code,
         details: plantsError.details,
@@ -122,7 +136,9 @@ export async function GET(request: NextRequest) {
     }
 
     const plantIds = (plants ?? []).map((p) => p.id)
+    console.log("[Plants search] plants query result:", { accountType, pathKind, rowsReturned: plantIds.length, totalCount: count ?? null })
     if (plantIds.length === 0) {
+      console.log("[Plants search] returning empty list (no plants matched):", { accountType, pathKind })
       return NextResponse.json({
         plants: [],
         total: count ?? 0,
