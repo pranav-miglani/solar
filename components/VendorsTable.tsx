@@ -148,8 +148,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     company_key: "",
     // PVBlink fields
     password: "",
-    // Foxesscloud fields
-    passwordMD5: "",
+    // FoxESS Cloud fields (API key only, no username/password)
+    apiKey: "",
     is_active: true,
     // Plant sync configuration
     plant_sync_mode: "LIST_PLANTS" as 'LIST_PLANTS' | 'PER_PLANT',
@@ -295,8 +295,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         company_key: vendor.credentials.company_key || "",
         // PVBlink fields
         password: vendor.credentials.password || "",
-        // Foxesscloud fields
-        passwordMD5: vendor.credentials.passwordMD5 || "",
+        // FoxESS Cloud fields
+        apiKey: vendor.credentials.apiKey || "",
         is_active: vendor.is_active,
         // Plant sync configuration
         plant_sync_mode:
@@ -330,8 +330,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
         company_key: "",
         // PVBlink fields
         password: "",
-        // Foxesscloud fields
-        passwordMD5: "",
+        // FoxESS Cloud fields
+        apiKey: "",
         is_active: true,
          // Plant sync configuration (defaults for new vendor)
         plant_sync_mode: "LIST_PLANTS",
@@ -368,9 +368,8 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
       credentials.email = formData.email
       credentials.password = formData.password
     } else if (formData.vendor_type === "FOXESSCLOUD") {
-      // Foxesscloud only requires username and passwordMD5
-      credentials.username = formData.username
-      credentials.passwordMD5 = formData.passwordMD5
+      // FoxESS Cloud uses static API key only (no login/token)
+      credentials.apiKey = formData.apiKey?.trim() || ""
     } else {
       // Solarman and other vendors
       credentials.appId = formData.appId
@@ -801,38 +800,22 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                 </>
               ) : formData.vendor_type === "FOXESSCLOUD" ? (
                 <>
-                  {/* Foxesscloud Fields - Only username and passwordMD5 */}
+                  {/* FoxESS Cloud – API key only (no username/password) */}
                   <div>
-                    <Label htmlFor="username">Username *</Label>
+                    <Label htmlFor="apiKey">API Key *</Label>
                     <Input
-                      id="username"
-                      value={formData.username}
-                      onChange={(e) =>
-                        setFormData({ ...formData, username: e.target.value })
-                      }
-                      required
-                      className="mt-1"
-                      placeholder="Enter username"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="passwordMD5">Password (MD5) *</Label>
-                    <Input
-                      id="passwordMD5"
+                      id="apiKey"
                       type="password"
-                      value={formData.passwordMD5}
+                      value={formData.apiKey}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          passwordMD5: e.target.value,
-                        })
+                        setFormData({ ...formData, apiKey: e.target.value })
                       }
                       required
                       className="mt-1"
-                      placeholder="MD5 hashed password"
+                      placeholder="e.g. 897255f1-42e2-427d-938a-e34a96274897"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      MD5 hashed password for Foxesscloud authentication
+                      FoxESS Open API key from the vendor portal. Used with per-request signature; no login required.
                     </p>
                   </div>
                 </>

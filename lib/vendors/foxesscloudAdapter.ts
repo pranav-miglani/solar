@@ -143,6 +143,10 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
   /**
    * Build FoxESS request headers: token (apiKey), timestamp, signature (MD5), lang.
    * path = URL path only (e.g. /op/v0/plant/list), not full URL.
+   *
+   * Single source of truth: all API calls (plant/list, device/list, device/generation,
+   * device/history/query, device/report/query, device/real/query, device/error/query)
+   * use this method and thus the same credentials.apiKey from config.
    */
   private buildFoxHeaders(path: string): Record<string, string> {
     const credentials = this.getCredentials()
