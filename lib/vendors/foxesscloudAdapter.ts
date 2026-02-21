@@ -140,11 +140,23 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     )
   }
 
+  /** Return a string with CR/LF shown as \r \n for debugging signature input. */
+  private static rawStringToDebug(s: string): string {
+    return s
+      .split("")
+      .map((c) => {
+        if (c === "\r") return "\\r"
+        if (c === "\n") return "\\n"
+        if (c.charCodeAt(0) < 32) return `[0x${c.charCodeAt(0).toString(16)}]`
+        return c
+      })
+      .join("")
+  }
+
   /**
    * Build FoxESS request headers: token (apiKey), timestamp, signature (MD5), lang.
    * Matches Postman: signature = MD5(path + "\r\n" + token + "\r\n" + timestamp).
-   * pathForSignature must be pathname only (no query string), e.g. /op/v0/device/generation
-   * not /op/v0/device/generation?sn=XYZ — per FoxESS Open API and Postman collection.
+   * pathForSignature must be pathname only (no query string).
    */
   private buildFoxHeaders(pathOrUrl: string): Record<string, string> {
     const credentials = this.getCredentials()
@@ -160,8 +172,32 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       pathForSignature = pathOrUrl.includes("?") ? pathOrUrl.split("?")[0] : pathOrUrl
     }
     const timestamp = Date.now().toString()
-    const rawSig = pathForSignature + "\r\n" + apiKey + "\r\n" + timestamp
-    const signature = createHash("md5").update(rawSig, "utf8").digest("hex")
+
+    // Variant 1: literal CRLF (two chars \r \n) — per Postman and FoxESS docs
+    const sepLiteral = "\r\n"
+    const rawSigLiteral = pathForSignature + sepLiteral + apiKey + sepLiteral + timestamp
+    const signatureLiteral = createHash("md5").update(rawSigLiteral, "utf8").digest("hex")
+
+    // Variant 2: four characters backslash-r-backslash-n (for comparison)
+    const sepEscaped = "\\r\\n"
+    const rawSigEscaped = pathForSignature + sepEscaped + apiKey + sepEscaped + timestamp
+    const signatureEscaped = createHash("md5").update(rawSigEscaped, "utf8").digest("hex")
+
+    logger.info("[FoxESS] Signature generation", {
+      pathForSignature,
+      pathOrUrl,
+      timestamp,
+      apiKeyLength: apiKey.length,
+      rawSigLiteralDebug: FoxesscloudAdapter.rawStringToDebug(rawSigLiteral),
+      rawSigLiteralLength: rawSigLiteral.length,
+      rawSigEscapedDebug: rawSigEscaped,
+      rawSigEscapedLength: rawSigEscaped.length,
+      signatureLiteral,
+      signatureEscaped,
+      separatorUsed: "literal \\r\\n (CRLF)",
+    })
+
+    const signature = signatureLiteral
     return {
       token: apiKey,
       timestamp,
