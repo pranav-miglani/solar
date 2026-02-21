@@ -327,7 +327,9 @@ export default function PlantsPage() {
       <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold">Plants</h1>
-          <p className="text-muted-foreground mt-1">Search by plant name to view details, work orders, and analytics</p>
+          <p className="text-muted-foreground mt-1">
+            {isGovt ? "Search by plant name to view details and work orders" : "Search by plant name to view details, work orders, and analytics"}
+          </p>
         </div>
 
         {recent.length > 0 && (
@@ -417,7 +419,7 @@ export default function PlantsPage() {
                   <TableRow>
                     <TableHead>Plant</TableHead>
                     {!isOrg && <TableHead>Organization</TableHead>}
-                    <TableHead>Vendor</TableHead>
+                    {!isGovt && <TableHead>Vendor</TableHead>}
                     <TableHead>Work orders</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -435,12 +437,14 @@ export default function PlantsPage() {
                           {p.organizations?.name ?? "—"}
                         </TableCell>
                       )}
-                      <TableCell>
-                        {p.vendors?.name ?? "—"}
-                        {p.vendors?.vendor_type && (
-                          <span className="text-muted-foreground text-sm ml-1">({p.vendors.vendor_type})</span>
-                        )}
-                      </TableCell>
+                      {!isGovt && (
+                        <TableCell>
+                          {p.vendors?.name ?? "—"}
+                          {p.vendors?.vendor_type && (
+                            <span className="text-muted-foreground text-sm ml-1">({p.vendors.vendor_type})</span>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {p.workOrders.length === 0 ? (
@@ -465,14 +469,16 @@ export default function PlantsPage() {
                           >
                             View plant
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleAnalyticsClick(p.id, displayName(p))}
-                          >
-                            <BarChart3 className="h-4 w-4 mr-1" />
-                            Analytics
-                          </Button>
+                          {!isGovt && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleAnalyticsClick(p.id, displayName(p))}
+                            >
+                              <BarChart3 className="h-4 w-4 mr-1" />
+                              Analytics
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
