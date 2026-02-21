@@ -466,9 +466,9 @@ export async function GET(
           // For PVBlink: vendorPlantId parameter = vendor_plant_id (string)
           // Pass the original vendorPlantId (string) - adapter will handle conversion if needed
           const dailyData = await (adapter as any).getDailyTelemetryRecords(
-            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" || vendor.vendor_type === "PVBLINK"
+            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" || vendor.vendor_type === "PVBLINK" || vendor.vendor_type === "FOXESSCLOUD"
               ? vendorPlantId 
-              : vendorPlantIdNum, // Use string for SolarDM/ShineMonitor/PVBlink, number for Solarman
+              : vendorPlantIdNum, // Use string for SolarDM/ShineMonitor/PVBlink/FoxESS, number for Solarman
             yearNum,
             monthNum,
             dayNum
