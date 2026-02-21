@@ -83,7 +83,7 @@ export function DashboardSidebar() {
       title: "Plants",
       href: "/plants",
       icon: Search,
-      roles: ["SUPERADMIN", "DEVELOPER", "ORG", "GOVT"],
+      roles: ["SUPERADMIN", "DEVELOPER", "ORG"],
     },
     {
       title: "Work Orders",

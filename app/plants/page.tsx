@@ -29,6 +29,7 @@ import { Search, Building2, FileText, BarChart3, ExternalLink } from "lucide-rea
 const RECENT_KEY = "plants-recent"
 const RECENT_MAX = 5
 const PAGE_SIZE = 20
+const MIN_SEARCH_LENGTH = 4
 const ORG_FILTER_ALL = "all"
 const MAX_API_PAGES = 100
 
@@ -148,7 +149,7 @@ export default function PlantsPage() {
   const search = useCallback(async () => {
     const name = searchQuery.trim().slice(0, 50)
     const searchKey = `${name}|${orgId}|${onlyInWorkOrders}`
-    if (!name) {
+    if (!name || name.length < MIN_SEARCH_LENGTH) {
       setPlants([])
       setTotal(0)
       setFilterByWorkOrder(false)
@@ -273,13 +274,23 @@ export default function PlantsPage() {
   }, [searchQuery, page, orgId, onlyInWorkOrders, fetchOnePage])
 
   useEffect(() => {
-    if (!searchQuery.trim()) {
+    const trimmed = searchQuery.trim()
+    if (!trimmed || trimmed.length < MIN_SEARCH_LENGTH) {
       setPlants([])
       setTotal(0)
       return
     }
     search()
   }, [searchQuery, page, orgId, onlyInWorkOrders, search])
+
+  useEffect(() => {
+    setPage(1)
+    accumulatedRef.current = []
+    apiPageFetchedRef.current = 0
+    exhaustedRef.current = false
+    totalFromApiRef.current = 0
+    searchKeyRef.current = ""
+  }, [searchQuery])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -313,6 +324,10 @@ export default function PlantsPage() {
     accountType === "ORG" ||
     accountType === "GOVT"
   if (!canAccess) {
+    router.push("/dashboard")
+    return null
+  }
+  if (accountType === "GOVT") {
     router.push("/dashboard")
     return null
   }
@@ -400,6 +415,11 @@ export default function PlantsPage() {
           <Card className="p-12 text-center">
             <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">Type a plant name to search</p>
+          </Card>
+        ) : searchQuery.trim().length < MIN_SEARCH_LENGTH ? (
+          <Card className="p-12 text-center">
+            <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Type at least 4 characters to search</p>
           </Card>
         ) : loading ? (
           <div className="flex justify-center py-12">
