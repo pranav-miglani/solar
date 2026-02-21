@@ -40,6 +40,21 @@ export async function GET(request: NextRequest) {
 
     const effectiveOrgId = getEffectiveOrgFilter(accountType, sessionOrgId, requestOrgId)
 
+    const govtRestrictToWorkOrders = accountType === "GOVT"
+    const onlyInWorkOrdersEffective = govtRestrictToWorkOrders || onlyInWorkOrders
+    console.log("[Plants search] params:", {
+      accountType,
+      name: name || "(empty)",
+      nameLength: name.length,
+      page,
+      limit,
+      requestOrgId: requestOrgId ?? null,
+      effectiveOrgId,
+      onlyInWorkOrders,
+      govtRestrictToWorkOrders,
+      onlyInWorkOrdersEffective,
+    })
+
     if (name.length === 0) {
       return NextResponse.json({
         plants: [],
@@ -63,16 +78,19 @@ export async function GET(request: NextRequest) {
       plantsQuery = plantsQuery.ilike("name", `%${name}%`)
     }
 
-    const govtRestrictToWorkOrders = accountType === "GOVT"
-    const onlyInWorkOrdersEffective = govtRestrictToWorkOrders || onlyInWorkOrders
-
     if (onlyInWorkOrdersEffective) {
-      const { data: plantIdsInWo } = await supabase
+      const { data: plantIdsInWo, error: wopError } = await supabase
         .from("work_order_plants")
         .select("plant_id")
         .eq("is_active", true)
-      const ids = plantIdsInWo?.map((r) => r.plant_id) ?? []
+      const rowCount = plantIdsInWo?.length ?? 0
+      console.log("[Plants search] work_order_plants result:", { rowCount, wopError: wopError ? { message: wopError.message, code: wopError.code, details: wopError.details } : null })
+      const rawIds = (plantIdsInWo ?? []).map((r) => r.plant_id).filter((id): id is number => typeof id === "number" && Number.isInteger(id))
+      const ids = [...new Set(rawIds)]
+      const dropped = rowCount - rawIds.length
+      if (dropped > 0) console.log("[Plants search] dropped non-integer plant_id(s):", dropped)
       if (ids.length === 0) {
+        console.log("[Plants search] no valid plant ids from work_order_plants, returning empty")
         return NextResponse.json({
           plants: [],
           total: 0,
@@ -80,16 +98,26 @@ export async function GET(request: NextRequest) {
           limit,
         })
       }
-      plantsQuery = plantsQuery.in("id", ids)
+      const MAX_IN_CLAUSE = 500
+      const idsToUse = ids.length > MAX_IN_CLAUSE ? ids.slice(0, MAX_IN_CLAUSE) : ids
+      if (ids.length > MAX_IN_CLAUSE) console.log("[Plants search] capped plant ids:", { total: ids.length, using: idsToUse.length })
+      console.log("[Plants search] applying .in('id', idsToUse):", { count: idsToUse.length, sample: idsToUse.slice(0, 5) })
+      plantsQuery = plantsQuery.in("id", idsToUse)
     }
 
     plantsQuery = plantsQuery.order("name", { ascending: true })
 
     const offset = (page - 1) * limit
+    console.log("[Plants search] querying plants: offset=", offset, "limit=", limit)
     const { data: plants, error: plantsError, count } = await plantsQuery.range(offset, offset + limit - 1)
 
     if (plantsError) {
-      console.error("Plants search error:", plantsError)
+      console.error("Plants search error (full):", {
+        message: plantsError.message,
+        code: plantsError.code,
+        details: plantsError.details,
+        hint: plantsError.hint,
+      })
       return NextResponse.json({ error: "Failed to fetch plants" }, { status: 500 })
     }
 
