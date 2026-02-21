@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { DashboardSidebar } from "@/components/DashboardSidebar"
@@ -30,6 +30,7 @@ const RECENT_KEY = "plants-recent"
 const RECENT_MAX = 5
 const PAGE_SIZE = 20
 const ORG_FILTER_ALL = "all"
+const MAX_API_PAGES = 100
 
 interface WorkOrderRef {
   id: number
@@ -44,6 +45,7 @@ interface PlantRow {
   organizations: { id: number; name: string } | null
   vendors: { id: number; name: string; vendor_type: string } | null
   workOrders: WorkOrderRef[]
+  in_work_order?: boolean
 }
 
 interface Org {
@@ -60,9 +62,19 @@ export default function PlantsPage() {
   const [onlyInWorkOrders, setOnlyInWorkOrders] = useState(false)
   const [plants, setPlants] = useState<PlantRow[]>([])
   const [total, setTotal] = useState(0)
+  const [filterByWorkOrder, setFilterByWorkOrder] = useState(false)
   const [loading, setLoading] = useState(false)
   const [orgs, setOrgs] = useState<Org[]>([])
   const [recent, setRecent] = useState<Array<{ id: number; name: string }>>([])
+  const [accumulatedFiltered, setAccumulatedFiltered] = useState<PlantRow[]>([])
+  const [apiPageFetched, setApiPageFetched] = useState(0)
+  const [exhausted, setExhausted] = useState(false)
+  const [totalFromApi, setTotalFromApi] = useState(0)
+  const accumulatedRef = useRef<PlantRow[]>([])
+  const apiPageFetchedRef = useRef(0)
+  const exhaustedRef = useRef(false)
+  const totalFromApiRef = useRef(0)
+  const searchKeyRef = useRef("")
 
   const accountType = account?.accountType
   const isOrg = accountType === "ORG"
@@ -117,33 +129,122 @@ export default function PlantsPage() {
     loadRecent()
   }, [loadRecent])
 
-  const search = useCallback(async () => {
-    const name = searchQuery.trim().slice(0, 50)
-    if (!name) {
-      setPlants([])
-      setTotal(0)
-      return
-    }
-    setLoading(true)
-    try {
+  const fetchOnePage = useCallback(
+    async (apiPage: number) => {
       const params = new URLSearchParams()
-      params.set("name", name)
-      params.set("page", String(page))
+      params.set("name", searchQuery.trim().slice(0, 50))
+      params.set("page", String(apiPage))
       params.set("limit", String(PAGE_SIZE))
       if (orgId && orgId !== ORG_FILTER_ALL) params.set("orgId", orgId)
       if (onlyInWorkOrders) params.set("onlyInWorkOrders", "true")
       const res = await fetch(`/api/plants/search?${params.toString()}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to fetch")
-      setPlants(data.plants ?? [])
-      setTotal(data.total ?? 0)
+      return data
+    },
+    [searchQuery, orgId, onlyInWorkOrders]
+  )
+
+  const search = useCallback(async () => {
+    const name = searchQuery.trim().slice(0, 50)
+    const searchKey = `${name}|${orgId}|${onlyInWorkOrders}`
+    if (!name) {
+      setPlants([])
+      setTotal(0)
+      setFilterByWorkOrder(false)
+      setAccumulatedFiltered([])
+      setApiPageFetched(0)
+      setExhausted(false)
+      setTotalFromApi(0)
+      accumulatedRef.current = []
+      apiPageFetchedRef.current = 0
+      exhaustedRef.current = false
+      totalFromApiRef.current = 0
+      searchKeyRef.current = ""
+      return
+    }
+    if (searchKey !== searchKeyRef.current) {
+      searchKeyRef.current = searchKey
+      accumulatedRef.current = []
+      apiPageFetchedRef.current = 0
+      exhaustedRef.current = false
+      totalFromApiRef.current = 0
+    }
+    setLoading(true)
+    try {
+      const needFetch = accumulatedRef.current.length === 0
+      if (!needFetch && (accumulatedRef.current.length >= page * PAGE_SIZE || exhaustedRef.current)) {
+        const slice = accumulatedRef.current.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+        setPlants(slice)
+        setTotal(exhaustedRef.current ? accumulatedRef.current.length : Math.max(accumulatedRef.current.length, totalFromApiRef.current))
+        setAccumulatedFiltered([...accumulatedRef.current])
+        setApiPageFetched(apiPageFetchedRef.current)
+        setExhausted(exhaustedRef.current)
+        setLoading(false)
+        return
+      }
+
+      const startPage = apiPageFetchedRef.current + 1
+      const data = await fetchOnePage(startPage)
+      const rawPlants = (data.plants ?? []) as PlantRow[]
+      const isFilterByWorkOrder = data.filterByWorkOrder === true
+      setFilterByWorkOrder(isFilterByWorkOrder)
+      const apiTotal = data.total ?? 0
+      setTotalFromApi(apiTotal)
+      totalFromApiRef.current = apiTotal
+
+      if (!isFilterByWorkOrder) {
+        setPlants(rawPlants)
+        setTotal(apiTotal)
+        setAccumulatedFiltered([])
+        setApiPageFetched(0)
+        setExhausted(false)
+        accumulatedRef.current = []
+        apiPageFetchedRef.current = 0
+        exhaustedRef.current = false
+        setLoading(false)
+        return
+      }
+
+      let accumulated = startPage === 1 ? rawPlants.filter((p) => p.in_work_order === true) : [...accumulatedRef.current, ...rawPlants.filter((p) => p.in_work_order === true)]
+      let lastPage = startPage
+      let nowExhausted = rawPlants.length < PAGE_SIZE
+      const noMoreApiPages = () => lastPage * PAGE_SIZE >= apiTotal || lastPage >= MAX_API_PAGES
+
+      while (accumulated.length < page * PAGE_SIZE && !nowExhausted && !noMoreApiPages()) {
+        lastPage += 1
+        const nextData = await fetchOnePage(lastPage)
+        const nextPlants = (nextData.plants ?? []) as PlantRow[]
+        accumulated = [...accumulated, ...nextPlants.filter((p) => p.in_work_order === true)]
+        nowExhausted = nextPlants.length < PAGE_SIZE
+      }
+      if (!nowExhausted && noMoreApiPages()) nowExhausted = true
+
+      accumulatedRef.current = accumulated
+      apiPageFetchedRef.current = lastPage
+      exhaustedRef.current = nowExhausted
+      setAccumulatedFiltered(accumulated)
+      setApiPageFetched(lastPage)
+      setExhausted(nowExhausted)
+      const slice = accumulated.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+      setPlants(slice)
+      setTotal(nowExhausted ? accumulated.length : Math.max(accumulated.length, apiTotal))
     } catch (e) {
       setPlants([])
       setTotal(0)
+      setFilterByWorkOrder(false)
+      setAccumulatedFiltered([])
+      setApiPageFetched(0)
+      setExhausted(false)
+      setTotalFromApi(0)
+      accumulatedRef.current = []
+      apiPageFetchedRef.current = 0
+      exhaustedRef.current = false
+      totalFromApiRef.current = 0
     } finally {
       setLoading(false)
     }
-  }, [searchQuery, page, orgId, onlyInWorkOrders])
+  }, [searchQuery, page, orgId, onlyInWorkOrders, fetchOnePage])
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -190,6 +291,7 @@ export default function PlantsPage() {
     return null
   }
 
+  const displayPlants = filterByWorkOrder ? plants.filter((p) => p.in_work_order === true) : plants
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const displayName = (p: PlantRow) => p.name?.trim() || `Plant ${p.id}`
 
@@ -275,9 +377,11 @@ export default function PlantsPage() {
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
           </div>
-        ) : plants.length === 0 ? (
+        ) : displayPlants.length === 0 ? (
           <Card className="p-12 text-center">
-            <p className="text-muted-foreground">No plants found</p>
+            <p className="text-muted-foreground">
+              {filterByWorkOrder ? "No plants in work orders match your search" : "No plants found"}
+            </p>
           </Card>
         ) : (
           <>
@@ -293,7 +397,7 @@ export default function PlantsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {plants.map((p) => (
+                  {displayPlants.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell>
                         <span className="font-medium">

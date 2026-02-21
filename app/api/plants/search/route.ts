@@ -83,40 +83,7 @@ export async function GET(request: NextRequest) {
       plantsQuery = plantsQuery.ilike("name", `%${name}%`)
     }
 
-    if (onlyInWorkOrdersEffective) {
-      console.log("[Plants search] work-order path start:", { accountType, pathKind: "work-order-restricted" })
-      const { data: plantIdsInWo, error: wopError } = await supabase
-        .from("work_order_plants")
-        .select("plant_id")
-        .eq("is_active", true)
-      const rowCount = plantIdsInWo?.length ?? 0
-      console.log("[Plants search] work_order_plants result:", {
-        accountType,
-        rowCount,
-        wopError: wopError ? { message: wopError.message, code: wopError.code, details: wopError.details } : null,
-      })
-      const rawIds = (plantIdsInWo ?? []).map((r) => r.plant_id).filter((id): id is number => typeof id === "number" && Number.isInteger(id))
-      const ids = [...new Set(rawIds)]
-      const dropped = rowCount - rawIds.length
-      if (dropped > 0) console.log("[Plants search] dropped non-integer plant_id(s):", { accountType, dropped })
-      if (ids.length === 0) {
-        console.log("[Plants search] no valid plant ids from work_order_plants, returning empty:", { accountType })
-        return NextResponse.json({
-          plants: [],
-          total: 0,
-          page,
-          limit,
-        })
-      }
-      const MAX_IN_CLAUSE = 500
-      const idsToUse = ids.length > MAX_IN_CLAUSE ? ids.slice(0, MAX_IN_CLAUSE) : ids
-      if (ids.length > MAX_IN_CLAUSE) {
-        console.log("[Plants search] capped plant ids:", { accountType, total: ids.length, using: idsToUse.length })
-      }
-      console.log("[Plants search] applying .in('id', idsToUse):", { accountType, count: idsToUse.length, sample: idsToUse.slice(0, 5) })
-      plantsQuery = plantsQuery.in("id", idsToUse)
-    }
-
+    // Same query for all: plants by name (and org). No work-order filter in API; UI filters when filterByWorkOrder.
     plantsQuery = plantsQuery.order("name", { ascending: true })
 
     const offset = (page - 1) * limit
@@ -174,16 +141,21 @@ export async function GET(request: NextRequest) {
       workOrdersByPlantId.set(row.plant_id, list)
     }
 
-    const plantsWithWorkOrders = (plants ?? []).map((p) => ({
-      ...p,
-      workOrders: workOrdersByPlantId.get(p.id) ?? [],
-    }))
+    const plantsWithWorkOrders = (plants ?? []).map((p) => {
+      const workOrders = workOrdersByPlantId.get(p.id) ?? []
+      return {
+        ...p,
+        workOrders,
+        in_work_order: workOrders.length > 0,
+      }
+    })
 
     return NextResponse.json({
       plants: plantsWithWorkOrders,
       total: count ?? 0,
       page,
       limit,
+      filterByWorkOrder: onlyInWorkOrdersEffective,
     })
   } catch (error: any) {
     console.error("Plants search error:", error)
