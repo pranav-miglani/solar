@@ -36,10 +36,20 @@ export default function AnalyticsPlantDetailPage() {
     return null
   }
 
+  const handleBack = () => {
+    const returnTo = typeof window !== "undefined" ? sessionStorage.getItem("analytics-return-to") : null
+    if (returnTo === "/plants") {
+      sessionStorage.removeItem("analytics-return-to")
+      router.push("/plants")
+    } else {
+      router.push("/analytics/plants")
+    }
+  }
+
   return (
     <div className="container mx-auto p-4 md:p-6">
       <div className="mb-6">
-        <Button variant="ghost" onClick={() => router.push("/analytics/plants")} className="mb-4">
+        <Button variant="ghost" onClick={handleBack} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Plants
         </Button>
