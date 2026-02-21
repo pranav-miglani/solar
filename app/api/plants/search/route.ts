@@ -149,6 +149,17 @@ export async function GET(request: NextRequest) {
         in_work_order: workOrders.length > 0,
       }
     })
+    const inWorkOrderCount = plantsWithWorkOrders.filter((p) => p.in_work_order).length
+    console.log("[Plants search] response:", {
+      accountType,
+      pathKind,
+      page,
+      limit,
+      filterByWorkOrder: onlyInWorkOrdersEffective,
+      rowsReturned: plantsWithWorkOrders.length,
+      inWorkOrderCount,
+      total: count ?? 0,
+    })
 
     return NextResponse.json({
       plants: plantsWithWorkOrders,

@@ -175,6 +175,12 @@ export default function PlantsPage() {
       const needFetch = accumulatedRef.current.length === 0
       if (!needFetch && (accumulatedRef.current.length >= page * PAGE_SIZE || exhaustedRef.current)) {
         const slice = accumulatedRef.current.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+        console.log("[Plants UI] reuse accumulated:", {
+          logicalPage: page,
+          accumulatedLength: accumulatedRef.current.length,
+          exhausted: exhaustedRef.current,
+          sliceLength: slice.length,
+        })
         setPlants(slice)
         setTotal(exhaustedRef.current ? accumulatedRef.current.length : Math.max(accumulatedRef.current.length, totalFromApiRef.current))
         setAccumulatedFiltered([...accumulatedRef.current])
@@ -185,6 +191,7 @@ export default function PlantsPage() {
       }
 
       const startPage = apiPageFetchedRef.current + 1
+      console.log("[Plants UI] fetch start:", { logicalPage: page, startPage, needFetch, accumulatedLength: accumulatedRef.current.length })
       const data = await fetchOnePage(startPage)
       const rawPlants = (data.plants ?? []) as PlantRow[]
       const isFilterByWorkOrder = data.filterByWorkOrder === true
@@ -194,6 +201,7 @@ export default function PlantsPage() {
       totalFromApiRef.current = apiTotal
 
       if (!isFilterByWorkOrder) {
+        console.log("[Plants UI] normal path (no filterByWorkOrder):", { rows: rawPlants.length, total: apiTotal })
         setPlants(rawPlants)
         setTotal(apiTotal)
         setAccumulatedFiltered([])
@@ -210,13 +218,23 @@ export default function PlantsPage() {
       let lastPage = startPage
       let nowExhausted = rawPlants.length < PAGE_SIZE
       const noMoreApiPages = () => lastPage * PAGE_SIZE >= apiTotal || lastPage >= MAX_API_PAGES
+      console.log("[Plants UI] filterByWorkOrder first page:", {
+        logicalPage: page,
+        apiPage: startPage,
+        rawRows: rawPlants.length,
+        inWorkOrder: accumulated.length,
+        apiTotal,
+        nowExhausted,
+      })
 
       while (accumulated.length < page * PAGE_SIZE && !nowExhausted && !noMoreApiPages()) {
         lastPage += 1
         const nextData = await fetchOnePage(lastPage)
         const nextPlants = (nextData.plants ?? []) as PlantRow[]
+        const added = nextPlants.filter((p) => p.in_work_order === true).length
         accumulated = [...accumulated, ...nextPlants.filter((p) => p.in_work_order === true)]
         nowExhausted = nextPlants.length < PAGE_SIZE
+        console.log("[Plants UI] fetch more:", { apiPage: lastPage, nextRows: nextPlants.length, added, accumulatedLength: accumulated.length, nowExhausted })
       }
       if (!nowExhausted && noMoreApiPages()) nowExhausted = true
 
@@ -227,6 +245,14 @@ export default function PlantsPage() {
       setApiPageFetched(lastPage)
       setExhausted(nowExhausted)
       const slice = accumulated.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+      console.log("[Plants UI] filterByWorkOrder done:", {
+        logicalPage: page,
+        apiPagesFetched: lastPage,
+        accumulatedLength: accumulated.length,
+        sliceLength: slice.length,
+        exhausted: nowExhausted,
+        totalSet: nowExhausted ? accumulated.length : Math.max(accumulated.length, apiTotal),
+      })
       setPlants(slice)
       setTotal(nowExhausted ? accumulated.length : Math.max(accumulated.length, apiTotal))
     } catch (e) {
