@@ -2,6 +2,8 @@
 
 This document explains what data is stored in the database for FoxESS Cloud (FOXESSCLOUD) vendors and how FoxESS Open API attributes map to database columns.
 
+**Status:** FoxESS data mapping is implemented and aligned with the adapter (`foxesscloudAdapter.ts`), sync/telemetry services, and the `plants` table. All mappings below reflect the current code.
+
 ## Data Flow Overview
 
 ```
