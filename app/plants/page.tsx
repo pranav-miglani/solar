@@ -29,6 +29,7 @@ import { Search, Building2, FileText, BarChart3, ExternalLink } from "lucide-rea
 const RECENT_KEY = "plants-recent"
 const RECENT_MAX = 5
 const PAGE_SIZE = 20
+const ORG_FILTER_ALL = "all"
 
 interface WorkOrderRef {
   id: number
@@ -55,7 +56,7 @@ export default function PlantsPage() {
   const { account, loading: userLoading } = useUser()
   const [searchQuery, setSearchQuery] = useState("")
   const [page, setPage] = useState(1)
-  const [orgId, setOrgId] = useState<string>("")
+  const [orgId, setOrgId] = useState<string>(ORG_FILTER_ALL)
   const [onlyInWorkOrders, setOnlyInWorkOrders] = useState(false)
   const [plants, setPlants] = useState<PlantRow[]>([])
   const [total, setTotal] = useState(0)
@@ -129,7 +130,7 @@ export default function PlantsPage() {
       params.set("name", name)
       params.set("page", String(page))
       params.set("limit", String(PAGE_SIZE))
-      if (orgId) params.set("orgId", orgId)
+      if (orgId && orgId !== ORG_FILTER_ALL) params.set("orgId", orgId)
       if (onlyInWorkOrders) params.set("onlyInWorkOrders", "true")
       const res = await fetch(`/api/plants/search?${params.toString()}`)
       const data = await res.json()
@@ -242,7 +243,7 @@ export default function PlantsPage() {
                       <SelectValue placeholder="All organizations" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All organizations</SelectItem>
+                      <SelectItem value={ORG_FILTER_ALL}>All organizations</SelectItem>
                       {orgs.map((org) => (
                         <SelectItem key={org.id} value={String(org.id)}>
                           {org.name}
