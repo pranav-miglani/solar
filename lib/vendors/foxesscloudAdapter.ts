@@ -162,15 +162,44 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     }
   }
 
-  private async foxGet(path: string): Promise<unknown> {
+  /**
+   * Log request/response for FoxESS API call (similar to SolarDM loggedFetch).
+   * Redacts token and signature in headers.
+   */
+  private async loggedFoxGet(
+    path: string,
+    context?: { operation?: string; description?: string }
+  ): Promise<unknown> {
     const baseUrl = this.getApiBaseUrl()
     const url = path.startsWith("http") ? path : `${baseUrl}${path}`
     const pathOnly = path.startsWith("http") ? new URL(path).pathname : path
     const headers = this.buildFoxHeaders(pathOnly)
-    const res = await pooledFetch(url, {
-      method: "GET",
-      headers,
-    })
+    const operation = context?.operation ?? "API_GET"
+    const description = context?.description ?? pathOnly
+
+    logger.info(`[FoxESS] ${operation}: ${description}`)
+    logger.info(`[FoxESS] Request URL: ${url}`)
+    logger.info("[FoxESS] Request method: GET")
+    logger.info("[FoxESS] Request headers:", JSON.stringify({
+      ...headers,
+      token: "[REDACTED]",
+      signature: "[REDACTED]",
+    }, null, 2))
+
+    const res = await pooledFetch(url, { method: "GET", headers })
+
+    logger.info(`[FoxESS] Response status: ${res.status} ${res.statusText}`)
+    const resClone = res.clone()
+    try {
+      const text = await resClone.text()
+      logger.info(
+        `[FoxESS] Response body (first 500 chars):`,
+        text.length > 500 ? text.substring(0, 500) + "..." : text
+      )
+    } catch {
+      logger.info("[FoxESS] Could not read response body for logging")
+    }
+
     if (!res.ok) {
       throw new Error(`[FoxESS] HTTP ${res.status} on ${path}`)
     }
@@ -183,15 +212,54 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     return data.result
   }
 
-  private async foxPost(path: string, body: object): Promise<unknown> {
+  /**
+   * Log request/response for FoxESS API POST (similar to SolarDM loggedFetch).
+   * Redacts token and signature in headers; sanitizes body (array lengths).
+   */
+  private async loggedFoxPost(
+    path: string,
+    body: object,
+    context?: { operation?: string; description?: string }
+  ): Promise<unknown> {
     const baseUrl = this.getApiBaseUrl()
     const url = `${baseUrl}${path}`
     const headers = this.buildFoxHeaders(path)
+    const operation = context?.operation ?? "API_POST"
+    const description = context?.description ?? path
+
+    const logBody: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(body)) {
+      logBody[k] = Array.isArray(v) && v.length > 5 ? `[${v.length} items]` : v
+    }
+
+    logger.info(`[FoxESS] ${operation}: ${description}`)
+    logger.info(`[FoxESS] Request URL: ${url}`)
+    logger.info("[FoxESS] Request method: POST")
+    logger.info("[FoxESS] Request headers:", JSON.stringify({
+      ...headers,
+      token: "[REDACTED]",
+      signature: "[REDACTED]",
+    }, null, 2))
+    logger.info("[FoxESS] Request body:", JSON.stringify(logBody, null, 2))
+
     const res = await pooledFetch(url, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
     })
+
+    logger.info(`[FoxESS] Response status: ${res.status} ${res.statusText}`)
+    const resClone = res.clone()
+    try {
+      const text = await resClone.text()
+      logger.info(
+        `[FoxESS] Response body (first 500 chars):`,
+        text.length > 500 ? text.substring(0, 500) + "..." : text
+      )
+    } catch {
+      logger.info("[FoxESS] Could not read response body for logging")
+    }
+
     if (!res.ok) {
       throw new Error(`[FoxESS] HTTP ${res.status} on ${path}`)
     }
@@ -202,6 +270,14 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       )
     }
     return data.result
+  }
+
+  private async foxGet(path: string): Promise<unknown> {
+    return this.loggedFoxGet(path)
+  }
+
+  private async foxPost(path: string, body: object): Promise<unknown> {
+    return this.loggedFoxPost(path, body)
   }
 
   async authenticate(): Promise<string> {
@@ -275,6 +351,9 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
   }
 
   async listPlants(): Promise<Plant[]> {
+    const baseUrl = this.getApiBaseUrl()
+    logger.info("[FoxESS] Fetching plants from:", `${baseUrl}/op/v0/plant/list`)
+
     const plants: Plant[] = []
     let page = 1
     const pageSize = 100
@@ -282,10 +361,14 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     const allStations: FoxPlantItem[] = []
 
     while (hasMore) {
-      const result = (await this.foxPost("/op/v0/plant/list", {
-        currentPage: page,
-        pageSize,
-      })) as FoxPlantListResult
+      const result = (await this.loggedFoxPost(
+        "/op/v0/plant/list",
+        {
+          currentPage: page,
+          pageSize,
+        },
+        { operation: "LIST_PLANTS", description: `Fetch plant list page ${page}` }
+      )) as FoxPlantListResult
       const list = result?.data ?? []
       const total = result?.total ?? 0
       allStations.push(...list)
@@ -356,6 +439,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       })
     }
 
+    logger.info(`[FoxESS] Successfully fetched ${plants.length} plants`)
     return plants
   }
 
