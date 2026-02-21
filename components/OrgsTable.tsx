@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import Link from "next/link"
-import { ExternalLink, Building2, Plus, User, Mail, Trash2, FileText, Download, Upload, Loader2 } from "lucide-react"
+import { ExternalLink, Building2, Plus, User, Mail, Trash2, FileText, Download, Upload, Loader2, Leaf } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -836,18 +836,18 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                           )}
                         </TableCell>
                       )}
-                      <TableCell className="py-4 align-middle">
-                        <div className="flex items-center justify-end gap-2 flex-nowrap">
+                      <TableCell className="py-3 align-middle">
+                        <div className="flex items-center justify-end gap-1.5 flex-nowrap">
                           <Link href={`/orgs/${org.id}/plants`}>
                             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                               <Button
                                 variant="default"
                                 size="sm"
-                                className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md hover:shadow-lg transition-all duration-200 whitespace-nowrap font-medium px-3"
+                                className="h-8 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-sm hover:shadow transition-all duration-200 whitespace-nowrap font-medium px-2.5 gap-1.5"
+                                title="Plants"
                               >
-                                <ExternalLink className="h-4 w-4 mr-1.5" />
-                                <span className="hidden lg:inline">View Plants</span>
-                                <span className="lg:hidden">Plants</span>
+                                <Leaf className="h-4 w-4 shrink-0" />
+                                <span className="hidden lg:inline">Plants</span>
                               </Button>
                             </motion.div>
                           </Link>
@@ -856,9 +856,10 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                               <Button
                                 variant="default"
                                 size="sm"
-                                className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white shadow-md hover:shadow-lg transition-all duration-200 whitespace-nowrap font-medium px-3"
+                                className="h-8 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white shadow-sm hover:shadow transition-all duration-200 whitespace-nowrap font-medium px-2.5 gap-1.5"
+                                title="Work Orders"
                               >
-                                <FileText className="h-4 w-4 mr-1.5" />
+                                <FileText className="h-4 w-4 shrink-0" />
                                 <span className="hidden lg:inline">Work Orders</span>
                                 <span className="lg:hidden">WO</span>
                               </Button>
@@ -878,19 +879,18 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                                     setEditingLogoUrl(orgAcc?.logo_url || "")
                                     setAccountDialogOpen(true)
                                   }}
-                                  className="border-2 border-border bg-background hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 whitespace-nowrap font-medium shadow-sm hover:shadow-md px-3"
+                                  className="h-8 border border-border bg-background hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 whitespace-nowrap font-medium shadow-sm hover:shadow px-2.5 gap-1.5"
+                                  title={orgAccount ? "Account" : "Add account"}
                                 >
                                   {orgAccount ? (
                                     <>
-                                      <User className="h-4 w-4 mr-1.5" />
-                                      <span className="hidden lg:inline">View Account</span>
-                                      <span className="lg:hidden">Account</span>
+                                      <User className="h-4 w-4 shrink-0" />
+                                      <span className="hidden lg:inline">Account</span>
                                     </>
                                   ) : (
                                     <>
-                                      <Plus className="h-4 w-4 mr-1.5" />
-                                      <span className="hidden lg:inline">Create Account</span>
-                                      <span className="lg:hidden">Create</span>
+                                      <Plus className="h-4 w-4 shrink-0" />
+                                      <span className="hidden lg:inline">+ Account</span>
                                     </>
                                   )}
                                 </Button>
@@ -902,10 +902,10 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                                       variant="outline"
                                       size="sm"
                                       onClick={() => setDeletingOrgId(org.id)}
-                                      className="border-2 border-destructive/30 bg-background hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-all duration-200 whitespace-nowrap font-medium shadow-sm hover:shadow-md px-3"
+                                      className="h-8 w-8 p-0 border border-destructive/40 hover:bg-destructive/10 hover:border-destructive text-destructive transition-all duration-200 shadow-sm hover:shadow"
+                                      title="Delete organization"
                                     >
-                                      <Trash2 className="h-4 w-4 mr-1.5" />
-                                      Delete
+                                      <Trash2 className="h-4 w-4" />
                                     </Button>
                                   </motion.div>
                                 </AlertDialogTrigger>
@@ -1006,25 +1006,25 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                         </Badge>
                       )}
                     </div>
-                    <div className="flex flex-col gap-2.5 pt-3 border-t">
-                      <Link href={`/orgs/${org.id}/plants`}>
+                    <div className="flex flex-col gap-2 pt-3 border-t">
+                      <Link href={`/orgs/${org.id}/plants`} className="w-full">
                         <Button
                           variant="default"
                           size="sm"
-                          className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md hover:shadow-lg transition-all duration-200 font-medium"
+                          className="w-full h-9 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-sm hover:shadow transition-all duration-200 font-medium gap-2"
                         >
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          View Plants
+                          <Leaf className="h-4 w-4 shrink-0" />
+                          Plants
                         </Button>
                       </Link>
-                      <Link href={`/orgs/${org.id}/workorders`}>
+                      <Link href={`/orgs/${org.id}/workorders`} className="w-full">
                         <Button
                           variant="default"
                           size="sm"
-                          className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white shadow-md hover:shadow-lg transition-all duration-200 font-medium"
+                          className="w-full h-9 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white shadow-sm hover:shadow transition-all duration-200 font-medium gap-2"
                         >
-                          <FileText className="h-4 w-4 mr-2" />
-                          View Work Orders
+                          <FileText className="h-4 w-4 shrink-0" />
+                          Work Orders
                         </Button>
                       </Link>
                       {isSuperAdmin && (
@@ -1040,17 +1040,17 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                               setEditingLogoUrl(orgAcc?.logo_url || "")
                               setAccountDialogOpen(true)
                             }}
-                            className="w-full border-2 border-border hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
+                            className="w-full h-9 border border-border hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 font-medium shadow-sm hover:shadow gap-2"
                           >
                             {orgAccount ? (
                               <>
-                                <User className="h-4 w-4 mr-2" />
-                                View Account
+                                <User className="h-4 w-4 shrink-0" />
+                                Account
                               </>
                             ) : (
                               <>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Create Account
+                                <Plus className="h-4 w-4 shrink-0" />
+                                + Account
                               </>
                             )}
                           </Button>
@@ -1060,10 +1060,10 @@ export function OrgsTable({ accountType }: OrgsTableProps) {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setDeletingOrgId(org.id)}
-                                className="w-full border-2 border-destructive/30 hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-all duration-200 font-medium shadow-sm hover:shadow-md"
+                                className="h-9 w-full border border-destructive/40 hover:bg-destructive/10 hover:border-destructive text-destructive transition-all duration-200 shadow-sm hover:shadow"
+                                title="Delete organization"
                               >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete Organization
+                                <Trash2 className="h-4 w-4 shrink-0" />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
