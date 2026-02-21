@@ -279,7 +279,7 @@ export default function PlantsPage() {
       return
     }
     search()
-  }, [searchQuery, page, orgId, onlyInWorkOrders])
+  }, [searchQuery, page, orgId, onlyInWorkOrders, search])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
