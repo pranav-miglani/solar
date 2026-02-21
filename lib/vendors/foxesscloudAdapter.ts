@@ -155,7 +155,8 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
 
   /**
    * Build FoxESS request headers: token (apiKey), timestamp, signature (MD5), lang.
-   * Matches Postman: signature = MD5(path + "\r\n" + token + "\r\n" + timestamp).
+   * Signature = MD5(path + "\\r\\n" + token + "\\r\\n" + timestamp) using the four
+   * characters backslash-r-backslash-n, not literal CRLF (per FoxESS API behaviour).
    * pathForSignature must be pathname only (no query string).
    */
   private buildFoxHeaders(pathOrUrl: string): Record<string, string> {
@@ -173,12 +174,12 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     }
     const timestamp = Date.now().toString()
 
-    // Variant 1: literal CRLF (two chars \r \n) — per Postman and FoxESS docs
+    // Variant 1: literal CRLF (two chars \r \n) — for comparison
     const sepLiteral = "\r\n"
     const rawSigLiteral = pathForSignature + sepLiteral + apiKey + sepLiteral + timestamp
     const signatureLiteral = createHash("md5").update(rawSigLiteral, "utf8").digest("hex")
 
-    // Variant 2: four characters backslash-r-backslash-n (for comparison)
+    // Variant 2: four characters \ r \ n — used by FoxESS API
     const sepEscaped = "\\r\\n"
     const rawSigEscaped = pathForSignature + sepEscaped + apiKey + sepEscaped + timestamp
     const signatureEscaped = createHash("md5").update(rawSigEscaped, "utf8").digest("hex")
@@ -194,10 +195,10 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       rawSigEscapedLength: rawSigEscaped.length,
       signatureLiteral,
       signatureEscaped,
-      separatorUsed: "literal \\r\\n (CRLF)",
+      separatorUsed: "four-char \\r\\n (used in request)",
     })
 
-    const signature = signatureLiteral
+    const signature = signatureEscaped
     return {
       token: apiKey,
       timestamp,
