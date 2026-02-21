@@ -24,9 +24,6 @@ function shouldLog(level: string): boolean {
 }
 
 function formatTimestamp(): string {
-  if (typeof Intl !== "undefined" && Intl.DateTimeFormat) {
-    return new Date().toISOString()
-  }
   return new Date().toISOString()
 }
 

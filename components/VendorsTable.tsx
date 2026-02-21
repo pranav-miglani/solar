@@ -163,7 +163,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
   useEffect(() => {
     logger.info(`${VENDORS_LOG} Vendors page loaded`, { accountType })
     fetchVendors()
-  }, [])
+  }, [accountType])
 
   // Load vendors + org metadata for display. Keeps local state in sync after every mutation.
   async function fetchVendors() {
@@ -183,39 +183,27 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
     }
   }
   
-  // Populate the auto-sync dialog from whichever vendor currently holds org-level settings.
-  function openSyncSettingsDialog(orgId: number, orgName: string) {
-    // Find the org's current sync settings from vendors
-    const vendor = vendors.find((v) => v.organizations?.id === orgId)
+  // Populate the auto-sync dialog from the vendor whose row was clicked (per-vendor settings).
+  function openSyncSettingsDialog(vendor: Vendor) {
+    const org = vendor.organizations
+    if (!org) return
 
-    if (vendor?.organizations) {
-      const inferredMode: 'LIST_PLANTS' | 'PER_PLANT' =
-        (vendor.plant_sync_mode as 'LIST_PLANTS' | 'PER_PLANT' | undefined) ??
-        (vendor.vendor_type === "SOLARMAN" || vendor.vendor_type === "SHINEMONITOR"
-          ? "LIST_PLANTS"
-          : "PER_PLANT")
+    const inferredMode: 'LIST_PLANTS' | 'PER_PLANT' =
+      (vendor.plant_sync_mode as 'LIST_PLANTS' | 'PER_PLANT' | undefined) ??
+      (vendor.vendor_type === "SOLARMAN" || vendor.vendor_type === "SHINEMONITOR"
+        ? "LIST_PLANTS"
+        : "PER_PLANT")
 
-      setSyncSettings({
-        enabled: vendor.organizations.auto_sync_enabled ?? true,
-        plant_sync_mode: inferredMode,
-        per_plant_sync_interval_minutes: vendor.per_plant_sync_interval_minutes ?? 15,
-        plant_sync_time_ist: vendor.plant_sync_time_ist || "02:00",
-        telemetry_sync_mode: (vendor.telemetry_sync_mode as 'LIST_PLANTS' | 'PER_PLANT') || 'LIST_PLANTS',
-        telemetry_sync_interval: vendor.telemetry_sync_interval ?? 15,
-      })
-      setSelectedVendorForSyncId(vendor.id)
-    } else {
-      setSyncSettings({
-        enabled: true,
-        plant_sync_mode: "LIST_PLANTS",
-        per_plant_sync_interval_minutes: 15,
-        plant_sync_time_ist: "02:00",
-        telemetry_sync_mode: "LIST_PLANTS",
-        telemetry_sync_interval: 15,
-      })
-      setSelectedVendorForSyncId(null)
-    }
-    setSelectedOrgForSync({ id: orgId, name: orgName })
+    setSyncSettings({
+      enabled: org.auto_sync_enabled ?? true,
+      plant_sync_mode: inferredMode,
+      per_plant_sync_interval_minutes: vendor.per_plant_sync_interval_minutes ?? 15,
+      plant_sync_time_ist: vendor.plant_sync_time_ist || "02:00",
+      telemetry_sync_mode: (vendor.telemetry_sync_mode as 'LIST_PLANTS' | 'PER_PLANT') || 'LIST_PLANTS',
+      telemetry_sync_interval: vendor.telemetry_sync_interval ?? 15,
+    })
+    setSelectedVendorForSyncId(vendor.id)
+    setSelectedOrgForSync({ id: org.id, name: org.name })
     setSyncSettingsDialogOpen(true)
   }
   
@@ -1198,7 +1186,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => openSyncSettingsDialog(vendor.organizations!.id, vendor.organizations!.name)}
+                              onClick={() => openSyncSettingsDialog(vendor)}
                               className="transition-all duration-200 hover:scale-110 hover:bg-primary/10"
                               title="Sync Settings"
                             >
@@ -1446,7 +1434,7 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => openSyncSettingsDialog(vendor.organizations!.id, vendor.organizations!.name)}
+                          onClick={() => openSyncSettingsDialog(vendor)}
                           className="w-full"
                           title="Sync Settings"
                         >
@@ -1550,14 +1538,14 @@ export function VendorsTable({ accountType }: VendorsTableProps) {
 
       {/* Sync Settings Dialog */}
       <Dialog open={syncSettingsDialogOpen} onOpenChange={setSyncSettingsDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">
               Auto-Sync Settings
             </DialogTitle>
           </DialogHeader>
           {selectedOrgForSync && (
-            <div className="space-y-5">
+            <div className="space-y-5 overflow-y-auto max-h-[calc(90vh-5rem)] pr-1 -mr-1">
               <div className="flex items-center gap-2 pb-3 border-b">
                 <Building2 className="h-5 w-5 text-primary" />
                 <span className="font-semibold text-base">{selectedOrgForSync.name}</span>
