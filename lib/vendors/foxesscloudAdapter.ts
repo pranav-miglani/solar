@@ -494,8 +494,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
           lastUpdateTime: null,
           vendorCreatedDate: parseFoxCreateDate(detail?.createDate) ?? null,
           startOperatingTime: parseFoxCreateDate(detail?.createDate) ?? null,
-          timezone: detail?.timezone ?? station.ianaTimezone ?? null,
-          modules: detail?.modules ?? undefined,
+          timezone: detail?.timezone ?? station.ianaTimezone ?? null
         },
       })
     }
