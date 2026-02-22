@@ -53,7 +53,8 @@ interface FoxPlantDetailResult {
 interface FoxDeviceItem {
   deviceSN: string
   deviceType?: string
-  plantID?: string
+  stationID?: string
+  stationName?: string
   status?: number
 }
 
@@ -82,11 +83,11 @@ interface FoxDeviceDetailResult {
   [key: string]: unknown
 }
 
+/** GET /op/v0/device/generation?sn={sn} - returns today, month, cumulative only */
 interface FoxGenerationResult {
   today?: number
   month?: number
-  year?: number
-  cumulate?: number
+  cumulative?: number
 }
 
 interface FoxHistoryDataPoint {
@@ -104,8 +105,22 @@ interface FoxReportResult {
   data?: Array<{ index: number; value: number }>
 }
 
+/** POST /op/v0/device/report/query with dimension "year" - result is array of { variable, unit?, values } (values = per month) */
+interface FoxReportYearResultItem {
+  variable?: string
+  unit?: string
+  values?: number[]
+}
+
+/** real/query can return object keyed by SN or array of { deviceSN, datas } */
 interface FoxRealQueryResult {
-  [deviceSN: string]: Array<{ variable: string; value?: number; data?: number }>
+  [deviceSN: string]: Array<{ variable: string; value?: number; data?: number; unit?: string }>
+}
+
+interface FoxRealQueryResultItem {
+  deviceSN: string
+  time?: string
+  datas?: Array<{ variable: string; value?: number; data?: number; unit?: string }>
 }
 
 interface FoxErrorItem {
@@ -164,13 +179,7 @@ function parseFoxCreateDate(createDate: string | undefined): string | null {
 }
 
 export class FoxesscloudAdapter extends BaseVendorAdapter {
-  private vendorId?: number
-  private supabaseClient?: any
 
-  setTokenStorage(vendorId: number, supabaseClient: any) {
-    this.vendorId = vendorId
-    this.supabaseClient = supabaseClient
-  }
 
   protected getApiBaseUrl(): string {
     if (this.config.apiBaseUrl) {
@@ -380,8 +389,8 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       })) as FoxDeviceListResult
       const list = result?.data ?? []
       for (const d of list) {
-        if (d.plantID && d.deviceSN) {
-          map.set(d.plantID, d)
+        if (d.stationID) {
+          map.set(d.stationID, d)
         }
       }
       const total = result?.total ?? 0
@@ -391,6 +400,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
         page++
       }
     }
+    logger.info(`[FoxESS] Successfully fetched plantToDevices :  ${JSON.stringify(map, null, 2)} `)
     return map
   }
 
@@ -422,16 +432,14 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     }
   }
 
-  async listPlants(): Promise<Plant[]> {
-    const baseUrl = this.getApiBaseUrl()
-    logger.info("[FoxESS] Fetching plants from:", `${baseUrl}/op/v0/plant/list`)
-
-    const plants: Plant[] = []
+  /**
+   * Fetch all stations from POST /op/v0/plant/list (paginated).
+   */
+  private async fetchAllStations(): Promise<FoxPlantListItem[]> {
+    const allStations: FoxPlantListItem[] = []
     let page = 1
     const pageSize = 100
     let hasMore = true
-    const allStations: FoxPlantListItem[] = []
-
     while (hasMore) {
       const result = (await this.loggedFoxPost(
         "/op/v0/plant/list",
@@ -450,51 +458,185 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
         page++
       }
     }
+    logger.info(`[FoxESS] Successfully fetched allStations :  ${JSON.stringify(allStations, null, 2)} `)
+    return allStations
+  }
 
-    logger.info(`[FoxESS] Successfully fetched plants :  ${allStations} `)
+  /**
+   * Fetch plant details (location, capacity, address, createDate) in parallel, 10 at a time.
+   * Returns a map of stationID (vendor plant id) to FoxPlantDetailResult or null.
+   */
+  private async fetchPlantDetailsMap(
+    stations: FoxPlantListItem[]
+  ): Promise<Map<string, FoxPlantDetailResult | null>> {
+    const detailByStationId = new Map<string, FoxPlantDetailResult | null>()
+    const detailBatchSize = 10
+    for (let i = 0; i < stations.length; i += detailBatchSize) {
+      const batch = stations.slice(i, i + detailBatchSize)
+      const details = await Promise.all(
+        batch.map((s) => this.getPlantDetail(s.stationID))
+      )
+      batch.forEach((s, j) => detailByStationId.set(s.stationID, details[j] ?? null))
+      if (i + detailBatchSize < stations.length) {
+        await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
+      }
+    }
+    return detailByStationId
+  }
 
-    const plantToDevices = await this.getPlantToDevicesMap()
-    logger.info(`[FoxESS] Successfully fetched plantToDevices :  ${plantToDevices} `)
+  /**
+   * Fetch energy generation (today, month, cumulative) for all device SNs in parallel, in batches of 10.
+   * Returns a map of device SN to FoxGenerationResult (daily = today, monthly = month, total = cumulative).
+   */
+  private async getDeviceIdToDailyMonthlyAndTotalEnergy(
+    deviceSns: string[]
+  ): Promise<Map<string, FoxGenerationResult>> {
+    const generationByDeviceSN = new Map<string, FoxGenerationResult>()
+    for (let i = 0; i < deviceSns.length; i += BATCH_SIZE) {
+      const batch = deviceSns.slice(i, i + BATCH_SIZE)
+      const settled = await Promise.allSettled(
+        batch.map((sn) =>
+          this.foxGet(`/op/v0/device/generation?sn=${encodeURIComponent(sn)}`)
+        )
+      )
+      batch.forEach((sn, j) => {
+        const s = settled[j]
+        if (s?.status === "fulfilled" && s.value) {
+          generationByDeviceSN.set(sn, s.value as FoxGenerationResult)
+        }
+      })
+      if (i + BATCH_SIZE < deviceSns.length) {
+        await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
+      }
+    }
+    logger.info(`[FoxESS] Successfully fetched generationByDeviceSN :  ${JSON.stringify(generationByDeviceSN, null, 2)} `)
+    return generationByDeviceSN
+  }
+
+  /**
+   * Get current power (kW) for all device SNs in a single POST /op/v1/device/real/query call.
+   * Returns map of deviceSN -> currentPowerKw (value from generationPower, in kW).
+   */
+  private async getDeviceIdToCurrentPowerKw(
+    deviceSns: string[]
+  ): Promise<Map<string, number>> {
+    const map = new Map<string, number>()
+    if (deviceSns.length === 0) return map
+    try {
+      const result = (await this.foxPost("/op/v1/device/real/query", {
+        sns: deviceSns,
+        variables: ["generationPower"],
+      })) as FoxRealQueryResult | FoxRealQueryResultItem[]
+      if (Array.isArray(result)) {
+        for (const item of result as FoxRealQueryResultItem[]) {
+          const sn = item.deviceSN
+          const datas = item.datas ?? []
+          const genPower = datas.find((d) => d.variable === "generationPower")
+          const val = genPower?.value ?? genPower?.data ?? 0
+          const kw = genPower?.unit === "kW" ? Number(val) : Number(val) / 1000
+          map.set(sn, kw)
+        }
+      } else {
+        for (const [sn, arr] of Object.entries(result ?? {})) {
+          if (!Array.isArray(arr)) continue
+          const genPower = arr.find((d) => d.variable === "generationPower")
+          const val = genPower?.value ?? genPower?.data ?? 0
+          const kw = genPower?.unit === "kW" ? Number(val) : Number(val) / 1000
+          map.set(sn, kw)
+        }
+      }
+    } catch (e) {
+      logger.warn("[FoxESS] getDeviceIdToCurrentPowerKw real/query failed:", e)
+    }
+    logger.info(`[FoxESS] Successfully fetched deviceIdToCurrentPowerKw :  ${JSON.stringify(map, null, 2)} `)
+    return map
+  }
+
+  /**
+   * Get yearly energy (kWh) for all device SNs via POST /op/v0/device/report/query per device (dimension "year").
+   * Response result can be array of { variable, values } (sum values = yearly kWh) or { data: [{ index, value }] }.
+   * Returns map of deviceSN -> yearlyKwh.
+   */
+  private async getDeviceIdToYearlyEnergyKwh(
+    deviceSns: string[],
+    year: number
+  ): Promise<Map<string, number>> {
+    const map = new Map<string, number>()
+    for (let i = 0; i < deviceSns.length; i++) {
+      const sn = deviceSns[i]
+      try {
+        const result = (await this.foxPost("/op/v0/device/report/query", {
+          sn,
+          year,
+          dimension: "year",
+          variables: ["generation"],
+        })) as FoxReportResult | FoxReportYearResultItem[]
+        let yearlyKwh = 0
+        if (Array.isArray(result)) {
+          const item = (result as FoxReportYearResultItem[]).find(
+            (r) => r.variable === "generation"
+          )
+          const values = item?.values ?? []
+          yearlyKwh = values.reduce((sum, v) => sum + (Number(v) || 0), 0)
+        } else {
+          const data = (result as FoxReportResult)?.data ?? []
+          yearlyKwh = data.reduce((sum, d) => sum + (d.value ?? 0), 0)
+        }
+        map.set(sn, yearlyKwh)
+      } catch (e) {
+        logger.warn(`[FoxESS] getDeviceIdToYearlyEnergyKwh device ${sn}:`, e)
+      }
+      if (i < deviceSns.length - 1) {
+        await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
+      }
+    }
+    logger.info(`[FoxESS] Successfully fetched deviceIdToYearlyEnergyKwh :  ${JSON.stringify(map, null, 2)} `)
+    return map
+  }
+
+  async listPlants(): Promise<Plant[]> {
+    const baseUrl = this.getApiBaseUrl()
+    logger.info("[FoxESS] Fetching plants from:", `${baseUrl}/op/v0/plant/list`)
+
+    const plants: Plant[] = []
+    const allStations = await this.fetchAllStations()
+
+    const vendorPlantIdToDevices = await this.getPlantToDevicesMap()
+    const vendorPlantIdToDetail = await this.fetchPlantDetailsMap(allStations)
+
+    const deviceSns = [...vendorPlantIdToDevices.values()]
+      .map((d) => d.deviceSN)
+      .filter((sn): sn is string => Boolean(sn))
+    logger.info(`[FoxESS] Successfully fetched deviceSns :  ${JSON.stringify(deviceSns, null, 2)} `)
+
+
+    const generationByDeviceSN =
+      await this.getDeviceIdToDailyMonthlyAndTotalEnergy(deviceSns)
+
+    const deviceIdToCurrentPowerKw =
+      await this.getDeviceIdToCurrentPowerKw(deviceSns)
+
+    const currentYear = new Date().getFullYear()
+    const deviceIdToYearlyEnergyKwh =
+      await this.getDeviceIdToYearlyEnergyKwh(deviceSns, currentYear)
 
     for (let idx = 0; idx < allStations.length; idx++) {
       const station = allStations[idx]
-      const detail = await this.getPlantDetail(station.stationID)
-      if (idx > 0) {
-        await new Promise((r) => setTimeout(r, 200))
-      }
-
-      const device = plantToDevices.get(station.stationID)
-      const deviceSNs = device ? [device.deviceSN] : []
+      const detail = vendorPlantIdToDetail.get(station.stationID) ?? null
+      const device = vendorPlantIdToDevices.get(station.stationID)
       const deviceStatus = device?.status
-      const generationByDevice: FoxGenerationResult[] = []
-
-      for (let i = 0; i < deviceSNs.length; i += BATCH_SIZE) {
-        const batch = deviceSNs.slice(i, i + BATCH_SIZE)
-        const settled = await Promise.allSettled(
-          batch.map((sn) =>
-            this.foxGet(`/op/v0/device/generation?sn=${encodeURIComponent(sn)}`)
-          )
-        )
-        for (const s of settled) {
-          if (s.status === "fulfilled" && s.value) {
-            generationByDevice.push(s.value as FoxGenerationResult)
-          }
-        }
-        if (i + BATCH_SIZE < deviceSNs.length) {
-          await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
-        }
-      }
+      const currentPowerKw =
+        device != null
+          ? (deviceIdToCurrentPowerKw.get(device.deviceSN) ?? null)
+          : null
+      const generationByDevice = generationByDeviceSN.get(device?.deviceSN ?? "") ?? null
 
       logger.info(`[FoxESS] Successfully fetched generationByDevice :  ${generationByDevice} `)
-      
-      const dailyKwh =
-        generationByDevice.reduce((sum, g) => sum + (g.today ?? 0), 0)
-      const monthlyKwh =
-        generationByDevice.reduce((sum, g) => sum + (g.month ?? 0), 0)
-      const yearlyKwh =
-        generationByDevice.reduce((sum, g) => sum + (g.year ?? 0), 0)
-      const totalKwh =
-        generationByDevice.reduce((sum, g) => sum + (g.cumulate ?? 0), 0)
+
+      const dailyKwh = generationByDevice?.today ?? 0;
+      const monthlyKwh = generationByDevice?.month ?? 0;
+      const yearlyKwh = deviceIdToYearlyEnergyKwh.get(device?.deviceSN ?? "") ?? 0;
+      const totalKwh = generationByDevice?.cumulative ?? 0;
 
       const addressParts = [
         detail?.address,
@@ -518,13 +660,14 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
               }
             : undefined,
         metadata: {
-          currentPowerKw: null,
+          currentPowerKw,
           dailyEnergyKwh: dailyKwh,
           monthlyEnergyMwh: monthlyKwh / 1000,
           yearlyEnergyMwh: yearlyKwh / 1000,
           totalEnergyMwh: totalKwh / 1000,
           networkStatus: deviceStatus != null ? mapFoxStatus(deviceStatus) : null,
-          lastUpdateTime: null,
+          lastUpdateTime:
+            deviceStatus === 1 ? new Date().toISOString() : null,
           vendorCreatedDate: parseFoxCreateDate(detail?.createDate) ?? null,
           startOperatingTime: parseFoxCreateDate(detail?.createDate) ?? null,
           timezone: detail?.timezone ?? station.ianaTimezone ?? null
@@ -537,27 +680,20 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
   }
 
   async listPlant(vendorPlantId: string): Promise<Plant | null> {
-    const deviceSNs = await this.getDeviceSNsForPlant(vendorPlantId)
-    if (deviceSNs.length === 0) {
-      return null
-    }
-
     const detail = await this.getPlantDetail(vendorPlantId)
+    const deviceSNsFromModules = (detail?.modules?.map((m) => m.deviceSN).filter(Boolean) ?? []) as string[]
+    const deviceSNs =
+      deviceSNsFromModules.length > 0
+        ? deviceSNsFromModules
+        : await this.getDeviceSNsForPlant(vendorPlantId)
+    if (deviceSNs.length === 0) return null
+
+    const generationByDeviceSN = await this.getDeviceIdToDailyMonthlyAndTotalEnergy(deviceSNs)
+    const generationByDevice = deviceSNs
+      .map((sn) => generationByDeviceSN.get(sn))
+      .filter((g): g is FoxGenerationResult => g != null)
 
     let currentPowerKw: number | null = null
-    const generationByDevice: FoxGenerationResult[] = []
-
-    for (const sn of deviceSNs) {
-      try {
-        const gen = (await this.foxGet(
-          `/op/v0/device/generation?sn=${encodeURIComponent(sn)}`
-        )) as FoxGenerationResult
-        generationByDevice.push(gen)
-      } catch {
-        // skip device
-      }
-    }
-
     try {
       const realResult = (await this.foxPost("/op/v1/device/real/query", {
         sns: deviceSNs,
@@ -583,9 +719,12 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     const monthlyKwh =
       generationByDevice.reduce((sum, g) => sum + (g.month ?? 0), 0)
     const yearlyKwh =
-      generationByDevice.reduce((sum, g) => sum + (g.year ?? 0), 0)
+      generationByDevice.reduce((sum, g) => sum + ((g as { year?: number }).year ?? 0), 0)
     const totalKwh =
-      generationByDevice.reduce((sum, g) => sum + (g.cumulate ?? 0), 0)
+      generationByDevice.reduce(
+        (sum, g) => sum + (g.cumulative ?? 0),
+        0
+      )
 
     const addressParts = [
       detail?.address,
@@ -882,7 +1021,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
         const gen = (await this.foxGet(
           `/op/v0/device/generation?sn=${encodeURIComponent(sn)}`
         )) as FoxGenerationResult
-        totalCumulateKwh += gen.cumulate ?? 0
+        totalCumulateKwh += gen.cumulative ?? 0
       } catch {
         // skip
       }
