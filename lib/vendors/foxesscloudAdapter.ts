@@ -21,23 +21,33 @@ interface FoxApiResponse<T = unknown> {
   result?: T
 }
 
-interface FoxPlantItem {
+/** Minimal plant from POST /op/v0/plant/list (list does not include capacity, address, etc.) */
+interface FoxPlantListItem {
   stationID: string
   name: string
-  capacity?: number
-  address?: string
-  lat?: number
-  lon?: number
-  timezone?: string
-  status?: number
-  createTime?: number
+  ianaTimezone?: string
 }
 
 interface FoxPlantListResult {
   currentPage: number
   pageSize: number
   total: number
-  data: FoxPlantItem[]
+  data: FoxPlantListItem[]
+}
+
+/** Full plant from GET /op/v0/plant/detail?id={stationID} (used for capacity, address, createDate, modules) */
+interface FoxPlantDetailResult {
+  stationName?: string
+  country?: string
+  address?: string
+  city?: string
+  timezone?: string
+  postcode?: string
+  capacity?: number
+  createDate?: string
+  modules?: Array<{ moduleSN?: string; deviceSN?: string }>
+  installer?: { name?: string; email?: string; phone?: string }
+  user?: { name?: string; email?: string; phone?: string }
 }
 
 interface FoxDeviceItem {
@@ -120,6 +130,19 @@ function mapFoxAlertSeverity(
     default:
       return "MEDIUM"
   }
+}
+
+/** Parse FoxESS createDate e.g. "2025-04-12 17:46:42 IST+0530" to ISO string */
+function parseFoxCreateDate(createDate: string | undefined): string | null {
+  if (!createDate || typeof createDate !== "string") return null
+  try {
+    const normalized = createDate.replace(/\s+IST[^\s]*$/, "").trim().replace(" ", "T")
+    const date = new Date(normalized)
+    if (!isNaN(date.getTime())) return date.toISOString()
+  } catch {
+    // ignore
+  }
+  return null
 }
 
 export class FoxesscloudAdapter extends BaseVendorAdapter {
@@ -324,10 +347,10 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
   }
 
   /**
-   * Build stationID -> deviceSN[] by fetching all devices (paginated).
+   * Build stationID -> single FoxDeviceItem (one-to-one: one plant has one device).
    */
-  private async getPlantToDevicesMap(): Promise<Map<string, string[]>> {
-    const map = new Map<string, string[]>()
+  private async getPlantToDevicesMap(): Promise<Map<string, FoxDeviceItem>> {
+    const map = new Map<string, FoxDeviceItem>()
     let page = 1
     const pageSize = 20
     let hasMore = true
@@ -339,9 +362,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       const list = result?.data ?? []
       for (const d of list) {
         if (d.plantID && d.deviceSN) {
-          const arr = map.get(d.plantID) ?? []
-          arr.push(d.deviceSN)
-          map.set(d.plantID, arr)
+          map.set(d.plantID, d)
         }
       }
       const total = result?.total ?? 0
@@ -354,6 +375,20 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     return map
   }
 
+  /**
+   * Fetch full plant details (capacity, address, createDate, modules). List API only returns stationID, name, ianaTimezone.
+   */
+  private async getPlantDetail(stationID: string): Promise<FoxPlantDetailResult | null> {
+    try {
+      const path = `/op/v0/plant/detail?id=${encodeURIComponent(stationID)}`
+      const result = (await this.foxGet(path)) as FoxPlantDetailResult | undefined
+      return result ?? null
+    } catch (e) {
+      logger.warn(`[FoxESS] getPlantDetail failed for ${stationID}:`, e)
+      return null
+    }
+  }
+
   async listPlants(): Promise<Plant[]> {
     const baseUrl = this.getApiBaseUrl()
     logger.info("[FoxESS] Fetching plants from:", `${baseUrl}/op/v0/plant/list`)
@@ -362,7 +397,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     let page = 1
     const pageSize = 100
     let hasMore = true
-    const allStations: FoxPlantItem[] = []
+    const allStations: FoxPlantListItem[] = []
 
     while (hasMore) {
       const result = (await this.loggedFoxPost(
@@ -383,10 +418,21 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       }
     }
 
-    const plantToDevices = await this.getPlantToDevicesMap()
+    logger.info(`[FoxESS] Successfully fetched plants :  ${allStations} `)
 
-    for (const station of allStations) {
-      const deviceSNs = plantToDevices.get(station.stationID) ?? []
+    const plantToDevices = await this.getPlantToDevicesMap()
+    logger.info(`[FoxESS] Successfully fetched plantToDevices :  ${plantToDevices} `)
+
+    for (let idx = 0; idx < allStations.length; idx++) {
+      const station = allStations[idx]
+      const detail = await this.getPlantDetail(station.stationID)
+      if (idx > 0) {
+        await new Promise((r) => setTimeout(r, 200))
+      }
+
+      const device = plantToDevices.get(station.stationID)
+      const deviceSNs = device ? [device.deviceSN] : []
+      const deviceStatus = device?.status
       const generationByDevice: FoxGenerationResult[] = []
 
       for (let i = 0; i < deviceSNs.length; i += BATCH_SIZE) {
@@ -406,6 +452,8 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
         }
       }
 
+      logger.info(`[FoxESS] Successfully fetched generationByDevice :  ${generationByDevice} `)
+      
       const dailyKwh =
         generationByDevice.reduce((sum, g) => sum + (g.today ?? 0), 0)
       const monthlyKwh =
@@ -415,30 +463,33 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       const totalKwh =
         generationByDevice.reduce((sum, g) => sum + (g.cumulate ?? 0), 0)
 
+      const addressParts = [
+        detail?.address,
+        detail?.city,
+        detail?.postcode,
+        detail?.country,
+      ].filter(Boolean) as string[]
+      const address = addressParts.length > 0 ? addressParts.join(", ") : undefined
+
       plants.push({
         id: station.stationID,
-        name: station.name ?? "",
-        capacityKw: station.capacity ?? 0,
-        location: {
-          lat: station.lat ?? undefined,
-          lng: station.lon ?? undefined,
-          address: station.address ?? undefined,
-        },
+        name: detail?.stationName ?? station.name ?? "",
+        capacityKw: detail?.capacity ?? 0,
+        location: address
+          ? { address, lat: undefined, lng: undefined }
+          : undefined,
         metadata: {
           currentPowerKw: null,
           dailyEnergyKwh: dailyKwh,
           monthlyEnergyMwh: monthlyKwh / 1000,
           yearlyEnergyMwh: yearlyKwh / 1000,
           totalEnergyMwh: totalKwh / 1000,
-          networkStatus: mapFoxStatus(station.status ?? 0),
+          networkStatus: deviceStatus != null ? mapFoxStatus(deviceStatus) : null,
           lastUpdateTime: null,
-          vendorCreatedDate: station.createTime
-            ? new Date(station.createTime * 1000).toISOString()
-            : null,
-          startOperatingTime: station.createTime
-            ? new Date(station.createTime * 1000).toISOString()
-            : null,
-          timezone: station.timezone ?? null,
+          vendorCreatedDate: parseFoxCreateDate(detail?.createDate) ?? null,
+          startOperatingTime: parseFoxCreateDate(detail?.createDate) ?? null,
+          timezone: detail?.timezone ?? station.ianaTimezone ?? null,
+          modules: detail?.modules ?? undefined,
         },
       })
     }
@@ -452,6 +503,8 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     if (deviceSNs.length === 0) {
       return null
     }
+
+    const detail = await this.getPlantDetail(vendorPlantId)
 
     let currentPowerKw: number | null = null
     const generationByDevice: FoxGenerationResult[] = []
@@ -496,46 +549,33 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     const totalKwh =
       generationByDevice.reduce((sum, g) => sum + (g.cumulate ?? 0), 0)
 
-    let station: FoxPlantItem | undefined
-    let page = 1
-    const pageSize = 100
-    while (true) {
-      const stationRes = (await this.foxPost("/op/v0/plant/list", {
-        currentPage: page,
-        pageSize,
-      })) as FoxPlantListResult
-      const list = stationRes?.data ?? []
-      station = list.find((s) => s.stationID === vendorPlantId)
-      if (station || list.length < pageSize) break
-      page++
-    }
+    const addressParts = [
+      detail?.address,
+      detail?.city,
+      detail?.postcode,
+      detail?.country,
+    ].filter(Boolean) as string[]
+    const address = addressParts.length > 0 ? addressParts.join(", ") : undefined
 
     return {
       id: vendorPlantId,
-      name: station?.name ?? "",
-      capacityKw: station?.capacity ?? 0,
-      location: {
-        lat: station?.lat ?? undefined,
-        lng: station?.lon ?? undefined,
-        address: station?.address ?? undefined,
-      },
+      name: detail?.stationName ?? `Plant ${vendorPlantId}`,
+      capacityKw: detail?.capacity ?? 0,
+      location: address
+        ? { address, lat: undefined, lng: undefined }
+        : undefined,
       metadata: {
         currentPowerKw,
         dailyEnergyKwh: dailyKwh,
         monthlyEnergyMwh: monthlyKwh / 1000,
         yearlyEnergyMwh: yearlyKwh / 1000,
         totalEnergyMwh: totalKwh / 1000,
-        networkStatus: station
-          ? mapFoxStatus(station.status ?? 0)
-          : "NORMAL",
+        networkStatus: null,
         lastUpdateTime: null,
-        vendorCreatedDate: station?.createTime
-          ? new Date(station.createTime * 1000).toISOString()
-          : null,
-        startOperatingTime: station?.createTime
-          ? new Date(station.createTime * 1000).toISOString()
-          : null,
-        timezone: station?.timezone ?? null,
+        vendorCreatedDate: parseFoxCreateDate(detail?.createDate) ?? null,
+        startOperatingTime: parseFoxCreateDate(detail?.createDate) ?? null,
+        timezone: detail?.timezone ?? null,
+        modules: detail?.modules ?? undefined,
       },
     }
   }

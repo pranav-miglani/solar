@@ -8,8 +8,9 @@ This document explains what data is stored in the database for FoxESS Cloud (FOX
 
 ```
 FoxESS Open API
-  POST /op/v0/plant/list     → stations
-  POST /op/v0/device/list    → deviceSN[] per plant
+  POST /op/v0/plant/list        → minimal list (stationID, name, ianaTimezone only)
+  GET  /op/v0/plant/detail?id=  → per-plant detail (capacity, address, createDate, modules)
+  POST /op/v0/device/list       → deviceSN[] per plant
   GET  /op/v0/device/generation?sn=...  → today, month, year, cumulate (per device)
     ↓
 FoxesscloudAdapter.listPlants() / listPlant()
@@ -18,6 +19,8 @@ sync-plants API route / live telemetry sync
     ↓
 Database (plants table)
 ```
+
+The **plant list** API does not return capacity, address, or createDate. The adapter calls **plant/detail** per `stationID` to get those fields (and `modules`). Telemetry (daily/monthly/yearly/current power) still comes from device/generation and device/real/query.
 
 ---
 
@@ -32,37 +35,115 @@ FoxESS does **not** use a login/token flow. It uses a **static API key + per-req
 
 ---
 
-## 2. FoxESS API Response Structures
+## 2. API Endpoints
 
-### Plant list — POST /op/v0/plant/list
+Each endpoint is documented with **Request** (params + body) then **Response**. POST requests use `Content-Type: application/json`.
+
+---
+
+### 2.1 Plant list — POST /op/v0/plant/list
+
+**Request**
+
+| Where | Name | Type | Required | Description |
+|-------|------|------|----------|-------------|
+| Body | `currentPage` | number | Yes | 1-based page index |
+| Body | `pageSize` | number | Yes | Page size (adapter uses 100) |
+
+```json
+{
+  "currentPage": 1,
+  "pageSize": 100
+}
+```
+
+**Response** (minimal — list does not include capacity, address, or createTime)
 
 ```json
 {
   "errno": 0,
+  "msg": "Operation successful",
   "result": {
-    "currentPage": 1,
-    "pageSize": 100,
-    "total": 5,
+    "total": 2,
     "data": [
       {
-        "stationID": "abc123",
-        "name": "My Solar Plant",
-        "capacity": 10.5,
-        "address": "123 Solar St",
-        "lat": 28.6139,
-        "lon": 77.2090,
-        "timezone": "Asia/Kolkata",
-        "status": 1,
-        "createTime": 1609459200
+        "name": "3500-24-2082-0-3",
+        "ianaTimezone": "Asia/Calcutta",
+        "stationID": "83180474-a329-4629-9ea2-fb82fee3e95b"
+      },
+      {
+        "name": "3500-24-2071-0-3",
+        "ianaTimezone": "Asia/Calcutta",
+        "stationID": "00c1020a-4a9a-4edc-b075-308eb0fa7586"
       }
-    ]
+    ],
+    "pageSize": 100,
+    "currentPage": 1
   }
 }
 ```
 
-Success: `errno === 0`. Pagination: `currentPage`, `pageSize`, `total`.
+Success: `errno === 0`. Pagination: `currentPage`, `pageSize`, `total`. Use **plant/detail** per `stationID` for capacity, address, createDate, modules.
 
-### Device list — POST /op/v0/device/list
+---
+
+### 2.2 Plant detail — GET /op/v0/plant/detail
+
+Used per plant to get full info (list does not provide these). Does **not** provide telemetry.
+
+**Request**
+
+| Where | Name | Type | Required | Description |
+|-------|------|------|----------|-------------|
+| Query | `id` | string | Yes | Plant/station ID (stationID from list) |
+
+Example: `GET /op/v0/plant/detail?id=00c1020a-4a9a-4edc-b075-308eb0fa7586`
+
+**Response**
+
+```json
+{
+  "errno": 0,
+  "msg": "Operation successful",
+  "result": {
+    "country": "IN",
+    "address": "Chandigarh ",
+    "installer": { "phone": "", "name": "solaryaan ltd", "email": "solaryaan ltd" },
+    "city": "Chandigarh ",
+    "timezone": "Asia/Calcutta",
+    "postcode": "160023",
+    "stationName": "3500-24-2071-0-3",
+    "user": { "phone": "", "name": "", "email": "document@mechatroniksolar.com" },
+    "modules": [
+      { "moduleSN": "709G3E9F53EB220", "deviceSN": "SYS1191161C3141" }
+    ],
+    "capacity": 3.0,
+    "createDate": "2025-04-12 17:46:42 IST+0530"
+  }
+}
+```
+
+Mapping: `capacity` → capacity_kw; `stationName` → name; `address` (and city, postcode, country) → location (JSONB); `createDate` → vendor_created_date, start_operating_time; `result.modules` → metadata.modules.
+
+---
+
+### 2.3 Device list — POST /op/v0/device/list
+
+**Request**
+
+| Where | Name | Type | Required | Description |
+|-------|------|------|----------|-------------|
+| Body | `currentPage` | number | Yes | 1-based page index |
+| Body | `pageSize` | number | Yes | Page size (adapter uses 20) |
+
+```json
+{
+  "currentPage": 1,
+  "pageSize": 20
+}
+```
+
+**Response**
 
 ```json
 {
@@ -82,7 +163,19 @@ Success: `errno === 0`. Pagination: `currentPage`, `pageSize`, `total`.
 
 Used to build `stationID → deviceSN[]`. One plant can have multiple inverters.
 
-### Device generation — GET /op/v0/device/generation?sn={deviceSN}
+---
+
+### 2.4 Device generation — GET /op/v0/device/generation
+
+**Request**
+
+| Where | Name | Type | Required | Description |
+|-------|------|------|----------|-------------|
+| Query | `sn` | string | Yes | Device serial number |
+
+Example: `GET /op/v0/device/generation?sn=XYZ001`
+
+**Response**
 
 ```json
 {
@@ -96,7 +189,127 @@ Used to build `stationID → deviceSN[]`. One plant can have multiple inverters.
 }
 ```
 
-All values in **kWh** except when stored as MWh (see unit table below).
+All values in **kWh** (converted to MWh where stored; see unit table later).
+
+---
+
+### 2.5 Real-time power — POST /op/v1/device/real/query
+
+**Request**
+
+| Where | Name | Type | Required | Description |
+|-------|------|------|----------|-------------|
+| Body | `sns` | string[] | Yes | Array of device serial numbers |
+| Body | `variables` | string[] | Yes | e.g. `["generationPower"]` |
+
+```json
+{
+  "sns": ["XYZ001", "XYZ002"],
+  "variables": ["generationPower"]
+}
+```
+
+**Response**
+
+Result keyed by device SN; each entry has `variable` and `value` (or `data`). Power in **W**; adapter converts to kW.
+
+---
+
+### 2.6 Daily history — POST /op/v0/device/history/query
+
+**Request**
+
+| Where | Name | Type | Required | Description |
+|-------|------|------|----------|-------------|
+| Body | `sn` | string | Yes | Device serial number |
+| Body | `variables` | string[] | Yes | e.g. `["generationPower"]` |
+| Body | `begin` | number | Yes | Start of day in UTC milliseconds |
+| Body | `end` | number | Yes | End of day in UTC milliseconds |
+
+```json
+{
+  "sn": "XYZ001",
+  "variables": ["generationPower"],
+  "begin": 1609459200000,
+  "end": 1609545599999
+}
+```
+
+**Response**
+
+`result.datas[]` with `variable` and `data: Array<[epochMs, powerW]>`. 5-minute intervals. Adapter aggregates multiple devices per plant and converts power W → kW where needed.
+
+---
+
+### 2.7 Monthly report — POST /op/v0/device/report/query
+
+**Request**
+
+| Where | Name | Type | Required | Description |
+|-------|------|------|----------|-------------|
+| Body | `sn` | string | Yes | Device serial number |
+| Body | `year` | number | Yes | Year (e.g. 2025) |
+| Body | `month` | number | Yes | Month 1–12 |
+| Body | `dimension` | string | Yes | `"month"` for daily values in month |
+| Body | `variables` | string[] | Yes | e.g. `["generation"]` |
+
+```json
+{
+  "sn": "XYZ001",
+  "year": 2025,
+  "month": 6,
+  "dimension": "month",
+  "variables": ["generation"]
+}
+```
+
+**Response**
+
+`result.data[]` with `index` (day 1–31) and `value` (daily kWh). Adapter sums per day across devices and stores as MWh in records.
+
+---
+
+### 2.8 Yearly report — POST /op/v0/device/report/query
+
+**Request**
+
+| Where | Name | Type | Required | Description |
+|-------|------|------|----------|-------------|
+| Body | `sn` | string | Yes | Device serial number |
+| Body | `year` | number | Yes | Year (e.g. 2025) |
+| Body | `dimension` | string | Yes | `"year"` for monthly values in year |
+| Body | `variables` | string[] | Yes | e.g. `["generation"]` |
+
+No `month` in body.
+
+```json
+{
+  "sn": "XYZ001",
+  "year": 2025,
+  "dimension": "year",
+  "variables": ["generation"]
+}
+```
+
+**Response**
+
+`result.data[]` with `index` (month 1–12) and `value` (monthly kWh). Adapter sums per month across devices and stores as MWh in records.
+
+---
+
+### 2.9 Device errors (alerts) — GET /op/v0/device/error/query
+
+**Request**
+
+| Where | Name | Type | Required | Description |
+|-------|------|------|----------|-------------|
+| Query | `sn` | string | Yes | Device serial number |
+
+Example: `GET /op/v0/device/error/query?sn=XYZ001`
+
+**Response**
+
+Array of error items: `id`, `errorCode`, `errorName`, `deviceSN`, `level` (0=LOW, 1=MEDIUM, 2=HIGH, 3=CRITICAL), `startTime`, `endTime` (Unix seconds). Adapter normalizes to `vendorAlertId`, `title`, `description`, `severity`.
 
 ---
 
@@ -104,31 +317,24 @@ All values in **kWh** except when stored as MWh (see unit table below).
 
 ### Plant (listPlants / listPlant)
 
-| FoxESS Field | Adapter Processing | Plant Object Field |
-|--------------|-------------------|-------------------|
-| `station.stationID` | Direct | `id` |
-| `station.name` | Direct | `name` |
-| `station.capacity` | Direct (already kW) | `capacityKw` |
-| `station.lat` | Combined | `location.lat` |
-| `station.lon` | **Note: FoxESS uses "lon"** | `location.lng` |
-| `station.address` | Combined | `location.address` |
-| Aggregated device `today` | Sum across devices | `metadata.dailyEnergyKwh` (kWh) |
-| Aggregated device `month` | Sum ÷ 1000 | `metadata.monthlyEnergyMwh` |
-| Aggregated device `year` | Sum ÷ 1000 | `metadata.yearlyEnergyMwh` |
-| Aggregated device `cumulate` | Sum ÷ 1000 | `metadata.totalEnergyMwh` |
-| Real-time `generationPower` | POST /op/v1/device/real/query, W → kW | `metadata.currentPowerKw` |
-| `station.status` | mapFoxStatus(1=NORMAL, 2=ALL_OFFLINE, 3=PARTIAL_OFFLINE) | `metadata.networkStatus` |
-| `station.createTime` | Unix (sec) → ISO | `metadata.vendorCreatedDate`, `metadata.startOperatingTime` |
-| `station.timezone` | Direct | `metadata.timezone` |
+Flow: **list** (minimal) → **detail** per stationID → device/list + device/generation (and real/query for current power) for telemetry.
 
-### Network status mapping
+| Source | FoxESS Field | Adapter Processing | Plant Object Field |
+|--------|--------------|-------------------|-------------------|
+| List | `station.stationID` | Direct | `id` (plantId) |
+| List | `station.name` | Fallback if detail missing | `name` |
+| Detail | `result.stationName` | Direct | `name` |
+| Detail | `result.capacity` | Direct (kW) | `capacityKw` |
+| Detail | `result.address`, `city`, `postcode`, `country` | Joined into one string | `location.address` |
+| Detail | (no lat/lon in detail) | — | `location.lat` / `lng` undefined |
+| Detail | `result.createDate` | Parsed (e.g. "2025-04-12 17:46:42 IST+0530" → ISO) | `metadata.vendorCreatedDate`, `metadata.startOperatingTime` |
+| Detail | `result.timezone` or list `ianaTimezone` | Direct | `metadata.timezone` |
+| Detail | `result.modules` | Direct | `metadata.modules` |
+| Devices | Aggregated device `today` | Sum across devices | `metadata.dailyEnergyKwh` (kWh) |
+| Devices | Aggregated device `month` / `year` / `cumulate` | Sum ÷ 1000 | `metadata.monthlyEnergyMwh` etc. |
+| Devices | Real-time `generationPower` | POST /op/v1/device/real/query, W → kW | `metadata.currentPowerKw` |
 
-| FoxESS status | metadata.networkStatus |
-|---------------|------------------------|
-| 1 | NORMAL |
-| 2 | ALL_OFFLINE |
-| 3 | PARTIAL_OFFLINE |
-| default | ALL_OFFLINE |
+List response only has `stationID`, `name`, `ianaTimezone`. All other plant fields (capacity, location, createDate, modules) come from **GET /op/v0/plant/detail?id={stationID}**. Telemetry still from device/generation and device/real/query.
 
 ---
 
