@@ -154,7 +154,7 @@ export async function GET(
 
         const vendorPlantId = plant.vendor_plant_id.toString()
         const vendorPlantIdNum = parseInt(plant.vendor_plant_id)
-        const startYearNum = startYear ? parseInt(startYear) : 2000 // Default start year
+        const startYearNum = startYear ? parseInt(startYear) : vendor.vendor_type === "FOXESSCLOUD" ? 2025 : 2000 // Default start year
         const endYearNum = endYear ? parseInt(endYear) : new Date().getFullYear() // Default to current year
 
         if (isNaN(startYearNum) || isNaN(endYearNum)) {

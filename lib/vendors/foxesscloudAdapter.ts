@@ -1195,7 +1195,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
   }
 
   async getAlerts(plantId: string): Promise<Alert[]> {
-    const deviceSNs = await this.getDeviceSNsForPlant(plantId)
+    const deviceSNs = (await this.getPlantDetail(plantId).then((detail) => detail?.modules?.map((m) => m.deviceSN) ?? [])).filter((s): s is string => Boolean(s))
     const alerts: Alert[] = []
     for (let i = 0; i < deviceSNs.length; i++) {
       const sn = deviceSNs[i]
