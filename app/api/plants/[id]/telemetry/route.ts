@@ -165,7 +165,7 @@ export async function GET(
         if (typeof (adapter as any).getTotalTelemetryRecords === "function") {
           // For Solarman: use numeric ID, for SolarDM/ShineMonitor/PVBlink: use string ID
           const totalData = await (adapter as any).getTotalTelemetryRecords(
-            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" || vendor.vendor_type === "PVBLINK"
+            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" || vendor.vendor_type === "PVBLINK" || vendor.vendor_type === "FOXESSCLOUD"
               ? vendorPlantId 
               : vendorPlantIdNum,
             startYearNum,
@@ -261,7 +261,7 @@ export async function GET(
         if (typeof (adapter as any).getYearlyTelemetryRecords === "function") {
           // For Solarman: use numeric ID, for SolarDM/ShineMonitor/PVBlink: use string ID
           const yearlyData = await (adapter as any).getYearlyTelemetryRecords(
-            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" || vendor.vendor_type === "PVBLINK"
+            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" || vendor.vendor_type === "PVBLINK" || vendor.vendor_type === "FOXESSCLOUD"
               ? vendorPlantId 
               : vendorPlantIdNum,
             yearNum
@@ -356,7 +356,7 @@ export async function GET(
         if (typeof (adapter as any).getMonthlyTelemetryRecords === "function") {
           // For Solarman: use numeric ID, for SolarDM/ShineMonitor/PVBlink: use string ID
           const monthlyData = await (adapter as any).getMonthlyTelemetryRecords(
-            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" || vendor.vendor_type === "PVBLINK"
+            vendor.vendor_type === "SOLARDM" || vendor.vendor_type === "SHINEMONITOR" || vendor.vendor_type === "PVBLINK" || vendor.vendor_type === "FOXESSCLOUD"
               ? vendorPlantId 
               : vendorPlantIdNum,
             yearNum,
