@@ -146,9 +146,9 @@ function mapFoxStatus(status: number): string {
     case 1:
       return "NORMAL"
     case 2:
-      return "ALL_OFFLINE"
-    case 3:
       return "PARTIAL_OFFLINE"
+    case 3:
+      return "ALL_OFFLINE"
     default:
       return "ALL_OFFLINE"
   }
@@ -684,7 +684,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
           : null
       const generationByDevice = generationByDeviceSN.get(device?.deviceSN ?? "") ?? null
 
-      logger.info(`[FoxESS] Successfully fetched generationByDevice :  ${generationByDevice} `)
+      logger.info(`[FoxESS] Successfully fetched generationByDevice :  ${JSON.stringify(generationByDevice, null, 2)} `)
 
       const dailyKwh = generationByDevice?.today ?? 0;
       const monthlyKwh = generationByDevice?.month ?? 0;
