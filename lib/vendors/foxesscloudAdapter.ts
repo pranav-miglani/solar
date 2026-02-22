@@ -12,6 +12,8 @@ import { logger } from "@/lib/context/logger"
 
 const BATCH_SIZE = 10
 const BATCH_DELAY_MS = 1100
+/** Max device SNs per real/query request body */
+const REAL_QUERY_MAX_SNS = 45
 /** FoxESS rate-limit errno: "Too many requests, please retry later" */
 const FOX_ERRNO_RATE_LIMIT = 40400
 const RATE_LIMIT_RETRY_DELAY_MS = 5000
@@ -550,8 +552,34 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     return generationByDeviceSN
   }
 
+  /** Parse real/query result into map of deviceSN -> currentPowerKw. */
+  private parseRealQueryResult(
+    result: FoxRealQueryResult | FoxRealQueryResultItem[],
+    map: Map<string, number>
+  ): void {
+    if (Array.isArray(result)) {
+      for (const item of result as FoxRealQueryResultItem[]) {
+        const sn = item.deviceSN
+        const datas = item.datas ?? []
+        const genPower = datas.find((d) => d.variable === "generationPower")
+        const val = genPower?.value ?? genPower?.data ?? 0
+        const kw = genPower?.unit === "kW" ? Number(val) : Number(val) / 1000
+        map.set(sn, kw)
+      }
+    } else {
+      for (const [sn, arr] of Object.entries(result ?? {})) {
+        if (!Array.isArray(arr)) continue
+        const genPower = arr.find((d) => d.variable === "generationPower")
+        const val = genPower?.value ?? genPower?.data ?? 0
+        const kw = genPower?.unit === "kW" ? Number(val) : Number(val) / 1000
+        map.set(sn, kw)
+      }
+    }
+  }
+
   /**
-   * Get current power (kW) for all device SNs in a single POST /op/v1/device/real/query call.
+   * Get current power (kW) for all device SNs via POST /op/v1/device/real/query.
+   * Request body accepts max 45 SNs per call; splits into multiple calls and merges results.
    * Returns map of deviceSN -> currentPowerKw (value from generationPower, in kW).
    */
   private async getDeviceIdToCurrentPowerKw(
@@ -559,33 +587,21 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
   ): Promise<Map<string, number>> {
     const map = new Map<string, number>()
     if (deviceSns.length === 0) return map
-    try {
-      const result = (await this.foxPost("/op/v1/device/real/query", {
-        sns: deviceSns,
-        variables: ["generationPower"],
-      })) as FoxRealQueryResult | FoxRealQueryResultItem[]
-      if (Array.isArray(result)) {
-        for (const item of result as FoxRealQueryResultItem[]) {
-          const sn = item.deviceSN
-          const datas = item.datas ?? []
-          const genPower = datas.find((d) => d.variable === "generationPower")
-          const val = genPower?.value ?? genPower?.data ?? 0
-          const kw = genPower?.unit === "kW" ? Number(val) : Number(val) / 1000
-          map.set(sn, kw)
-        }
-      } else {
-        for (const [sn, arr] of Object.entries(result ?? {})) {
-          if (!Array.isArray(arr)) continue
-          const genPower = arr.find((d) => d.variable === "generationPower")
-          const val = genPower?.value ?? genPower?.data ?? 0
-          const kw = genPower?.unit === "kW" ? Number(val) : Number(val) / 1000
-          map.set(sn, kw)
-        }
+    for (let i = 0; i < deviceSns.length; i += REAL_QUERY_MAX_SNS) {
+      const chunk = deviceSns.slice(i, i + REAL_QUERY_MAX_SNS)
+      try {
+        const result = (await this.foxPost("/op/v1/device/real/query", {
+          sns: chunk,
+          variables: ["generationPower"],
+        })) as FoxRealQueryResult | FoxRealQueryResultItem[]
+        this.parseRealQueryResult(result, map)
+      } catch (e) {
+        logger.warn("[FoxESS] getDeviceIdToCurrentPowerKw real/query failed for chunk:", e)
       }
-    } catch (e) {
-      logger.warn("[FoxESS] getDeviceIdToCurrentPowerKw real/query failed:", e)
+      if (i + REAL_QUERY_MAX_SNS < deviceSns.length) {
+        await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
+      }
     }
-    logger.info(`[FoxESS] Successfully fetched deviceIdToCurrentPowerKw :  ${JSON.stringify(map, null, 2)} `)
     return map
   }
 
