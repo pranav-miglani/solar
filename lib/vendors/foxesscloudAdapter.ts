@@ -1006,13 +1006,26 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
           month,
           dimension: "month",
           variables: ["generation"],
-        })) as FoxReportResult
-        const data = result?.data ?? []
-        for (const item of data) {
-          const day = item.index
-          const kwh = item.value ?? 0
-          dayToValue[day] = (dayToValue[day] ?? 0) + kwh
-          sumAllDays += kwh
+        })) as FoxReportYearResultItem[] | FoxReportResult
+        // API returns result = array of { variable, unit?, values } (values = daily kWh for the month)
+        if (Array.isArray(result)) {
+          const item = (result as FoxReportYearResultItem[]).find(
+            (r) => r.variable === "generation"
+          )
+          const values = item?.values ?? []
+          for (let d = 1; d <= values.length; d++) {
+            const kwh = Number(values[d - 1]) || 0
+            dayToValue[d] = (dayToValue[d] ?? 0) + kwh
+            sumAllDays += kwh
+          }
+        } else {
+          const data = (result as FoxReportResult)?.data ?? []
+          for (const item of data) {
+            const day = item.index
+            const kwh = item.value ?? 0
+            dayToValue[day] = (dayToValue[day] ?? 0) + kwh
+            sumAllDays += kwh
+          }
         }
       } catch (e) {
         logger.warn(`[FoxESS] getMonthlyTelemetryRecords device ${sn}:`, e)
@@ -1021,20 +1034,18 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
         await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
       }
     }
-
     const records = Object.entries(dayToValue)
       .map(([day, kwh]) => ({
         day: parseInt(day, 10),
-        generationValue: kwh / 1000,
+        generationValue: kwh, // already in kWh from API
       }))
       .sort((a, b) => a.day - b.day)
-
     return {
       statistics: {
         systemId: plantIdStr,
         year,
         month,
-        generationValue: sumAllDays / 1000,
+        generationValue: sumAllDays, // already in kWh
       },
       records,
     }
@@ -1060,13 +1071,26 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
           year,
           dimension: "year",
           variables: ["generation"],
-        })) as FoxReportResult
-        const data = result?.data ?? []
-        for (const item of data) {
-          const month = item.index
-          const kwh = item.value ?? 0
-          monthToValue[month] = (monthToValue[month] ?? 0) + kwh
-          sumAllMonths += kwh
+        })) as FoxReportYearResultItem[] | FoxReportResult
+        // API returns result = array of { variable, unit?, values } (values = 12 monthly kWh)
+        if (Array.isArray(result)) {
+          const item = (result as FoxReportYearResultItem[]).find(
+            (r) => r.variable === "generation"
+          )
+          const values = item?.values ?? []
+          for (let m = 1; m <= 12; m++) {
+            const kwh = Number(values[m - 1]) || 0
+            monthToValue[m] = (monthToValue[m] ?? 0) + kwh
+            sumAllMonths += kwh
+          }
+        } else {
+          const data = (result as FoxReportResult)?.data ?? []
+          for (const item of data) {
+            const month = item.index
+            const kwh = item.value ?? 0
+            monthToValue[month] = (monthToValue[month] ?? 0) + kwh
+            sumAllMonths += kwh
+          }
         }
       } catch (e) {
         logger.warn(`[FoxESS] getYearlyTelemetryRecords device ${sn}:`, e)
@@ -1079,7 +1103,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     const records = Object.entries(monthToValue)
       .map(([month, kwh]) => ({
         month: parseInt(month, 10),
-        generationValue: kwh / 1000,
+        generationValue: kwh, // already in kWh from API
       }))
       .sort((a, b) => a.month - b.month)
 
@@ -1087,7 +1111,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       statistics: {
         systemId: plantIdStr,
         year,
-        generationValue: sumAllMonths / 1000,
+        generationValue: sumAllMonths, // already in kWh
       },
       records,
     }
