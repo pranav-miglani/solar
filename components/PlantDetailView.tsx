@@ -151,8 +151,8 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
       setTelemetryLoading(true)
       let response: Response
 
-      // For Solarman, SolarDM, ShineMonitor, and PVBlink vendors, use the new API with date parameters
-      if ((plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM" || plant?.vendors?.vendor_type === "SHINEMONITOR" || plant?.vendors?.vendor_type === "PVBLINK") && selectedDate) {
+      // For Solarman, SolarDM, ShineMonitor, PVBlink, and FoxESS Cloud vendors, use the new API with date parameters
+      if ((plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM" || plant?.vendors?.vendor_type === "SHINEMONITOR" || plant?.vendors?.vendor_type === "PVBLINK" || plant?.vendors?.vendor_type === "FOXESSCLOUD") && selectedDate) {
         const year = selectedDate.getFullYear()
         const month = selectedDate.getMonth() + 1
         
@@ -177,7 +177,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
           return
         }
       } else {
-        // Fallback: return empty data if not Solarman, SolarDM, or ShineMonitor
+        // Fallback: return empty data for unsupported vendor types
         setTelemetry([])
         setTelemetryStats(null)
         return
@@ -546,8 +546,8 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
               <div className="flex flex-col gap-4">
                 <CardTitle>Telemetry</CardTitle>
                 
-                {/* Period Tabs and Date Selector (for Solarman, SolarDM, ShineMonitor, and PVBlink) */}
-                {(plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM" || plant?.vendors?.vendor_type === "SHINEMONITOR" || plant?.vendors?.vendor_type === "PVBLINK") && (
+                {/* Period Tabs and Date Selector (for Solarman, SolarDM, ShineMonitor, PVBlink, FoxESS Cloud) */}
+                {(plant?.vendors?.vendor_type === "SOLARMAN" || plant?.vendors?.vendor_type === "SOLARDM" || plant?.vendors?.vendor_type === "SHINEMONITOR" || plant?.vendors?.vendor_type === "PVBLINK" || plant?.vendors?.vendor_type === "FOXESSCLOUD") && (
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <Tabs 
                       value={selectedPeriod} 
@@ -648,7 +648,7 @@ export function PlantDetailView({ plantId }: { plantId: string }) {
                   data={telemetry} 
                   title={selectedPeriod === "day" ? "Solar Power" : selectedPeriod === "month" ? "Monthly Production" : selectedPeriod === "year" ? "Yearly Production" : selectedPeriod === "total" ? "Total Production" : "Generation Power (24h)"}
                   statistics={telemetryStats || undefined}
-                  showAreaFill={plant?.vendors?.vendor_type === "SOLARMAN" || (plant?.vendors?.vendor_type === "SOLARDM" && selectedPeriod === "day") || (plant?.vendors?.vendor_type === "SHINEMONITOR" && selectedPeriod === "day") || (plant?.vendors?.vendor_type === "PVBLINK" && selectedPeriod === "day")}
+                  showAreaFill={plant?.vendors?.vendor_type === "SOLARMAN" || (plant?.vendors?.vendor_type === "SOLARDM" && selectedPeriod === "day") || (plant?.vendors?.vendor_type === "SHINEMONITOR" && selectedPeriod === "day") || (plant?.vendors?.vendor_type === "PVBLINK" && selectedPeriod === "day") || (plant?.vendors?.vendor_type === "FOXESSCLOUD" && selectedPeriod === "day")}
                   period={selectedPeriod}
                 />
               ) : (
