@@ -1140,7 +1140,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
   }
 
   async getRealtime(plantId: string): Promise<RealtimeData> {
-    const deviceSNs = (await this.getPlantDetail(plantIdStr).then((detail) => detail?.modules?.map((m) => m.deviceSN) ?? [])).filter((s): s is string => Boolean(s))
+    const deviceSNs = (await this.getPlantDetail(plantId).then((detail) => detail?.modules?.map((m) => m.deviceSN) ?? [])).filter((s): s is string => Boolean(s))
     let totalPowerW = 0
     if (deviceSNs.length > 0) {
       try {
