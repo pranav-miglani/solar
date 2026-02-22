@@ -1051,15 +1051,14 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     }
   }
 
-  async getYearlyTelemetryRecords(
-    plantId: string | number,
+  /**
+   * Fetch yearly report (12 monthly kWh) for one year for given device SNs. Does not call getPlantDetail.
+   * Used by getYearlyTelemetryRecords and getTotalTelemetryRecords (pass deviceSNs already obtained).
+   */
+  private async fetchYearlyGenerationForDevices(
+    deviceSNs: string[],
     year: number
-  ): Promise<{
-    statistics: { systemId: string | number; year: number; generationValue: number }
-    records: Array<{ month: number; generationValue: number }>
-  }> {
-    const plantIdStr = plantId.toString()
-    const deviceSNs = (await this.getPlantDetail(plantIdStr).then((detail) => detail?.modules?.map((m) => m.deviceSN) ?? [])).filter((s): s is string => Boolean(s))
+  ): Promise<{ monthToValue: Record<number, number>; sumAllMonths: number }> {
     const monthToValue: Record<number, number> = {}
     let sumAllMonths = 0
 
@@ -1072,7 +1071,6 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
           dimension: "year",
           variables: ["generation"],
         })) as FoxReportYearResultItem[] | FoxReportResult
-        // API returns result = array of { variable, unit?, values } (values = 12 monthly kWh)
         if (Array.isArray(result)) {
           const item = (result as FoxReportYearResultItem[]).find(
             (r) => r.variable === "generation"
@@ -1093,17 +1091,31 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
           }
         }
       } catch (e) {
-        logger.warn(`[FoxESS] getYearlyTelemetryRecords device ${sn}:`, e)
+        logger.warn(`[FoxESS] fetchYearlyGenerationForDevices device ${sn} year ${year}:`, e)
       }
       if (i < deviceSNs.length - 1) {
         await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
       }
     }
 
+    return { monthToValue, sumAllMonths }
+  }
+
+  async getYearlyTelemetryRecords(
+    plantId: string | number,
+    year: number
+  ): Promise<{
+    statistics: { systemId: string | number; year: number; generationValue: number }
+    records: Array<{ month: number; generationValue: number }>
+  }> {
+    const plantIdStr = plantId.toString()
+    const deviceSNs = (await this.getPlantDetail(plantIdStr).then((detail) => detail?.modules?.map((m) => m.deviceSN) ?? [])).filter((s): s is string => Boolean(s))
+    const { monthToValue, sumAllMonths } = await this.fetchYearlyGenerationForDevices(deviceSNs, year)
+
     const records = Object.entries(monthToValue)
       .map(([month, kwh]) => ({
         month: parseInt(month, 10),
-        generationValue: kwh, // already in kWh from API
+        generationValue: kwh,
       }))
       .sort((a, b) => a.month - b.month)
 
@@ -1111,7 +1123,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       statistics: {
         systemId: plantIdStr,
         year,
-        generationValue: sumAllMonths, // already in kWh
+        generationValue: sumAllMonths,
       },
       records,
     }
@@ -1127,27 +1139,19 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
   }> {
     const plantIdStr = plantId.toString()
     const deviceSNs = (await this.getPlantDetail(plantIdStr).then((detail) => detail?.modules?.map((m) => m.deviceSN) ?? [])).filter((s): s is string => Boolean(s))
-    let totalCumulateKwh = 0
     const yearlyRecords: Array<{ year: number; generationValue: number }> = []
 
-    for (const sn of deviceSNs) {
-      try {
-        const gen = (await this.foxGet(
-          `/op/v0/device/generation?sn=${encodeURIComponent(sn)}`
-        )) as FoxGenerationResult
-        totalCumulateKwh += gen.cumulative ?? 0
-      } catch {
-        // skip
-      }
-    }
+    // Reuse same generation API as listPlants/listPlant: GET /op/v0/device/generation (today, month, cumulative)
+    const generationByDeviceSN = await this.getDeviceIdToDailyMonthlyAndTotalEnergy(deviceSNs)
+    const totalCumulateKwh = [...generationByDeviceSN.values()].reduce(
+      (sum, g) => sum + (g.cumulative ?? 0),
+      0
+    )
 
     for (let y = startYear; y <= endYear; y++) {
       try {
-        const yr = await this.getYearlyTelemetryRecords(plantIdStr, y)
-        yearlyRecords.push({
-          year: y,
-          generationValue: yr.statistics.generationValue,
-        })
+        const { sumAllMonths } = await this.fetchYearlyGenerationForDevices(deviceSNs, y)
+        yearlyRecords.push({ year: y, generationValue: sumAllMonths })
       } catch {
         yearlyRecords.push({ year: y, generationValue: 0 })
       }
@@ -1156,7 +1160,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     return {
       statistics: {
         systemId: plantIdStr,
-        generationValue: totalCumulateKwh / 1000,
+        generationValue: totalCumulateKwh,
         operatingTotalDays: null,
       },
       records: yearlyRecords,
