@@ -359,7 +359,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       })) as FoxDeviceListResult
       const list = result?.data ?? []
       for (const d of list) {
-        if (d.plantID === plantId && d.deviceSN) {
+        if (d.stationID === plantId && d.deviceSN) {
           sns.push(d.deviceSN)
         }
       }
