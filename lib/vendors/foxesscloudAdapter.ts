@@ -290,7 +290,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
 
     const logBody: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(body)) {
-      logBody[k] = Array.isArray(v) && v.length > 5 ? `[${v.length} items]` : v
+      logBody[k] = v
     }
 
     logger.info(`[FoxESS] ${operation}: ${description}`)
