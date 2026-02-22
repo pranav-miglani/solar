@@ -993,7 +993,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     records: Array<{ day: number; generationValue: number }>
   }> {
     const plantIdStr = plantId.toString()
-    const deviceSNs = await this.getDeviceSNsForPlant(plantIdStr)
+    const deviceSNs = (await this.getPlantDetail(plantIdStr).then((detail) => detail?.modules?.map((m) => m.deviceSN) ?? [])).filter((s): s is string => Boolean(s))
     const dayToValue: Record<number, number> = {}
     let sumAllDays = 0
 
@@ -1048,7 +1048,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     records: Array<{ month: number; generationValue: number }>
   }> {
     const plantIdStr = plantId.toString()
-    const deviceSNs = await this.getDeviceSNsForPlant(plantIdStr)
+    const deviceSNs = (await this.getPlantDetail(plantIdStr).then((detail) => detail?.modules?.map((m) => m.deviceSN) ?? [])).filter((s): s is string => Boolean(s))
     const monthToValue: Record<number, number> = {}
     let sumAllMonths = 0
 
@@ -1102,7 +1102,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     records: Array<{ year: number; generationValue: number }>
   }> {
     const plantIdStr = plantId.toString()
-    const deviceSNs = await this.getDeviceSNsForPlant(plantIdStr)
+    const deviceSNs = (await this.getPlantDetail(plantIdStr).then((detail) => detail?.modules?.map((m) => m.deviceSN) ?? [])).filter((s): s is string => Boolean(s))
     let totalCumulateKwh = 0
     const yearlyRecords: Array<{ year: number; generationValue: number }> = []
 
@@ -1140,7 +1140,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
   }
 
   async getRealtime(plantId: string): Promise<RealtimeData> {
-    const deviceSNs = await this.getDeviceSNsForPlant(plantId)
+    const deviceSNs = (await this.getPlantDetail(plantIdStr).then((detail) => detail?.modules?.map((m) => m.deviceSN) ?? [])).filter((s): s is string => Boolean(s))
     let totalPowerW = 0
     if (deviceSNs.length > 0) {
       try {
