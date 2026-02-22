@@ -475,9 +475,15 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
         id: station.stationID,
         name: detail?.stationName ?? station.name ?? "",
         capacityKw: detail?.capacity ?? 0,
-        location: address
-          ? { address, lat: undefined, lng: undefined }
-          : undefined,
+        location:
+          address || device?.deviceSN
+            ? {
+                address,
+                lat: undefined,
+                lng: undefined,
+                deviceSN: device?.deviceSN,
+              }
+            : undefined,
         metadata: {
           currentPowerKw: null,
           dailyEnergyKwh: dailyKwh,
@@ -556,14 +562,21 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       detail?.country,
     ].filter(Boolean) as string[]
     const address = addressParts.length > 0 ? addressParts.join(", ") : undefined
+    const firstSN = deviceSNs[0]
 
     return {
       id: vendorPlantId,
       name: detail?.stationName ?? `Plant ${vendorPlantId}`,
       capacityKw: detail?.capacity ?? 0,
-      location: address
-        ? { address, lat: undefined, lng: undefined }
-        : undefined,
+      location:
+        address || firstSN
+          ? {
+              address,
+              lat: undefined,
+              lng: undefined,
+              deviceSN: firstSN,
+            }
+          : undefined,
       metadata: {
         currentPowerKw,
         dailyEnergyKwh: dailyKwh,

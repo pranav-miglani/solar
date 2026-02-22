@@ -21,6 +21,7 @@ export interface Plant {
     lat?: number
     lng?: number
     address?: string
+    deviceSN?: string
   }
   metadata?: Record<string, any>
 }

@@ -185,10 +185,13 @@ async function syncVendorPlants(
         }
       }
 
-      // Ensure location.address is included
+      // Build location JSONB (address, lat, lng, deviceSN)
       const location = plant.location || {}
       if (metadata.locationAddress && !location.address) {
         location.address = metadata.locationAddress
+      }
+      if (plant.location?.deviceSN != null) {
+        location.deviceSN = plant.location.deviceSN
       }
 
       return {
@@ -197,7 +200,7 @@ async function syncVendorPlants(
         vendor_plant_id: plant.id.toString(), // Vendor's plant ID (unique per vendor)
         name: plant.name || `Plant ${plant.id}`,
         capacity_kw: plant.capacityKw || 0, // installedCapacity from vendor
-        location: location, // Includes address, lat, lng
+        location: location, // Includes address, lat, lng, deviceSN
         // Production metrics
         current_power_kw: metadata.currentPowerKw || null, // generationPower from vendor (converted to kW)
         daily_energy_kwh: metadata.dailyEnergyKwh || null,
