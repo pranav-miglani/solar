@@ -64,6 +64,24 @@ interface FoxDeviceListResult {
   data: FoxDeviceItem[]
 }
 
+/** Device detail from GET /op/v1/device/detail?sn={sn} */
+interface FoxDeviceDetailResult {
+  deviceType?: string
+  deviceSN?: string
+  capacity?: number
+  stationName?: string
+  stationID?: string
+  status?: number
+  hasPV?: boolean
+  hasBattery?: boolean
+  productType?: string
+  moduleSN?: string
+  batteryList?: unknown[]
+  masterVersion?: string
+  slaveVersion?: string
+  [key: string]: unknown
+}
+
 interface FoxGenerationResult {
   today?: number
   month?: number
@@ -343,6 +361,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
         page++
       }
     }
+    logger.info(`[FoxESS] Successfully fetched deviceSNs for plant ${plantId}: ${sns}`)
     return sns
   }
 
@@ -385,6 +404,20 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       return result ?? null
     } catch (e) {
       logger.warn(`[FoxESS] getPlantDetail failed for ${stationID}:`, e)
+      return null
+    }
+  }
+
+  /**
+   * Fetch device info by SN. GET /op/v1/device/detail?sn={sn}
+   */
+  private async getDeviceDetail(sn: string): Promise<FoxDeviceDetailResult | null> {
+    try {
+      const path = `/op/v1/device/detail?sn=${encodeURIComponent(sn)}`
+      const result = (await this.foxGet(path)) as FoxDeviceDetailResult | undefined
+      return result ?? null
+    } catch (e) {
+      logger.warn(`[FoxESS] getDeviceDetail failed for ${sn}:`, e)
       return null
     }
   }
@@ -586,8 +619,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
         lastUpdateTime: null,
         vendorCreatedDate: parseFoxCreateDate(detail?.createDate) ?? null,
         startOperatingTime: parseFoxCreateDate(detail?.createDate) ?? null,
-        timezone: detail?.timezone ?? null,
-        modules: detail?.modules ?? undefined,
+        timezone: detail?.timezone ?? null
       },
     }
   }
