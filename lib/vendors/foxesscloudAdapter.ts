@@ -12,6 +12,10 @@ import { logger } from "@/lib/context/logger"
 
 const BATCH_SIZE = 10
 const BATCH_DELAY_MS = 1100
+/** FoxESS rate-limit errno: "Too many requests, please retry later" */
+const FOX_ERRNO_RATE_LIMIT = 40400
+const RATE_LIMIT_RETRY_DELAY_MS = 5000
+const RATE_LIMIT_MAX_RETRIES = 3
 
 // --- FoxESS API response types ---
 
@@ -404,14 +408,47 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     return map
   }
 
+  /** Retry an async fn on rate-limit (errno 40400) with backoff. */
+  private async retryOnRateLimit<T>(
+    fn: () => Promise<T>,
+    context: string
+  ): Promise<T> {
+    let lastErr: Error | null = null
+    for (let attempt = 0; attempt <= RATE_LIMIT_MAX_RETRIES; attempt++) {
+      try {
+        return await fn()
+      } catch (e) {
+        lastErr = e instanceof Error ? e : new Error(String(e))
+        const isRateLimit =
+          lastErr.message.includes(`errno=${FOX_ERRNO_RATE_LIMIT}`) ||
+          lastErr.message.includes("40400")
+        if (!isRateLimit || attempt === RATE_LIMIT_MAX_RETRIES) {
+          throw lastErr
+        }
+        const delayMs = RATE_LIMIT_RETRY_DELAY_MS * (attempt + 1)
+        logger.warn(
+          `[FoxESS] Rate limit (40400) on ${context}, retry ${attempt + 1}/${RATE_LIMIT_MAX_RETRIES} in ${delayMs}ms`
+        )
+        await new Promise((r) => setTimeout(r, delayMs))
+      }
+    }
+    throw lastErr ?? new Error("retry failed")
+  }
+
   /**
    * Fetch full plant details (capacity, address, createDate, modules). List API only returns stationID, name, ianaTimezone.
+   * Retries on rate-limit (errno 40400).
    */
   private async getPlantDetail(stationID: string): Promise<FoxPlantDetailResult | null> {
     try {
-      const path = `/op/v0/plant/detail?id=${encodeURIComponent(stationID)}`
-      const result = (await this.foxGet(path)) as FoxPlantDetailResult | undefined
-      return result ?? null
+      return await this.retryOnRateLimit(
+        async () => {
+          const path = `/op/v0/plant/detail?id=${encodeURIComponent(stationID)}`
+          const result = (await this.foxGet(path)) as FoxPlantDetailResult | undefined
+          return result ?? null
+        },
+        `getPlantDetail(${stationID})`
+      )
     } catch (e) {
       logger.warn(`[FoxESS] getPlantDetail failed for ${stationID}:`, e)
       return null
@@ -470,7 +507,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     stations: FoxPlantListItem[]
   ): Promise<Map<string, FoxPlantDetailResult | null>> {
     const detailByStationId = new Map<string, FoxPlantDetailResult | null>()
-    const detailBatchSize = 10
+    const detailBatchSize = 5
     for (let i = 0; i < stations.length; i += detailBatchSize) {
       const batch = stations.slice(i, i + detailBatchSize)
       const details = await Promise.all(
@@ -478,7 +515,7 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       )
       batch.forEach((s, j) => detailByStationId.set(s.stationID, details[j] ?? null))
       if (i + detailBatchSize < stations.length) {
-        await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
+        await new Promise((r) => setTimeout(r, 2000))
       }
     }
     return detailByStationId
