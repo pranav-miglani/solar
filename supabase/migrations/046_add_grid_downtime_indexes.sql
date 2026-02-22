@@ -39,3 +39,5 @@ reducing query count from 3514 (per-plant) to 1 (batch).';
 -- optimized with idx_pgdr_plant_date (plant_id, reading_date DESC) which
 -- was created in migration 045_add_analytics_grid_downtime.sql
 
+
+

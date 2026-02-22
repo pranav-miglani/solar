@@ -10,7 +10,6 @@ interface ImportRow {
   work_order_id?: number
   title: string
   description?: string
-  location?: string
   org_id: number
   org_name?: string
   // Option 1: Use vendor_id + vendor_plant_id
@@ -120,7 +119,6 @@ export async function POST(request: NextRequest) {
           work_order_id: rowData["Work Order ID"] ? parseInt(rowData["Work Order ID"]) : undefined,
           title: rowData["Title"]?.toString() || "",
           description: rowData["Description"]?.toString() || "",
-          location: rowData["Location"]?.toString() || "",
           org_id: rowData["Organization ID"] ? parseInt(rowData["Organization ID"]) : 0,
           org_name: rowData["Organization Name"]?.toString() || "",
           // Option 1 fields
@@ -640,7 +638,6 @@ export async function POST(request: NextRequest) {
           .insert({
             title: firstRow.title,
             description: firstRow.description || null,
-            location: firstRow.location || null,
             org_id: firstRow.org_id,
             priority: "MEDIUM",
             created_by: sessionData.accountId,

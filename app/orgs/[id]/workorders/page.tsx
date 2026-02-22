@@ -62,12 +62,6 @@ export default function OrgWorkOrdersPage() {
 
   const accountType = account.accountType
 
-  // GOVT users cannot access organization pages directly
-  if (accountType === "GOVT") {
-    router.push("/dashboard")
-    return null
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       <DashboardSidebar />

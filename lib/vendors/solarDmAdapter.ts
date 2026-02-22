@@ -7,6 +7,7 @@ import type {
   VendorConfig,
 } from "./types"
 import { pooledFetch } from "./httpClient"
+import { logger } from "@/lib/context/logger"
 
 interface SolarDmAuthResponse {
   code: number
@@ -161,7 +162,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
     // Check for cached token first
     const cachedToken = await this.getTokenFromDB()
     if (cachedToken) {
-      console.log("[SolarDM] returing cached token")
+      logger.info("[SolarDM] returing cached token")
       return cachedToken
     }
 
@@ -183,7 +184,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
       regionSign: "3",
     }
 
-    console.log("[SolarDM] Authenticating with:", url)
+    logger.info("[SolarDM] Authenticating with:", url)
 
     const response = await pooledFetch(url, {
       method: "POST",
@@ -217,7 +218,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
       data.data.refreshToken
     )
 
-    console.log("[SolarDM] Authentication successful")
+    logger.info("[SolarDM] Authentication successful")
     return data.data.token
   }
 
@@ -268,7 +269,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
 
     try {
       const plantInfoUrl = `${baseUrl}/dms/plant/${vendorPlantId}`
-      console.log(`[SolarDM] Fetching plant info for plant ${vendorPlantId} from: ${plantInfoUrl}`)
+      logger.info(`[SolarDM] Fetching plant info for plant ${vendorPlantId} from: ${plantInfoUrl}`)
 
       const plantInfoResponse = await this.loggedFetch(
         plantInfoUrl,
@@ -315,11 +316,11 @@ export class SolarDmAdapter extends BaseVendorAdapter {
                 lastUpdateTime = date.toISOString()
               }
             } catch (parseError) {
-              console.warn(`[SolarDM] Failed to parse lastUpdateTime: ${plantData.lastUpdateTime}`, parseError)
+              console.warn(`[SolarDM] Failed to parse ${vendorPlantId} lastUpdateTime: ${plantData.lastUpdateTime}`, parseError)
             }
           }
 
-          console.log(`[SolarDM] Plant info fetched:`, {
+          logger.info(`[SolarDM] Plant info ${vendorPlantId} fetched:`, {
             plantName,
             communicateStatus: plantData.communicateStatus,
             networkStatus,
@@ -345,7 +346,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
     // Fetch live telemetry data from metering endpoint
     try {
       const meteringUrl = `${baseUrl}/dms/data_panel/metering/sub_v2/${vendorPlantId}`
-      console.log(`[SolarDM] Fetching live telemetry for plant ${vendorPlantId} from: ${meteringUrl}`)
+      logger.info(`[SolarDM] Fetching live telemetry for ${plantName} plant with id ${vendorPlantId} from: ${meteringUrl}`)
 
       const response = await this.loggedFetch(
         meteringUrl,
@@ -354,7 +355,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
         },
         {
           operation: "GET_PLANT_LIVE_TELEMETRY",
-          description: `Fetch SolarDM live telemetry for plant ${vendorPlantId}`,
+          description: `Fetch SolarDM live telemetry for plant ${plantName} with id ${vendorPlantId}`,
         }
       )
 
@@ -370,11 +371,17 @@ export class SolarDmAdapter extends BaseVendorAdapter {
 
       const data = await response.json()
 
+      // Log full response for telemetry sync debugging
+      logger.info(`[SolarDM] Full metering API response for ${plantName} with id ${vendorPlantId}:`, JSON.stringify(data, null, 2))
+
       if (data.code !== 0 || !data.data?.energy) {
         throw new Error(`SolarDM API error: ${data.message || "Unknown error"}`)
       }
 
       const energy = data.data.energy
+      
+      // Log full energy object
+      logger.info(`[SolarDM] Full energy object for ${plantName} with id ${vendorPlantId}:`, JSON.stringify(energy, null, 2))
 
       // Parse values from strings like "12.8_kWh", "0_KW", "3_kWp"
       // currDay, currMonth, currYear, total are in kWh format: "12.8_kWh"
@@ -397,7 +404,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
         lastUpdateTime = new Date().toISOString()
       }
 
-      console.log(`[SolarDM] Successfully fetched live telemetry for plant ${vendorPlantId}:`, {
+      logger.info(`[SolarDM] Successfully fetched live telemetry for ${plantName} with id ${vendorPlantId}:`, {
         capacityKw,
         currentPowerKw,
         dailyEnergyKwh,
@@ -427,7 +434,7 @@ export class SolarDmAdapter extends BaseVendorAdapter {
         },
       }
     } catch (error: any) {
-      console.error(`[SolarDM] Error fetching live telemetry for plant ${vendorPlantId}:`, error.message)
+      console.error(`[SolarDM] Error fetching live telemetry for ${plantName} with id ${vendorPlantId}:`, error.message)
       // If we have plant name from plant info, return minimal plant object
       // Otherwise return null (plant doesn't exist or both endpoints failed)
       // Note: capacityKw is required by Plant interface but NOT used by live telemetry sync (only metadata is used)
@@ -457,7 +464,7 @@ async listPlants(): Promise<Plant[]> {
     const baseUrl = this.getApiBaseUrl()
     const url = `${baseUrl}/dms/plant/list_all`
 
-    console.log("[SolarDM] Fetching plants from:", url)
+    logger.info("[SolarDM] Fetching plants from:", url)
 
     const response = await pooledFetch(url, {
       method: "GET",
@@ -485,7 +492,7 @@ async listPlants(): Promise<Plant[]> {
 
     const total = data.data.total || 0
     const plants = data.data.list || []
-    console.log(`[SolarDM] Successfully fetched ${plants.length} plants (total: ${total})`)
+    logger.info(`[SolarDM] Successfully fetched ${plants.length} plants (total: ${total})`)
 
     // Map SolarDM plants to Plant format
     return plants.map((plant) => {
@@ -608,9 +615,9 @@ async listPlants(): Promise<Plant[]> {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     
     // SolarDM endpoint: /dms/data_panel/history/stats/daily/{plantId}?plantId={plantId}&type=date&time=YYYY-MM-DD
-    const url = `${baseUrl}/dms/data_panel/history/stats/daily/${plantIdStr}?plantId=${plantIdStr}&type=date&time=${dateStr}`
+    const url = `${baseUrl}/dms/data_panel/history/stats/daily_v2/${plantIdStr}?plantId=${plantIdStr}&type=date&time=${dateStr}`
 
-    console.log("[SolarDM] Fetching daily telemetry records:", {
+    logger.info("[SolarDM] Fetching daily telemetry records:", {
       plantId: plantIdStr,
       year,
       month,
@@ -644,7 +651,7 @@ async listPlants(): Promise<Plant[]> {
     }
 
     const dataList = data.data.dataList || []
-    console.log(`[SolarDM] Successfully fetched ${dataList.length} daily telemetry records`)
+    logger.info(`[SolarDM] Successfully fetched ${dataList.length} daily telemetry records`)
 
     // Transform SolarDM response to match Solarman format
     const records = dataList.map((item: any) => {
@@ -659,11 +666,11 @@ async listPlants(): Promise<Plant[]> {
         dateTime = Math.floor(Date.now() / 1000) // Fallback to current time
       }
 
-      // generationPower is already in W (watts) - keep as is for now, will be converted to kW in API route
+      // generationPower from API is in kW; passed through as-is (route uses it as kW for SOLARDM)
       // Note: SolarDM provides 20-minute intervals, not 15-minute like Solarman
       return {
         systemId: plantIdStr,
-        generationPower: item.generationPower || 0, // Power in W
+        generationPower: item.generationPower || 0, // kW
         dateTime, // Unix timestamp in seconds
         generationCapacity: null, // Not provided by SolarDM
         timeZoneOffset: null, // Not provided by SolarDM
@@ -677,7 +684,7 @@ async listPlants(): Promise<Plant[]> {
     let dailyGenerationKwh = 0
 
     records.forEach((record: any) => {
-      const powerKw = record.generationPower / 1000 // Convert W to kW
+      const powerKw = record.generationPower  // Already in kW
       const energyKwh = powerKw * intervalHours
       dailyGenerationKwh += energyKwh
     })
@@ -738,7 +745,7 @@ async listPlants(): Promise<Plant[]> {
     // SolarDM endpoint: /dms/data_panel/history/stats/month/{plantId}?plantId={plantId}&type=month&time=YYYY-MM
     const url = `${baseUrl}/dms/data_panel/history/stats/month/${plantIdStr}?plantId=${plantIdStr}&type=month&time=${monthStr}`
 
-    console.log("[SolarDM] Fetching monthly telemetry records:", {
+    logger.info("[SolarDM] Fetching monthly telemetry records:", {
       plantId: plantIdStr,
       year,
       month,
@@ -771,7 +778,7 @@ async listPlants(): Promise<Plant[]> {
     }
 
     const dataList = data.data.dataList || []
-    console.log(`[SolarDM] Successfully fetched ${dataList.length} monthly telemetry records`)
+    logger.info(`[SolarDM] Successfully fetched ${dataList.length} monthly telemetry records`)
 
     // Transform SolarDM response to match Solarman format
     const records = dataList.map((item: any) => {
@@ -856,7 +863,7 @@ async listPlants(): Promise<Plant[]> {
     // SolarDM endpoint: /dms/data_panel/history/stats/year/{plantId}?plantId={plantId}&type=year&time=YYYY
     const url = `${baseUrl}/dms/data_panel/history/stats/year/${plantIdStr}?plantId=${plantIdStr}&type=year&time=${yearStr}`
 
-    console.log("[SolarDM] Fetching yearly telemetry records:", {
+    logger.info("[SolarDM] Fetching yearly telemetry records:", {
       plantId: plantIdStr,
       year,
       yearStr,
@@ -888,7 +895,7 @@ async listPlants(): Promise<Plant[]> {
     }
 
     const dataList = data.data.dataList || []
-    console.log(`[SolarDM] Successfully fetched ${dataList.length} yearly telemetry records`)
+    logger.info(`[SolarDM] Successfully fetched ${dataList.length} yearly telemetry records`)
 
     // Transform SolarDM response to match Solarman format
     const records = dataList.map((item: any) => {
@@ -979,7 +986,7 @@ async listPlants(): Promise<Plant[]> {
     // SolarDM endpoint: /dms/data_panel/history/stats/total/{plantId}?plantId={plantId}&type=all&time=YYYY+~+YYYY
     const url = `${baseUrl}/dms/data_panel/history/stats/total/${plantIdStr}?plantId=${plantIdStr}&type=all&time=${timeStr}`
 
-    console.log("[SolarDM] Fetching total telemetry records:", {
+    logger.info("[SolarDM] Fetching total telemetry records:", {
       plantId: plantIdStr,
       startYear,
       endYear,
@@ -1012,7 +1019,7 @@ async listPlants(): Promise<Plant[]> {
     }
 
     const dataList = data.data.dataList || []
-    console.log(`[SolarDM] Successfully fetched ${dataList.length} total telemetry records`)
+    logger.info(`[SolarDM] Successfully fetched ${dataList.length} total telemetry records`)
 
     // Transform SolarDM response to match Solarman format
     const records = dataList.map((item: any) => {
@@ -1125,14 +1132,14 @@ async listPlants(): Promise<Plant[]> {
       }
     }
     
-    console.log(`[SolarDM] ${operation}: ${description}`)
-    console.log(`[SolarDM] Request URL: ${fullUrl}`)
-    console.log(`[SolarDM] Request method: ${options.method || "GET"}`)
-    console.log(`[SolarDM] Request headers:`, JSON.stringify(headers, null, 2))
-    console.log(`[SolarDM] Authorization Header: Bearer ${token}`)
+    logger.info(`[SolarDM] ${operation}: ${description}`)
+    logger.info(`[SolarDM] Request URL: ${fullUrl}`)
+    logger.info(`[SolarDM] Request method: ${options.method || "GET"}`)
+    logger.info(`[SolarDM] Request headers:`, JSON.stringify(headers, null, 2))
+    logger.info(`[SolarDM] Authorization Header: Bearer ${token}`)
     
     if (options.body) {
-      console.log(`[SolarDM] Request body:`, typeof options.body === 'string' ? options.body : JSON.stringify(options.body))
+      logger.info(`[SolarDM] Request body:`, typeof options.body === 'string' ? options.body : JSON.stringify(options.body))
     }
     
     const response = await pooledFetch(fullUrl, {
@@ -1140,16 +1147,28 @@ async listPlants(): Promise<Plant[]> {
       headers,
     })
     
-    console.log(`[SolarDM] Response status: ${response.status} ${response.statusText}`)
-    console.log(`[SolarDM] Response headers:`, JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
+    logger.info(`[SolarDM] Response status: ${response.status} ${response.statusText}`)
+    logger.info(`[SolarDM] Response headers:`, JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
     
     // Log response body for debugging (but don't consume it)
     const responseClone = response.clone()
     try {
       const responseText = await responseClone.text()
-      console.log(`[SolarDM] Response body (first 500 chars):`, responseText.substring(0, 500))
+      // For telemetry operations, log full response (no limit)
+      if (operation === "GET_PLANT_LIVE_TELEMETRY" || operation === "GET_PLANT_INFO") {
+        logger.info(`[SolarDM] Response body (full):`, responseText)
+        try {
+          const responseJson = JSON.parse(responseText)
+          logger.info(`[SolarDM] Response body (parsed JSON):`, JSON.stringify(responseJson, null, 2))
+        } catch (parseError) {
+          logger.info(`[SolarDM] Response body is not valid JSON, logged as text above`)
+        }
+      } else {
+        // For other operations, limit to 500 chars to avoid log spam
+        logger.info(`[SolarDM] Response body (first 500 chars):`, responseText.substring(0, 500))
+      }
     } catch (e) {
-      console.log(`[SolarDM] Could not read response body for logging`)
+      logger.info(`[SolarDM] Could not read response body for logging`)
     }
     
     return response
@@ -1217,7 +1236,7 @@ async listPlants(): Promise<Plant[]> {
     let totalPages = 1
     const allAlerts: any[] = []
     
-    console.log(`[SolarDM] Starting getAllAlerts - startDate: ${startDate?.toISOString()}, endDate: ${endDate?.toISOString()}`)
+    logger.info(`[SolarDM] Starting getAllAlerts - startDate: ${startDate?.toISOString()}, endDate: ${endDate?.toISOString()}`)
     
     while (current <= totalPages) {
       const params = new URLSearchParams({
@@ -1227,8 +1246,8 @@ async listPlants(): Promise<Plant[]> {
       })
       
       const fullUrl = `${url}?${params.toString()}`
-      console.log(`[SolarDM] Fetching page ${current}/${totalPages} from: ${fullUrl}`)
-      console.log(`[SolarDM] Query parameters:`, {
+      logger.info(`[SolarDM] Fetching page ${current}/${totalPages} from: ${fullUrl}`)
+      logger.info(`[SolarDM] Query parameters:`, {
         current: current.toString(),
         size: pageSize.toString(),
         faultInfo: "There is no mains voltage",
@@ -1259,7 +1278,7 @@ async listPlants(): Promise<Plant[]> {
       }
       
       const data = await response.json()
-      console.log(`[SolarDM] Page ${current} response:`, {
+      logger.info(`[SolarDM] Page ${current} response:`, {
         code: data.code,
         message: data.message,
         total: data.data?.total,
@@ -1280,18 +1299,18 @@ async listPlants(): Promise<Plant[]> {
         // Handle pagination: if pages is 0 but we have records, calculate pages
         if (apiPages === 0 && totalRecords > 0) {
           totalPages = Math.ceil(totalRecords / pageSize)
-          console.log(`[SolarDM] API returned pages=0 but total=${totalRecords}, calculating pages: ${totalPages}`)
+          logger.info(`[SolarDM] API returned pages=0 but total=${totalRecords}, calculating pages: ${totalPages}`)
         } else if (apiPages > 0) {
           totalPages = apiPages
         } else {
           totalPages = 1
         }
         
-        console.log(`[SolarDM] Total pages: ${totalPages}, total records: ${totalRecords}`)
+        logger.info(`[SolarDM] Total pages: ${totalPages}, total records: ${totalRecords}`)
         
         // Log first few records for debugging
         if (records.length > 0) {
-          console.log(`[SolarDM] Sample record from page 1:`, {
+          logger.info(`[SolarDM] Sample record from page 1:`, {
             id: records[0].id,
             plantId: records[0].plantId,
             happenTime: records[0].happenTime,
@@ -1305,11 +1324,11 @@ async listPlants(): Promise<Plant[]> {
       }
       
       if (records.length === 0) {
-        console.log(`[SolarDM] No records on page ${current}, stopping pagination`)
+        logger.info(`[SolarDM] No records on page ${current}, stopping pagination`)
         break
       }
       
-      console.log(`[SolarDM] Page ${current}: Received ${records.length} records`)
+      logger.info(`[SolarDM] Page ${current}: Received ${records.length} records`)
       
       // Don't filter by date here - let the sync service handle it
       // This allows us to see all alerts and log what's being filtered
@@ -1317,14 +1336,14 @@ async listPlants(): Promise<Plant[]> {
       
       // Check if we've reached the last page or if we've fetched all records
       if (current >= totalPages || allAlerts.length >= totalRecords) {
-        console.log(`[SolarDM] Reached last page (${totalPages}) or fetched all records (${allAlerts.length}/${totalRecords}), stopping pagination`)
+        logger.info(`[SolarDM] Reached last page (${totalPages}) or fetched all records (${allAlerts.length}/${totalRecords}), stopping pagination`)
         break
       }
       
       current++
     }
     
-    console.log(`[SolarDM] getAllAlerts complete: ${allAlerts.length} total alerts fetched across ${current - 1} pages`)
+    logger.info(`[SolarDM] getAllAlerts complete: ${allAlerts.length} total alerts fetched across ${current - 1} pages`)
     return allAlerts
   }
 

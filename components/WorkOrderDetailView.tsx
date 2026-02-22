@@ -21,10 +21,16 @@ import {
   ExternalLink,
   AlertCircle,
   Trash2,
+  Wifi,
+  WifiOff,
+  Sun,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ProductionOverview } from "@/components/ProductionOverview"
+import { WorkOrderModal } from "@/components/WorkOrderModal"
+import { InsolationChart } from "@/components/InsolationChart"
+import { subDays } from "date-fns"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,12 +74,31 @@ interface WorkOrder {
   title: string
   description: string | null
   created_at: string
+  wms_device?: {
+    id: number
+    device_name: string
+    vendor_device_id: string
+    site_name: string
+    site_address: string | null
+    vendor_name: string
+    vendor_type: string
+  } | null
   work_order_plants: Array<{
     id: number
     is_active: boolean
     added_at: string
     plants: Plant
   }>
+}
+
+interface InsolationReading {
+  reading_date: string
+  insolation_value: number
+  reading_count?: number
+  metadata?: {
+    min_irr?: number
+    max_irr?: number
+  }
 }
 
 interface WorkOrderDetailViewProps {
@@ -89,6 +114,10 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
   const [productionData, setProductionData] = useState<any>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [insolationReadings, setInsolationReadings] = useState<InsolationReading[]>([])
+  const [insolationLoading, setInsolationLoading] = useState(false)
+  const [insolationDateRange, setInsolationDateRange] = useState(30) // Default to last 30 days
 
   const isSuperAdmin = accountType === "SUPERADMIN" || accountType === "DEVELOPER"
   const isGovt = accountType === "GOVT"
@@ -98,6 +127,14 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
     fetchProductionData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workOrderId])
+
+  // Fetch insolation data when WMS device is assigned (only for SUPERADMIN/DEVELOPER)
+  useEffect(() => {
+    if (isSuperAdmin && workOrder?.wms_device?.id) {
+      fetchInsolationData(workOrder.wms_device.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workOrder?.wms_device?.id, isSuperAdmin, insolationDateRange])
 
   async function fetchWorkOrder() {
     try {
@@ -126,6 +163,30 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
       }
     } catch (err) {
       console.error("Failed to fetch production data:", err)
+    }
+  }
+
+  async function fetchInsolationData(deviceId: number) {
+    try {
+      setInsolationLoading(true)
+      const endDate = new Date().toISOString().split("T")[0]
+      const startDate = subDays(new Date(), insolationDateRange).toISOString().split("T")[0]
+      
+      const response = await fetch(
+        `/api/insolation-readings?deviceId=${deviceId}&startDate=${startDate}&endDate=${endDate}`
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        setInsolationReadings(data.readings || [])
+      } else {
+        setInsolationReadings([])
+      }
+    } catch (err) {
+      console.error("Failed to fetch insolation data:", err)
+      setInsolationReadings([])
+    } finally {
+      setInsolationLoading(false)
     }
   }
 
@@ -271,7 +332,7 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
       </div>
 
       {/* Organization & Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className={`grid grid-cols-1 gap-4 ${isSuperAdmin ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -327,6 +388,54 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
             </div>
           </CardContent>
         </Card>
+
+        {/* WMS Device Mapping Card (only for SUPERADMIN/DEVELOPER) */}
+        {isSuperAdmin && (
+          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border-orange-200 dark:border-orange-800">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                    WMS Device Mapping
+                  </p>
+                  {workOrder?.wms_device ? (
+                    <div className="mt-2">
+                      <p className="text-sm font-semibold text-orange-900 dark:text-orange-100 truncate">
+                        {workOrder.wms_device.site_name} &gt; {workOrder.wms_device.device_name || workOrder.wms_device.vendor_device_id} ({workOrder.wms_device.vendor_name})
+                      </p>
+                      {workOrder.wms_device.site_address && (
+                        <p className="text-xs text-muted-foreground mt-1 truncate">
+                          {workOrder.wms_device.site_address}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-2">
+                      <p className="text-sm font-semibold text-red-600 dark:text-red-400">
+                        No WMS mapping
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {workOrder?.wms_device ? (
+                  <Wifi className="h-8 w-8 text-orange-500" />
+                ) : (
+                  <WifiOff className="h-8 w-8 text-red-500" />
+                )}
+              </div>
+              {!workOrder?.wms_device && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 w-full"
+                  onClick={() => setEditModalOpen(true)}
+                >
+                  Assign WMS Device
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Production Overview */}
@@ -338,14 +447,77 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
         />
       )}
 
-      {/* Description */}
+      {/* Foot Notes */}
       {workOrder.description && (
         <Card>
           <CardHeader>
-            <CardTitle>Description</CardTitle>
+            <CardTitle>Foot Notes</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">{workOrder.description}</p>
+            <p className="text-muted-foreground whitespace-pre-wrap">{workOrder.description}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* WMS Device Insolation Graph (only for SUPERADMIN/DEVELOPER) */}
+      {isSuperAdmin && workOrder?.wms_device && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sun className="h-5 w-5 text-yellow-500" />
+                <CardTitle>WMS Device Insolation Data</CardTitle>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={insolationDateRange === 7 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setInsolationDateRange(7)}
+                >
+                  7 Days
+                </Button>
+                <Button
+                  variant={insolationDateRange === 30 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setInsolationDateRange(30)}
+                >
+                  30 Days
+                </Button>
+                <Button
+                  variant={insolationDateRange === 100 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setInsolationDateRange(100)}
+                >
+                  100 Days
+                </Button>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              {workOrder.wms_device.site_name} &gt; {workOrder.wms_device.device_name || workOrder.wms_device.vendor_device_id} ({workOrder.wms_device.vendor_name})
+            </p>
+          </CardHeader>
+          <CardContent>
+            {insolationLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-muted-foreground">Loading insolation data...</div>
+              </div>
+            ) : insolationReadings.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                No insolation data available for the selected period
+              </div>
+            ) : (
+              <InsolationChart
+                data={insolationReadings}
+                title="Insolation Readings"
+                statistics={{
+                  averageInsolation: insolationReadings.reduce((sum, r) => sum + r.insolation_value, 0) / insolationReadings.length,
+                  minInsolation: Math.min(...insolationReadings.map(r => r.insolation_value)),
+                  maxInsolation: Math.max(...insolationReadings.map(r => r.insolation_value)),
+                  totalDays: insolationReadings.length,
+                }}
+                period="range"
+              />
+            )}
           </CardContent>
         </Card>
       )}
@@ -493,6 +665,22 @@ export function WorkOrderDetailView({ workOrderId, accountType }: WorkOrderDetai
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Modal for WMS Device Assignment */}
+      {isSuperAdmin && (
+        <WorkOrderModal
+          open={editModalOpen}
+          onOpenChange={(open) => {
+            setEditModalOpen(open)
+            if (!open) {
+              // Refresh work order data when modal closes
+              fetchWorkOrder()
+            }
+          }}
+          workOrderId={workOrder?.id}
+          organizationName={organization?.name}
+        />
+      )}
     </div>
   )
 }

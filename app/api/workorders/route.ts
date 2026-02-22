@@ -39,10 +39,10 @@ export async function GET(request: NextRequest) {
         id,
         title,
         description,
-        location,
         created_at,
         updated_at,
         org_id,
+        wms_device_id,
         organizations:org_id(id, name),
         work_order_plants(
           *,
@@ -81,6 +81,31 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Fetch minimal WMS device info for work orders that have devices assigned
+    // Only include device name for list view (only SUPERADMIN/DEVELOPER can see)
+    if (accountType === "SUPERADMIN" || accountType === "DEVELOPER") {
+      const wmsDeviceIds = (workOrders || [])
+        .map((wo: any) => wo.wms_device_id)
+        .filter((id: any) => id !== null && id !== undefined)
+
+      if (wmsDeviceIds.length > 0) {
+        const { data: devices } = await supabase
+          .from("wms_devices")
+          .select("id, device_name")
+          .in("id", wmsDeviceIds)
+
+        const deviceMap = new Map((devices || []).map((d: any) => [d.id, d]))
+
+        // Add WMS device info to work orders
+        workOrders?.forEach((wo: any) => {
+          if (wo.wms_device_id && deviceMap.has(wo.wms_device_id)) {
+            const device = deviceMap.get(wo.wms_device_id)
+            wo.wms_device = { id: device.id, device_name: device.device_name }
+          }
+        })
+      }
+    }
+
     return NextResponse.json({ workOrders: workOrders || [] })
   } catch (error) {
     console.error("Work orders error:", error)
@@ -108,11 +133,11 @@ export async function POST(request: NextRequest) {
 
     const accountType = sessionData.accountType as string
 
-    // Only SUPERADMIN can create work orders
+    // Only SUPERADMIN/DEVELOPER can create work orders
     requirePermission(accountType as any, "work_orders", "create")
 
     const body = await request.json()
-    const { title, description, location, plantIds } = body
+    const { title, description, plantIds, wmsDeviceId } = body
 
     if (!title || !plantIds || plantIds.length === 0) {
       return NextResponse.json(
@@ -156,14 +181,56 @@ export async function POST(request: NextRequest) {
 
     const orgId = orgIds[0] // All plants belong to the same org
 
+    // Validate WMS device if provided (only SUPERADMIN/DEVELOPER can assign)
+    let validatedWmsDeviceId: number | null = null
+    if (wmsDeviceId !== undefined && wmsDeviceId !== null && wmsDeviceId !== "") {
+      if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER") {
+        return NextResponse.json(
+          { error: "Only SUPERADMIN/DEVELOPER can assign WMS devices" },
+          { status: 403 }
+        )
+      }
+
+      const { data: wmsDevice, error: wmsDeviceError } = await supabase
+        .from("wms_devices")
+        .select(`
+          id,
+          wms_sites!inner(
+            id,
+            org_id
+          )
+        `)
+        .eq("id", wmsDeviceId)
+        .single()
+
+      if (wmsDeviceError || !wmsDevice) {
+        return NextResponse.json(
+          { error: "WMS device not found" },
+          { status: 400 }
+        )
+      }
+
+      // Validate device belongs to same org as plants
+      // Handle wms_sites as either object or array (TypeScript inference issue)
+      const site = Array.isArray(wmsDevice.wms_sites) ? wmsDevice.wms_sites[0] : wmsDevice.wms_sites
+      if (!site || site.org_id !== orgId) {
+        return NextResponse.json(
+          { error: "WMS device must belong to the same organization as the plants" },
+          { status: 400 }
+        )
+      }
+
+      validatedWmsDeviceId = wmsDeviceId
+    }
+
     // Create work order (static, no status)
     const { data: workOrder, error: woError } = await supabase
       .from("work_orders")
       .insert({
         title,
         description,
-        location,
         org_id: orgId, // Set the organization ID for cascade delete
+        wms_device_id: validatedWmsDeviceId,
         priority: "MEDIUM", // Default value for existing schema, but not used in UI
         created_by: sessionData.accountId,
       })

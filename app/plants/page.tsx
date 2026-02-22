@@ -1,0 +1,540 @@
+"use client"
+
+import { useEffect, useState, useCallback, useRef } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { DashboardSidebar } from "@/components/DashboardSidebar"
+import { useUser } from "@/context/UserContext"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Search, Building2, FileText, BarChart3, ExternalLink } from "lucide-react"
+
+const RECENT_KEY = "plants-recent"
+const RECENT_MAX = 5
+const PAGE_SIZE = 20
+const MIN_SEARCH_LENGTH = 4
+const ORG_FILTER_ALL = "all"
+const MAX_API_PAGES = 100
+
+interface WorkOrderRef {
+  id: number
+  title: string
+}
+
+interface PlantRow {
+  id: number
+  name: string | null
+  org_id: number
+  vendor_id: number
+  organizations: { id: number; name: string } | null
+  vendors: { id: number; name: string; vendor_type: string } | null
+  workOrders: WorkOrderRef[]
+  in_work_order?: boolean
+}
+
+interface Org {
+  id: number
+  name: string
+}
+
+export default function PlantsPage() {
+  const router = useRouter()
+  const { account, loading: userLoading } = useUser()
+  const [searchQuery, setSearchQuery] = useState("")
+  const [page, setPage] = useState(1)
+  const [orgId, setOrgId] = useState<string>(ORG_FILTER_ALL)
+  const [onlyInWorkOrders, setOnlyInWorkOrders] = useState(false)
+  const [plants, setPlants] = useState<PlantRow[]>([])
+  const [total, setTotal] = useState(0)
+  const [filterByWorkOrder, setFilterByWorkOrder] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [orgs, setOrgs] = useState<Org[]>([])
+  const [recent, setRecent] = useState<Array<{ id: number; name: string }>>([])
+  const [accumulatedFiltered, setAccumulatedFiltered] = useState<PlantRow[]>([])
+  const [apiPageFetched, setApiPageFetched] = useState(0)
+  const [exhausted, setExhausted] = useState(false)
+  const [totalFromApi, setTotalFromApi] = useState(0)
+  const accumulatedRef = useRef<PlantRow[]>([])
+  const apiPageFetchedRef = useRef(0)
+  const exhaustedRef = useRef(false)
+  const totalFromApiRef = useRef(0)
+  const searchKeyRef = useRef("")
+
+  const accountType = account?.accountType
+  const isOrg = accountType === "ORG"
+  const isGovt = accountType === "GOVT"
+  const showOrgFilter = !isOrg && (accountType === "GOVT" || accountType === "SUPERADMIN" || accountType === "DEVELOPER")
+  const showOnlyInWorkOrdersFilter = !isGovt && (accountType === "SUPERADMIN" || accountType === "DEVELOPER" || accountType === "ORG")
+
+  const fetchOrgs = useCallback(async () => {
+    if (!showOrgFilter) return
+    try {
+      const res = await fetch("/api/orgs")
+      const data = await res.json()
+      if (data.orgs) setOrgs(data.orgs)
+    } catch {
+      setOrgs([])
+    }
+  }, [showOrgFilter])
+
+  useEffect(() => {
+    if (userLoading || !account) return
+    if (!account) {
+      router.push("/auth/login")
+      return
+    }
+    fetchOrgs()
+  }, [userLoading, account, router, fetchOrgs])
+
+  const loadRecent = useCallback(() => {
+    try {
+      const raw = typeof window !== "undefined" ? sessionStorage.getItem(RECENT_KEY) : null
+      if (!raw) {
+        setRecent([])
+        return
+      }
+      const parsed = JSON.parse(raw) as Array<{ id: number; name: string }>
+      setRecent(Array.isArray(parsed) ? parsed.slice(0, RECENT_MAX) : [])
+    } catch {
+      setRecent([])
+    }
+  }, [])
+
+  useEffect(() => {
+    loadRecent()
+  }, [loadRecent])
+
+  const addToRecent = useCallback((id: number, name: string) => {
+    const raw = typeof window !== "undefined" ? sessionStorage.getItem(RECENT_KEY) : null
+    let list: Array<{ id: number; name: string }> = raw ? JSON.parse(raw) : []
+    if (!Array.isArray(list)) list = []
+    list = [{ id, name: name || `Plant ${id}` }, ...list.filter((p) => p.id !== id)].slice(0, RECENT_MAX)
+    sessionStorage.setItem(RECENT_KEY, JSON.stringify(list))
+    loadRecent()
+  }, [loadRecent])
+
+  const fetchOnePage = useCallback(
+    async (apiPage: number) => {
+      const params = new URLSearchParams()
+      params.set("name", searchQuery.trim().slice(0, 50))
+      params.set("page", String(apiPage))
+      params.set("limit", String(PAGE_SIZE))
+      if (orgId && orgId !== ORG_FILTER_ALL) params.set("orgId", orgId)
+      if (onlyInWorkOrders) params.set("onlyInWorkOrders", "true")
+      const res = await fetch(`/api/plants/search?${params.toString()}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to fetch")
+      return data
+    },
+    [searchQuery, orgId, onlyInWorkOrders]
+  )
+
+  const search = useCallback(async () => {
+    const name = searchQuery.trim().slice(0, 50)
+    const searchKey = `${name}|${orgId}|${onlyInWorkOrders}`
+    if (!name || name.length < MIN_SEARCH_LENGTH) {
+      setPlants([])
+      setTotal(0)
+      setFilterByWorkOrder(false)
+      setAccumulatedFiltered([])
+      setApiPageFetched(0)
+      setExhausted(false)
+      setTotalFromApi(0)
+      accumulatedRef.current = []
+      apiPageFetchedRef.current = 0
+      exhaustedRef.current = false
+      totalFromApiRef.current = 0
+      searchKeyRef.current = ""
+      return
+    }
+    if (searchKey !== searchKeyRef.current) {
+      searchKeyRef.current = searchKey
+      accumulatedRef.current = []
+      apiPageFetchedRef.current = 0
+      exhaustedRef.current = false
+      totalFromApiRef.current = 0
+    }
+    setLoading(true)
+    try {
+      const needFetch = accumulatedRef.current.length === 0
+      if (!needFetch && (accumulatedRef.current.length >= page * PAGE_SIZE || exhaustedRef.current)) {
+        const slice = accumulatedRef.current.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+        console.log("[Plants UI] reuse accumulated:", {
+          logicalPage: page,
+          accumulatedLength: accumulatedRef.current.length,
+          exhausted: exhaustedRef.current,
+          sliceLength: slice.length,
+        })
+        setPlants(slice)
+        setTotal(exhaustedRef.current ? accumulatedRef.current.length : Math.max(accumulatedRef.current.length, totalFromApiRef.current))
+        setAccumulatedFiltered([...accumulatedRef.current])
+        setApiPageFetched(apiPageFetchedRef.current)
+        setExhausted(exhaustedRef.current)
+        setLoading(false)
+        return
+      }
+
+      const startPage = apiPageFetchedRef.current + 1
+      console.log("[Plants UI] fetch start:", { logicalPage: page, startPage, needFetch, accumulatedLength: accumulatedRef.current.length })
+      const data = await fetchOnePage(startPage)
+      const rawPlants = (data.plants ?? []) as PlantRow[]
+      const isFilterByWorkOrder = data.filterByWorkOrder === true
+      setFilterByWorkOrder(isFilterByWorkOrder)
+      const apiTotal = data.total ?? 0
+      setTotalFromApi(apiTotal)
+      totalFromApiRef.current = apiTotal
+
+      if (!isFilterByWorkOrder) {
+        console.log("[Plants UI] normal path (no filterByWorkOrder):", { rows: rawPlants.length, total: apiTotal })
+        setPlants(rawPlants)
+        setTotal(apiTotal)
+        setAccumulatedFiltered([])
+        setApiPageFetched(0)
+        setExhausted(false)
+        accumulatedRef.current = []
+        apiPageFetchedRef.current = 0
+        exhaustedRef.current = false
+        setLoading(false)
+        return
+      }
+
+      let accumulated = startPage === 1 ? rawPlants.filter((p) => p.in_work_order === true) : [...accumulatedRef.current, ...rawPlants.filter((p) => p.in_work_order === true)]
+      let lastPage = startPage
+      let nowExhausted = rawPlants.length < PAGE_SIZE
+      const noMoreApiPages = () => lastPage * PAGE_SIZE >= apiTotal || lastPage >= MAX_API_PAGES
+      console.log("[Plants UI] filterByWorkOrder first page:", {
+        logicalPage: page,
+        apiPage: startPage,
+        rawRows: rawPlants.length,
+        inWorkOrder: accumulated.length,
+        apiTotal,
+        nowExhausted,
+      })
+
+      while (accumulated.length < page * PAGE_SIZE && !nowExhausted && !noMoreApiPages()) {
+        lastPage += 1
+        const nextData = await fetchOnePage(lastPage)
+        const nextPlants = (nextData.plants ?? []) as PlantRow[]
+        const added = nextPlants.filter((p) => p.in_work_order === true).length
+        accumulated = [...accumulated, ...nextPlants.filter((p) => p.in_work_order === true)]
+        nowExhausted = nextPlants.length < PAGE_SIZE
+        console.log("[Plants UI] fetch more:", { apiPage: lastPage, nextRows: nextPlants.length, added, accumulatedLength: accumulated.length, nowExhausted })
+      }
+      if (!nowExhausted && noMoreApiPages()) nowExhausted = true
+
+      accumulatedRef.current = accumulated
+      apiPageFetchedRef.current = lastPage
+      exhaustedRef.current = nowExhausted
+      setAccumulatedFiltered(accumulated)
+      setApiPageFetched(lastPage)
+      setExhausted(nowExhausted)
+      const slice = accumulated.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+      console.log("[Plants UI] filterByWorkOrder done:", {
+        logicalPage: page,
+        apiPagesFetched: lastPage,
+        accumulatedLength: accumulated.length,
+        sliceLength: slice.length,
+        exhausted: nowExhausted,
+        totalSet: nowExhausted ? accumulated.length : Math.max(accumulated.length, apiTotal),
+      })
+      setPlants(slice)
+      setTotal(nowExhausted ? accumulated.length : Math.max(accumulated.length, apiTotal))
+    } catch (e) {
+      setPlants([])
+      setTotal(0)
+      setFilterByWorkOrder(false)
+      setAccumulatedFiltered([])
+      setApiPageFetched(0)
+      setExhausted(false)
+      setTotalFromApi(0)
+      accumulatedRef.current = []
+      apiPageFetchedRef.current = 0
+      exhaustedRef.current = false
+      totalFromApiRef.current = 0
+    } finally {
+      setLoading(false)
+    }
+  }, [searchQuery, page, orgId, onlyInWorkOrders, fetchOnePage])
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim()
+    if (!trimmed || trimmed.length < MIN_SEARCH_LENGTH) {
+      setPlants([])
+      setTotal(0)
+      return
+    }
+    search()
+  }, [searchQuery, page, orgId, onlyInWorkOrders, search])
+
+  useEffect(() => {
+    setPage(1)
+    accumulatedRef.current = []
+    apiPageFetchedRef.current = 0
+    exhaustedRef.current = false
+    totalFromApiRef.current = 0
+    searchKeyRef.current = ""
+  }, [searchQuery])
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setPage(1)
+  }
+
+  const handleAnalyticsClick = (plantId: number, plantName: string) => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("analytics-return-to", "/plants")
+    }
+    addToRecent(plantId, plantName)
+    router.push(`/analytics/plants/${plantId}`)
+  }
+
+  const handleViewPlantClick = (plantId: number, plantName: string) => {
+    addToRecent(plantId, plantName)
+    router.push(`/plants/${plantId}`)
+  }
+
+  if (userLoading || !account) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      </div>
+    )
+  }
+
+  const canAccess =
+    accountType === "SUPERADMIN" ||
+    accountType === "DEVELOPER" ||
+    accountType === "ORG" ||
+    accountType === "GOVT"
+  if (!canAccess) {
+    router.push("/dashboard")
+    return null
+  }
+  if (accountType === "GOVT") {
+    router.push("/dashboard")
+    return null
+  }
+
+  const displayPlants = filterByWorkOrder ? plants.filter((p) => p.in_work_order === true) : plants
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const displayName = (p: PlantRow) => p.name?.trim() || `Plant ${p.id}`
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <DashboardSidebar />
+      <div className="md:ml-64 p-4 md:p-8 pt-16 md:pt-8">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold">Plants</h1>
+          <p className="text-muted-foreground mt-1">
+            {isGovt ? "Search by plant name to view details and work orders" : "Search by plant name to view details, work orders, and analytics"}
+          </p>
+        </div>
+
+        {recent.length > 0 && (
+          <Card className="mb-6 p-4">
+            <p className="text-sm font-medium text-muted-foreground mb-2">Recently viewed</p>
+            <div className="flex flex-wrap gap-2">
+              {recent.map((p) => (
+                <Link key={p.id} href={`/plants/${p.id}`}>
+                  <Button variant="outline" size="sm">
+                    {p.name} ({p.id})
+                  </Button>
+                </Link>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        <Card className="p-4 mb-6">
+          <form onSubmit={handleSearchSubmit} className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1 flex gap-2">
+                <Search className="h-4 w-4 self-center text-muted-foreground" />
+                <Input
+                  placeholder="Type a plant name to search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  maxLength={50}
+                  className="max-w-md"
+                />
+                <Button type="submit" disabled={loading}>
+                  Search
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              {showOrgFilter && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Organization</span>
+                  <Select value={orgId} onValueChange={setOrgId}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="All organizations" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ORG_FILTER_ALL}>All organizations</SelectItem>
+                      {orgs.map((org) => (
+                        <SelectItem key={org.id} value={String(org.id)}>
+                          {org.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {showOnlyInWorkOrdersFilter && (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={onlyInWorkOrders}
+                    onCheckedChange={(c) => setOnlyInWorkOrders(!!c)}
+                  />
+                  <span className="text-sm">Only plants in work orders</span>
+                </label>
+              )}
+            </div>
+          </form>
+        </Card>
+
+        {!searchQuery.trim() ? (
+          <Card className="p-12 text-center">
+            <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Type a plant name to search</p>
+          </Card>
+        ) : searchQuery.trim().length < MIN_SEARCH_LENGTH ? (
+          <Card className="p-12 text-center">
+            <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Type at least 4 characters to search</p>
+          </Card>
+        ) : loading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+          </div>
+        ) : displayPlants.length === 0 ? (
+          <Card className="p-12 text-center">
+            <p className="text-muted-foreground">
+              {filterByWorkOrder ? "No plants in work orders match your search" : "No plants found"}
+            </p>
+          </Card>
+        ) : (
+          <>
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Plant</TableHead>
+                    {!isOrg && <TableHead>Organization</TableHead>}
+                    {!isGovt && <TableHead>Vendor</TableHead>}
+                    <TableHead>Work orders</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {displayPlants.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell>
+                        <span className="font-medium">
+                          {displayName(p)} ({p.id})
+                        </span>
+                      </TableCell>
+                      {!isOrg && (
+                        <TableCell>
+                          {p.organizations?.name ?? "—"}
+                        </TableCell>
+                      )}
+                      {!isGovt && (
+                        <TableCell>
+                          {p.vendors?.name ?? "—"}
+                          {p.vendors?.vendor_type && (
+                            <span className="text-muted-foreground text-sm ml-1">({p.vendors.vendor_type})</span>
+                          )}
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {p.workOrders.length === 0 ? (
+                            "—"
+                          ) : (
+                            p.workOrders.map((wo) => (
+                              <Link key={wo.id} href={`/workorders/${wo.id}`}>
+                                <Button variant="link" size="sm" className="h-auto p-0 text-primary">
+                                  {wo.title}
+                                </Button>
+                              </Link>
+                            ))
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2 flex-wrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewPlantClick(p.id, displayName(p))}
+                          >
+                            View plant
+                          </Button>
+                          {!isGovt && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleAnalyticsClick(p.id, displayName(p))}
+                            >
+                              <BarChart3 className="h-4 w-4 mr-1" />
+                              Analytics
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm text-muted-foreground">
+                  Page {page} of {totalPages} ({total} plants)
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}

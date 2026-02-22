@@ -187,11 +187,11 @@ COMMENT ON COLUMN plants.start_operating_time IS 'When plant started operating (
 -- Work Orders table (static, no status)
 -- Note: priority and created_by are nullable/deprecated but kept for backward compatibility
 -- org_id is required for cascade delete: when an organization is deleted, all its work orders are automatically deleted
+-- Location column was removed in migration 050_drop_location_from_work_orders.sql
 CREATE TABLE work_orders (
   id SERIAL PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT,
-  location TEXT, -- Physical location of the work order
   org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, -- Organization this work order belongs to (required for cascade delete)
   priority work_order_priority DEFAULT 'MEDIUM', -- DEPRECATED: No longer used in UI, kept for backward compatibility
   created_by UUID REFERENCES accounts(id) ON DELETE CASCADE, -- DEPRECATED: No longer used in UI, kept for backward compatibility

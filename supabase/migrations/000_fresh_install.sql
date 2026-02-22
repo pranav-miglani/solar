@@ -232,13 +232,16 @@ CREATE TABLE work_orders (
   id SERIAL PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT,
-  location TEXT, -- Physical location of the work order
   org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, -- Organization this work order belongs to (required for cascade delete)
+  wms_device_id INTEGER NULL REFERENCES wms_devices(id) ON DELETE SET NULL, -- Optional WMS device assigned to this work order. Only SUPERADMIN/DEVELOPER can assign. Device must belong to same organization as work order.
   priority work_order_priority DEFAULT 'MEDIUM', -- DEPRECATED: No longer used in UI, kept for backward compatibility
   created_by UUID REFERENCES accounts(id) ON DELETE CASCADE, -- DEPRECATED: No longer used in UI, kept for backward compatibility
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Index for WMS device lookup
+CREATE INDEX idx_work_orders_wms_device_id ON work_orders(wms_device_id);
 
 -- Work Order - Plant mapping
 CREATE TABLE work_order_plants (

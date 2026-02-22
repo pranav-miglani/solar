@@ -36,10 +36,10 @@ export async function GET(
         id,
         title,
         description,
-        location,
         created_at,
         updated_at,
         org_id,
+        wms_device_id,
         work_order_plants(
           *,
           plants(
@@ -76,7 +76,56 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({ workOrder })
+    // Fetch WMS device info if assigned (only for SUPERADMIN/DEVELOPER)
+    let wmsDevice = null
+    if (workOrder?.wms_device_id && (accountType === "SUPERADMIN" || accountType === "DEVELOPER")) {
+      const { data: device, error: deviceError } = await supabase
+        .from("wms_devices")
+        .select(`
+          id,
+          device_name,
+          vendor_device_id,
+          wms_sites!inner(
+            id,
+            site_name,
+            address,
+            wms_vendors!inner(
+              id,
+              name,
+              vendor_type
+            )
+          )
+        `)
+        .eq("id", workOrder.wms_device_id)
+        .single()
+
+      if (!deviceError && device) {
+        // Handle wms_sites as either object or array (TypeScript inference issue)
+        const site = Array.isArray(device.wms_sites) ? device.wms_sites[0] : device.wms_sites
+        if (site) {
+          const vendor = Array.isArray(site.wms_vendors) ? site.wms_vendors[0] : site.wms_vendors
+          if (vendor) {
+            wmsDevice = {
+              id: device.id,
+              device_name: device.device_name,
+              vendor_device_id: device.vendor_device_id,
+              site_name: site.site_name,
+              site_address: site.address,
+              vendor_name: vendor.name,
+              vendor_type: vendor.vendor_type,
+            }
+          }
+        }
+      }
+    }
+
+    // Add flattened WMS device info to work order response
+    const response = {
+      ...workOrder,
+      wms_device: wmsDevice,
+    }
+
+    return NextResponse.json({ workOrder: response })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
@@ -102,11 +151,11 @@ export async function PUT(
 
     const accountType = sessionData.accountType as string
 
-    // Only SUPERADMIN can update work orders
+    // Only SUPERADMIN/DEVELOPER can update work orders
     requirePermission(accountType as any, "work_orders", "update")
 
     const body = await request.json()
-    const { title, description, location, plantIds } = body
+    const { title, description, plantIds, wmsDeviceId } = body
 
     if (!title || !plantIds || plantIds.length === 0) {
       return NextResponse.json(
@@ -116,6 +165,22 @@ export async function PUT(
     }
 
     const supabase = getMainClient()
+
+    // Get current work order to get org_id
+    const { data: currentWorkOrder, error: currentError } = await supabase
+      .from("work_orders")
+      .select("org_id")
+      .eq("id", params.id)
+      .single()
+
+    if (currentError || !currentWorkOrder) {
+      return NextResponse.json(
+        { error: "Work order not found" },
+        { status: 404 }
+      )
+    }
+
+    const orgId = currentWorkOrder.org_id
 
     // Validate that all plants belong to the same organization
     const { data: plants, error: plantsError } = await supabase
@@ -138,26 +203,82 @@ export async function PUT(
       )
     }
 
-    // Check that all plants belong to the same org
-    const orgIds = [...new Set(plants.map((p) => p.org_id))]
-    if (orgIds.length > 1) {
+    // Check that all plants belong to the same org as work order
+    const plantOrgIds = [...new Set(plants.map((p) => p.org_id))]
+    if (plantOrgIds.length > 1) {
       return NextResponse.json(
         { error: "All plants must belong to the same organization" },
         { status: 400 }
       )
     }
 
-    const orgId = orgIds[0] // All plants belong to the same org
+    if (plantOrgIds[0] !== orgId) {
+      return NextResponse.json(
+        { error: "All plants must belong to the same organization as the work order" },
+        { status: 400 }
+      )
+    }
+
+    // Validate WMS device if provided (only SUPERADMIN/DEVELOPER can assign)
+    let validatedWmsDeviceId: number | null = null
+    if (wmsDeviceId !== undefined && wmsDeviceId !== null && wmsDeviceId !== "") {
+      if (accountType !== "SUPERADMIN" && accountType !== "DEVELOPER") {
+        return NextResponse.json(
+          { error: "Only SUPERADMIN/DEVELOPER can assign WMS devices" },
+          { status: 403 }
+        )
+      }
+
+      const { data: wmsDevice, error: wmsDeviceError } = await supabase
+        .from("wms_devices")
+        .select(`
+          id,
+          wms_sites!inner(
+            id,
+            org_id
+          )
+        `)
+        .eq("id", wmsDeviceId)
+        .single()
+
+      if (wmsDeviceError || !wmsDevice) {
+        return NextResponse.json(
+          { error: "WMS device not found" },
+          { status: 400 }
+        )
+      }
+
+      // Validate device belongs to same org as work order
+      // Handle wms_sites as either object or array (TypeScript inference issue)
+      const site = Array.isArray(wmsDevice.wms_sites) ? wmsDevice.wms_sites[0] : wmsDevice.wms_sites
+      if (!site || site.org_id !== orgId) {
+        return NextResponse.json(
+          { error: "WMS device must belong to the same organization as the work order" },
+          { status: 400 }
+        )
+      }
+
+      validatedWmsDeviceId = wmsDeviceId
+    } else if (wmsDeviceId === null || wmsDeviceId === "") {
+      // Explicitly clearing WMS device assignment
+      validatedWmsDeviceId = null
+    }
 
     // Update work order
+    const updateData: any = {
+      title,
+      description,
+      org_id: orgId, // Update the organization ID for cascade delete
+    }
+
+    // Only update wms_device_id if explicitly provided (allows clearing assignment)
+    if (wmsDeviceId !== undefined) {
+      updateData.wms_device_id = validatedWmsDeviceId
+    }
+
     const { data: workOrder, error: woError } = await supabase
       .from("work_orders")
-      .update({
-        title,
-        description,
-        location,
-        org_id: orgId, // Update the organization ID for cascade delete
-      })
+      .update(updateData)
       .eq("id", params.id)
       .select()
       .single()

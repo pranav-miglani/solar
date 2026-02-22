@@ -15,9 +15,9 @@ import {
   X,
   RefreshCw,
   BookOpen,
-  BookMarked,
   CloudSun,
   Database,
+  Search,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -74,22 +74,16 @@ export function DashboardSidebar() {
       roles: ["SUPERADMIN", "DEVELOPER"],
     },
     {
-      title: "System Flow",
-      href: "/superadmin/system-flow",
+      title: "Developer Docs",
+      href: "/superadmin/developer-docs",
       icon: BookOpen,
       roles: ["DEVELOPER"],
     },
     {
-      title: "Release Notes",
-      href: "/superadmin/release-notes",
-      icon: FileText,
-      roles: ["DEVELOPER"],
-    },
-    {
-      title: "Documentation & Runbooks",
-      href: "/superadmin/documentation-runbooks",
-      icon: BookMarked,
-      roles: ["DEVELOPER"],
+      title: "Plants",
+      href: "/plants",
+      icon: Search,
+      roles: ["SUPERADMIN", "DEVELOPER", "ORG"],
     },
     {
       title: "Work Orders",
