@@ -96,12 +96,15 @@ interface FoxGenerationResult {
   cumulative?: number
 }
 
+/** Data point: API can return [epochMs, value] or { time: string, value: number } */
 interface FoxHistoryDataPoint {
   variable: string
   unit?: string
-  data: Array<[number, number]> // [epochMs, value]
+  name?: string
+  data: Array<[number, number]> | Array<{ time: string; value: number }>
 }
 
+/** POST /op/v0/device/history/query - result can be single object or array of { deviceSN, datas } */
 interface FoxHistoryResult {
   deviceSN?: string
   datas?: FoxHistoryDataPoint[]
@@ -467,6 +470,33 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
       return result ?? null
     } catch (e) {
       logger.warn(`[FoxESS] getDeviceDetail failed for ${sn}:`, e)
+      return null
+    }
+  }
+
+  /**
+   * POST /op/v0/device/history/query - time-series power for one device.
+   * Body: { sn, variables: ["generationPower"], begin (ms), end (ms) }.
+   * Returns result (single object or first element if API returns array).
+   */
+  private async fetchDeviceHistory(
+    sn: string,
+    begin: number,
+    end: number
+  ): Promise<FoxHistoryResult | null> {
+    try {
+      const result = (await this.foxPost("/op/v0/device/history/query", {
+        sn,
+        variables: ["generationPower"],
+        begin,
+        end,
+      })) as FoxHistoryResult | FoxHistoryResult[]
+      if (Array.isArray(result) && result.length > 0) {
+        return result[0] as FoxHistoryResult
+      }
+      return (result as FoxHistoryResult) ?? null
+    } catch (e) {
+      logger.warn(`[FoxESS] fetchDeviceHistory failed for ${sn}:`, e)
       return null
     }
   }
@@ -876,8 +906,9 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     }>
   }> {
     const plantIdStr = plantId.toString()
-    const deviceSNs = await this.getDeviceSNsForPlant(plantIdStr)
-    if (deviceSNs.length === 0) {
+    const deviceSnList = (await this.getPlantDetail(plantIdStr).then((detail) => detail?.modules?.map((m) => m.deviceSN) ?? [])).filter((s): s is string => Boolean(s))
+
+    if (deviceSnList.length === 0) {
       return {
         statistics: {
           systemId: plantIdStr,
@@ -898,28 +929,34 @@ export class FoxesscloudAdapter extends BaseVendorAdapter {
     let totalDailyKwh = 0
     const intervalHours = 5 / 60
 
-    for (let i = 0; i < deviceSNs.length; i++) {
-      const sn = deviceSNs[i]
-      try {
-        const result = (await this.foxPost("/op/v0/device/history/query", {
-          sn,
-          variables: ["generationPower"],
-          begin: startOfDay,
-          end: endOfDay,
-        })) as FoxHistoryResult
-        const datas = result?.datas ?? []
-        for (const block of datas) {
-          const points = block.data ?? []
-          for (const [epochMs, powerW] of points) {
-            const sec = Math.floor(epochMs / 1000)
-            tsToPower[sec] = (tsToPower[sec] ?? 0) + powerW
-            totalDailyKwh += (powerW / 1000) * intervalHours
+    for (let i = 0; i < deviceSnList.length; i++) {
+      const sn = deviceSnList[i]
+      const result = await this.fetchDeviceHistory(sn, startOfDay, endOfDay)
+      if (!result) continue
+      const datas = result.datas ?? []
+      for (const block of datas) {
+        const points = block.data ?? []
+        const isTuple = points.length > 0 && Array.isArray(points[0])
+        for (const pt of points) {
+          let epochMs: number
+          let powerW: number
+          if (isTuple && Array.isArray(pt)) {
+            epochMs = pt[0]
+            powerW = Number(pt[1])
+          } else {
+            const obj = pt as { time?: string; value: number }
+            const timeStr = obj.time ?? ""
+            const d = new Date(timeStr.replace(" IST+0530", "").trim())
+            epochMs = d.getTime()
+            powerW = Number(obj.value)
+            if (block.unit === "kW") powerW *= 1000
           }
+          const sec = Math.floor(epochMs / 1000)
+          tsToPower[sec] = (tsToPower[sec] ?? 0) + powerW
+          totalDailyKwh += (powerW / 1000) * intervalHours
         }
-      } catch (e) {
-        logger.warn(`[FoxESS] getDailyTelemetryRecords device ${sn}:`, e)
       }
-      if (i < deviceSNs.length - 1) {
+      if (i < deviceSnList.length - 1) {
         await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
       }
     }
